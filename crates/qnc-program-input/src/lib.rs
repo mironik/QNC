@@ -76,6 +76,9 @@ pub struct SoundDraft {
     pub overlaps: Vec<(String, (u32, u32))>,
     /// The segment's picture J as drafted (lane 0); `None` keeps the stored one.
     pub picture_lead: Option<u32>,
+    /// Clips with the J and L of their A1 sound as drafted at a cut (user 2026-10-29), story
+    /// frames; the others keep theirs.
+    pub joins: Vec<(String, (u32, u32))>,
 }
 
 impl SoundDraft {
@@ -90,6 +93,11 @@ impl SoundDraft {
         } else {
             for cover in covers.iter_mut().filter(|cover| cover.cover_id == self.id) {
                 (cover.a2_source_channel, cover.a2_level_db, cover.a2_off) = (self.channel, self.level_db, self.off);
+            }
+        }
+        for (id, (lead, tail)) in &self.joins {
+            for segment in segments.iter_mut().filter(|segment| &segment.segment_id == id) {
+                (segment.a1_lead_frames, segment.a1_tail_frames) = (*lead, *tail);
             }
         }
         for (id, (lead, tail)) in &self.overlaps {

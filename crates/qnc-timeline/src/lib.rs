@@ -584,26 +584,42 @@ pub struct TimelineMarkerPin<'a> {
     /// `None` for a side with no cover. Away from `frame` they are drawn red on A2.
     pub sound_tail: Option<u64>,
     pub sound_lead: Option<u64>,
+    /// The cut between two clips on A1 (user 2026-10-29: "every cut is a marker"), not an M
+    /// marker: drawn only while taken or while its A1 sound is split; it bounds no slot.
+    pub join: bool,
+    /// The two sides of its A1 sound when it lies between two clips: where the sound of the
+    /// clip before ends (its L) and where the sound of the clip after starts (its J).
+    pub a1_tail: Option<u64>,
+    pub a1_lead: Option<u64>,
+    /// The lane of its sound while its sound is taken: 0 A1, 1 A2.
+    pub sound_lane: u8,
 }
 
 impl TimelineMarkerPin<'_> {
-    /// The sides of its A2 sound that exist.
-    fn sound_sides(&self) -> impl Iterator<Item = u64> + '_ {
-        self.sound_lead.into_iter().chain(self.sound_tail)
+    /// The sides of its sound on `lane` that exist.
+    fn sides(&self, lane: u8) -> impl Iterator<Item = u64> + '_ {
+        let (lead, tail) = if lane == 0 { (self.a1_lead, self.a1_tail) } else { (self.sound_lead, self.sound_tail) };
+        lead.into_iter().chain(tail)
+    }
+
+    /// Whether its sound on `lane` is away from its picture (a J or an L).
+    fn split(&self, lane: u8) -> bool {
+        self.sides(lane).any(|side| side != self.frame)
     }
 
     /// Whether its A2 sound is away from its picture (a J or an L).
     fn sound_split(&self) -> bool {
-        self.sound_sides().any(|side| side != self.frame)
+        self.split(1)
     }
 
     /// Where the moving part of it is while taken: the picture's cut, or the sound's sides that move.
     fn moving_frames(&self) -> Vec<u64> {
+        let (lead, tail) = if self.sound_lane == 0 { (self.a1_lead, self.a1_tail) } else { (self.sound_lead, self.sound_tail) };
         match self.part {
             TimelineMarkerPart::Whole | TimelineMarkerPart::Picture => vec![self.frame],
-            TimelineMarkerPart::Sound => self.sound_sides().collect(),
-            TimelineMarkerPart::SoundLead => self.sound_lead.into_iter().collect(),
-            TimelineMarkerPart::SoundTail => self.sound_tail.into_iter().collect(),
+            TimelineMarkerPart::Sound => self.sides(self.sound_lane).collect(),
+            TimelineMarkerPart::SoundLead => lead.into_iter().collect(),
+            TimelineMarkerPart::SoundTail => tail.into_iter().collect(),
         }
     }
 }
@@ -1283,7 +1299,7 @@ fn paint_trim_playheads(ui: &mut egui::Ui, outer: Rect, input: &TimelineInput<'_
         let (range_start, duration) = (input.state.range_start(), input.state.duration_frames());
         for marker in input.markers.iter().filter(|marker| marker.taken) {
             if marker.part.is_sound() {
-                paint_sound_sides(ui, track, range_start, duration, marker, &marker.moving_frames(), input);
+                paint_lane_sides(ui, track, range_start, duration, marker, marker.sound_lane, &marker.moving_frames(), input);
             } else {
                 paint_taken_marker(ui, track, x_for_frame(track, range_start, duration, marker.frame), marker.part, input);
             }
@@ -1453,9 +1469,13 @@ fn paint_audio_band(ui: &mut egui::Ui, band: Rect, lane: AudioLane, peaks: &[f32
     match band_response.interact_pointer_pos().filter(|_| band_response.clicked() && input.state.can_cue()) {
         Some(pos) => {
             let frame = frame_for_x(track_rect, input.state.range_start(), input.state.duration_frames(), pos.x);
-            let edge = matches!(lane, AudioLane::A2)
-                .then(|| cut_edge_hit(track_rect, input.state.range_start(), input.state.duration_frames(), egui::pos2(pos.x, track_rect.bottom()), input))
-                .flatten();
+            let side_lane = match lane {
+                AudioLane::A1 => Some(0),
+                AudioLane::A2 => Some(1),
+                _ => None,
+            };
+            let edge = side_lane
+                .and_then(|side_lane| cut_side_at(track_rect, input.state.range_start(), input.state.duration_frames(), pos.x, side_lane, input));
             if let Some(id) = edge {
                 TimelineIntent::TakeCutEdge { id: id.to_string(), frame }
             } else if holding(input) {
@@ -2245,6 +2265,11 @@ fn paint_markers(
         if marker.id.trim().is_empty() {
             continue;
         }
+        // A cut between two clips (user 2026-10-29) is drawn only while taken or while its
+        // A1 sound is away from its picture; it bounds no slot.
+        if marker.join && !marker.taken && !marker.split(0) {
+            continue;
+        }
         let x = x_for_frame(track, range_start, duration, marker.frame);
         let (width, color) = if hovered == Some(marker.id) { (2.0, input.theme.marker_hover) } else { (1.0, input.theme.focus) };
         // With audio bands a marker belongs to the covers: its line runs over the video and
@@ -2255,28 +2280,33 @@ fn paint_markers(
             if let Some(origin) = marker.origin.map(|frame| x_for_frame(track, range_start, duration, frame)) {
                 ui.painter().line_segment([egui::pos2(origin, top), egui::pos2(origin, track.bottom())], Stroke::new(1.5, input.theme.text));
             }
-            if marker.part.is_sound() {
-                // Its sound taken: the picture stays, both sides of the sound on A2 (the
-                // moving one thick, user 2026-10-29: J and L together).
+            if marker.part.is_sound() || marker.join {
+                // Its sound taken: the picture stays, both sides of the sound on its lane (the
+                // moving one thick, user 2026-10-29: J and L together, on A1 or A2).
                 let bottom = track.bottom() - video_middle_insets(input).1;
                 ui.painter().line_segment([egui::pos2(x, top), egui::pos2(x, bottom)], Stroke::new(1.5, input.theme.text));
-                paint_sound_sides(ui, track, range_start, duration, marker, &marker.moving_frames(), input);
+                let moving = if marker.part.is_sound() { marker.moving_frames() } else { Vec::new() };
+                paint_lane_sides(ui, track, range_start, duration, marker, marker.sound_lane, &moving, input);
             } else {
                 paint_taken_marker(ui, track, x, marker.part, input);
             }
             continue;
         }
-        // A cut whose A2 sound is away from its picture (a J or an L, or both): the line over
-        // the picture, the sound's sides red on A2 (user 2026-10-22, 2026-10-29).
+        // A cut whose sound is away from its picture (a J or an L, or both): the line over the
+        // picture, the sound's sides red on its lane (user 2026-10-22, 2026-10-29).
         let split = marker.sound_split();
+        let split_a1 = marker.split(0);
         let bottom = if split { track.bottom() - video_middle_insets(input).1 } else { track.bottom() };
         // A split cut is red in both parts (user 2026-10-22); a whole one keeps its colour.
-        let (width, color) = if split { (2.0, input.theme.marker_hover) } else { (width, color) };
+        let (width, color) = if split || split_a1 { (2.0, input.theme.marker_hover) } else { (width, color) };
         ui.painter().line_segment([egui::pos2(x, top), egui::pos2(x, bottom)], Stroke::new(width, color));
         if split {
             paint_sound_sides(ui, track, range_start, duration, marker, &[], input);
         }
-        if !input.layers.audio_bands {
+        if split_a1 {
+            paint_lane_sides(ui, track, range_start, duration, marker, 0, &[], input);
+        }
+        if !input.layers.audio_bands && !marker.join {
             ui.painter().text(
                 egui::pos2(x + 3.0, track.top() + 2.0),
                 Align2::LEFT_TOP,
@@ -2306,17 +2336,35 @@ fn paint_a1_splits(ui: &mut egui::Ui, track: Rect, range_start: u64, duration: u
 /// and the end of the sound before (its L), joined at the top of A2; the sides in `moving`
 /// are thick (they are taken), the others thin.
 fn paint_sound_sides(ui: &mut egui::Ui, track: Rect, range_start: u64, duration: u64, marker: &TimelineMarkerPin<'_>, moving: &[u64], input: &TimelineInput<'_>) {
-    let top = track.bottom() - video_middle_insets(input).1;
+    paint_lane_sides(ui, track, range_start, duration, marker, 1, moving, input);
+}
+
+/// The band of a lane on a Wrap row: A1 above the picture, A2 below it.
+fn lane_band(track: Rect, lane: u8, input: &TimelineInput<'_>) -> (f32, f32) {
+    if lane == 0 {
+        (track.top(), track.top() + slot_top(input))
+    } else {
+        (track.bottom() - video_middle_insets(input).1, track.bottom())
+    }
+}
+
+/// The sides of a cut's sound on `lane` (user 2026-10-29: A1 or A2): the start of the sound
+/// after (its J) and the end of the sound before (its L), joined at the picture's edge of the
+/// band; the sides in `moving` are thick (they are taken), the others thin.
+#[allow(clippy::too_many_arguments)]
+fn paint_lane_sides(ui: &mut egui::Ui, track: Rect, range_start: u64, duration: u64, marker: &TimelineMarkerPin<'_>, lane: u8, moving: &[u64], input: &TimelineInput<'_>) {
+    let (top, bottom) = lane_band(track, lane, input);
+    let edge = if lane == 0 { bottom } else { top };
     let x = |frame: u64| x_for_frame(track, range_start, duration, frame);
     let picture = x(marker.frame);
     let (mut left, mut right) = (picture, picture);
-    for side in marker.sound_sides() {
+    for side in marker.sides(lane) {
         let at = x(side);
         let width = if moving.contains(&side) { 3.0 } else { 2.0 };
-        ui.painter().line_segment([egui::pos2(at, top), egui::pos2(at, track.bottom())], Stroke::new(width, input.theme.marker_hover));
+        ui.painter().line_segment([egui::pos2(at, top), egui::pos2(at, bottom)], Stroke::new(width, input.theme.marker_hover));
         (left, right) = (left.min(at), right.max(at));
     }
-    ui.painter().line_segment([egui::pos2(left, top), egui::pos2(right, top)], Stroke::new(1.0, input.theme.marker_hover));
+    ui.painter().line_segment([egui::pos2(left, edge), egui::pos2(right, edge)], Stroke::new(1.0, input.theme.marker_hover));
 }
 
 /// A taken marker is red (user 2026-10-22): whole, or only its picture; thicker than a trim
@@ -2334,15 +2382,25 @@ fn paint_taken_marker(ui: &mut egui::Ui, track: Rect, x: f32, part: TimelineMark
 /// The taken marker whose sound is taken, when `pos` is over A2 within reach of one of its
 /// sound's sides (user 2026-10-29: a click takes that side, a drag moves it).
 fn cut_edge_hit<'a>(track: Rect, range_start: u64, duration: u64, pos: egui::Pos2, input: &TimelineInput<'a>) -> Option<&'a str> {
-    if !input.layers.markers || pos.y < track.bottom() - video_middle_insets(input).1 - 2.0 {
+    if !input.layers.markers {
         return None;
     }
-    input
-        .markers
-        .iter()
-        .find(|marker| marker.taken && marker.part.is_sound())
-        .filter(|marker| marker.sound_sides().any(|side| (pos.x - x_for_frame(track, range_start, duration, side)).abs() <= marker_reach::MARKER_REACH))
-        .map(|marker| marker.id)
+    let marker = input.markers.iter().find(|marker| marker.taken && marker.part.is_sound())?;
+    // Over the band of the lane whose sound is taken (A1 above the picture, A2 below it).
+    let (top, bottom) = lane_band(track, marker.sound_lane, input);
+    if pos.y < top - 2.0 || pos.y > bottom + 2.0 {
+        return None;
+    }
+    cut_side_at(track, range_start, duration, pos.x, marker.sound_lane, input)
+}
+
+/// The taken cut whose sound on `lane` is taken, when `x` is within reach of one of its sides.
+fn cut_side_at<'a>(track: Rect, range_start: u64, duration: u64, x: f32, lane: u8, input: &TimelineInput<'a>) -> Option<&'a str> {
+    let marker = input.markers.iter().find(|marker| marker.taken && marker.part.is_sound() && marker.sound_lane == lane)?;
+    marker
+        .sides(lane)
+        .any(|side| (x - x_for_frame(track, range_start, duration, side)).abs() <= marker_reach::MARKER_REACH)
+        .then_some(marker.id)
 }
 
 fn paint_range_outline(
@@ -2911,6 +2969,10 @@ mod tests {
             origin: None,
             sound_tail: None,
             sound_lead: None,
+            join: false,
+            a1_tail: None,
+            a1_lead: None,
+            sound_lane: 1,
         }];
 
         // A right click off the strip takes the nearest marker, however far (user 2026-10-20).

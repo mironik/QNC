@@ -44,6 +44,69 @@ pub struct MarkerPin {
     /// its J); `None` for a side with no cover.
     pub sound_tail: Option<u64>,
     pub sound_lead: Option<u64>,
+    /// The cut between two clips on A1 (user 2026-10-29: "every cut is a marker, the join of
+    /// two clips is a marker, the OUT of the one before and the IN of the one after"), not an M
+    /// marker: its id is `join:` and the clip after; it has no slot.
+    pub join: bool,
+    /// The A1 sound at this cut when it lies between two clips: where the sound of the clip
+    /// before ends (its L) and where the sound of the clip after starts (its J).
+    pub a1_tail: Option<u64>,
+    pub a1_lead: Option<u64>,
+    /// The lane whose sound moves while its sound is taken: 0 A1, 1 A2.
+    pub sound_lane: u8,
+}
+
+/// The id of the cut before the clip `segment_id` on A1.
+pub const JOIN_PREFIX: &str = "join:";
+
+/// The clip after the cut of a join pin's id; `None` for an M marker.
+pub fn join_segment(marker_id: &str) -> Option<&str> {
+    marker_id.strip_prefix(JOIN_PREFIX)
+}
+
+/// The cut between two clips of the user on A1 at `frame`: the clip before and the one after.
+pub fn join_at(view: &SegmentsView, frame: u64) -> Option<(&SegmentRow, &SegmentRow)> {
+    view.rows.windows(2).find_map(|pair| {
+        let (before, after) = (&pair[0], &pair[1]);
+        (!before.lead && !after.lead && before.end_frame == frame && after.start_frame == frame).then_some((before, after))
+    })
+}
+
+/// The cuts between two clips on A1 where no M marker stands (an M marker on such a cut is
+/// that cut, user 2026-10-29).
+pub fn join_pins(view: &SegmentsView, markers: &[MarkerPin]) -> Vec<MarkerPin> {
+    view.rows
+        .windows(2)
+        .filter(|pair| !pair[0].lead && !pair[1].lead)
+        .map(|pair| (pair[1].start_frame, &pair[1].segment_id))
+        .filter(|(frame, _)| !markers.iter().any(|pin| pin.frame == *frame))
+        .map(|(frame, segment_id)| MarkerPin {
+            marker_id: format!("{JOIN_PREFIX}{segment_id}"),
+            frame,
+            join: true,
+            ..MarkerPin::at(frame)
+        })
+        .collect()
+}
+
+impl MarkerPin {
+    fn at(frame: u64) -> Self {
+        Self {
+            marker_id: String::new(),
+            frame,
+            locked: false,
+            selected: false,
+            taken: false,
+            taken_part: TakenPart::Whole,
+            origin: None,
+            sound_tail: None,
+            sound_lead: None,
+            join: false,
+            a1_tail: None,
+            a1_lead: None,
+            sound_lane: 1,
+        }
+    }
 }
 
 /// The program between two neighbouring M markers, `[start, end)`.
@@ -67,14 +130,9 @@ pub fn resolve(
         .filter(|marker| marker.program_frame <= view.total_frames && !view.is_empty())
         .map(|marker| MarkerPin {
             marker_id: marker.marker_id.clone(),
-            frame: marker.program_frame,
             locked: !marker.system_role.is_empty(),
             selected: selected == Some(marker.marker_id.as_str()),
-            taken: false,
-            taken_part: TakenPart::Whole,
-            origin: None,
-            sound_tail: None,
-            sound_lead: None,
+            ..MarkerPin::at(marker.program_frame)
         })
         .collect::<Vec<_>>();
     pins.sort_by(|a, b| a.frame.cmp(&b.frame).then(a.marker_id.cmp(&b.marker_id)));

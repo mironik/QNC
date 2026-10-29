@@ -95,9 +95,11 @@ pub(crate) fn paint_program(
         })
         .chain(draft_span)
         .collect::<Vec<_>>();
+    // Every cut is a marker (user 2026-10-29): the cuts between two clips come with the M markers.
     let markers = segments
         .markers
         .iter()
+        .chain(&segments.joins)
         // v5 `local_marker_frame`: a marker on a segment border is drawn at the end
         // of the earlier row; only the first row shows frame 0.
         .filter(|pin| (start..=end).contains(&pin.frame) && (pin.frame != start || start == 0))
@@ -116,6 +118,10 @@ pub(crate) fn paint_program(
             origin: pin.origin.filter(|frame| (start..=end).contains(frame)).map(local),
             sound_tail: pin.sound_tail.filter(|frame| (start..=end).contains(frame)).map(local),
             sound_lead: pin.sound_lead.filter(|frame| (start..=end).contains(frame)).map(local),
+            join: pin.join,
+            a1_tail: pin.a1_tail.filter(|frame| (start..=end).contains(frame)).map(local),
+            a1_lead: pin.a1_lead.filter(|frame| (start..=end).contains(frame)).map(local),
+            sound_lane: pin.sound_lane,
         })
         .collect::<Vec<_>>();
     // v5 `local_peaks_for_row`: this row's part of the program wave.

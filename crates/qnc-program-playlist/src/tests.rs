@@ -79,6 +79,8 @@ fn segment(
         a1_off: false,
         covers: Vec::new(),
         v_lead_frames: 0,
+        a1_lead_frames: 0,
+        a1_tail_frames: 0,
     }
 }
 
@@ -667,4 +669,30 @@ fn a_cut_join_leaves_the_sound_as_it_is() {
     let before = playlist.clone();
     join_a1(&mut playlist.items, &[A1Join { end: 100, start: 100, frames: 0 }]).unwrap();
     assert_eq!(playlist, before);
+}
+
+/// User 2026-10-29: the A1 cut between two clips of the story has the J of the clip after
+/// (its sound starts before its picture) and the L of the clip before (its sound goes on after
+/// its picture); over that window the one before falls and the one after rises.
+#[test]
+fn the_a1_cut_crosses_the_j_after_and_the_l_before() {
+    let timebase = tb(50);
+    let parts = vec![
+        ProgramSegmentInput { a1_tail_frames: 3, ..segment("s0", "offovi", "a", (0, 100), (100, 200), timebase) },
+        ProgramSegmentInput { a1_lead_frames: 5, ..segment("s1", "tonovi", "b", (100, 200), (300, 400), timebase) },
+    ];
+    let playlist = build_flat_program_playlist(&input(200, parts), &mut resolver(&["a", "b"], timebase)).unwrap();
+    let at = |frame: i64| playlist.items.iter().find(|item| item.record_range.in_frame <= frame && frame < item.record_range.out_frame).unwrap();
+    let a1 = |frame: i64| {
+        at(frame).sources.iter().filter(|source| source.audio_routes.iter().any(|route| route.output_channel == PROGRAM_AUDIO_OUTPUT_A1)).cloned().collect::<Vec<_>>()
+    };
+    assert_eq!(a1(94).len(), 1, "before the J only the clip before is heard");
+    let early = a1(96);
+    assert_eq!(early.len(), 2, "the J: the clip after is heard 5 frames before its picture");
+    let lead = early.iter().find(|source| source.source_id.ends_with(":lead")).unwrap();
+    assert_eq!(lead.audio_routes[0].fade_in, Some((95, 103)));
+    let late = a1(101);
+    let tail = late.iter().find(|source| source.source_id.ends_with(":tail")).unwrap();
+    assert_eq!(tail.audio_routes[0].fade_out, Some((95, 103)), "the L: the clip before goes on 3 frames");
+    assert_eq!(a1(104).len(), 1, "after the L only the clip after");
 }

@@ -11,38 +11,47 @@ impl ProgramSegments {
         let mut view = program(&self.stored, self.selected.as_deref(), self.story_rate);
         (view.undo_depth, view.redo_depth) = self.history;
         view.markers = resolve(&view, &self.stored_markers, self.selected_marker.as_deref());
+        // The cuts between two clips on A1 where no M marker stands (user 2026-10-29).
+        view.joins = qnc_program_view::join_pins(&view, &view.markers);
         view.alert = self.alert.clone();
-        // A cut whose A2 sound is stored away from its picture (a J or an L) shows it always
-        // (user 2026-10-22: the moved red cut stays visible); both its sides (2026-10-29).
-        for pin in view.markers.iter_mut() {
-            (pin.sound_tail, pin.sound_lead) = self.cut_sound_frames(&pin.marker_id, pin.frame);
+        // The clips of the story as they are now (the A1 cuts are found among them).
+        self.view.rows = view.rows.clone();
+        // A cut whose sound is stored away from its picture (a J or an L) shows it always
+        // (user 2026-10-22: the moved red cut stays visible); both its sides, on A2 and on A1
+        // (2026-10-29).
+        for pin in view.markers.iter_mut().chain(view.joins.iter_mut()) {
+            (pin.sound_tail, pin.sound_lead) = self.cut_sound_frames(1, &pin.marker_id, pin.frame);
+            (pin.a1_tail, pin.a1_lead) = self.cut_sound_frames(0, &pin.marker_id, pin.frame);
         }
         if let Some((marker_id, draft)) = &self.marker_edit {
-            // The draft is drawn where the marker is going.
+            // The draft is drawn where the cut is going.
             for pin in view
                 .markers
                 .iter_mut()
+                .chain(view.joins.iter_mut())
                 .filter(|pin| &pin.marker_id == marker_id)
             {
                 pin.origin = Some(pin.frame);
                 // The picture alone moves: its sound stays where it is stored.
                 if self.cut_part != CutPart::Picture {
-                    (pin.sound_tail, pin.sound_lead) = self.cut_sound_frames(marker_id, *draft);
+                    (pin.sound_tail, pin.sound_lead) = self.cut_sound_frames(1, marker_id, *draft);
+                    (pin.a1_tail, pin.a1_lead) = self.cut_sound_frames(0, marker_id, *draft);
                 }
                 pin.frame = *draft;
                 pin.taken = true;
-                pin.taken_part = match self.cut_part {
-                    CutPart::Whole => qnc_program_view::TakenPart::Whole,
-                    CutPart::Picture => qnc_program_view::TakenPart::Picture,
-                    CutPart::Sound { edge: crate::SoundEdge::Both, .. } => qnc_program_view::TakenPart::Sound,
-                    CutPart::Sound { edge: crate::SoundEdge::Lead, .. } => qnc_program_view::TakenPart::SoundLead,
-                    CutPart::Sound { edge: crate::SoundEdge::Tail, .. } => qnc_program_view::TakenPart::SoundTail,
+                pin.sound_lane = self.taken_sound().map_or(1, |(lane, _)| lane);
+                pin.taken_part = match self.taken_sound() {
+                    None if self.cut_part == CutPart::Picture => qnc_program_view::TakenPart::Picture,
+                    None => qnc_program_view::TakenPart::Whole,
+                    Some((_, crate::SoundEdge::Both)) => qnc_program_view::TakenPart::Sound,
+                    Some((_, crate::SoundEdge::Lead)) => qnc_program_view::TakenPart::SoundLead,
+                    Some((_, crate::SoundEdge::Tail)) => qnc_program_view::TakenPart::SoundTail,
                 };
             }
         }
         if !known(
             &self.selected_marker,
-            view.markers.iter().map(|pin| pin.marker_id.as_str()),
+            view.markers.iter().chain(&view.joins).map(|pin| pin.marker_id.as_str()),
         ) {
             self.selected_marker = None;
         }

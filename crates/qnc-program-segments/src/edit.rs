@@ -171,7 +171,8 @@ impl ProgramSegments {
         let (from, to) = (earliest.saturating_sub(half), (latest + half).min(view.total_frames.max(latest + 1)));
         let (segments, covers) = view.wave_placements();
         let near = |placements: Vec<qnc_program_waveform::Placement>| placements.into_iter().filter(|at| at.program_start < to && from < at.program_end).collect();
-        Some(qnc_program_view::ZoomSound { from, to, cut, lanes: [near(segments), near(covers)], cut_sound, ..Default::default() })
+        let taken_cut = self.marker_edit.as_ref().map(|(id, _)| id.clone());
+        Some(qnc_program_view::ZoomSound { from, to, cut, lanes: [near(segments), near(covers)], cut_sound, taken_cut, ..Default::default() })
     }
 
     /// Whether a segment edge taken from the segment panel waits for Enter or Escape.

@@ -11,12 +11,14 @@ impl ProgramSegments {
     /// Ctrl+M: the marker to edit and its draft on its own frame.
     pub(crate) fn edit_marker(&mut self) {
         let playhead = self.playhead.unwrap_or(0);
+        // Every cut is a marker (user 2026-10-29): the cuts between two clips are taken too.
         let pin = match &self.selected_marker {
-            Some(id) => self.view.markers.iter().find(|pin| &pin.marker_id == id),
+            Some(id) => self.view.markers.iter().chain(&self.view.joins).find(|pin| &pin.marker_id == id),
             None => self
                 .view
                 .markers
                 .iter()
+                .chain(&self.view.joins)
                 .filter(|pin| !pin.locked)
                 .min_by_key(|pin| pin.frame.abs_diff(playhead)),
         };
@@ -34,7 +36,9 @@ impl ProgramSegments {
         let pins = self.stored_pins();
         let Some(pin) = pins
             .iter()
+            .chain(&self.view.joins)
             .find(|pin| pin.marker_id == marker_id && !pin.locked)
+            .cloned()
         else {
             return self.refresh_view(qnc_ui_text::text("story.msg.edge_markers_locked").into());
         };
@@ -75,6 +79,17 @@ impl ProgramSegments {
         let Some((marker_id, _)) = self.marker_edit.clone() else {
             return;
         };
+        // A cut between two clips (user 2026-10-29): its picture moves with the clips' Edit
+        // (Ctrl+Shift+I/O); here only its sound, in the zoom.
+        if qnc_program_view::join_segment(&marker_id).is_some() {
+            let stored = self.cut_frame(&marker_id).unwrap_or(frame);
+            let words = if frame == stored { "story.msg.join_taken" } else { "story.msg.join_moves_with_edit" };
+            self.refresh_view(qnc_ui_text::text(words).into());
+            if frame == stored {
+                self.cue_program(frame);
+            }
+            return;
+        }
         if let Err(error) = check_move(&self.stored_pins(), &marker_id, frame) {
             return self.refresh_view(error);
         }

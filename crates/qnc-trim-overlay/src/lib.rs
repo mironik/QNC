@@ -147,11 +147,17 @@ fn paint_sound(ui: &mut egui::Ui, area: Rect, sound: &ZoomSound, gap_at: Option<
                 ui.painter().line_segment([egui::pos2(x, middle - height), egui::pos2(x, middle + height.max(0.5))], Stroke::new(step.max(1.0), Color32::from_rgb(80, 190, 148)));
             }
         }
-        ui.painter().text(band.left_top() + Vec2::new(6.0, 4.0), Align2::LEFT_TOP, if lane == 0 { "A1" } else { "A2" }, FontId::proportional(12.0), visuals.text_color());
-        if lane == 1 {
-            if let Some(cut_sound) = &sound.cut_sound {
-                side = paint_cut_sound(ui, band, sound, cut_sound, &x_of);
+        // The lane's label is a button while a cut is taken (user 2026-10-29: the lanes of J/L
+        // chosen in the zoom too): a click takes the cut's sound on that lane, as Ctrl+1/Ctrl+2.
+        // The label is made after the band's sides so that its click is its own.
+        let taken_lane = sound.cut_sound.as_ref().filter(|cut| usize::from(cut.lane) == lane).is_some();
+        if let Some(cut_sound) = sound.cut_sound.as_ref().filter(|cut| usize::from(cut.lane) == lane) {
+            if let Some(event) = paint_cut_sound(ui, band, sound, cut_sound, &x_of, lane == 0) {
+                side = Some(event);
             }
+        }
+        if let Some(clicked) = paint_lane_label(ui, band, lane, sound.taken_cut.as_deref(), taken_lane, visuals) {
+            side = Some(clicked);
         }
     }
     // One thin line from between the pictures down through both waves when the cut is there.
@@ -163,11 +169,32 @@ fn paint_sound(ui: &mut egui::Ui, area: Rect, sound: &ZoomSound, gap_at: Option<
     (word, side)
 }
 
+/// The label of a lane (A1, A2); with a cut taken it is a button whose click takes the cut's
+/// sound on that lane (`select_audio_a1`/`select_audio_a2` named to the cut, as Ctrl+1/Ctrl+2
+/// on the Wrap row). The lane whose sound is taken has a red frame.
+fn paint_lane_label(ui: &mut egui::Ui, band: Rect, lane: usize, taken_cut: Option<&str>, taken_lane: bool, visuals: &egui::Visuals) -> Option<ActionEvent> {
+    let text = if lane == 0 { "A1" } else { "A2" };
+    let Some(cut) = taken_cut else {
+        ui.painter().text(band.left_top() + Vec2::new(6.0, 4.0), Align2::LEFT_TOP, text, FontId::proportional(12.0), visuals.text_color());
+        return None;
+    };
+    let rect = Rect::from_min_size(band.left_top() + Vec2::new(4.0, 3.0), Vec2::new(26.0, 18.0));
+    let response = ui.interact(rect, ui.id().with(("zoom_lane_label", lane)), Sense::click());
+    let frame = if taken_lane { SIDE_LINE } else if response.hovered() { visuals.strong_text_color() } else { visuals.text_color() };
+    ui.painter().rect_stroke(rect, 2.0, Stroke::new(if taken_lane { 2.0 } else { 1.0 }, frame), egui::StrokeKind::Inside);
+    ui.painter().text(rect.center(), Align2::CENTER_CENTER, text, FontId::proportional(12.0), visuals.text_color());
+    if response.hovered() {
+        ui.ctx().set_cursor_icon(egui::CursorIcon::PointingHand);
+    }
+    let action = if lane == 0 { "select_audio_a1" } else { "select_audio_a2" };
+    response.clicked().then(|| ActionEvent::key(action).with_target(cut.to_string()).at("segments"))
+}
+
 /// The taken cut's A2 sound on the zoom's A2 (user 2026-10-29: "that option in the zoom too"):
 /// where the sound after starts (J) and where the sound before ends (L), red, the moving ones
 /// thick, joined at the top of A2. A click near a side takes it, a drag moves it, the same
 /// system actions as on the Wrap row.
-fn paint_cut_sound(ui: &mut egui::Ui, band: Rect, sound: &ZoomSound, cut_sound: &ZoomCutSound, x_of: &dyn Fn(u64) -> f32) -> Option<ActionEvent> {
+fn paint_cut_sound(ui: &mut egui::Ui, band: Rect, sound: &ZoomSound, cut_sound: &ZoomCutSound, x_of: &dyn Fn(u64) -> f32, a1: bool) -> Option<ActionEvent> {
     let sides: Vec<u64> = cut_sound.lead.into_iter().chain(cut_sound.tail).filter(|frame| (sound.from..=sound.to).contains(frame)).collect();
     let cut_x = x_of(sound.cut);
     let (mut left, mut right) = (cut_x, cut_x);
@@ -177,8 +204,10 @@ fn paint_cut_sound(ui: &mut egui::Ui, band: Rect, sound: &ZoomSound, cut_sound: 
         ui.painter().line_segment([egui::pos2(x, band.top()), egui::pos2(x, band.bottom())], Stroke::new(width, SIDE_LINE));
         (left, right) = (left.min(x), right.max(x));
     }
-    ui.painter().line_segment([egui::pos2(left, band.top()), egui::pos2(right, band.top())], Stroke::new(1.0, SIDE_LINE));
-    let response = ui.interact(band, ui.id().with("cut_sound"), Sense::click_and_drag());
+    // Joined at the picture's edge of the lane: the bottom of A1, the top of A2.
+    let edge = if a1 { band.bottom() } else { band.top() };
+    ui.painter().line_segment([egui::pos2(left, edge), egui::pos2(right, edge)], Stroke::new(1.0, SIDE_LINE));
+    let response = ui.interact(band, ui.id().with(("cut_sound", a1)), Sense::click_and_drag());
     let span = (sound.to - sound.from).max(1) as f32;
     let frame_at = |x: f32| sound.from + (((x - band.left()) / band.width()).clamp(0.0, 1.0) * span).round() as u64;
     let near = |x: f32| sides.iter().any(|side| (x_of(*side) - x).abs() <= SIDE_REACH);
@@ -186,7 +215,7 @@ fn paint_cut_sound(ui: &mut egui::Ui, band: Rect, sound: &ZoomSound, cut_sound: 
     if response.hovered() && response.hover_pos().is_some_and(|pos| near(pos.x)) {
         ui.ctx().set_cursor_icon(egui::CursorIcon::ResizeHorizontal);
     }
-    let drag_key = ui.id().with("cut_sound_drag");
+    let drag_key = ui.id().with(("cut_sound_drag", a1));
     if response.drag_started() {
         let started = ui.ctx().input(|i| i.pointer.press_origin()).is_some_and(|pos| near(pos.x));
         ui.ctx().data_mut(|d| d.insert_temp(drag_key, started));

@@ -12,7 +12,7 @@ pub use edit_stills::{edit_stills, mark_clip_edges, program_picture, trim_stills
 
 pub use markers::{
     check_move, first_empty_slot, neighbour_marker, neighbour_segment, neighbour_slot,
-    program_frame, resolve, slot_at, slots, source_at, MarkerPin, Slot, TakenPart,
+    join_at, join_pins, join_segment, program_frame, resolve, slot_at, slots, source_at, MarkerPin, Slot, TakenPart, JOIN_PREFIX,
 };
 pub use qnc_program_commands::{SegmentCommand, SegmentKind};
 
@@ -107,6 +107,9 @@ pub struct ZoomSound {
     pub unheard: Vec<(u64, u64)>,
     /// The taken cut's A2 sound (user 2026-10-29: its J and L in the zoom too).
     pub cut_sound: Option<ZoomCutSound>,
+    /// The taken cut (an M marker or a cut between two clips): a click on the zoom's A1 or A2
+    /// takes its sound on that lane (user 2026-10-29: the lanes chosen in the zoom too).
+    pub taken_cut: Option<String>,
 }
 
 /// The sides of the taken cut's A2 sound in the zoom: where the sound after starts (its J) and
@@ -115,6 +118,8 @@ pub struct ZoomSound {
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct ZoomCutSound {
     pub marker_id: String,
+    /// The lane of the sound: 0 A1 (the cut between two clips), 1 A2 (the covers).
+    pub lane: u8,
     pub lead: Option<u64>,
     pub tail: Option<u64>,
     pub moving: Vec<u64>,
@@ -136,6 +141,9 @@ pub struct SegmentsView {
     /// The Segment tab list, deleted segments included.
     pub parts: Vec<SegmentPart>,
     pub markers: Vec<MarkerPin>,
+    /// The cuts between two clips on A1 where no M marker stands (user 2026-10-29: every cut
+    /// is a marker); they have no slot and only their A1 sound is edited.
+    pub joins: Vec<MarkerPin>,
     pub slots: Vec<Slot>,
     /// Covers by program frame.
     pub covers: Vec<CoverSpan>,

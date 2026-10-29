@@ -147,10 +147,8 @@ impl ProgramSegments {
         if let Some(slot) = &self.slot_move {
             return [slot.start, slot.end].iter().map(|frame| (*frame, slot.moved(*frame))).collect();
         }
-        let marker = self.marker_edit.as_ref().and_then(|(id, draft)| {
-            let stored = self.stored_markers.iter().find(|marker| &marker.marker_id == id)?;
-            Some((stored.program_frame, *draft))
-        });
+        // A cut between two clips (user 2026-10-29) is found among the clips.
+        let marker = self.marker_edit.as_ref().and_then(|(id, draft)| Some((self.cut_frame(id)?, *draft)));
         marker.into_iter().collect()
     }
 

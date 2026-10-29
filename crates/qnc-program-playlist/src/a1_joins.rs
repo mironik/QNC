@@ -68,22 +68,44 @@ pub fn join_a1(items: &mut Vec<FlatProgramItem>, joins: &[A1Join]) -> Result<(),
             continue;
         }
         let at = join.end;
-        let left_out = source_at(&before, &left, at);
-        let right_in = source_at(&after, &right, at);
         let room = half
             .min(before.record_range.frame_len())
             .min(after.record_range.frame_len())
-            .min((left.source_duration_frames - left_out).max(0))
-            .min(right_in.max(0));
-        if room <= 0 {
-            continue;
+            .min((left.source_duration_frames - source_at(&before, &left, at)).max(0))
+            .min(source_at(&after, &right, at).max(0));
+        if room > 0 {
+            cross_a1(items, at, room, room)?;
         }
-        let window = (at - room, at + room);
-        split_at(items, window.0)?;
-        split_at(items, window.1)?;
-        fade_a1(items, (window.0, at), |route| route.fade_out = Some(window));
-        fade_a1(items, (at, window.1), |route| route.fade_in = Some(window));
-        extend(items, &right, (window.0, at), right_in - room, "lead", |route| route.fade_in = Some(window));
+    }
+    Ok(())
+}
+
+/// The A1 sounds cross at the cut `at` (user 2026-10-29: the J and L of A1, "every cut is a
+/// marker"): the sound after starts `lead` frames before the cut, the sound before goes on
+/// `tail` after it; over that window the one before falls and the one after rises. Each side
+/// is as long as the source has frames and as the clip next to it allows; a cut with neither
+/// stays a cut.
+pub fn cross_a1(items: &mut Vec<FlatProgramItem>, at: i64, lead: i64, tail: i64) -> Result<(), String> {
+    let before = items.iter().find(|item| item.record_range.out_frame == at).cloned();
+    let after = items.iter().find(|item| item.record_range.in_frame == at).cloned();
+    let (Some(before), Some(after)) = (before, after) else { return Ok(()) };
+    let (Some(left), Some(right)) = (a1_sound(&before).cloned(), a1_sound(&after).cloned()) else { return Ok(()) };
+    let left_out = source_at(&before, &left, at);
+    let right_in = source_at(&after, &right, at);
+    let lead = lead.min(before.record_range.frame_len()).min(right_in.max(0)).max(0);
+    let tail = tail.min(after.record_range.frame_len()).min((left.source_duration_frames - left_out).max(0)).max(0);
+    if lead + tail <= 0 {
+        return Ok(());
+    }
+    let window = (at - lead, at + tail);
+    split_at(items, window.0)?;
+    split_at(items, window.1)?;
+    fade_a1(items, (window.0, at), |route| route.fade_out = Some(window));
+    fade_a1(items, (at, window.1), |route| route.fade_in = Some(window));
+    if lead > 0 {
+        extend(items, &right, (window.0, at), right_in - lead, "lead", |route| route.fade_in = Some(window));
+    }
+    if tail > 0 {
         extend(items, &left, (at, window.1), left_out, "tail", |route| route.fade_out = Some(window));
     }
     Ok(())

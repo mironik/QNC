@@ -130,6 +130,44 @@ impl Store {
         self.set_cut_sound_edges(marker_id, bound(tail), bound(lead))
     }
 
+    /// The A1 sound at the join before `segment_id` (user 2026-10-29): the L of the active
+    /// segment before it and the J of it. A lead has no join of its own; the segment must have
+    /// one before it.
+    pub(crate) fn set_join_sound(&mut self, segment_id: &str, tail: u32, lead: u32) -> Result<Data> {
+        if tail > MAX_OVERLAP_FRAMES || lead > MAX_OVERLAP_FRAMES {
+            return Err(qnc_ui_text::fill("story.overlap_too_long", &[("frames", &MAX_OVERLAP_FRAMES.to_string())]));
+        }
+        let segment_id = segment_id.trim();
+        leads::refuse_lead(&self.conn, segment_id)?;
+        let before: Option<String> = self
+            .conn
+            .query_row(
+                "SELECT part_id FROM story_parts
+                 WHERE active = 1 AND sort_index < (SELECT sort_index FROM story_parts WHERE part_id = ?1)
+                 ORDER BY sort_index DESC LIMIT 1",
+                [segment_id],
+                |row| row.get(0),
+            )
+            .optional()
+            .map_err(err)?;
+        let Some(before) = before else {
+            return Err(qnc_ui_text::text("story.join_none").into());
+        };
+        leads::refuse_lead(&self.conn, &before)?;
+        let now = story_now();
+        self.conn
+            .execute("UPDATE story_parts SET a1_tail_frames = ?1, updated_at = ?2 WHERE part_id = ?3", params![tail, now, before])
+            .map_err(err)?;
+        let changed = self
+            .conn
+            .execute("UPDATE story_parts SET a1_lead_frames = ?1, updated_at = ?2 WHERE part_id = ?3 AND active = 1", params![lead, now, segment_id])
+            .map_err(err)?;
+        if changed == 0 {
+            return Err(format!("part_id not found: {segment_id}"));
+        }
+        Ok(Data::Changed)
+    }
+
     /// The picture J of a Ton segment, at most `MAX_OVERLAP_FRAMES`; an Off segment has no picture.
     pub(crate) fn set_picture_lead(&mut self, segment_id: &str, frames: u32) -> Result<Data> {
         if frames > MAX_OVERLAP_FRAMES {

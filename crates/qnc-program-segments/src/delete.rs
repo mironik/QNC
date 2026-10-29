@@ -13,6 +13,10 @@ impl ProgramSegments {
         if self.sync_drafting() {
             return self.refresh_view(qnc_ui_text::text("story.msg.sync_draft_is_escape").into());
         }
+        // A cut between two clips is not deleted (it goes with its clips).
+        if self.marker_edit.as_ref().is_some_and(|(id, _)| qnc_program_view::join_segment(id).is_some()) {
+            return self.refresh_view(qnc_ui_text::text("story.msg.join_moves_with_edit").into());
+        }
         if let Some((marker_id, _)) = self.marker_edit.take() {
             self.selected_marker = None;
             return self.write(Operation::DeleteMarker { marker_id });

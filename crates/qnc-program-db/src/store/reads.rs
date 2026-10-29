@@ -40,7 +40,7 @@ impl Store {
             .prepare(
                 "SELECT segment_id, kind, sort_index, clip_id, in_frame, out_frame, fps_num,
                         fps_den, active, a1_source_channel, duration_frames, a1_level_db, a1_off,
-                        v_lead_frames, lead
+                        v_lead_frames, lead, a1_lead_frames, a1_tail_frames
                  FROM public_story_parts ORDER BY sort_index, segment_id",
             )
             .map_err(err)?;
@@ -68,6 +68,8 @@ impl Store {
                     duration_frames: if duration > 0 { duration } else { out_frame.saturating_sub(in_frame) },
                     v_lead_frames: row.get::<_, i64>(13)?.clamp(0, i64::from(MAX_OVERLAP_FRAMES)) as u32,
                     lead: row.get(14)?,
+                    a1_lead_frames: row.get::<_, i64>(15)?.clamp(0, i64::from(MAX_OVERLAP_FRAMES)) as u32,
+                    a1_tail_frames: row.get::<_, i64>(16)?.clamp(0, i64::from(MAX_OVERLAP_FRAMES)) as u32,
                 })
             })
             .map_err(err)?

@@ -35,6 +35,7 @@ impl ProgramSegments {
             .view
             .markers
             .iter()
+            .chain(&self.view.joins)
             .find(|pin| pin.marker_id == marker_id)
             .map(|pin| pin.frame)
         else {

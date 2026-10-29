@@ -6991,3 +6991,23 @@ uzima tu stranu, povlacenje je pomice (iste sistemske radnje kao na Wrap retku: 
 `timeline_drag_cut_edge`), kotacic kao strelice. `qnc-program-view` `ZoomSound.cut_sound` (`ZoomCutSound`),
 `qnc-program-segments` (`zoom_cut_sound`, prozor zooma), `qnc-trim-overlay` (`paint_cut_sound`), ugovor modula. Testovi,
 conformance, release build. Uzivo nije provjereno.
+Izvedeno 2026-10-29 (korisnik: "nastavi s J i L na A1... treba omoguciti da se i na zumu mogu selektirati audio kanali za
+J/L"; "svaki rez je marker, spoj dva klipa cini marker, OUT prethodnog i IN trenutnog"; "prostor izmedu dva markera zovemo
+slot"): rez dvaju klipova na A1 ima J i L kao rez M markera na A2. `qnc-program-db`: `story_parts.a1_lead_frames` (J zvuka
+klipa poslije reza) i `a1_tail_frames` (L zvuka klipa prije), stare price dobivaju 0; operacija `SetJoinSound`
+(segment poslije reza: njemu J, prethodnom L, jedan Undo korak; lead i rez bez prethodnog klipa se odbijaju,
+`story.join_none`). `qnc-program-playlist` `cross_a1`: na rezu se A1 dvaju klipova mijesa preko prozora J..L koliko izvori
+imaju slika (`join_a1` SubSegmenta koristi isto). `qnc-program-input` (`SoundDraft.joins`: nacrt se cuje prije Entera).
+`qnc-program-view`: rez dvaju klipova bez M markera na istom mjestu je pin `join:<segment poslije>` (`join_pins`,
+`SegmentsView.joins`), ne omeduje slot, ne pomice se cijeli ni po slici (slika ide Editom segmenta), brisanje se odbija.
+`qnc-program-segments` (`cut_part.rs`): rez se uzima Ctrl+M ili desnim klikom, u zoomu Ctrl+1 uzima njegov A1 zvuk
+(Ctrl+2 A2 zvuk M markera), Ctrl+I samo J, Ctrl+O samo L, strelice/kotacic/povlacenje pomicu, Enter zapisuje, Esc
+odustaje. `qnc-timeline`: rez dvaju klipova crta se samo dok je uzet ili dok mu je A1 zvuk odmaknut od slike; strane A1
+crveno na traci A1 (iznad slike), A2 na traci A2; klik i povlacenje strane rade na traci uzetog zvuka (`lane_band`,
+`cut_side_at`). Zoom reza (`qnc-trim-overlay`): oznake A1 i A2 su gumbi dok je rez uzet (`ZoomSound.taken_cut`), klik je
+`select_audio_a1`/`select_audio_a2` na taj rez (kao Ctrl+1/Ctrl+2), traka uzetog zvuka ima crveni okvir oznake, strane
+reza crtaju se i hvataju i na A1. Panel Segmenti predaje i reze dvaju klipova (`qnc-segment-panel`). Rjecnik:
+`story.msg.join_taken`, `story.msg.join_moves_with_edit`, `cut_sound_*` s `{lane}`. Testovi `qnc-program-db` (48),
+`qnc-program-playlist` (21), `qnc-program-segments` (62, novi `the_a1_sound_of_a_cut_between_two_clips_has_a_j_and_an_l`),
+conformance, release build. Uzivo nije provjereno. Nije izvedeno: J/L reza koji pada na granicu Wrap redova crta se samo na
+retku na kojem je strana (drugi redak ne pokazuje stranu iza granice).

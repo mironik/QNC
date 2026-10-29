@@ -446,6 +446,27 @@ fn the_picture_or_the_sound_of_a_marker_cut_moves_alone() {
     assert_eq!(overlaps(&mut store), vec![(0, 0, 3), (14, 0, 0)]);
 }
 
+/// User 2026-10-29 ("every cut is a marker"): the cut between two clips on A1 has the L of the
+/// clip before and the J of the clip after, written together in one Undo step; the first clip
+/// has no cut on A1 before it.
+#[test]
+fn the_a1_cut_between_two_clips_has_the_l_before_and_the_j_after_together() {
+    let dir = tempfile::tempdir().unwrap();
+    let path = dir.path().join("db");
+    let mut store = imported_store(&path);
+    three_segments(&mut store);
+    let users: Vec<String> = segments(&mut store).into_iter().filter(|row| row.lead.is_empty()).map(|row| row.segment_id).collect();
+    let sound = |store: &mut Story| {
+        segments(store).into_iter().filter(|row| row.lead.is_empty()).map(|row| (row.a1_lead_frames, row.a1_tail_frames)).collect::<Vec<_>>()
+    };
+    run(&mut store, Operation::SetJoinSound { segment_id: users[1].clone(), tail_frames: 3, lead_frames: 5 }).unwrap();
+    assert_eq!(sound(&mut store), vec![(0, 3), (5, 0), (0, 0)], "the L of the first, the J of the second");
+    run(&mut store, Operation::UndoStory).unwrap();
+    assert_eq!(sound(&mut store), vec![(0, 0), (0, 0), (0, 0)], "one Undo step");
+    // The first clip's cut on A1 is with nothing or with the lead-in, which is not edited.
+    assert!(run(&mut store, Operation::SetJoinSound { segment_id: users[0].clone(), tail_frames: 2, lead_frames: 2 }).is_err());
+}
+
 /// User 2026-10-29: the J of the cover after and the L of the cover before at one cut, both at
 /// once (an overlap), one Undo step; a picture moved keeps both where they are in the story.
 #[test]

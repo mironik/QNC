@@ -73,6 +73,8 @@ pub fn load_pieces(
             a1_off: sound.is_some_and(|sound| sound.2),
             covers: Vec::new(),
             v_lead_frames: 0,
+            a1_lead_frames: 0,
+            a1_tail_frames: 0,
         });
         start = record_range.out_frame;
     }
@@ -105,6 +107,8 @@ fn gap_segment(index: usize, clip_id: &str, (from, to): (i64, i64), timebase: Fr
         a1_off: true,
         covers: Vec::new(),
         v_lead_frames: 0,
+        a1_lead_frames: 0,
+        a1_tail_frames: 0,
     })
 }
 

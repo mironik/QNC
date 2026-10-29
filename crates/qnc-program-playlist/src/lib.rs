@@ -23,7 +23,7 @@ mod overlay;
 mod window;
 
 pub(crate) use build::*;
-pub use a1_joins::{join_a1, A1Join};
+pub use a1_joins::{cross_a1, join_a1, A1Join};
 pub use overlay::*;
 pub use window::*;
 
@@ -97,6 +97,10 @@ pub struct ProgramSegmentInput {
     pub covers: Vec<ProgramCoverInput>,
     /// The picture J (Ton only): its picture starts this many frames before its sound.
     pub v_lead_frames: i64,
+    /// The J and L of its A1 sound (user 2026-10-29): its sound starts `a1_lead_frames`
+    /// before its picture and goes on `a1_tail_frames` after it, crossing the sound next to it.
+    pub a1_lead_frames: i64,
+    pub a1_tail_frames: i64,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -136,6 +140,13 @@ pub fn build_flat_program_playlist(
         return Err("The program is empty.".into());
     }
     picture_lead::lead_pictures(&mut items, &input.segments, resolver)?;
+    // The A1 cut between two clips: the J of the one after and the L of the one before.
+    for pair in input.segments.windows(2) {
+        let (before, after) = (&pair[0], &pair[1]);
+        if before.a1_tail_frames > 0 || after.a1_lead_frames > 0 {
+            cross_a1(&mut items, after.record_range.in_frame, after.a1_lead_frames, before.a1_tail_frames)?;
+        }
+    }
     let asked: std::collections::HashMap<&str, crossfade::Overlap> = input
         .segments
         .iter()

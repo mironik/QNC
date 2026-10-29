@@ -85,7 +85,7 @@ mod tests {
     #[test]
     fn a_right_click_takes_the_nearest_marker_however_far_but_not_on_a_cover_strip() {
         let track = Rect::from_min_size(egui::pos2(0.0, 0.0), egui::vec2(1000.0, 20.0)); // 10 px a frame
-        let pin = |id, frame, locked| TimelineMarkerPin { id, frame, taken: false, locked, part: Default::default(), origin: None, sound_tail: None, sound_lead: None };
+        let pin = |id, frame, locked| TimelineMarkerPin { id, frame, taken: false, locked, part: Default::default(), origin: None, sound_tail: None, sound_lead: None, join: false, a1_tail: None, a1_lead: None, sound_lane: 1 };
         let markers = [pin("a", 10, false), pin("b", 90, false)];
         assert_eq!(marker_for_right_click(track, 0, 100, egui::pos2(101.0, 5.0), &markers, true), None, "on the strip: the slot");
         assert_eq!(marker_for_right_click(track, 0, 100, egui::pos2(400.0, 5.0), &markers, false), Some("a"), "300 px away, the nearer");
@@ -100,9 +100,9 @@ mod tests {
     #[test]
     fn only_the_taken_marker_has_a_zone_for_the_drag() {
         let track = Rect::from_min_size(egui::pos2(0.0, 0.0), egui::vec2(1000.0, 20.0));
-        let unchosen = [TimelineMarkerPin { id: "a", frame: 10, taken: false, locked: false, part: Default::default(), origin: None, sound_tail: None, sound_lead: None }];
+        let unchosen = [TimelineMarkerPin { id: "a", frame: 10, taken: false, locked: false, part: Default::default(), origin: None, sound_tail: None, sound_lead: None, join: false, a1_tail: None, a1_lead: None, sound_lane: 1 }];
         assert_eq!(marker_to_drag(track, 0, 100, egui::pos2(110.0, 5.0), &unchosen), None, "no zone before it is taken");
-        let chosen = [TimelineMarkerPin { id: "a", frame: 10, taken: true, locked: false, part: Default::default(), origin: None, sound_tail: None, sound_lead: None }];
+        let chosen = [TimelineMarkerPin { id: "a", frame: 10, taken: true, locked: false, part: Default::default(), origin: None, sound_tail: None, sound_lead: None, join: false, a1_tail: None, a1_lead: None, sound_lane: 1 }];
         assert_eq!(marker_to_drag(track, 0, 100, egui::pos2(130.0, 5.0), &chosen), Some("a"), "within the zone");
         assert_eq!(marker_to_drag(track, 0, 100, egui::pos2(160.0, 5.0), &chosen), None, "past it");
     }

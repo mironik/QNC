@@ -38,6 +38,13 @@ pub struct ProgramSegment {
     /// segment of the user; a lead is not edited.
     #[serde(default)]
     pub lead: String,
+    /// The J and L of its A1 sound (user 2026-10-29): its sound starts `a1_lead_frames` story
+    /// frames before its picture, over the end of the segment before, and goes on
+    /// `a1_tail_frames` after it, over the start of the segment after; the two sounds cross.
+    #[serde(default)]
+    pub a1_lead_frames: u32,
+    #[serde(default)]
+    pub a1_tail_frames: u32,
 }
 
 /// An M marker on the program axis (v5 `story_markers`). `system_role` is
@@ -198,6 +205,11 @@ pub enum Operation {
     /// overlap): `tail_frames` the L of the cover before, `lead_frames` the J of the cover
     /// after, story frames. A side with no cover takes none. One UNDO step.
     SetCutSoundEdges { marker_id: String, tail_frames: u32, lead_frames: u32 },
+    /// Both sides of the A1 sound at the join of two segments (user 2026-10-29: "every cut is a
+    /// marker", the join is the OUT of the one before and the IN of the one after):
+    /// `tail_frames` the L of the segment before, `lead_frames` the J of `segment_id`, the
+    /// segment after. One UNDO step.
+    SetJoinSound { segment_id: String, tail_frames: u32, lead_frames: u32 },
     /// Both markers of the slot move so it starts at `start_frame` (user 2026-10-10).
     MoveSlot { slot_id: String, start_frame: u64 },
     /// A slot longer or shorter by `frames` story frames at its start (`start`) or its
@@ -274,6 +286,7 @@ impl Operation {
                 | Self::MoveMarkerPicture { .. }
                 | Self::SetCutSound { .. }
                 | Self::SetCutSoundEdges { .. }
+                | Self::SetJoinSound { .. }
                 | Self::MoveSlot { .. }
                 | Self::TrimSlot { .. }
                 | Self::DeleteMarker { .. }

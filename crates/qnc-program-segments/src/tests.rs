@@ -16,6 +16,8 @@ fn stored(id: &str, kind: &str, range: (u64, u64)) -> ProgramSegment {
         a1_off: false,
         duration_frames: range.1 - range.0,
         v_lead_frames: 0,
+        a1_lead_frames: 0,
+        a1_tail_frames: 0,
         lead: String::new(),
     }
 }
@@ -904,6 +906,40 @@ fn the_j_and_the_l_of_a_cut_move_apart_and_are_written_together() {
     segments.apply_action("step_forward_frame");
     let draft = segments.cut_sound_draft().unwrap();
     assert!(draft.contains(&("c0".to_string(), (0, 4))) && draft.contains(&("c1".to_string(), (3, 0))), "{draft:?}");
+}
+
+/// User 2026-10-29: every cut is a marker, the join of two clips too (the OUT of the clip
+/// before and the IN of the clip after). With it taken in the zoom Ctrl+1 takes its A1 sound:
+/// the J of the clip after and the L of the clip before move as on A2 and are drafted to their
+/// clips; its picture does not move from here.
+#[test]
+fn the_a1_sound_of_a_cut_between_two_clips_has_a_j_and_an_l() {
+    let mut segments = component();
+    segments.stored = vec![stored("a", "tonovi", (100, 140)), stored("b", "tonovi", (100, 160))];
+    segments.stored_markers.clear();
+    segments.refresh_view(String::new());
+    let join = segments.view().joins.iter().find(|pin| pin.frame == 40).expect("the cut between the two clips").marker_id.clone();
+    assert!(segments.view().joins.iter().all(|pin| pin.join));
+    segments.apply(SegmentCommand::TakeMarker(join.clone()));
+    assert!(segments.editing_marker(), "the cut is taken");
+    segments.apply_action("step_forward_frame");
+    assert_eq!(segments.view().joins.iter().find(|pin| pin.marker_id == join).map(|pin| pin.frame), Some(40), "its picture does not move here");
+    segments.set_playhead(Some(45));
+    segments.apply_action("wrap_zoom");
+    assert!(segments.take_cut_part(None, false, 0), "the A1 sound taken in the zoom");
+    assert_eq!(segments.taken_sound().map(|(lane, _)| lane), Some(0));
+    segments.apply_action("step_back_frame");
+    segments.apply_action("step_back_frame");
+    let draft = segments.join_sound_draft().expect("the A1 draft");
+    assert!(draft.contains(&("b".to_string(), (2, 0))) && draft.contains(&("a".to_string(), (0, 0))), "{draft:?}");
+    assert!(segments.take_sound_edge(false), "the L alone");
+    segments.apply_action("step_forward_frame");
+    let draft = segments.join_sound_draft().unwrap();
+    assert!(draft.contains(&("a".to_string(), (0, 1))), "{draft:?}");
+    if let Some(sound) = &segments.view().zoom_sound {
+        assert_eq!(sound.cut_sound.as_ref().map(|cut| cut.lane), Some(0));
+        assert_eq!(sound.taken_cut.as_deref(), Some(join.as_str()));
+    }
 }
 
 /// Locked (user 2026-10-21): Ctrl+Shift+J takes the picture J of the Ton segment under the

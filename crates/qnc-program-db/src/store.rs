@@ -236,6 +236,9 @@ impl Store {
             } => self.move_marker(marker_id, *program_frame),
             Operation::MoveMarkerPicture { marker_id, program_frame } => self.move_marker_picture(marker_id, *program_frame),
             Operation::SetCutSound { marker_id, offset } => self.set_cut_sound(marker_id, *offset),
+            Operation::SetJoinSound { segment_id, tail_frames, lead_frames } => {
+                self.set_join_sound(segment_id, *tail_frames, *lead_frames)
+            }
             Operation::SetCutSoundEdges { marker_id, tail_frames, lead_frames } => {
                 self.set_cut_sound_edges(marker_id, *tail_frames, *lead_frames)
             }
