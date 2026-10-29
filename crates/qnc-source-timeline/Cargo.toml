@@ -13,7 +13,6 @@ qnc-action-event = { workspace = true }
 eframe = { workspace = true }
 qnc-dev-diagnostics = { workspace = true }
 qnc-lane-choice = { workspace = true }
-qnc-level-meter = { workspace = true }
 qnc-source-channels = { workspace = true }
 qnc-source-dock = { workspace = true }
 qnc-source-panel = { workspace = true }

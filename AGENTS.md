@@ -6929,3 +6929,7 @@ postavlja na traku iznad timelinea (zaglavlje source docka, iza IN/OUT/Duration,
 sa source timelineom (Ingest, MA, Story). Razine izlaza A1/A2 uzima iz previewa (`SourceTimelineView.levels`, u `sync`).
 Traka panela Segmenti vise nema metar (bio bi drugi odmah iznad), NORM ostaje; `levels` uklonjen iz `qnc-segment-panel`,
 `qnc-right-panel` i Story ploce. Forme nisu narasle. Testovi, conformance, release build.
+Vraceno 2026-10-29 (korisnik: "nevalja, analiziraj polozaj u zadnjoj pushanoj verziji"): u `origin/libav-decoder`
+(`2627516`, 28. 10.) metar (kocka `qnc-level-meter`) je na traci panela Segmenti, u sredini, lijevo od NORM, iznad reda
+programa na dnu panela. Metar na traci source timelinea (dface57) uklonjen; stanje je kao u pushanoj verziji, uz traku i
+kad prica nema segmenata (8fa1de4).
