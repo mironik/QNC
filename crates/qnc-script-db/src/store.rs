@@ -52,6 +52,7 @@ impl Store {
             Operation::SetFields { id, fields } => self.set_fields(*id, fields),
             Operation::AddPiece { id, piece } => self.add_piece(*id, piece),
             Operation::SetJoin { id, index, gap_before, cut } => self.set_join(*id, *index, *gap_before, *cut),
+            Operation::SetPiece { id, index, piece } => self.set_piece(*id, *index, piece),
         }
     }
 
@@ -279,6 +280,20 @@ impl Store {
             return Err(qnc_ui_text::text("db.script_no_join").into());
         };
         (piece.gap_before, piece.cut) = (gap_before, cut);
+        self.store_pieces(id, block)
+    }
+
+    /// Part `index` with its new range (an edge trimmed on the SubSegment timeline): the same
+    /// clip, a range of at least one frame; its pause and join stay.
+    fn set_piece(&mut self, id: i64, index: usize, piece: &Piece) -> Result<Data> {
+        let mut block = self.read()?.into_iter().find(|block| block.id == id).ok_or_else(|| qnc_ui_text::text("db.script_no_block").to_string())?;
+        let Some(stored) = block.pieces.get_mut(index) else {
+            return Err(qnc_ui_text::text("db.script_no_join").into());
+        };
+        if piece.clip_id != stored.clip_id || piece.to_frame <= piece.from_frame {
+            return Err(qnc_ui_text::fill("db.script_clip_range", &[("kind", &block.kind)]));
+        }
+        *stored = Piece { gap_before: stored.gap_before, cut: stored.cut, ..piece.clone() };
         self.store_pieces(id, block)
     }
 

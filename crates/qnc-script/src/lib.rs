@@ -69,6 +69,9 @@ pub const JOIN_GAP: &str = "subsegment_join_gap";
 pub const JOIN_CUT: &str = "subsegment_join_cut";
 /// The SubSegment closes; the source timeline is back.
 pub const SUBSEGMENT_CLOSE: &str = "subsegment_close";
+/// An edge of a part is taken for trimming (a right click on its timeline): `target` is
+/// `part:in` or `part:out`.
+pub const TAKE_EDGE: &str = "subsegment_take_edge";
 /// A block of a recorded kind is recorded from the microphone, or its recording stops (target:
 /// its id; without one the chosen block). The catalog names it `record_toggle` (v4).
 pub const RECORD: &str = "record_toggle";
@@ -117,11 +120,26 @@ pub struct Script {
     open_subsegment: Option<i64>,
     /// The parts the player should play and the frame it should show (once).
     pieces_request: Option<(Vec<qnc_source_preview::PieceInput>, u64)>,
+    /// The edge of a part being trimmed on the SubSegment timeline, not written yet.
+    trim: Option<Trim>,
+    /// The waves of the SubSegment's clips (read in the background).
+    waves: qnc_program_waveform::ProgramWaves,
+    /// The project the waves read from.
+    waves_project: Option<String>,
+}
+
+/// An edge of part `index` being trimmed: the OUT or the IN, and the part's range as drafted.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+struct Trim {
+    index: usize,
+    out: bool,
+    from: u64,
+    to: u64,
 }
 
 impl Default for Script {
     fn default() -> Self {
-        Self { view: ScriptView::default(), blocks: Vec::new(), project: None, reading: None, read_at: None, writing: None, source_request: None, names: HashMap::new(), words_per_second: Ok(0.0), take: None, taking: None, exporting: None, open_subsegment: None, pieces_request: None }
+        Self { view: ScriptView::default(), blocks: Vec::new(), project: None, reading: None, read_at: None, writing: None, source_request: None, names: HashMap::new(), words_per_second: Ok(0.0), take: None, taking: None, exporting: None, open_subsegment: None, pieces_request: None, trim: None, waves: qnc_program_waveform::ProgramWaves::new(), waves_project: None }
     }
 }
 
@@ -174,12 +192,106 @@ impl Script {
             (self.open_subsegment, self.view.subsegment) = (None, None);
             return;
         }
+        let block = self.drafted(block);
         let inputs = view::piece_inputs(&block);
         if playing.is_some_and(|playing| playing != inputs.as_slice()) && self.pieces_request.is_none() {
             self.pieces_request = Some((inputs, preview.program_frame().unwrap_or(0)));
         }
         let playhead = playing.and_then(|_| preview.program_frame());
-        self.view.subsegment = Some(view::subsegment_view(&block, playhead));
+        let mut shown = view::subsegment_view(&block, playhead);
+        if self.waves_project != self.project {
+            self.waves.set_reader(preview.artifact_reader());
+            self.waves_project = self.project.clone();
+        }
+        let placements = view::subsegment_placements(&shown, &view::block_pieces(&block));
+        let names = &self.names;
+        shown.a1 = self.waves.peaks(shown.total_frames, &placements, &[], |clip| names.get(clip).map(|(_, frames, _)| *frames)).a1;
+        shown.trim = self.trim.and_then(|trim| shown.parts.get(trim.index).map(|part| (trim.index, trim.out, if trim.out { part.end.saturating_sub(1) } else { part.start })));
+        self.view.subsegment = Some(shown);
+    }
+
+    /// The block with the part being trimmed as drafted (the player plays the draft, user
+    /// 2026-10-29: edited as a cover is, heard before Enter).
+    fn drafted(&self, mut block: Block) -> Block {
+        if let Some(trim) = self.trim {
+            if block.pieces.len() > trim.index {
+                (block.pieces[trim.index].from_frame, block.pieces[trim.index].to_frame) = (trim.from, trim.to);
+            }
+        }
+        block
+    }
+
+    /// The trim keys of the open SubSegment (user 2026-10-29: its parts are edited as covers
+    /// are): Ctrl+I / Ctrl+O take the IN or OUT of the part under the playhead (a right click
+    /// on a join takes the IN after it), arrows and the wheel move it a frame, Enter keeps it,
+    /// Esc gives it up. Every move plays the draft at the edge. `None` for any other key.
+    fn trim_key(&mut self, action_id: &str, target: Option<&str>, preview: &SourcePreview) -> Option<bool> {
+        let block = self.block(self.open_subsegment)?.clone();
+        let pieces = view::block_pieces(&block);
+        let take = |index: usize, out: bool| pieces.get(index).map(|piece| Trim { index, out, from: piece.from_frame, to: piece.to_frame });
+        let step = match action_id {
+            "select_mark_in" | "select_mark_out" => {
+                let at = self.view.subsegment.as_ref().and_then(|view| view.playhead).unwrap_or(0);
+                let index = self.view.subsegment.as_ref().and_then(|view| view.parts.iter().position(|part| at < part.end)).unwrap_or(0);
+                self.trim = take(index, action_id == "select_mark_out");
+                0
+            }
+            TAKE_EDGE => {
+                let mut parts = target.unwrap_or_default().split(':');
+                let index = parts.next().and_then(|index| index.parse::<usize>().ok())?;
+                self.trim = take(index, parts.next() == Some("out"));
+                0
+            }
+            "step_back_frame" | "step_forward_frame" if self.trim.is_some() => if action_id == "step_forward_frame" { 1 } else { -1 },
+            "wheel_source_back" | "wheel_source_forward" if self.trim.is_some() => if qnc_wheel_jog::source_step_forward(action_id)? { 1 } else { -1 },
+            "activate_focused_item" if self.trim.is_some() => {
+                let trim = self.trim.take()?;
+                let piece = self.trimmed_piece(&pieces[trim.index], trim);
+                let id = block.id;
+                return Some(self.write(preview, move |target| qnc_script_db::set_piece(target, id, trim.index, piece).map(|_| None)));
+            }
+            "clear_focus" if self.trim.is_some() => {
+                self.trim = None;
+                self.pieces_request = Some((view::piece_inputs(&block), self.edge_frame(&block).unwrap_or(0)));
+                return Some(true);
+            }
+            _ => return None,
+        };
+        let trim = self.trim.as_mut()?;
+        let length = self.names.get(&pieces[trim.index].clip_id).map_or(u64::MAX, |(_, frames, _)| *frames);
+        match trim.out {
+            true => trim.to = trim.to.saturating_add_signed(step).clamp(trim.from + 1, length),
+            false => trim.from = trim.from.saturating_add_signed(step).min(trim.to - 1),
+        }
+        let drafted = self.drafted(block);
+        self.pieces_request = Some((view::piece_inputs(&drafted), self.edge_frame(&drafted).unwrap_or(0)));
+        Some(true)
+    }
+
+    /// The frame of the trimmed edge on the SubSegment's axis (the last frame of an OUT).
+    fn edge_frame(&self, block: &Block) -> Option<u64> {
+        let trim = self.trim?;
+        let shown = view::subsegment_view(block, None);
+        let part = shown.parts.get(trim.index)?;
+        Some(if trim.out { part.end.saturating_sub(1) } else { part.start })
+    }
+
+    /// The part with its trimmed range: its timecodes and length moved with it.
+    fn trimmed_piece(&self, piece: &Piece, trim: Trim) -> Piece {
+        let fps = self.names.get(&piece.clip_id).filter(|(_, _, seconds)| *seconds > 0.0).map_or(0, |(_, frames, seconds)| (*frames as f64 / seconds).round() as u32);
+        let moved = |label: &str, from: u64, to: u64| match qnc_source_timecode::parse_timecode(label, fps).filter(|_| fps > 0) {
+            Some(frames) => qnc_source_timecode::format_frames((frames + to).saturating_sub(from), fps),
+            None => label.to_string(),
+        };
+        Piece {
+            from_frame: trim.from,
+            to_frame: trim.to,
+            start_tc: moved(&piece.start_tc, piece.from_frame, trim.from),
+            end_tc: moved(&piece.end_tc, piece.to_frame, trim.to),
+            length: if fps > 0 { qnc_source_timecode::format_frames(trim.to - trim.from, fps) } else { (trim.to - trim.from).to_string() },
+            seconds: self.seconds_of(&piece.clip_id, trim.to - trim.from),
+            ..piece.clone()
+        }
     }
 
     /// The kind `code` of the project's profile.
@@ -189,6 +301,12 @@ impl Script {
 
     /// The script's own actions; `None` for any other.
     pub fn act(&mut self, action_id: &str, target: Option<&str>, (preview, timeline, timecode, transcript): (&SourcePreview, &TimelineProjection, Option<&SourceTimecode>, &TranscriptView)) -> Option<bool> {
+        // While a SubSegment is open in place of the source timeline its trim keys are its own.
+        if self.open_subsegment.is_some() {
+            if let Some(done) = self.trim_key(action_id, target, preview) {
+                return Some(done);
+            }
+        }
         let id = || target.and_then(|id| id.parse::<i64>().ok());
         Some(match action_id {
             EDITOR_TEXT => {

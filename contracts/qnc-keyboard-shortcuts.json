@@ -187,6 +187,9 @@
     "subsegment_close": {
       "label": "Zatvori SubSegment, vrati source timeline"
     },
+    "subsegment_take_edge": {
+      "label": "Uzmi rub dijela SubSegmenta (desni klik na spoj)"
+    },
     "transcribe_fast": {
       "label": "Transkribiraj brzo (procesor)"
     },

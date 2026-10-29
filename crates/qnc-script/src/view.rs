@@ -268,12 +268,16 @@ pub struct SubsegmentPart {
 
 /// The SubSegment open in place of the source timeline (user 2026-10-29): its parts one after
 /// another on V1 and A1 as the player plays them, the playhead of that player.
-#[derive(Debug, Clone, Default, PartialEq, Eq)]
+#[derive(Debug, Clone, Default, PartialEq)]
 pub struct SubsegmentView {
     pub block_id: i64,
     pub parts: Vec<SubsegmentPart>,
     pub total_frames: u64,
     pub playhead: Option<u64>,
+    /// The A1 wave of the parts on the SubSegment's axis (peaks over the whole of it).
+    pub a1: Vec<f32>,
+    /// The edge being trimmed: its part, whether it is the OUT, and its frame on the axis.
+    pub trim: Option<(usize, bool, u64)>,
 }
 
 /// The parts of a clip block (its own range when it has no parts).
@@ -311,5 +315,24 @@ pub fn subsegment_view(block: &Block, playhead: Option<u64>) -> SubsegmentView {
             part
         })
         .collect();
-    SubsegmentView { block_id: block.id, parts, total_frames: start, playhead }
+    SubsegmentView { block_id: block.id, parts, total_frames: start, playhead, a1: Vec::new(), trim: None }
+}
+
+/// Where the parts play on the SubSegment's axis, for its wave (channel 1 of each clip: the
+/// wave of A1 as recorded).
+pub fn subsegment_placements(view: &SubsegmentView, pieces: &[Piece]) -> Vec<qnc_program_waveform::Placement> {
+    view.parts
+        .iter()
+        .zip(pieces)
+        .map(|(part, piece)| qnc_program_waveform::Placement {
+            clip_id: piece.clip_id.clone(),
+            channel: 0,
+            program_start: part.start,
+            program_end: part.end,
+            source_in: piece.from_frame,
+            source_out: piece.to_frame,
+            level_db: 0,
+            off: false,
+        })
+        .collect()
 }

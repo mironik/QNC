@@ -9,4 +9,5 @@ eframe = { workspace = true }
 qnc-action-event = { workspace = true }
 qnc-script = { workspace = true }
 qnc-timeline = { workspace = true }
+qnc-wheel-jog = { workspace = true }
 qnc-ui-text = { workspace = true }

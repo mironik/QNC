@@ -164,6 +164,8 @@ pub enum Operation {
     AddPiece { id: i64, piece: Piece },
     /// The pause before part `index` (frames) and whether its sound is cut (else crossed).
     SetJoin { id: i64, index: usize, gap_before: u64, cut: bool },
+    /// Part `index` with a new range (its pause and join stay).
+    SetPiece { id: i64, index: usize, piece: Piece },
 }
 
 impl Operation {
@@ -294,3 +296,8 @@ fn write(target: &ProjectDbTarget, operation: Operation) -> Result<Data> {
 
 #[cfg(test)]
 mod tests;
+
+/// Part `index` of block `id` with a new range (an edge trimmed on the SubSegment timeline).
+pub fn set_piece(target: &ProjectDbTarget, id: i64, index: usize, piece: Piece) -> Result<()> {
+    write(target, Operation::SetPiece { id, index, piece }).map(drop)
+}

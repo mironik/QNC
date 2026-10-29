@@ -7,7 +7,7 @@
 
 use eframe::egui::{self, RichText};
 use qnc_action_event::ActionEvent;
-use qnc_script::{SubsegmentView, JOIN_CUT, JOIN_GAP, SUBSEGMENT_CLOSE, SUBSEGMENT_CUE};
+use qnc_script::{SubsegmentView, JOIN_CUT, JOIN_GAP, SUBSEGMENT_CLOSE, SUBSEGMENT_CUE, TAKE_EDGE};
 use qnc_timeline::{
     AudioLane, TimelineFocusPaint, TimelineInput, TimelineIntent, TimelineLayerFlags, TimelineMarkerPart, TimelineMarkerPin,
     TimelineMetrics, TimelineProjection, TimelineTheme, TimelineVirtualSpan,
@@ -64,8 +64,11 @@ pub fn show(ui: &mut egui::Ui, view: &SubsegmentView, theme: TimelineTheme) -> O
         .iter()
         .zip(&ids)
         .skip(1)
-        .map(|(part, id)| TimelineMarkerPin { id, frame: part.start, taken: false, locked: true, part: TimelineMarkerPart::Whole, origin: None, sound_at: None })
+        .map(|(part, id)| TimelineMarkerPin { id, frame: part.start, taken: false, locked: false, part: TimelineMarkerPart::Whole, origin: None, sound_at: None })
         .collect();
+    // The edge being trimmed, as the trim playhead of a cover's edge.
+    let trim_label = qnc_ui_text::text("subsegment.trimming");
+    let trim: Vec<(u64, &str)> = view.trim.map(|(_, _, frame)| (frame, trim_label)).into_iter().collect();
     let intent = ui
         .push_id("qnc_subsegment_timeline", |ui| {
             qnc_timeline::show(
@@ -84,7 +87,7 @@ pub fn show(ui: &mut egui::Ui, view: &SubsegmentView, theme: TimelineTheme) -> O
                     draft_out_frame: duration,
                     draft_in_active: false,
                     draft_out_active: false,
-                    a1_peaks: &[],
+                    a1_peaks: &view.a1,
                     a2_peaks: &[],
                     a3_peaks: &[],
                     a4_peaks: &[],
@@ -98,7 +101,7 @@ pub fn show(ui: &mut egui::Ui, view: &SubsegmentView, theme: TimelineTheme) -> O
                     a1_channel: None,
                     a2_channel: None,
                     wave_over_video: None,
-                    trim_playheads: &[],
+                    trim_playheads: &trim,
                     a1_splits: &[],
                     pictures: &[],
                     holding: false,
@@ -106,9 +109,15 @@ pub fn show(ui: &mut egui::Ui, view: &SubsegmentView, theme: TimelineTheme) -> O
             )
         })
         .inner;
-    if let TimelineIntent::CueFrame(frame) = intent {
-        answer = answer.or(Some(ActionEvent::key(SUBSEGMENT_CUE).with_target(frame.to_string())));
-    }
+    let event = match intent {
+        TimelineIntent::CueFrame(frame) => Some(ActionEvent::key(SUBSEGMENT_CUE).with_target(frame.to_string())),
+        // A right click on a join takes the IN of the part after it, as Ctrl+I.
+        TimelineIntent::TakeMarker { id, .. } => id.strip_prefix("part-").map(|index| ActionEvent::key(TAKE_EDGE).with_target(format!("{index}:in"))),
+        // The wheel moves the playhead, or the taken edge, a frame as the arrows do.
+        TimelineIntent::Wheel(wheel) if !wheel.ctrl => Some(ActionEvent::key(if wheel.up == qnc_wheel_jog::source_step_forward("wheel_source_forward").unwrap_or(true) { "step_forward_frame" } else { "step_back_frame" })),
+        _ => None,
+    };
+    answer = answer.or(event);
     // The pause and join before every part after the first.
     for (index, part) in view.parts.iter().enumerate().skip(1) {
         let target = |step: Option<i64>| match step {

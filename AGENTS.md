@@ -6836,3 +6836,14 @@ timelineu, pomak IN/OUT pojedinog dijela, SubSegment kao virtualni klip u bazi (
 u poolu, Ton segment u Storyju iz SubSegmenta. Testovi `qnc-program-playlist` (2 nova: crossfade i razmak, rez ne dira
 zvuk), `qnc-script-db` (novi: razmak i spoj), `qnc-program-input`, `qnc-script`, `qnc-side-pieces`,
 `qnc-source-preview`, conformance. Uzivo nije provjereno.
+Dopuna 2026-10-29 (korisnik: "nastavi s valom na SubSegment timeline; on treba sve opcije koje imaju pokrivalice, da
+se moze editirati na isti nacin"): prvi dio. Timeline SubSegmenta ima val A1 svojih dijelova (`qnc-program-waveform`
+`ProgramWaves` kroz citac artefakata previewa, `SourcePreview::artifact_reader`; val kanala 1 kako je snimljen, ne
+kanala zadrzanog za A1). Rub dijela se uredjuje kao rub slota pokrivalice: Ctrl+I / Ctrl+O uzimaju IN ili OUT dijela pod
+playheadom, desni klik na spoj uzima IN dijela iza njega (`subsegment_take_edge`), strelice i kotacic ga pomicu za sliku,
+bijeli trim playhead pokazuje rub, svaki pomak odmah svira nacrt na rubu (player otvara SubSegment s nacrtom), Enter
+zapisuje (`qnc-script-db` `SetPiece`: isti klip, barem jedna slika, razmak i spoj ostaju; timecodeovi i duljina
+pomaknuti za isto), Esc odustaje. `qnc-script` (`trim_key`, `drafted`, `trimmed_piece`, `SubsegmentView.a1`/`trim`),
+`qnc-subsegment-panel`. Nije izvedeno: zoom reza (slike prije/poslije, fini val, rijeci) kao kod pokrivalica, filmstrip
+dijelova, kanal i razina A1 po dijelu, povlacenje ruba misem, premjestanje i brisanje dijela. Testovi `qnc-script-db`
+(novi), `qnc-script`, conformance. Uzivo nije provjereno.

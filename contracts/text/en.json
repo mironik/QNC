@@ -569,6 +569,7 @@
     "script.open_subsegment": "Open SubSegment",
     "subsegment.title": "SubSegment: {parts} parts, {frames} frames",
     "subsegment.close": "Close",
+    "subsegment.trimming": "TRIM",
     "subsegment.join": "Join {n}: pause {frames} fr",
     "subsegment.cut": "Cut",
     "subsegment.crossfade": "Crossfade",

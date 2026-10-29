@@ -494,6 +494,12 @@ impl SourcePreview {
         self.context.as_ref()?.project_target.as_ref()
     }
 
+    /// The reader of the project's published waves and filmstrips (a SubSegment draws its
+    /// parts' waves with it).
+    pub fn artifact_reader(&self) -> Option<Arc<dyn TimelineArtifactRead>> {
+        self.context.as_ref()?.artifacts.clone()
+    }
+
     pub fn hear_channels(&mut self, ((a1, a2), (l1, l2)): ((u16, u16), (f32, f32))) -> bool {
         let Some(clip_id) = self.view.clip_id.clone() else {
             return false;

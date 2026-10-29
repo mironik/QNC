@@ -226,3 +226,17 @@ a drugi dio", "the words stay");
     assert!(set_join(&target, id, 0, 5, false).is_err(), "the first part has no join");
     assert!(set_join(&target, id, 2, 5, false).is_err(), "no such part");
 }
+
+#[test]
+fn a_trimmed_part_keeps_its_clip_pause_and_join() {
+    let (_dir, target) = written();
+    let id = add(&target, None, sot("2002")).unwrap();
+    add_piece(&target, id, piece("2002", 500, 550, "a drugi dio")).unwrap();
+    set_join(&target, id, 1, 6, true).unwrap();
+    set_piece(&target, id, 1, piece("2002", 490, 545, "a drugi dio")).unwrap();
+    let block = read(&target).unwrap().remove(0);
+    let part = &block.pieces[1];
+    assert_eq!((part.from_frame, part.to_frame, part.gap_before, part.cut), (490, 545, 6, true));
+    assert!(set_piece(&target, id, 1, piece("2679", 1, 9, "")).is_err(), "a part keeps its clip");
+    assert!(set_piece(&target, id, 1, piece("2002", 9, 9, "")).is_err(), "a part keeps at least one frame");
+}

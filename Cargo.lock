@@ -5557,6 +5557,7 @@ dependencies = [
  "qnc-db-broker",
  "qnc-dev-diagnostics",
  "qnc-newsroom-sheet-db",
+ "qnc-program-waveform",
  "qnc-script-db",
  "qnc-script-export",
  "qnc-script-files",
@@ -5569,6 +5570,7 @@ dependencies = [
  "qnc-ui-text",
  "qnc-voice-record",
  "qnc-voice-take",
+ "qnc-wheel-jog",
  "serde",
  "serde_json",
 ]
@@ -6124,6 +6126,7 @@ dependencies = [
  "qnc-script",
  "qnc-timeline",
  "qnc-ui-text",
+ "qnc-wheel-jog",
 ]
 
 [[package]]
