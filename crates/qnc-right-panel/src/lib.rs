@@ -18,7 +18,6 @@ pub use qnc_side_pieces::{SCRIPT_PANEL, SEGMENT_PANEL, TRANSCRIPT_PANEL, VIDEO_A
 pub struct Shown<'a> {
     pub segments: &'a qnc_program_view::SegmentsView,
     pub cover_lengths: &'a [qnc_segment_panel::CoverLengthBand],
-    pub levels: [Option<f32>; 2],
     pub transcript: &'a qnc_transcript::TranscriptView,
     /// The shots of the clip on the preview (Video AI).
     pub shots: &'a qnc_clip_shots::ShotsView,
@@ -50,7 +49,7 @@ pub fn show_tabbed(ui: &mut egui::Ui, kind: &str, tabs: &[RightPanelTab], theme:
 /// The panel of `kind`, and whether it is the segment panel (it takes the keyboard focus).
 pub fn show(ui: &mut egui::Ui, kind: &str, theme: &qnc_desktop_theme::Theme, shown: &Shown<'_>) -> (Option<ActionEvent>, bool) {
     match kind {
-        SEGMENT_PANEL => (qnc_segment_panel::show(ui, shown.segments, theme, shown.cover_lengths, shown.levels), true),
+        SEGMENT_PANEL => (qnc_segment_panel::show(ui, shown.segments, theme, shown.cover_lengths), true),
         TRANSCRIPT_PANEL => (qnc_transcript_panel::show(ui, shown.transcript, theme, shown.timecode), false),
         VIDEO_AI_PANEL => (qnc_shot_panel::show(ui, shown.shots, theme, shown.timecode, shown.cover_lengths), false),
         SCRIPT_PANEL => (qnc_script_panel::show(ui, shown.script, shown.transcript, theme), false),

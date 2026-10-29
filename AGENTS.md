@@ -6923,3 +6923,9 @@ prici bez segmenata metra i NORM nije bilo. Sada je traka na dnu panela i bez se
 conformance, release build.
 Vraceno 2026-10-29 (korisnik: "makni metar ispod monitora"): metar u panelu transporta (462b506) uklonjen, `transport_width`
 opet 290. Metar je samo na traci panela Segmenti, kao u verzijama od 28. 10.
+Izmjena 2026-10-29 (korisnik: "on je trebao biti kocka"; "da, u svim formama"; "vu-metar ne smije biti dio kocke source
+timeline, ta kocka koristi vu-metar kocku"): VU-metar je kocka `qnc-level-meter`; kocka `qnc-source-timeline` je koristi i
+postavlja na traku iznad timelinea (zaglavlje source docka, iza IN/OUT/Duration, prije gumba forme), pa ga ima svaka forma
+sa source timelineom (Ingest, MA, Story). Razine izlaza A1/A2 uzima iz previewa (`SourceTimelineView.levels`, u `sync`).
+Traka panela Segmenti vise nema metar (bio bi drugi odmah iznad), NORM ostaje; `levels` uklonjen iz `qnc-segment-panel`,
+`qnc-right-panel` i Story ploce. Forme nisu narasle. Testovi, conformance, release build.

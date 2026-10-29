@@ -59,7 +59,13 @@ pub struct SourceTimelineView {
     pub timecode: Option<SourceTimecode>,
     /// What a taken lane does, for the form's status line (empty: nothing to say).
     pub message: String,
+    /// The peaks (dBFS) the player measured at its outputs A1 and A2, for the level meter on
+    /// the header bar above the timeline (user 2026-10-29: in every form).
+    pub levels: [Option<f32>; 2],
 }
+
+/// The width of the level meter on the header bar.
+const METER_W: f32 = 96.0;
 
 /// The state of the source timeline of one form.
 #[derive(Debug, Default)]
@@ -103,6 +109,7 @@ impl SourceTimeline {
         self.apply_kept_sound(count, preview);
         let timecode = self.timecodes.for_clip(content, clip_id);
         self.refresh(timecode);
+        self.view.levels = preview.view().output_levels;
         &self.view
     }
 
@@ -400,6 +407,7 @@ impl SourceTimeline {
             wave_over_video: wave_over_video(&self.lanes),
             timecode,
             message: self.message.clone(),
+            levels: self.view.levels,
         };
     }
 }
@@ -450,6 +458,13 @@ pub fn show_with(
     let mut answer = None;
     let slot = &mut answer;
     let mut drawn = instead.map(|instead| move |ui: &mut Ui| *slot = instead(ui));
+    // The level meter of the player's output on the bar above the timeline, before the form's own header.
+    let header = |ui: &mut Ui| {
+        let (meter, _) = ui.allocate_exact_size(eframe::egui::vec2(METER_W, theme.chrome_control_height), eframe::egui::Sense::hover());
+        let meter_style = qnc_level_meter::MeterStyle { background: theme.bg, border: theme.border, text: theme.text_muted };
+        qnc_level_meter::show(ui, ui.make_persistent_id("qnc_source_timeline_level_meter"), meter, &[("A1", view.levels[0]), ("A2", view.levels[1])], meter_style);
+        header(ui);
+    };
     let intent = qnc_source_dock::show_timeline_dock_with(ui, rect, style, title, header, timeline, drawn.as_mut().map(|draw| draw as &mut dyn FnMut(&mut Ui)));
     drop(drawn);
     (intent, answer)

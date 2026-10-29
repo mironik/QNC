@@ -103,7 +103,6 @@ pub fn show(
     segments: &SegmentsView,
     theme: &qnc_desktop_theme::Theme,
     lengths: &[CoverLengthBand],
-    levels: [Option<f32>; 2],
 ) -> Option<ActionEvent> {
     let timeline_theme = qnc_theme_styles::timeline(theme);
     // A refused take, on top of the screen so it is noticed (user 2026-10-21).
@@ -154,7 +153,7 @@ pub fn show(
                 });
                 ui.scope_builder(egui::UiBuilder::new().max_rect(egui::Rect::from_min_max(egui::pos2(body.left(), bar_top), body.max)), |ui| {
                     ui.separator();
-                    command = bar::show(ui, segments, timeline_theme, levels);
+                    command = bar::show(ui, segments, timeline_theme);
                 });
                 return;
             }
@@ -209,7 +208,7 @@ pub fn show(
             ui.scope_builder(egui::UiBuilder::new().max_rect(playlist), |ui| {
                 ui.set_clip_rect(playlist);
                 ui.separator();
-                command = command.take().or(bar::show(ui, segments, timeline_theme, levels));
+                command = command.take().or(bar::show(ui, segments, timeline_theme));
                 ui.add_space(2.0);
                 let total = segments.total_frames;
                 // Every timeline row needs its own id space: `qnc-timeline` names its
