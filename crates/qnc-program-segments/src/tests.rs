@@ -1064,3 +1064,28 @@ fn the_picture_of_a_join_moves_alone_as_a_j_or_an_l() {
     assert!(segments.take_cut_part(Some(join.clone()), false, 0), "the A1 sound of the same cut");
     assert!(segments.join_picture_draft().is_none());
 }
+
+/// User 2026-10-29: a cover is no layer above the clips, it overwrites the picture and A2 of its
+/// slot. A cut of the picture is only where the picture changes: the join of two clips under a
+/// cover cuts only A1; an M marker between two empty slots cuts neither picture nor A2; at the
+/// edge of a cover the picture is cut.
+#[test]
+fn a_picture_cut_is_only_where_the_picture_changes() {
+    let mut segments = component();
+    segments.stored = vec![stored("a", "tonovi", (100, 140)), stored("b", "tonovi", (100, 160))];
+    segments.stored_markers = vec![marker("S", 0, "program_start"), marker("m1", 30, ""), marker("m2", 50, ""), marker("m3", 80, ""), marker("E", 100, "program_end")];
+    segments.stored_slots = vec![slot(("S", 0), ("m1", 30), false), slot(("m1", 30), ("m2", 50), true), slot(("m2", 50), ("m3", 80), false), slot(("m3", 80), ("E", 100), false)];
+    segments.stored_covers = vec![cover("c1", "m1|m2", (30, 50))];
+    segments.refresh_view(String::new());
+    let join = segments.view().joins.iter().find(|pin| pin.frame == 40).unwrap().marker_id.clone();
+    assert_eq!(segments.no_picture_cut(&join), Some("story.msg.join_under_cover"));
+    assert_eq!(segments.no_picture_cut("m3"), Some("story.msg.marker_no_picture_cut"), "two empty slots");
+    assert_eq!(segments.no_picture_cut("m2"), None, "the end of the cover");
+    segments.apply(SegmentCommand::TakeMarker(join.clone()));
+    segments.set_playhead(Some(40));
+    segments.apply_action("wrap_zoom");
+    assert!(segments.take_cut_part(None, true, 0));
+    assert!(!segments.cut_picture_taken(), "the join under the cover has no picture cut");
+    assert!(segments.take_cut_part(None, false, 0), "its A1 cut is there");
+    assert!(segments.cut_sound_taken());
+}

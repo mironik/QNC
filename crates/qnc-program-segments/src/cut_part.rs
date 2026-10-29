@@ -79,6 +79,12 @@ impl ProgramSegments {
         };
         let stored = self.cut_frame(&marker_id);
         if picture {
+            // A cut of the picture is only where the picture of the program changes (user
+            // 2026-10-29: a cover overwrites the picture and A2, it is no layer above).
+            if let Some(words) = self.no_picture_cut(&marker_id) {
+                self.refresh_view(qnc_ui_text::text(words).into());
+                return true;
+            }
             // The picture of a cut between two clips starts where it is stored, which may be
             // apart from its sound (a J or L of the picture).
             if let Some(frame) = self.join_picture_frame(&marker_id) {
@@ -202,6 +208,20 @@ impl ProgramSegments {
         }
     }
 
+    /// Why the cut has no picture cut (a text code), `None` when it has one. A cover overwrites
+    /// the picture of its slot (user 2026-10-29): the join of two clips under a cover is a cut
+    /// of A1 only; an M marker between two empty slots changes no picture and no A2, it only
+    /// bounds the slots.
+    pub(crate) fn no_picture_cut(&self, marker_id: &str) -> Option<&'static str> {
+        let frame = self.cut_frame(marker_id)?;
+        if qnc_program_view::join_segment(marker_id).is_some() {
+            let covered = self.view.covers.iter().any(|cover| cover.start_frame < frame && frame < cover.end_frame);
+            return covered.then_some("story.msg.join_under_cover");
+        }
+        let (before, after) = self.cut_covers(marker_id);
+        (before.is_none() && after.is_none()).then_some("story.msg.marker_no_picture_cut")
+    }
+
     /// The two clips of a cut between them, as stored: the one before and `segment_id` after.
     fn join_pair(&self, marker_id: &str) -> Option<(&qnc_program_db::ProgramSegment, &qnc_program_db::ProgramSegment)> {
         let segment_id = qnc_program_view::join_segment(marker_id)?;
@@ -228,6 +248,10 @@ impl ProgramSegments {
             .filter_map(|pair| {
                 let marker_id = format!("{}{}", qnc_program_view::JOIN_PREFIX, pair[1].segment_id);
                 let cut = pair[1].start_frame;
+                // Under a cover the picture is the cover's: no picture cut to show.
+                if self.no_picture_cut(&marker_id).is_some() {
+                    return None;
+                }
                 let picture = match (self.cut_part, &self.marker_edit) {
                     (CutPart::Picture, Some((id, draft))) if *id == marker_id => Some(*draft),
                     _ => self.join_picture_frame(&marker_id),

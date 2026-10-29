@@ -7036,3 +7036,13 @@ sada slika reza spoja. Ton reza (A1 na spoju, A2 na M markeru) ostaje kako je bi
 rjecnik. Nije izvedeno: M marker koji stoji tocno na spoju i dalje mice pokrivalice, ne klipove; slike u zoomu za sliku spoja
 pokazuju spremljenu pricu, ne nacrt L/J slike. Testovi `qnc-program-db` (50), `qnc-program-playlist` (22),
 `qnc-program-segments` (63), `qnc-program-input`, zlatna tablica tipki, conformance. Uzivo nije provjereno.
+Odluka i izvedba 2026-10-29 (korisnik: "pokrivalice necemo tretirati kao novi sloj nego kao overwrite slike i A2, tako cemo
+sve imati u jednom sloju i moci raditi sve vrste rezova, isti sustav kao program timeline / ravna playlista"; "skoro nista se
+ne mijenja, samo pokrivalica radi overwrite"; "da, kreni s prvom tockom, ali trenutno stanje pushaj kao punu verziju"):
+stanje prije je pushano kao grana `libav-decoder` (d38ed3a) i oznaka `v-2026-10-29-pre-overwrite-covers`. Baza, segmenti,
+markeri i slotovi ostaju; pokrivalica na svom rasponu prepisuje sliku programa i A2. Korak 1: rez slike postoji samo gdje se
+slika programa mijenja (`qnc-program-segments` `no_picture_cut`): spoj dvaju klipova ispod pokrivalice ima samo rez A1
+(`story.msg.join_under_cover`), M marker izmedju dva prazna slota nema rez slike ni A2, samo omeduje slotove i mice se cijeli
+(`story.msg.marker_no_picture_cut`); razdvojena slika spoja ispod pokrivalice se ne crta. Test
+`a_picture_cut_is_only_where_the_picture_changes`, conformance. Nije izvedeno: korak 2 (rez na rubu pokrivalice s istim
+dijelovima kao spoj: roll i slika prema segmentu ispod), korak 3 (prikaz). Uzivo nije provjereno.
