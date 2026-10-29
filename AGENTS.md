@@ -7017,3 +7017,22 @@ jer se zoom prozor reza vidi i dok je marker uzet na Wrap retku. Sada gumb zoom 
 njegov ton i izvan uvecanog slota (`qnc-program-segments` `take_cut_part`, `from_trim_zoom`); tipke Ctrl+1/Ctrl+2 na Wrap
 retku i dalje pomicu cijeli marker. Klik na A1 uz M marker usred segmenta i dalje kaze da tamo A1 nema rez (dva klipa se ne
 spajaju). Test `the_lane_buttons_of_the_trim_zoom_take_the_sound_of_the_taken_cut`, conformance, release build.
+Otkljucano i izvedeno 2026-10-29 (korisnik: "zoom treba jednako raditi na svim formama gdje postoji marker, ne samo na
+pokrivalicama... kako cemo podvuci ton izjave pod pokrivalicu s J, ili staviti sliku tona preko offa"; "marker predstavlja
+timecode... klipu X ton pocinje na timecode Y, slika Z"; "ok, odkljucaj"; zatim "zoom ne treba pokazivati timekodove,
+timekodovi su alat za opis reza, u bazu zapisujemo timekodove"): rez spoja dvaju klipova je rez kao M marker, a rez su OUT
+klipa prije i IN klipa poslije, slika i ton svaki svoj. (1) Cijeli rez spoja (Ctrl+M, desni klik, strelice, kotacic) je roll:
+`qnc-program-db` operacija `RollJoin` (OUT segmenta prije i IN segmenta poslije za isto, svaki u svojim slikama izvora; prica
+zadrzava duljinu; marker izmedju starog i novog reza se odbija `story.join_past_marker`, marker na rezu ide s njim; jedan Undo
+korak); na Wrap retku rez ide samo izmedju susjednih rezova (markeri i spojevi). (2) Samo slika spoja (u zoomu Ctrl+I/O kao kod
+M markera): slika klipa poslije pocinje ranije (J slike, `v_lead_frames`) ili slika klipa prije traje dulje (L slike, novi
+stupac `story_parts.v_tail_frames`, stare price 0), ton ostaje; operacija `SetJoinPicture` (oba u jednom Undo koraku); slika
+Offa je crno. `qnc-program-playlist` `picture_lead.rs` slaze J i L slike za Ton i Off. Nacrt se vidi i cuje prije Entera
+(`qnc-program-input` `SoundDraft.pictures`, `qnc-program-segments` `join_picture_draft`), razdvojena slika i ton crtaju se
+kao do sada (`a1_splits`, sada za J i L slike). (3) Uklonjen zaseban put J slike: Ctrl+Shift+J (akcija
+`select_segment_picture_lead` iz kataloga i pomoci), `overlap.rs`, operacija `SetSegmentPictureLead`; J slike Ton/Off je
+sada slika reza spoja. Ton reza (A1 na spoju, A2 na M markeru) ostaje kako je bio. Timecodeovi se ne prikazuju u zoomu
+(pokusaj s kockom `qnc-cut-edges` uklonjen na zahtjev korisnika). Ugovor `story.database.json` (`picture_lead`, `join_roll`),
+rjecnik. Nije izvedeno: M marker koji stoji tocno na spoju i dalje mice pokrivalice, ne klipove; slike u zoomu za sliku spoja
+pokazuju spremljenu pricu, ne nacrt L/J slike. Testovi `qnc-program-db` (50), `qnc-program-playlist` (22),
+`qnc-program-segments` (63), `qnc-program-input`, zlatna tablica tipki, conformance. Uzivo nije provjereno.

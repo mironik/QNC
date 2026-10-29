@@ -500,3 +500,51 @@ mod cover_tests;
 mod sound_tests;
 mod store_tests;
 mod lead_tests;
+
+/// User 2026-10-29 ("a cut is the OUT of the clip before and the IN of the clip after"): the
+/// whole join of two clips moves (a roll): the OUT of the first and the IN of the second by as
+/// much, the story keeps its length and the markers after the join; one Undo step. Past a marker
+/// it is refused.
+#[test]
+fn a_join_rolls_the_out_before_and_the_in_after_together() {
+    let dir = tempfile::tempdir().unwrap();
+    let path = dir.path().join("db");
+    let mut store = imported_store(&path);
+    three_segments(&mut store);
+    let users: Vec<String> = segments(&mut store).into_iter().filter(|row| row.lead.is_empty()).map(|row| row.segment_id).collect();
+    let ranges = |store: &mut Story| {
+        segments(store).into_iter().filter(|row| row.lead.is_empty()).map(|row| (row.in_frame, row.out_frame)).collect::<Vec<_>>()
+    };
+    let Data::Created(m25) = marker(&mut store, 25).unwrap() else { panic!() };
+    run(&mut store, Operation::RollJoin { segment_id: users[1].clone(), frames: 3 }).unwrap();
+    assert_eq!(ranges(&mut store), vec![(0, 13), (103, 110), (200, 210)]);
+    assert_eq!(markers(&mut store), vec![25], "a marker after the join stays");
+    run(&mut store, Operation::RollJoin { segment_id: users[1].clone(), frames: -5 }).unwrap();
+    assert_eq!(ranges(&mut store), vec![(0, 8), (98, 110), (200, 210)]);
+    run(&mut store, Operation::UndoStory).unwrap();
+    assert_eq!(ranges(&mut store), vec![(0, 13), (103, 110), (200, 210)], "one Undo step");
+    // The join of the second and third clip (at 20) cannot pass the marker at 25.
+    assert!(run(&mut store, Operation::RollJoin { segment_id: users[2].clone(), frames: 6 }).is_err());
+    let _ = m25;
+}
+
+/// User 2026-10-29: only the picture at a join moves: the picture L of the clip before and the
+/// picture J of the clip after, written together in one Undo step; the sound stays.
+#[test]
+fn the_picture_at_a_join_has_an_l_before_and_a_j_after() {
+    let dir = tempfile::tempdir().unwrap();
+    let path = dir.path().join("db");
+    let mut store = imported_store(&path);
+    three_segments(&mut store);
+    let users: Vec<String> = segments(&mut store).into_iter().filter(|row| row.lead.is_empty()).map(|row| row.segment_id).collect();
+    let pictures = |store: &mut Story| {
+        segments(store).into_iter().filter(|row| row.lead.is_empty()).map(|row| (row.v_lead_frames, row.v_tail_frames)).collect::<Vec<_>>()
+    };
+    run(&mut store, Operation::SetJoinPicture { segment_id: users[1].clone(), tail_frames: 4, lead_frames: 0 }).unwrap();
+    assert_eq!(pictures(&mut store), vec![(0, 4), (0, 0), (0, 0)], "the picture L of the first");
+    run(&mut store, Operation::SetJoinPicture { segment_id: users[1].clone(), tail_frames: 0, lead_frames: 2 }).unwrap();
+    assert_eq!(pictures(&mut store), vec![(0, 0), (2, 0), (0, 0)], "the picture J of the second");
+    run(&mut store, Operation::UndoStory).unwrap();
+    assert_eq!(pictures(&mut store), vec![(0, 4), (0, 0), (0, 0)], "one Undo step");
+    assert!(run(&mut store, Operation::SetJoinPicture { segment_id: users[0].clone(), tail_frames: 1, lead_frames: 0 }).is_err());
+}

@@ -15,7 +15,7 @@ impl ProgramSegments {
         }
         // A cut between two clips is not deleted (it goes with its clips).
         if self.marker_edit.as_ref().is_some_and(|(id, _)| qnc_program_view::join_segment(id).is_some()) {
-            return self.refresh_view(qnc_ui_text::text("story.msg.join_moves_with_edit").into());
+            return self.refresh_view(qnc_ui_text::text("story.msg.join_not_deleted").into());
         }
         if let Some((marker_id, _)) = self.marker_edit.take() {
             self.selected_marker = None;

@@ -1271,7 +1271,7 @@ mod tests {
 
     #[test]
     fn a_drafted_level_opens_the_program_with_the_draft_never_the_whole_output() {
-        let sound = |level_db: i8| SoundDraft { lane: 0, id: "s".into(), channel: 0, level_db, off: false, overlaps: Vec::new(), picture_lead: None, joins: Vec::new() };
+        let sound = |level_db: i8| SoundDraft { lane: 0, id: "s".into(), channel: 0, level_db, off: false, overlaps: Vec::new(), pictures: Vec::new(), joins: Vec::new() };
         assert_eq!(draft_output_level(Some(&sound(-6)), Some(&sound(-12))), None, "never the whole output: only this part's sound (live 2026-10-22)");
         assert_eq!(draft_output_level(Some(&sound(0)), Some(&sound(-20))), None, "1000 % is not: the draft itself is heard");
         assert_eq!(draft_output_level(None, Some(&sound(-20))), Some([100, 100]), "the stored sound again");

@@ -134,54 +134,35 @@ impl Store {
     /// segment before it and the J of it. A lead has no join of its own; the segment must have
     /// one before it.
     pub(crate) fn set_join_sound(&mut self, segment_id: &str, tail: u32, lead: u32) -> Result<Data> {
+        self.set_join_sides(segment_id, ("a1_tail_frames", tail), ("a1_lead_frames", lead))
+    }
+
+    /// The picture at the join before `segment_id` (user 2026-10-29): the picture L of the
+    /// segment before it and the picture J of it; an Off's picture is black.
+    pub(crate) fn set_join_picture(&mut self, segment_id: &str, tail: u32, lead: u32) -> Result<Data> {
+        self.set_join_sides(segment_id, ("v_tail_frames", tail), ("v_lead_frames", lead))
+    }
+
+    /// One side of a join on the segment before `segment_id` (`tail`) and one on it (`lead`).
+    fn set_join_sides(&mut self, segment_id: &str, (tail_column, tail): (&str, u32), (lead_column, lead): (&str, u32)) -> Result<Data> {
         if tail > MAX_OVERLAP_FRAMES || lead > MAX_OVERLAP_FRAMES {
             return Err(qnc_ui_text::fill("story.overlap_too_long", &[("frames", &MAX_OVERLAP_FRAMES.to_string())]));
         }
         let segment_id = segment_id.trim();
-        leads::refuse_lead(&self.conn, segment_id)?;
-        let before: Option<String> = self
-            .conn
-            .query_row(
-                "SELECT part_id FROM story_parts
-                 WHERE active = 1 AND sort_index < (SELECT sort_index FROM story_parts WHERE part_id = ?1)
-                 ORDER BY sort_index DESC LIMIT 1",
-                [segment_id],
-                |row| row.get(0),
-            )
-            .optional()
-            .map_err(err)?;
-        let Some(before) = before else {
-            return Err(qnc_ui_text::text("story.join_none").into());
-        };
-        leads::refuse_lead(&self.conn, &before)?;
+        let before = join_before(&self.conn, segment_id)?;
         let now = story_now();
         self.conn
-            .execute("UPDATE story_parts SET a1_tail_frames = ?1, updated_at = ?2 WHERE part_id = ?3", params![tail, now, before])
+            .execute(&format!("UPDATE story_parts SET {tail_column} = ?1, updated_at = ?2 WHERE part_id = ?3"), params![tail, now, before])
             .map_err(err)?;
-        let changed = self
-            .conn
-            .execute("UPDATE story_parts SET a1_lead_frames = ?1, updated_at = ?2 WHERE part_id = ?3 AND active = 1", params![lead, now, segment_id])
-            .map_err(err)?;
-        if changed == 0 {
-            return Err(format!("part_id not found: {segment_id}"));
-        }
-        Ok(Data::Changed)
-    }
-
-    /// The picture J of a Ton segment, at most `MAX_OVERLAP_FRAMES`; an Off segment has no picture.
-    pub(crate) fn set_picture_lead(&mut self, segment_id: &str, frames: u32) -> Result<Data> {
-        if frames > MAX_OVERLAP_FRAMES {
-            return Err(qnc_ui_text::fill("story.overlap_too_long", &[("frames", &MAX_OVERLAP_FRAMES.to_string())]));
-        }
         let changed = self
             .conn
             .execute(
-                "UPDATE story_parts SET v_lead_frames = ?1, updated_at = ?2 WHERE part_id = ?3 AND kind = 'tonovi'",
-                params![frames, story_now(), segment_id.trim()],
+                &format!("UPDATE story_parts SET {lead_column} = ?1, updated_at = ?2 WHERE part_id = ?3 AND active = 1"),
+                params![lead, now, segment_id],
             )
             .map_err(err)?;
         if changed == 0 {
-            return Err(qnc_ui_text::text("story.picture_lead_ton_only").into());
+            return Err(format!("part_id not found: {segment_id}"));
         }
         Ok(Data::Changed)
     }
@@ -204,4 +185,22 @@ impl Store {
         }
         Ok(Data::Changed)
     }
+}
+
+/// The active segment before `segment_id` at their join; a lead has no join of its own.
+pub(crate) fn join_before(conn: &Connection, segment_id: &str) -> Result<String> {
+    leads::refuse_lead(conn, segment_id)?;
+    let before: Option<String> = conn
+        .query_row(
+            "SELECT part_id FROM story_parts
+             WHERE active = 1 AND sort_index < (SELECT sort_index FROM story_parts WHERE part_id = ?1)
+             ORDER BY sort_index DESC LIMIT 1",
+            [segment_id],
+            |row| row.get(0),
+        )
+        .optional()
+        .map_err(err)?;
+    let before = before.ok_or_else(|| qnc_ui_text::text("story.join_none").to_string())?;
+    leads::refuse_lead(conn, &before)?;
+    Ok(before)
 }

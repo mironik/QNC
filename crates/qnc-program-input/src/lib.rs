@@ -74,8 +74,9 @@ pub struct SoundDraft {
     /// Covers with their J and L as drafted on the Wrap row (user 2026-10-21: the sound of an
     /// M marker's cut), story frames; the others keep theirs.
     pub overlaps: Vec<(String, (u32, u32))>,
-    /// The segment's picture J as drafted (lane 0); `None` keeps the stored one.
-    pub picture_lead: Option<u32>,
+    /// Clips with the J and L of their picture as drafted at a cut (user 2026-10-29: only the
+    /// picture of the cut moves), story frames; the others keep theirs.
+    pub pictures: Vec<(String, (u32, u32))>,
     /// Clips with the J and L of their A1 sound as drafted at a cut (user 2026-10-29), story
     /// frames; the others keep theirs.
     pub joins: Vec<(String, (u32, u32))>,
@@ -86,9 +87,6 @@ impl SoundDraft {
         if self.lane == 0 {
             for segment in segments.iter_mut().filter(|segment| segment.segment_id == self.id) {
                 (segment.a1_source_channel, segment.a1_level_db, segment.a1_off) = (self.channel, self.level_db, self.off);
-                if let Some(frames) = self.picture_lead {
-                    segment.v_lead_frames = frames;
-                }
             }
         } else {
             for cover in covers.iter_mut().filter(|cover| cover.cover_id == self.id) {
@@ -98,6 +96,11 @@ impl SoundDraft {
         for (id, (lead, tail)) in &self.joins {
             for segment in segments.iter_mut().filter(|segment| &segment.segment_id == id) {
                 (segment.a1_lead_frames, segment.a1_tail_frames) = (*lead, *tail);
+            }
+        }
+        for (id, (lead, tail)) in &self.pictures {
+            for segment in segments.iter_mut().filter(|segment| &segment.segment_id == id) {
+                (segment.v_lead_frames, segment.v_tail_frames) = (*lead, *tail);
             }
         }
         for (id, (lead, tail)) in &self.overlaps {

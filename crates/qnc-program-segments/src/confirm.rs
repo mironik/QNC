@@ -32,7 +32,6 @@ impl ProgramSegments {
             || self.commit_marker_edit()
             || self.commit_slot_move()
             || self.commit_slot_trim()
-            || self.commit_overlap()
     }
 
     /// Ctrl+I (`start`) or Ctrl+O on the segment panel: that edge of the slot under the
@@ -74,9 +73,6 @@ impl ProgramSegments {
         }
         if let Some(trim) = &self.slot_trim {
             return Some(Take::SlotEdge(trim.slot_id.clone(), trim.start));
-        }
-        if let Some(edit) = &self.overlap {
-            return Some(Take::Overlap(edit.id.clone(), edit.kind));
         }
         if let Some((part, _)) = self.part_sound.taken() {
             return Some(Take::Sound(part.lane, part.id.clone()));
@@ -125,7 +121,6 @@ impl ProgramSegments {
     /// take of the same thing replaces.
     pub(crate) fn let_go_edits(&mut self, keep_sound: bool) {
         self.slot_trim = None;
-        self.overlap = None;
         self.cut_part = crate::CutPart::Whole;
         self.slot_move = None;
         self.marker_edit = None;
@@ -142,7 +137,7 @@ impl ProgramSegments {
     }
 
     pub fn leave_panel(&mut self) -> bool {
-        let taken = self.slot_trim.take().is_some() | self.slot_move.take().is_some() | self.overlap.take().is_some();
+        let taken = self.slot_trim.take().is_some() | self.slot_move.take().is_some();
         let taken = taken | self.marker_edit.take().is_some() | self.cover_taken.take().is_some();
         if taken {
             self.refresh_view(qnc_ui_text::text("story.msg.panel_left_edit_dropped").into());
@@ -163,8 +158,6 @@ pub(crate) enum Take {
     /// A lane (0 = A1 of a segment, 1 = A2 of a cover) and its part.
     Sound(u8, String),
     Cover(String),
-    /// A cover's J or L, or a segment's picture J.
-    Overlap(String, crate::overlap::Kind),
 }
 
 impl Take {
@@ -178,7 +171,6 @@ impl Take {
             Self::SlotEdge(..) => "story.take.slot_edge",
             Self::Sound(..) => "story.take.sound",
             Self::Cover(_) => "story.take.cover",
-            Self::Overlap(..) => "story.take.overlap",
         }
     }
 }

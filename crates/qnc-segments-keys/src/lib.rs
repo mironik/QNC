@@ -45,16 +45,16 @@ pub fn sound(
     }))
 }
 
-/// The parts of a cut and the picture J (user 2026-10-21). With an M marker taken, Ctrl+I/O
-/// move only its picture and Ctrl+2 only its A2 sound (Ctrl+1: A1 has no cut there);
-/// Ctrl+Shift+J takes the picture J of a Ton segment. While the sound of a cut or a picture J
-/// is taken the arrows (and the wheel) change it, heard and seen at once; Escape drops it and
-/// the stored story plays again. `Continue` for any other key.
+/// The parts of a cut (user 2026-10-21, one cut for every marker and join 2026-10-29). With a
+/// cut taken (an M marker or the join of two clips), Ctrl+I/O move only its picture, Ctrl+1 its
+/// A1 sound, Ctrl+2 its A2 sound. While a part is taken the arrows (and the wheel) change it,
+/// heard and seen at once; Escape drops it and the stored story plays again. `Continue` for
+/// any other key.
 pub fn overlap(
     action_id: &str,
     (preview, wrap, segments): (&mut SourcePreview, &mut WrapSession, &mut ProgramSegments),
 ) -> ControlFlow<Option<bool>> {
-    let drafting = segments.overlap_taken() || segments.cut_sound_taken();
+    let drafting = segments.cut_picture_taken() || segments.cut_sound_taken();
     let done = match action_id {
         // With the cut's sound taken: Ctrl+I its J (the sound after starts), Ctrl+O its L (the
         // sound before ends), user 2026-10-29; else the picture alone.
@@ -63,7 +63,6 @@ pub fn overlap(
         lane @ ("select_audio_a1" | "select_audio_a2") if segments.editing_marker() => {
             segments.take_cut_part(None, false, u8::from(lane == "select_audio_a2"))
         }
-        "select_segment_picture_lead" => segments.apply_action(action_id),
         "step_back_frame" | "step_forward_frame" | "clear_focus" if drafting => segments.apply_action(action_id),
         _ => return ControlFlow::Continue(()),
     };
@@ -85,15 +84,15 @@ pub fn cut_edge(
 /// The picture J or the cut's sound drafted on the Wrap row, as the program plays it before Enter.
 fn overlap_draft(segments: &ProgramSegments) -> Option<SoundDraft> {
     if let Some(covers) = segments.cut_sound_draft() {
-        return Some(SoundDraft { lane: 1, id: String::new(), channel: 0, level_db: 0, off: false, overlaps: covers, picture_lead: None, joins: Vec::new() });
+        return Some(SoundDraft { lane: 1, id: String::new(), channel: 0, level_db: 0, off: false, overlaps: covers, pictures: Vec::new(), joins: Vec::new() });
     }
     // The A1 sound of a cut between two clips (user 2026-10-29).
     if let Some(joins) = segments.join_sound_draft() {
-        return Some(SoundDraft { lane: 1, id: String::new(), channel: 0, level_db: 0, off: false, overlaps: Vec::new(), picture_lead: None, joins });
+        return Some(SoundDraft { lane: 1, id: String::new(), channel: 0, level_db: 0, off: false, overlaps: Vec::new(), pictures: Vec::new(), joins });
     }
-    let draft = segments.overlap_draft()?;
-    let (channel, level_db, off) = draft.sound;
-    Some(SoundDraft { lane: 0, id: draft.id, channel, level_db, off, overlaps: Vec::new(), picture_lead: Some(draft.frames), joins: Vec::new() })
+    // The picture of a cut between two clips (user 2026-10-29).
+    let pictures = segments.join_picture_draft()?;
+    Some(SoundDraft { lane: 1, id: String::new(), channel: 0, level_db: 0, off: false, overlaps: Vec::new(), pictures, joins: Vec::new() })
 }
 
 /// A channel picked in the column of the taken sound (a click, or any device that names
@@ -143,7 +142,7 @@ fn part_span(segments: &ProgramSegments) -> Option<(u16, u64, u64)> {
 /// The keyboard left the segment panel (a click, Tab or Enter): what it took is dropped and
 /// the stored sound is heard again. True when an edit was dropped.
 pub fn left(preview: &mut SourcePreview, wrap: &WrapSession, segments: &mut ProgramSegments) -> bool {
-    if segments.part_sound_taken() || segments.overlap_taken() || segments.cut_sound_taken() {
+    if segments.part_sound_taken() || segments.cut_picture_taken() || segments.cut_sound_taken() {
         segments.release_part_sound();
         preview.hear_part_level(None);
         preview.hear_program_draft(None, None, wrap.playhead());
@@ -162,7 +161,7 @@ pub fn dropped(preview: &mut SourcePreview, wrap: &WrapSession, segments: &mut P
 /// Enter on the segment panel confirms what it took (a marker, slot, slot edge, sound);
 /// false when there is nothing to confirm (the walk goes on).
 pub fn confirm(preview: &mut SourcePreview, segments: &mut ProgramSegments) -> bool {
-    let sound = segments.part_sound_taken() || segments.overlap_taken() || segments.cut_sound_taken();
+    let sound = segments.part_sound_taken() || segments.cut_picture_taken() || segments.cut_sound_taken();
     let confirmed = segments.confirm_program();
     if sound && confirmed {
         preview.forget_program_draft(); // written: the program opens from the story
@@ -219,13 +218,13 @@ fn say_part_lane(segments: &mut ProgramSegments) {
 /// The sound drafted on the Wrap row, as the program plays it before Enter.
 fn sound_draft(segments: &ProgramSegments) -> Option<SoundDraft> {
     let (lane, id, draft) = segments.part_sound_draft_now()?;
-    Some(SoundDraft { lane, id, channel: draft.channel, level_db: draft.level_db, off: draft.off, overlaps: Vec::new(), picture_lead: None, joins: Vec::new() })
+    Some(SoundDraft { lane, id, channel: draft.channel, level_db: draft.level_db, off: draft.off, overlaps: Vec::new(), pictures: Vec::new(), joins: Vec::new() })
 }
 
 /// The stored sound of the part taken on the Wrap row.
 fn stored_sound(segments: &ProgramSegments) -> Option<SoundDraft> {
     let (lane, id, stored) = segments.part_sound_stored()?;
-    Some(SoundDraft { lane, id, channel: stored.channel, level_db: stored.level_db, off: stored.off, overlaps: Vec::new(), picture_lead: None, joins: Vec::new() })
+    Some(SoundDraft { lane, id, channel: stored.channel, level_db: stored.level_db, off: stored.off, overlaps: Vec::new(), pictures: Vec::new(), joins: Vec::new() })
 }
 
 #[cfg(test)]

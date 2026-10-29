@@ -172,7 +172,8 @@ impl Store {
             | Operation::PurgeSegment { segment_id }
             | Operation::MoveSegment { segment_id, .. }
             | Operation::SetSegmentSound { segment_id, .. }
-            | Operation::SetSegmentPictureLead { segment_id, .. } => refuse_lead(&self.conn, segment_id)?,
+            | Operation::SetJoinPicture { segment_id, .. }
+            | Operation::RollJoin { segment_id, .. } => refuse_lead(&self.conn, segment_id)?,
             _ => {}
         }
         match operation {
@@ -239,6 +240,10 @@ impl Store {
             Operation::SetJoinSound { segment_id, tail_frames, lead_frames } => {
                 self.set_join_sound(segment_id, *tail_frames, *lead_frames)
             }
+            Operation::SetJoinPicture { segment_id, tail_frames, lead_frames } => {
+                self.set_join_picture(segment_id, *tail_frames, *lead_frames)
+            }
+            Operation::RollJoin { segment_id, frames } => self.roll_join(segment_id, *frames),
             Operation::SetCutSoundEdges { marker_id, tail_frames, lead_frames } => {
                 self.set_cut_sound_edges(marker_id, *tail_frames, *lead_frames)
             }
@@ -278,7 +283,6 @@ impl Store {
             Operation::SetCoverSound { cover_id, channel, level_db, off } => {
                 self.set_sound("story_covers", "cover_id", "a2", cover_id, (*channel, lane_level(*level_db)?, *off))
             }
-            Operation::SetSegmentPictureLead { segment_id, frames } => self.set_picture_lead(segment_id, *frames),
             Operation::SetCoverOverlap { cover_id, lead_frames, tail_frames } => {
                 self.set_cover_overlap(cover_id, *lead_frames, *tail_frames)
             }

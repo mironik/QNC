@@ -95,8 +95,12 @@ pub struct ProgramSegmentInput {
     pub a1_level_db: i8,
     pub a1_off: bool,
     pub covers: Vec<ProgramCoverInput>,
-    /// The picture J (Ton only): its picture starts this many frames before its sound.
+    /// The picture J: its picture starts this many frames before its sound, over the end of
+    /// the segment before (an Off's picture is black).
     pub v_lead_frames: i64,
+    /// The picture L (user 2026-10-29): its picture goes on this many frames after its sound,
+    /// over the start of the segment after (an Off's picture is black).
+    pub v_tail_frames: i64,
     /// The J and L of its A1 sound (user 2026-10-29): its sound starts `a1_lead_frames`
     /// before its picture and goes on `a1_tail_frames` after it, crossing the sound next to it.
     pub a1_lead_frames: i64,

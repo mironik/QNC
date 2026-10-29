@@ -4,19 +4,12 @@ impl ProgramSegments {
     /// Whether a keyboard catalog action belongs to the program.
     pub fn handles(&self, action_id: &str) -> bool {
         self.command_for(action_id).is_some()
-            || action_id == "select_segment_picture_lead"
-            || ((self.slot_move.is_some() || self.slot_trim.is_some() || self.overlap.is_some())
+            || ((self.slot_move.is_some() || self.slot_trim.is_some())
                 && matches!(action_id, "step_back_frame" | "step_forward_frame" | "clear_focus"))
     }
 
     /// Applies a keyboard catalog action of the program; false if it is not one.
     pub fn apply_action(&mut self, action_id: &str) -> bool {
-        if let Some(done) = self.overlap_key(action_id) {
-            return done; // a taken J or L of a cover (segment panel)
-        }
-        if action_id == "select_segment_picture_lead" {
-            return self.take_picture_lead(self.playhead.unwrap_or(0));
-        }
         if let Some(done) = self.trim_key(action_id) {
             return done; // a taken slot edge (segment panel)
         }

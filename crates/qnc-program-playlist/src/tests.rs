@@ -79,6 +79,7 @@ fn segment(
         a1_off: false,
         covers: Vec::new(),
         v_lead_frames: 0,
+        v_tail_frames: 0,
         a1_lead_frames: 0,
         a1_tail_frames: 0,
     }
@@ -695,4 +696,33 @@ fn the_a1_cut_crosses_the_j_after_and_the_l_before() {
     let tail = late.iter().find(|source| source.source_id.ends_with(":tail")).unwrap();
     assert_eq!(tail.audio_routes[0].fade_out, Some((95, 103)), "the L: the clip before goes on 3 frames");
     assert_eq!(a1(104).len(), 1, "after the L only the clip after");
+}
+
+/// User 2026-10-29 ("the cut is the OUT of the clip before and the IN of the clip after,
+/// picture and sound each"): the picture L of a Ton goes on over the start of the Off after,
+/// the sound stays; the picture J of an Off is black over the end of the Ton before.
+#[test]
+fn the_picture_of_a_join_goes_on_past_its_sound_and_an_off_is_black() {
+    let timebase = tb(50);
+    let mut ton = segment("ton", "tonovi", "speaker", (0, 50), (10, 60), timebase);
+    ton.v_tail_frames = 20;
+    let off = segment("off", "offovi", "voice", (50, 100), (100, 150), timebase);
+    let playlist = build_flat_program_playlist(&input(100, vec![ton.clone(), off.clone()]), &mut resolver(&["voice", "speaker"], timebase)).unwrap();
+    let at = |playlist: &FlatProgramPlaylist, frame: i64| playlist.items.iter().find(|item| item.record_range.in_frame <= frame && frame < item.record_range.out_frame).unwrap().clone();
+    let picture = |playlist: &FlatProgramPlaylist, frame: i64| {
+        at(playlist, frame).sources.iter().find(|source| source.video_layer == Some(ProgramVideoLayer::Base)).map(|source| (source.clip_id.clone(), source.source_range.source_in))
+    };
+    let sound = |playlist: &FlatProgramPlaylist, frame: i64| {
+        at(playlist, frame).sources.iter().find(|source| source.audio_routes.iter().any(|route| route.output_channel == PROGRAM_AUDIO_OUTPUT_A1)).map(|source| source.clip_id.clone())
+    };
+    assert_eq!(picture(&playlist, 55), Some(("speaker".into(), 60)), "the speaker's picture goes on after his OUT (its item from 50)");
+    assert_eq!(sound(&playlist, 55).as_deref(), Some("voice"), "the Off is heard");
+    assert_eq!(picture(&playlist, 70), None, "black after the picture L");
+    let (mut ton, mut off) = (ton, off);
+    ton.v_tail_frames = 0;
+    off.v_lead_frames = 10;
+    let playlist = build_flat_program_playlist(&input(100, vec![ton, off]), &mut resolver(&["voice", "speaker"], timebase)).unwrap();
+    assert_eq!(picture(&playlist, 39), Some(("speaker".into(), 10)));
+    assert_eq!(picture(&playlist, 40), None, "the Off's black starts 10 early");
+    assert_eq!(sound(&playlist, 45).as_deref(), Some("speaker"), "the speaker is still heard");
 }

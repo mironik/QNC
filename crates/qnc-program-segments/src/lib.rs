@@ -17,10 +17,8 @@ mod edit;
 mod nav;
 mod slot_move;
 mod slot_trim;
-mod overlap;
 mod cut_part;
 pub use cut_part::{CutPart, CutSound, SoundEdge};
-pub use overlap::OverlapDraft;
 mod marker_edit;
 mod part_sound;
 mod sync;
@@ -233,8 +231,6 @@ pub struct ProgramSegments {
     slot_move: Option<slot_move::SlotMove>,
     /// The slot edge taken with Ctrl+I/O on the segment panel (`slot_trim.rs`).
     slot_trim: Option<slot_trim::SlotTrim>,
-    /// The J or L of a cover taken with Ctrl+J / Ctrl+L (`overlap.rs`).
-    overlap: Option<overlap::OverlapEdit>,
     /// What of the taken marker's cut moves (`cut_part.rs`).
     cut_part: cut_part::CutPart,
     /// A cover taken with Ctrl+click; Delete removes it.

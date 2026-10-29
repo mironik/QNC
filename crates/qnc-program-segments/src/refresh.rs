@@ -121,9 +121,8 @@ impl ProgramSegments {
         };
         view.source_edit_stills = self.source_stills();
         view.trim_frames = self.edit_moves().into_iter().map(|(_, new)| new).collect();
-        view.trim_frames.extend(self.overlap.as_ref().map(overlap::OverlapEdit::frame));
         view.trim_frames.extend(self.cut_sound_trim_frames());
-        view.a1_splits = self.picture_leads();
+        view.a1_splits = self.picture_splits();
         qnc_program_view::mark_clip_edges(&mut view.edit_stills, |id| self.clip_frames.get(id).copied());
         self.lane_view(&mut view);
         view.zoom = self.zoom_window(&view);

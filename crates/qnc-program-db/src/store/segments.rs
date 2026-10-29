@@ -499,3 +499,42 @@ impl Store {
         Ok(Data::Changed)
     }
 }
+
+impl Store {
+    /// The join before `segment_id` moves `frames` story frames, picture and sound (a roll, user
+    /// 2026-10-29): the OUT of the segment before and the IN of `segment_id` by as much, each in
+    /// its own source frames; the story keeps its length. A marker between the old and the new
+    /// join is refused (it would leave its clip); one on the join moves with it.
+    pub(crate) fn roll_join(&mut self, segment_id: &str, frames: i64) -> Result<Data> {
+        let segment_id = segment_id.trim();
+        if frames == 0 {
+            return Ok(Data::Changed);
+        }
+        let before = sound::join_before(&self.conn, segment_id)?;
+        let (join, _) = segment_window(&self.conn, segment_id)?.ok_or_else(|| format!("part not found: {segment_id}"))?;
+        let (join, to) = (join as i64, join as i64 + frames);
+        if user_markers_from(&self.conn, join.min(to) + 1)?.iter().any(|(_, frame)| *frame < join.max(to)) {
+            return Err(qnc_ui_text::text("story.join_past_marker").into());
+        }
+        let rate = story_rate(&self.conn)?.ok_or(qnc_ui_text::text("story.story_segments"))?;
+        let range = |id: &str| -> Result<(i64, i64, i64)> {
+            let (in_frame, out_frame, num, den): (i64, i64, u32, u32) = self
+                .conn
+                .query_row(
+                    "SELECT in_frame, out_frame, source_fps_num, source_fps_den FROM story_parts WHERE part_id = ?1 AND active = 1",
+                    [id],
+                    |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?, row.get(3)?)),
+                )
+                .map_err(err)?;
+            let (num, den) = story_per_source(rate, (num, den))?;
+            // Story frames to this clip's source frames.
+            Ok((in_frame, out_frame, frames * den / num))
+        };
+        let (before_in, before_out, before_delta) = range(&before)?;
+        let (after_in, after_out, after_delta) = range(segment_id)?;
+        let moved = |frame: i64| u64::try_from(frame).map_err(|_| qnc_ui_text::text("story.range_shorter_than_one_picture_story").to_string());
+        self.trim_segment(&before, (moved(before_in)?, moved(before_out + before_delta)?))?;
+        self.trim_segment(segment_id, (moved(after_in + after_delta)?, moved(after_out)?))?;
+        Ok(Data::Changed)
+    }
+}

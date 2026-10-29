@@ -45,6 +45,11 @@ pub struct ProgramSegment {
     pub a1_lead_frames: u32,
     #[serde(default)]
     pub a1_tail_frames: u32,
+    /// The picture L of the segment (user 2026-10-29: a cut is the OUT of the clip before and
+    /// the IN of the clip after, picture and sound each): its picture goes on that many story
+    /// frames after its sound, over the start of the segment after (black for an Off); 0 none.
+    #[serde(default)]
+    pub v_tail_frames: u32,
 }
 
 /// An M marker on the program axis (v5 `story_markers`). `system_role` is
@@ -210,6 +215,16 @@ pub enum Operation {
     /// `tail_frames` the L of the segment before, `lead_frames` the J of `segment_id`, the
     /// segment after. One UNDO step.
     SetJoinSound { segment_id: String, tail_frames: u32, lead_frames: u32 },
+    /// Only the picture at the join of two segments moves (user 2026-10-29: the cut is the
+    /// picture and sound timecodes of the clip before and after): `tail_frames` the picture L
+    /// of the segment before (its picture goes on over the one after), `lead_frames` the
+    /// picture J of `segment_id` (its picture starts over the one before); an Off's picture
+    /// is black. The sound stays. One UNDO step.
+    SetJoinPicture { segment_id: String, tail_frames: u32, lead_frames: u32 },
+    /// The whole join of two segments moves `frames` story frames (a roll): the OUT of the
+    /// segment before and the IN of `segment_id`, picture and sound, by as much; the story
+    /// keeps its length, the markers after the join stay. One UNDO step.
+    RollJoin { segment_id: String, frames: i64 },
     /// Both markers of the slot move so it starts at `start_frame` (user 2026-10-10).
     MoveSlot { slot_id: String, start_frame: u64 },
     /// A slot longer or shorter by `frames` story frames at its start (`start`) or its
@@ -259,8 +274,6 @@ pub enum Operation {
     SetSegmentSound { segment_id: String, channel: u16, level_db: i8, off: bool },
     /// The sound of a cover on A2 changed later. An UNDO step.
     SetCoverSound { cover_id: String, channel: u16, level_db: i8, off: bool },
-    /// The picture J of a Ton segment (user 2026-10-21), story frames. An UNDO step.
-    SetSegmentPictureLead { segment_id: String, frames: u32 },
     /// The J and L of a cover's A2 (user 2026-10-21), story frames. An UNDO step.
     SetCoverOverlap { cover_id: String, lead_frames: u32, tail_frames: u32 },
     /// v5 `delete_cover`; its B-roll virtual shot stays.
@@ -287,6 +300,8 @@ impl Operation {
                 | Self::SetCutSound { .. }
                 | Self::SetCutSoundEdges { .. }
                 | Self::SetJoinSound { .. }
+                | Self::SetJoinPicture { .. }
+                | Self::RollJoin { .. }
                 | Self::MoveSlot { .. }
                 | Self::TrimSlot { .. }
                 | Self::DeleteMarker { .. }
@@ -295,7 +310,6 @@ impl Operation {
                 | Self::SetSegmentSound { .. }
                 | Self::SetCoverSound { .. }
                 | Self::SetCoverOverlap { .. }
-                | Self::SetSegmentPictureLead { .. }
         )
     }
 

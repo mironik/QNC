@@ -550,9 +550,6 @@
     "segment_replace": {
       "label": "Panel Segmenti: zamijeni segment oznacenim izvorom"
     },
-    "select_segment_picture_lead": {
-      "label": "Uzmi J sliku Ton segmenta pod Wrap playheadom: slika govornika prije njegova tona; lijevo/desno dulje/krace, Enter sprema"
-    },
     "wrap_zoom": {
       "label": "Uvecaj na mjestu source timelinea ono pod Wrap playheadom (ili dvokliknuto): pokrivalicu sa susjedima po 15 % sirine, inace segment; Esc zatvara"
     },
@@ -610,7 +607,7 @@
       { "title": "Audio A1 / A2", "actions": ["select_audio_a1", "select_audio_a2", "lane_level_down", "lane_level_up"] },
       { "title": "Segmenti", "actions": ["add_ton_segment", "add_off_segment", "step_prev_part", "step_next_part", "select_segment_start", "select_segment_end", "delete_part"] },
       { "title": "Markeri i slotovi", "actions": ["add_marker", "add_marker_continue", "select_marker", "delete_marker", "select_current_marker_slot", "select_mark_in", "select_mark_out", "navigate_prev_object", "navigate_next_object"] },
-      { "title": "Pokrivalice", "actions": ["quick_overwrite_cover", "overwrite_cover", "cover_mode_covers", "cover_mode_sync", "select_segment_picture_lead"] },
+      { "title": "Pokrivalice", "actions": ["quick_overwrite_cover", "overwrite_cover", "cover_mode_covers", "cover_mode_sync"] },
       { "title": "Pool i tabovi", "actions": ["save_virtual_shot", "page_prev", "page_next", "toggle_focused_item", "editorial_tab_all", "editorial_tab_virtual", "editorial_tab_broll", "editorial_tab_segment", "editorial_tab_transcript", "editorial_tab_subsegment"] },
       { "title": "Općenito", "actions": ["undo_object", "redo_object", "focus_next", "focus_prev", "toggle_cheatsheet"] }
     ]
@@ -990,7 +987,6 @@
             "shift": false
           }
         ],
-        "select_segment_picture_lead": [{ "code": "KeyJ", "ctrl": true, "shift": true }],
         "select_current_marker_slot": [
           {
             "code": "KeyS",

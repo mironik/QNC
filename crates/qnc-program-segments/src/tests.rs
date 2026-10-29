@@ -18,6 +18,7 @@ fn stored(id: &str, kind: &str, range: (u64, u64)) -> ProgramSegment {
         v_lead_frames: 0,
         a1_lead_frames: 0,
         a1_tail_frames: 0,
+        v_tail_frames: 0,
         lead: String::new(),
     }
 }
@@ -925,7 +926,7 @@ fn the_lane_buttons_of_the_trim_zoom_take_the_sound_of_the_taken_cut() {
 /// User 2026-10-29: every cut is a marker, the join of two clips too (the OUT of the clip
 /// before and the IN of the clip after). With it taken in the zoom Ctrl+1 takes its A1 sound:
 /// the J of the clip after and the L of the clip before move as on A2 and are drafted to their
-/// clips; its picture does not move from here.
+/// clips.
 #[test]
 fn the_a1_sound_of_a_cut_between_two_clips_has_a_j_and_an_l() {
     let mut segments = component();
@@ -937,7 +938,7 @@ fn the_a1_sound_of_a_cut_between_two_clips_has_a_j_and_an_l() {
     segments.apply(SegmentCommand::TakeMarker(join.clone()));
     assert!(segments.editing_marker(), "the cut is taken");
     segments.apply_action("step_forward_frame");
-    assert_eq!(segments.view().joins.iter().find(|pin| pin.marker_id == join).map(|pin| pin.frame), Some(40), "its picture does not move here");
+    assert_eq!(segments.view().joins.iter().find(|pin| pin.marker_id == join).map(|pin| pin.frame), Some(41), "the whole cut rolls");
     segments.set_playhead(Some(45));
     segments.apply_action("wrap_zoom");
     assert!(segments.take_cut_part(None, false, 0), "the A1 sound taken in the zoom");
@@ -956,25 +957,6 @@ fn the_a1_sound_of_a_cut_between_two_clips_has_a_j_and_an_l() {
     }
 }
 
-/// Locked (user 2026-10-21): Ctrl+Shift+J takes the picture J of the Ton segment under the
-/// Wrap playhead (not the first, not an Off); its length is free.
-#[test]
-fn ctrl_shift_j_takes_the_picture_j_of_a_ton_segment() {
-    let mut segments = component();
-    segments.stored = vec![stored("a", "offovi", (0, 40)), stored("b", "tonovi", (0, 60))];
-    segments.refresh_view(String::new());
-    segments.set_playhead(Some(10));
-    assert!(!segments.apply_action("select_segment_picture_lead"), "the first segment (an Off) has none");
-    segments.set_playhead(Some(50));
-    assert!(segments.apply_action("select_segment_picture_lead"));
-    for _ in 0..600 {
-        segments.apply_action("step_back_frame");
-    }
-    assert!(segments.overlap_draft().is_some());
-    assert_eq!(segments.view().trim_frames, vec![0], "600 frames earlier is past the story start");
-    segments.apply_action("clear_focus");
-    assert!(!segments.overlap_taken());
-}
 
 #[test]
 fn a_double_click_enlarges_a_cover_with_its_neighbours_else_the_segment_and_the_program_row_the_program() {
@@ -1044,4 +1026,41 @@ fn undo_lets_go_of_a_taken_slot_whose_frames_belong_to_the_story_before_it() {
     assert!(segments.handles("step_forward_frame"), "the slot is taken");
     segments.apply(SegmentCommand::Undo);
     assert!(!segments.handles("step_forward_frame"), "Undo let it go: the arrows go back to the playhead");
+}
+
+/// User 2026-10-29 ("a marker is a timecode: clip X's sound starts at Y, its picture at Z"):
+/// the join of two clips is a cut as an M marker is. Whole it rolls between the cuts beside it;
+/// in the zoom Ctrl+I/O take its picture alone: the picture J of the clip after (earlier) or the
+/// picture L of the clip before (later), drafted to their clips; Ctrl+M takes it whole again.
+#[test]
+fn the_picture_of_a_join_moves_alone_as_a_j_or_an_l() {
+    let mut segments = component();
+    segments.stored = vec![stored("a", "offovi", (100, 140)), stored("b", "tonovi", (100, 160))];
+    segments.stored_markers = vec![marker("S", 0, "program_start"), marker("m1", 30, ""), marker("E", 100, "program_end")];
+    segments.refresh_view(String::new());
+    let join = segments.view().joins.iter().find(|pin| pin.frame == 40).unwrap().marker_id.clone();
+    segments.apply(SegmentCommand::TakeMarker(join.clone()));
+    for _ in 0..20 {
+        segments.apply_action("step_back_frame");
+    }
+    assert_eq!(segments.view().joins.iter().find(|pin| pin.marker_id == join).map(|pin| pin.frame), Some(31), "the roll stops before the marker at 30");
+    segments.apply_action("clear_focus");
+    segments.apply(SegmentCommand::TakeMarker(join.clone()));
+    segments.set_playhead(Some(45));
+    segments.apply_action("wrap_zoom");
+    assert!(segments.take_cut_part(None, true, 0), "the picture alone");
+    assert!(segments.cut_picture_taken());
+    for _ in 0..4 {
+        segments.apply_action("step_back_frame");
+    }
+    let draft = segments.join_picture_draft().expect("the picture drafted");
+    assert!(draft.contains(&("b".to_string(), (4, 0))), "the picture J of the clip after: {draft:?}");
+    assert_eq!(segments.view().a1_splits, vec![(36, 40)], "its picture at 36, its sound at 40");
+    for _ in 0..7 {
+        segments.apply_action("step_forward_frame");
+    }
+    let draft = segments.join_picture_draft().unwrap();
+    assert!(draft.contains(&("a".to_string(), (0, 3))), "the picture L of the clip before: {draft:?}");
+    assert!(segments.take_cut_part(Some(join.clone()), false, 0), "the A1 sound of the same cut");
+    assert!(segments.join_picture_draft().is_none());
 }

@@ -79,18 +79,11 @@ impl ProgramSegments {
         let Some((marker_id, _)) = self.marker_edit.clone() else {
             return;
         };
-        // A cut between two clips (user 2026-10-29): its picture moves with the clips' Edit
-        // (Ctrl+Shift+I/O); here only its sound, in the zoom.
-        if qnc_program_view::join_segment(&marker_id).is_some() {
-            let stored = self.cut_frame(&marker_id).unwrap_or(frame);
-            let words = if frame == stored { "story.msg.join_taken" } else { "story.msg.join_moves_with_edit" };
-            self.refresh_view(qnc_ui_text::text(words).into());
-            if frame == stored {
-                self.cue_program(frame);
-            }
-            return;
-        }
-        if let Err(error) = check_move(&self.stored_pins(), &marker_id, frame) {
+        // A cut between two clips (user 2026-10-29) moves as an M marker does, between the cuts
+        // beside it (markers and other joins): whole a roll, its picture alone a picture J or L.
+        let join = qnc_program_view::join_segment(&marker_id).is_some();
+        let pins = if join { self.cut_pins() } else { self.stored_pins() };
+        if let Err(error) = check_move(&pins, &marker_id, frame) {
             return self.refresh_view(error);
         }
         let before = self.marker_edit.clone();
@@ -103,7 +96,11 @@ impl ProgramSegments {
         }
         // Only its picture moving says so on every step (the log 2026-10-22: the whole marker's
         // words came back after the first step).
-        let words = if self.cut_part == crate::CutPart::Picture { "story.msg.cut_picture_taken" } else { "story.msg.marker_taken" };
+        let words = match (self.cut_part == crate::CutPart::Picture, join) {
+            (true, _) => "story.msg.cut_picture_taken",
+            (false, true) => "story.msg.join_taken",
+            (false, false) => "story.msg.marker_taken",
+        };
         self.refresh_view(qnc_ui_text::text(words).into());
         self.cue_program(frame);
     }
@@ -133,5 +130,13 @@ impl ProgramSegments {
     /// The stored markers without the draft: neighbours are checked against them.
     fn stored_pins(&self) -> Vec<crate::MarkerPin> {
         crate::resolve(&self.view, &self.stored_markers, None)
+    }
+
+    /// Every stored cut: the markers and the joins of two clips, in program order.
+    fn cut_pins(&self) -> Vec<crate::MarkerPin> {
+        let mut pins = self.stored_pins();
+        pins.extend(self.view.joins.iter().cloned());
+        pins.sort_by_key(|pin| pin.frame);
+        pins
     }
 }

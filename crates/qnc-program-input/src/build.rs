@@ -46,6 +46,7 @@ pub fn build_input(
             a1_off: segment.a1_off,
             covers,
             v_lead_frames: i64::from(segment.v_lead_frames),
+            v_tail_frames: i64::from(segment.v_tail_frames),
             a1_lead_frames: i64::from(segment.a1_lead_frames),
             a1_tail_frames: i64::from(segment.a1_tail_frames),
         });

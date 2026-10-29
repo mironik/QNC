@@ -79,9 +79,10 @@ impl ProgramSegments {
         };
         let stored = self.cut_frame(&marker_id);
         if picture {
-            if qnc_program_view::join_segment(&marker_id).is_some() {
-                self.refresh_view(qnc_ui_text::text("story.msg.join_moves_with_edit").into());
-                return true;
+            // The picture of a cut between two clips starts where it is stored, which may be
+            // apart from its sound (a J or L of the picture).
+            if let Some(frame) = self.join_picture_frame(&marker_id) {
+                self.marker_edit = Some((marker_id, frame));
             }
             self.cut_part = CutPart::Picture;
             return self.say_cut();
@@ -191,9 +192,70 @@ impl ProgramSegments {
         }
     }
 
-    /// Ctrl+M on the taken cut: the whole cut moves again.
+    /// Ctrl+M on the taken cut: the whole cut moves again, from where it is stored.
     pub(crate) fn whole_cut(&mut self) {
         self.cut_part = CutPart::Whole;
+        if let Some((marker_id, _)) = self.marker_edit.clone() {
+            if let Some(frame) = self.cut_frame(&marker_id).filter(|_| qnc_program_view::join_segment(&marker_id).is_some()) {
+                self.marker_edit = Some((marker_id, frame));
+            }
+        }
+    }
+
+    /// The two clips of a cut between them, as stored: the one before and `segment_id` after.
+    fn join_pair(&self, marker_id: &str) -> Option<(&qnc_program_db::ProgramSegment, &qnc_program_db::ProgramSegment)> {
+        let segment_id = qnc_program_view::join_segment(marker_id)?;
+        let cut = self.view.rows.iter().find(|row| row.segment_id == segment_id)?.start_frame;
+        self.join_clips(cut)
+    }
+
+    /// Where the picture of a cut between two clips is stored: its sound cut plus the picture
+    /// L of the clip before, less the picture J of the clip after. `None` for an M marker.
+    pub(crate) fn join_picture_frame(&self, marker_id: &str) -> Option<u64> {
+        let cut = self.cut_frame(marker_id)?;
+        let (before, after) = self.join_pair(marker_id)?;
+        Some((cut + u64::from(before.v_tail_frames)).saturating_sub(u64::from(after.v_lead_frames)))
+    }
+
+    /// The picture of every cut between two clips apart from its sound, as (picture frame,
+    /// sound frame), the taken one as drafted (user 2026-10-29: the picture and the sound of a
+    /// cut are each their own timecode).
+    pub(crate) fn picture_splits(&self) -> Vec<(u64, u64)> {
+        self.view
+            .rows
+            .windows(2)
+            .filter(|pair| !pair[0].lead && !pair[1].lead)
+            .filter_map(|pair| {
+                let marker_id = format!("{}{}", qnc_program_view::JOIN_PREFIX, pair[1].segment_id);
+                let cut = pair[1].start_frame;
+                let picture = match (self.cut_part, &self.marker_edit) {
+                    (CutPart::Picture, Some((id, draft))) if *id == marker_id => Some(*draft),
+                    _ => self.join_picture_frame(&marker_id),
+                }?;
+                (picture != cut).then_some((picture, cut))
+            })
+            .collect()
+    }
+
+    /// The picture of the taken cut between two clips as drafted, for the program to show before
+    /// Enter: the two clips with their picture (J, L); `None` while it is not taken or as stored.
+    pub fn join_picture_draft(&self) -> Option<Vec<(String, (u32, u32))>> {
+        let (CutPart::Picture, Some((marker_id, draft))) = (self.cut_part, &self.marker_edit) else {
+            return None;
+        };
+        let (before, after) = self.join_pair(marker_id)?;
+        let (tail, lead) = picture_sides(*draft, self.cut_frame(marker_id)?);
+        if (tail, lead) == (before.v_tail_frames, after.v_lead_frames) {
+            return None;
+        }
+        Some(vec![
+            (before.segment_id.clone(), (before.v_lead_frames, tail)),
+            (after.segment_id.clone(), (lead, after.v_tail_frames)),
+        ])
+    }
+
+    pub fn cut_picture_taken(&self) -> bool {
+        self.marker_edit.is_some() && self.cut_part == CutPart::Picture
     }
 
     /// Whether the cut has sound on `lane` to move: covers on A2, two clips on A1.
@@ -281,9 +343,25 @@ impl ProgramSegments {
             self.marker_committing = true;
             return self.write(Operation::SetJoinSound { segment_id, tail_frames: draft.tail, lead_frames: draft.lead });
         }
-        // A cut between two clips moves with its clips' Edit, not as a marker.
-        if join.is_some() {
-            return self.refresh_view(String::new());
+        // A cut between two clips (user 2026-10-29): whole, the OUT before and the IN after move
+        // together (a roll); its picture alone, a picture L before or J after.
+        if let Some(segment_id) = join {
+            let (Some(cut), Some((before, after))) = (self.cut_frame(&marker_id), self.join_pair(&marker_id)) else {
+                return self.refresh_view(String::new());
+            };
+            let operation = match part {
+                CutPart::Whole if frame != cut => Operation::RollJoin { segment_id, frames: frame as i64 - cut as i64 },
+                CutPart::Picture => {
+                    let (tail, lead) = picture_sides(frame, cut);
+                    if (tail, lead) == (before.v_tail_frames, after.v_lead_frames) {
+                        return self.refresh_view(String::new());
+                    }
+                    Operation::SetJoinPicture { segment_id, tail_frames: tail, lead_frames: lead }
+                }
+                _ => return self.refresh_view(String::new()),
+            };
+            self.marker_committing = true;
+            return self.write(operation);
         }
         self.marker_committing = true;
         self.write(match part {
@@ -397,4 +475,11 @@ impl ProgramSegments {
         self.refresh_view(message);
         true
     }
+}
+
+/// The picture of a join at `picture` with its sound cut at `cut`, as the picture L of the clip
+/// before (later) and the picture J of the clip after (earlier).
+fn picture_sides(picture: u64, cut: u64) -> (u32, u32) {
+    let offset = picture as i64 - cut as i64;
+    (offset.clamp(0, MOST) as u32, (-offset).clamp(0, MOST) as u32)
 }
