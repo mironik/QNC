@@ -118,6 +118,10 @@ pub fn show(ui: &mut egui::Ui, view: &SubsegmentView, theme: TimelineTheme) -> O
         _ => None,
     };
     answer = answer.or(event);
+    // The trim zoom of a taken edge, as a cover's: its wheel moves the edge; a double click on
+    // a word is not a cut here (the source timeline is not shown).
+    let zoomed = view.zoom.as_deref().and_then(|zoom| qnc_trim_overlay::show(ui.ctx(), zoom)).filter(|event| event.action_id != "transcript_cut_word");
+    answer = answer.or(zoomed);
     // The pause and join before every part after the first.
     for (index, part) in view.parts.iter().enumerate().skip(1) {
         let target = |step: Option<i64>| match step {

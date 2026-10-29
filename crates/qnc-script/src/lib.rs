@@ -126,6 +126,8 @@ pub struct Script {
     waves: qnc_program_waveform::ProgramWaves,
     /// The project the waves read from.
     waves_project: Option<String>,
+    /// The pictures, fine wave and words of the trim zoom.
+    trim_stills: qnc_trim_stills::TrimStills,
 }
 
 /// An edge of part `index` being trimmed: the OUT or the IN, and the part's range as drafted.
@@ -139,7 +141,7 @@ struct Trim {
 
 impl Default for Script {
     fn default() -> Self {
-        Self { view: ScriptView::default(), blocks: Vec::new(), project: None, reading: None, read_at: None, writing: None, source_request: None, names: HashMap::new(), words_per_second: Ok(0.0), take: None, taking: None, exporting: None, open_subsegment: None, pieces_request: None, trim: None, waves: qnc_program_waveform::ProgramWaves::new(), waves_project: None }
+        Self { view: ScriptView::default(), blocks: Vec::new(), project: None, reading: None, read_at: None, writing: None, source_request: None, names: HashMap::new(), words_per_second: Ok(0.0), take: None, taking: None, exporting: None, open_subsegment: None, pieces_request: None, trim: None, waves: qnc_program_waveform::ProgramWaves::new(), waves_project: None, trim_stills: qnc_trim_stills::TrimStills::new() }
     }
 }
 
@@ -160,7 +162,7 @@ impl Script {
 
     /// Whether a read or a write of this process runs (the form repaints soon).
     pub fn busy(&self) -> bool {
-        self.reading.is_some() || self.writing.is_some() || self.take.is_some() || self.taking.is_some() || self.exporting.is_some()
+        self.reading.is_some() || self.writing.is_some() || self.take.is_some() || self.taking.is_some() || self.exporting.is_some() || self.trim_stills.loading()
     }
 
     /// A clip and IN/OUT a chosen clip block opens on the source timeline, once.
@@ -207,6 +209,15 @@ impl Script {
         let names = &self.names;
         shown.a1 = self.waves.peaks(shown.total_frames, &placements, &[], |clip| names.get(clip).map(|(_, frames, _)| *frames)).a1;
         shown.trim = self.trim.and_then(|trim| shown.parts.get(trim.index).map(|part| (trim.index, trim.out, if trim.out { part.end.saturating_sub(1) } else { part.start })));
+        // The trim zoom of the taken edge: its pictures, fine wave and words come from the
+        // same pieces as a cover's (`qnc-trim-stills`).
+        let pieces = view::block_pieces(&block);
+        let rate = pieces.first().and_then(|piece| names.get(&piece.clip_id)).filter(|(_, _, seconds)| *seconds > 0.0).map_or(25, |(_, frames, seconds)| (*frames as f64 / seconds).round() as u64);
+        let zoom = self.trim.and_then(|trim| view::subsegment_zoom(&shown, &pieces, (trim.index, trim.out), rate, |clip| names.get(clip).map(|(_, frames, _)| *frames)));
+        shown.zoom = zoom.map(|mut zoom| {
+            self.trim_stills.fill(&mut zoom, preview.still_locator(), None);
+            Box::new(zoom)
+        });
         self.view.subsegment = Some(shown);
     }
 

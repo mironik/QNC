@@ -15,6 +15,8 @@ qnc-status-line = { workspace = true }
 qnc-source-preview = { workspace = true }
 qnc-source-timecode = { workspace = true }
 qnc-program-waveform = { workspace = true }
+qnc-program-view = { workspace = true }
+qnc-trim-stills = { workspace = true }
 qnc-wheel-jog = { workspace = true }
 qnc-timeline = { workspace = true }
 qnc-transcript = { workspace = true }

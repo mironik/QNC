@@ -6847,3 +6847,11 @@ pomaknuti za isto), Esc odustaje. `qnc-script` (`trim_key`, `drafted`, `trimmed_
 `qnc-subsegment-panel`. Nije izvedeno: zoom reza (slike prije/poslije, fini val, rijeci) kao kod pokrivalica, filmstrip
 dijelova, kanal i razina A1 po dijelu, povlacenje ruba misem, premjestanje i brisanje dijela. Testovi `qnc-script-db`
 (novi), `qnc-script`, conformance. Uzivo nije provjereno.
+Dopuna 2026-10-29 (korisnik: "da, nastavi sa zoomom reza"): dok je rub dijela SubSegmenta uzet, u sredini ekrana je
+isti zoom reza kao kod pokrivalica (`qnc-trim-overlay`, slike, fini val i rijeci puni `qnc-trim-stills`, ne kopija):
+za IN zadnja slika prije reza (prethodni dio, a iza razmaka ono sto je prije IN-a) i prva slika dijela (oznacena), za
+OUT zadnja slika dijela (oznacena) i prva sljedeceg dijela (iza zadnjeg dijela ili prije razmaka ono sto je iza OUT-a);
+ispod A1 sekundu sa svake strane reza na osi SubSegmenta s rijecima. Kotacic nad zoomom pomice rub; dvoklik na rijec tu
+ne radi rez. `qnc-script` (`subsegment_zoom`, `SubsegmentView.zoom`, `trim_stills`; slike prate nacrt), crta ga
+`qnc-subsegment-panel`. Test `the_zoom_of_a_subsegment_edge_shows_the_pictures_either_side_of_its_cut`, conformance.
+Uzivo nije provjereno.

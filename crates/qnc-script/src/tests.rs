@@ -67,3 +67,29 @@ fn the_story_has_the_first_and_last_words_of_its_blocks_in_its_length() {
     assert_eq!(story.items[2].cues, Some(("Ne odustajemo od...".to_string(), "...odustajemo od naših zahtjeva.".to_string())), "a SOT shows its cues");
     assert_eq!(story.items[1].cues, None);
 }
+
+fn part(clip: &str, from: u64, to: u64, gap: u64) -> Piece {
+    Piece { clip_id: clip.into(), clip_name: clip.into(), from_frame: from, to_frame: to, start_tc: String::new(), end_tc: String::new(), length: String::new(), seconds: 1.0, text: String::new(), gap_before: gap, cut: false }
+}
+
+#[test]
+fn the_zoom_of_a_subsegment_edge_shows_the_pictures_either_side_of_its_cut() {
+    let pieces = vec![part("a", 100, 150, 0), part("a", 300, 340, 0), part("b", 10, 60, 5)];
+    let block = Block::of_pieces("sot", pieces.clone());
+    let shown = subsegment_view(&block, None);
+    assert_eq!(shown.parts.iter().map(|p| (p.start, p.end)).collect::<Vec<_>>(), vec![(0, 50), (50, 90), (95, 145)]);
+    // The IN of the second part: the last picture of the first part, then its own first, marked.
+    let zoom = subsegment_zoom(&shown, &pieces, (1, false), 50, |_| Some(1000)).unwrap();
+    let pictures: Vec<_> = zoom.source_edit_stills.iter().map(|s| (s.picture.as_ref().map(|p| (p.clip_id.as_str(), p.source_frame)), s.cut)).collect();
+    assert_eq!(pictures, vec![(Some(("a", 149)), false), (Some(("a", 300)), true)]);
+    let sound = zoom.zoom_sound.unwrap();
+    assert_eq!((sound.from, sound.to, sound.cut), (0, 100, 50));
+    assert_eq!(sound.lanes[0].len(), 3, "every part within a second of the cut is heard on A1");
+    // The IN of the third part follows a pause: before it is what lies before its own IN.
+    let zoom = subsegment_zoom(&shown, &pieces, (2, false), 50, |_| Some(1000)).unwrap();
+    assert_eq!(zoom.source_edit_stills[0].picture.as_ref().map(|p| p.source_frame), Some(9));
+    // The OUT of the first part: its last picture, marked, then the next part's first.
+    let zoom = subsegment_zoom(&shown, &pieces, (0, true), 50, |_| Some(1000)).unwrap();
+    let pictures: Vec<_> = zoom.source_edit_stills.iter().map(|s| (s.picture.as_ref().map(|p| p.source_frame), s.cut)).collect();
+    assert_eq!(pictures, vec![(Some(149), true), (Some(300), false)]);
+}

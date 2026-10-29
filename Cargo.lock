@@ -5557,6 +5557,7 @@ dependencies = [
  "qnc-db-broker",
  "qnc-dev-diagnostics",
  "qnc-newsroom-sheet-db",
+ "qnc-program-view",
  "qnc-program-waveform",
  "qnc-script-db",
  "qnc-script-export",
@@ -5567,6 +5568,7 @@ dependencies = [
  "qnc-status-line",
  "qnc-timeline",
  "qnc-transcript",
+ "qnc-trim-stills",
  "qnc-ui-text",
  "qnc-voice-record",
  "qnc-voice-take",
@@ -6125,6 +6127,7 @@ dependencies = [
  "qnc-action-event",
  "qnc-script",
  "qnc-timeline",
+ "qnc-trim-overlay",
  "qnc-ui-text",
  "qnc-wheel-jog",
 ]
