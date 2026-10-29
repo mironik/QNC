@@ -6921,3 +6921,5 @@ Popravak 2026-10-29 (korisnik: "vu-metar se nalazio na traci iznad source timeli
 jedno mjesto metra, traku panela Segmenti; panel bez segmenata (od 24. 9.) crtao je samo poruku i nije crtao traku, pa u
 prici bez segmenata metra i NORM nije bilo. Sada je traka na dnu panela i bez segmenata (`qnc-segment-panel`). Testovi,
 conformance, release build.
+Vraceno 2026-10-29 (korisnik: "makni metar ispod monitora"): metar u panelu transporta (462b506) uklonjen, `transport_width`
+opet 290. Metar je samo na traci panela Segmenti, kao u verzijama od 28. 10.
