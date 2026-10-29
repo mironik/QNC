@@ -66,7 +66,7 @@ pub fn show(ctx: &egui::Context, segments: &SegmentsView) -> Option<ActionEvent>
         .interactable(true)
         .show(ctx, |ui| {
             let (rect, _) = ui.allocate_exact_size(size, Sense::hover());
-            let wheel = qnc_wheel_jog::take(ui, rect, ui.id().with("wheel")).or_else(|| qnc_touchpad::take(ui, rect, ui.id().with("touchpad")));
+            let wheel = qnc_wheel_jog::take(ui, rect, ui.id().with("wheel")).or_else(|| qnc_touchpad::take(ui, rect, ui.id().with("touchpad")).and_then(|gesture| gesture.wheel()));
             let (actions, panel) = if source { (qnc_wheel_jog::SOURCE_ACTIONS, "source_timeline") } else { (qnc_wheel_jog::SEGMENTS_ACTIONS, "segments") };
             turned = wheel.map(|wheel| ActionEvent::key(wheel.action(actions)).at(panel));
             let visuals = ui.visuals().clone();

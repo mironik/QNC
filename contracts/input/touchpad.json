@@ -1,10 +1,12 @@
 {
   "version": 1,
-  "description": "The touchpad map of QNC (user 2026-10-18: every input device is a block with its own map). A role is what a gesture does over a panel: jog = the panel's wheel (the left/right arrow), level = Ctrl+wheel (the level of a taken A1/A2 sound), none = nothing. On Windows a two-finger swipe arrives as fine wheel steps and a pinch as Ctrl with them; on macOS a pinch is its own gesture.",
+  "description": "The touchpad map of QNC (user 2026-10-18: every input device is a block with its own map). A role is what a gesture does over a panel: jog = the panel's wheel (the left/right arrow), level = Ctrl+wheel (the level of a taken A1/A2 sound), undo = undo (up, away from the user) or redo (down) of the story where the panel maps it (user 2026-10-29: left-right for the markers, up-down for undo-redo), none = nothing. On Windows a two-finger swipe arrives as fine wheel steps and a pinch as Ctrl with them; on macOS a pinch is its own gesture.",
   "swipe_horizontal": "jog",
-  "swipe_vertical": "jog",
+  "swipe_vertical": "undo",
   "pinch": "level",
   "lines_per_step": 1.0,
   "points_per_step": 40.0,
-  "zoom_per_step": 1.1
+  "zoom_per_step": 1.1,
+  "lines_per_undo": 3.0,
+  "points_per_undo": 120.0
 }

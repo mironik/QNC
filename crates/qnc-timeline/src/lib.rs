@@ -13,6 +13,7 @@ mod marker_reach;
 use marker_reach::{marker_for_right_click, marker_to_drag, source_mark_in_reach, taken_marker_for_right_click};
 pub use events::take_marker_drag_event;
 mod lanes;
+mod undo_drag;
 pub use events::event;
 pub use lanes::{drafted_choice, lane_choice, lane_key, lane_message, Lane, LaneChoice, LaneKey};
 
@@ -74,6 +75,9 @@ pub struct TimelineLayerFlags {
     /// (user 2026-10-15: Ctrl+click on V switches a Wrap row between filmstrip and a
     /// narrow video row).
     pub compact_video: bool,
+    /// A mostly up/down left-button drag is undo (up) or redo (down), not a scrub nor a marker
+    /// drag (user 2026-10-29; the Wrap rows).
+    pub undo_drag: bool,
 }
 
 /// The dark band above the light middle of the video row (without audio bands).
@@ -103,7 +107,14 @@ impl TimelineLayerFlags {
             playhead: true,
             audio_bands: false,
             compact_video: false,
+            undo_drag: false,
         }
+    }
+
+    /// An up/down drag is undo or redo.
+    pub fn with_undo_drag(mut self) -> Self {
+        self.undo_drag = true;
+        self
     }
 
     /// A1 above and A2 below the light middle of the video row, in its dark bands.
@@ -871,6 +882,9 @@ pub enum TimelineIntent {
     /// "double click for IN/OUT; which is IN and which OUT the timecode decides, IN is the
     /// smaller"), as two cuts do.
     CutAt(u64),
+    /// A mostly up/down drag with the mouse or a two-finger swipe along: undo (up) or redo
+    /// (`redo`, down) of the story (user 2026-10-29).
+    UndoStep { redo: bool },
 }
 
 impl Default for TimelineIntent {
@@ -1002,7 +1016,10 @@ pub fn show(ui: &mut egui::Ui, input: TimelineInput<'_>) -> TimelineIntent {
     let notch = qnc_wheel_jog::take(ui, outer, ui.id().with("qnc-timeline-wheel"));
     let swipe = qnc_touchpad::take(ui, outer, ui.id().with("qnc-timeline-touchpad"));
     let touch = qnc_touch_gestures::take(ui, outer, ui.id().with("qnc-timeline-touch"));
-    let wheel = notch.or(swipe).or(touch);
+    let gesture_undo = swipe.or(touch).and_then(|gesture| gesture.undo());
+    let wheel = notch.or(swipe.and_then(|gesture| gesture.wheel())).or(touch.and_then(|gesture| gesture.wheel()));
+    // Left-right drags the markers, up-down is undo or redo (user 2026-10-29).
+    let (undo_held, undo_step) = if input.layers.undo_drag { undo_drag::take(ui, outer, ui.id().with("qnc-timeline-undo-drag")) } else { (false, None) };
     let over = ui.ctx().pointer_hover_pos().is_some_and(|at| outer.contains(at));
     // A cut (scissors) on every timeline: the middle button over it or a two-finger tap
     // (user 2026-10-18: on the source timeline and on the Wrap rows with the covers).
@@ -1226,6 +1243,15 @@ pub fn show(ui: &mut egui::Ui, input: TimelineInput<'_>) -> TimelineIntent {
     }
     paint_trim_playheads(ui, outer, &input);
 
+    if undo_held {
+        // The row's own drags of the first pixels are not given.
+        take_marker_drag(ui.ctx());
+        take_cut_edge_drag(ui.ctx());
+        return undo_step.map_or(TimelineIntent::None, |redo| TimelineIntent::UndoStep { redo });
+    }
+    if let (Some(redo), TimelineIntent::None) = (gesture_undo, &intent) {
+        return TimelineIntent::UndoStep { redo };
+    }
     // The middle button also presses on the track; the cut is what it means (live
     // 2026-10-18: the cue of that press won and no cut came).
     if cut {

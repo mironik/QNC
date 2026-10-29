@@ -70,10 +70,14 @@ pub enum Pointer {
     WheelForward,
     CtrlWheelBack,
     CtrlWheelForward,
+    /// A mostly up/down drag or a two-finger swipe along, up: undo (user 2026-10-29).
+    DragUp,
+    /// Down: redo.
+    DragDown,
 }
 
 impl Pointer {
-    pub const ALL: [Pointer; 34] = [
+    pub const ALL: [Pointer; 36] = [
         Self::Click,
         Self::ClickHolding,
         Self::ClickStrip,
@@ -108,6 +112,8 @@ impl Pointer {
         Self::WheelForward,
         Self::CtrlWheelBack,
         Self::CtrlWheelForward,
+        Self::DragUp,
+        Self::DragDown,
     ];
 
     /// Its name in the contract.
@@ -147,6 +153,8 @@ impl Pointer {
             Self::WheelForward => "wheel_forward",
             Self::CtrlWheelBack => "ctrl_wheel_back",
             Self::CtrlWheelForward => "ctrl_wheel_forward",
+            Self::DragUp => "drag_up",
+            Self::DragDown => "drag_down",
         }
     }
 }
@@ -236,6 +244,9 @@ mod tests {
         assert_eq!(map.action("segments", Pointer::Click), Some("timeline_cue_frame"), "a left click is the playhead");
         assert_eq!(map.action(source, Pointer::ShiftClick), None, "nothing to add on a source timeline");
         assert_eq!(map.action("segments", Pointer::DoubleClick), Some("segment_edit"), "a double click is Edit");
+        assert_eq!(map.action("segments", Pointer::DragUp), Some("undo_object"), "a drag up is undo (user 2026-10-29)");
+        assert_eq!(map.action("segments", Pointer::DragDown), Some("redo_object"), "a drag down is redo");
+        assert_eq!(map.action(source, Pointer::DragUp), None, "a source timeline has no story to undo");
     }
 
     #[test]

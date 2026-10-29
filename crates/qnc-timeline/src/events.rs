@@ -41,6 +41,7 @@ pub fn event(intent: &TimelineIntent, panel: &str, frame: &dyn Fn(u64) -> u64) -
         // IN or OUT dragged: the clip's own frame, never mapped.
         TimelineIntent::DragMark { in_mark, frame: at } => (if *in_mark { Pointer::DragIn } else { Pointer::DragOut }, Some(*at), None),
         TimelineIntent::Cut => (Pointer::MiddleClick, None, None),
+        TimelineIntent::UndoStep { redo } => (if *redo { Pointer::DragDown } else { Pointer::DragUp }, None, None),
         TimelineIntent::CutAt(at) => (Pointer::DoubleClickFrame, Some(frame(*at)), None),
         TimelineIntent::Wheel(turn) => (
             match (turn.ctrl, turn.up) {

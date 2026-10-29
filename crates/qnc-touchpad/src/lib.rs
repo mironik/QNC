@@ -12,7 +12,8 @@
 //! (`qnc-wheel-jog`), never this one's. No form state, no database, no player.
 
 use eframe::egui::{self, Rect, Ui};
-use qnc_gesture_steps::{Role, Steps};
+use qnc_gesture_steps::{Gesture, Role, Steps};
+#[cfg(test)]
 use qnc_wheel_jog::Wheel;
 
 pub const MODULE_ID: &str = "qnc.module.touchpad";
@@ -33,6 +34,10 @@ pub struct TouchpadMap {
     pub points_per_step: f32,
     /// The zoom factor of one pinch step (macOS).
     pub zoom_per_step: f32,
+    /// Fine wheel steps (Windows) and points (macOS) of one undo or redo: a longer swipe than
+    /// a jog step, so one swipe is not many undos.
+    pub lines_per_undo: f32,
+    pub points_per_undo: f32,
 }
 
 impl TouchpadMap {
@@ -45,6 +50,8 @@ impl TouchpadMap {
             lines_per_step: qnc_gesture_steps::amount(&map, "lines_per_step", 0.0)?,
             points_per_step: qnc_gesture_steps::amount(&map, "points_per_step", 0.0)?,
             zoom_per_step: qnc_gesture_steps::amount(&map, "zoom_per_step", 1.0)?,
+            lines_per_undo: qnc_gesture_steps::amount(&map, "lines_per_undo", 0.0)?,
+            points_per_undo: qnc_gesture_steps::amount(&map, "points_per_undo", 0.0)?,
         })
     }
 
@@ -61,13 +68,19 @@ fn add(map: &TouchpadMap, events: &[egui::Event], steps: &mut Steps) {
     for event in events {
         match event {
             egui::Event::MouseWheel { unit, delta, modifiers } if !qnc_wheel_jog::is_notch(*unit, *delta) => {
-                let per_step = if *unit == egui::MouseWheelUnit::Point { map.points_per_step } else { map.lines_per_step };
+                let point = *unit == egui::MouseWheelUnit::Point;
+                let per_step = if point { map.points_per_step } else { map.lines_per_step };
+                let per = |role: Role| match (role, point) {
+                    (Role::Undo, true) => map.points_per_undo,
+                    (Role::Undo, false) => map.lines_per_undo,
+                    _ => per_step,
+                };
                 // Windows: a pinch is the fine wheel with Ctrl.
                 if modifiers.ctrl || modifiers.command {
                     steps.add(map.pinch, (delta.x + delta.y) / per_step);
                 } else {
-                    steps.add(map.swipe_horizontal, delta.x / per_step);
-                    steps.add(map.swipe_vertical, delta.y / per_step);
+                    steps.add(map.swipe_horizontal, delta.x / per(map.swipe_horizontal));
+                    steps.add(map.swipe_vertical, delta.y / per(map.swipe_vertical));
                 }
             }
             egui::Event::Zoom(factor) if *factor > 0.0 => steps.add(map.pinch, factor.ln() / map.zoom_per_step.ln()),
@@ -88,7 +101,7 @@ fn touchpad_event(event: &egui::Event) -> bool {
 /// The touchpad over `rect` this frame: one step of the panel's wheel (`ctrl`: Ctrl+wheel),
 /// the rest in the next frames, in order. Over the panel the scroll is taken, so a list under
 /// it does not move.
-pub fn take(ui: &Ui, rect: Rect, key: egui::Id) -> Option<Wheel> {
+pub fn take(ui: &Ui, rect: Rect, key: egui::Id) -> Option<Gesture> {
     let map = TouchpadMap::of_this_qnc()?;
     let ctx = ui.ctx();
     let over = ctx.pointer_hover_pos().is_some_and(|at| rect.contains(at));
@@ -124,26 +137,30 @@ mod tests {
         egui::Event::MouseWheel { unit: egui::MouseWheelUnit::Line, delta: egui::vec2(x, y), modifiers }
     }
 
-    fn all(steps: &mut Steps) -> Vec<Wheel> {
+    fn all(steps: &mut Steps) -> Vec<Gesture> {
         std::iter::from_fn(|| steps.next()).collect()
     }
 
     #[test]
     fn a_windows_swipe_adds_up_fractions_of_a_notch_to_steps() {
         let mut steps = Steps::default();
-        add(&map(), &[fine(0.0, 0.4, false), fine(0.0, 0.4, false)], &mut steps);
+        add(&map(), &[fine(0.4, 0.0, false), fine(0.4, 0.0, false)], &mut steps);
         assert!(all(&mut steps).is_empty(), "less than a notch: no step yet");
-        add(&map(), &[fine(0.0, 0.4, false)], &mut steps);
-        assert_eq!(all(&mut steps), vec![Wheel { up: true, ctrl: false }]);
-        add(&map(), &[fine(-2.5, 0.0, false)], &mut steps);
-        assert_eq!(all(&mut steps).len(), 2, "across, back: two steps");
+        add(&map(), &[fine(0.4, 0.0, false)], &mut steps);
+        assert_eq!(all(&mut steps), vec![Gesture::Wheel(Wheel { up: true, ctrl: false })], "across: the jog");
+        add(&map(), &[fine(0.0, 1.6, false)], &mut steps);
+        assert!(all(&mut steps).is_empty(), "a short swipe along: no undo yet");
+        add(&map(), &[fine(0.0, 1.6, false)], &mut steps);
+        assert_eq!(all(&mut steps), vec![Gesture::Undo { redo: false }], "along, up: undo (user 2026-10-29)");
+        add(&map(), &[fine(0.0, -3.3, false)], &mut steps);
+        assert_eq!(all(&mut steps), vec![Gesture::Undo { redo: true }], "along, down: redo");
     }
 
     #[test]
     fn a_pinch_is_the_level_and_a_whole_notch_is_the_mouse_wheels() {
         let mut steps = Steps::default();
         add(&map(), &[fine(0.0, 0.5, true), fine(0.0, 0.6, true)], &mut steps);
-        assert_eq!(all(&mut steps), vec![Wheel { up: true, ctrl: true }], "Windows: the fine wheel with Ctrl is a pinch");
+        assert_eq!(all(&mut steps), vec![Gesture::Wheel(Wheel { up: true, ctrl: true })], "Windows: the fine wheel with Ctrl is a pinch");
         add(&map(), &[egui::Event::Zoom(1.1f32.powi(2) * 1.001)], &mut steps);
         assert_eq!(all(&mut steps).len(), 2, "macOS: two zoom steps out");
         let notch = egui::Event::MouseWheel { unit: egui::MouseWheelUnit::Line, delta: egui::vec2(0.0, 1.0), modifiers: egui::Modifiers::NONE };
