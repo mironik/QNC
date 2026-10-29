@@ -11,6 +11,12 @@ use crate::ProgramSegments;
 impl ProgramSegments {
     /// The selected object as (type, id) for undo selected; `None` when nothing is selected.
     pub(crate) fn selected_object(&self) -> Option<(&'static str, String)> {
+        self.picked_object().or_else(|| self.selected.clone().map(|segment| ("segment", segment)))
+    }
+
+    /// The object the user picked (a taken cut, a cover, a marker, the cover of a selected slot),
+    /// without the selected segment, which is always there.
+    pub(crate) fn picked_object(&self) -> Option<(&'static str, String)> {
         if let Some((id, _)) = &self.marker_edit {
             return Some(match qnc_program_view::join_segment(id) {
                 Some(segment_id) => ("segment", segment_id.to_string()),
@@ -28,7 +34,7 @@ impl ProgramSegments {
                 return Some(("cover", cover.cover_id.clone()));
             }
         }
-        self.selected.clone().map(|segment| ("segment", segment))
+        None
     }
 
     /// Ctrl+Backspace (`redo` with Shift): the selected object's newest change undone, or what

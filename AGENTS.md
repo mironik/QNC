@@ -7062,3 +7062,13 @@ izabrana pokrivalica, izabrani marker, pokrivalica izabranog slota, izabrani seg
 "Redo sel." u traci panela Segmenti lijevo od Undo/Redo (ukljuceni kad je nesto izabrano). Testovi
 `undo_selected_takes_back_the_changes_of_one_object_whenever_they_were`, `undo_selected_takes_the_selected_object`,
 conformance. Nije izvedeno: undo/redo misem. Uzivo nije provjereno.
+Odbaceno i izvedeno 2026-10-30 (korisnik: "nisu ni geste ni mis adekvatni na predlozeni nacin"; "dva prsta na touchpadu
+igra ulogu Ctrl+, sto znaci da selektira markere, isto radi i desni klik misa"; "napravi audit komandi"; Backspace "undo
+selektiranog"): undo okomitim povlacenjem misa i okomitim swipeom touchpada (8c52904) vracen (2e4e145). Backspace (i
+Ctrl+Z, Ctrl+U, gumb Undo: ista akcija `undo_object`) radi undo izabranog kad je nesto uzeto ili izabrano (uzeti rez,
+uzeta ili izabrana pokrivalica, izabrani marker, pokrivalica izabranog slota), inace vremenski undo; Shift+Backspace isto
+za redo. Izabrani segment ne racuna se (uvijek postoji). Obican klik na Wrap redak pusta izabrani marker kao i izabranu
+pokrivalicu, pa Backspace opet radi vremenski undo. `qnc-program-segments` (`picked_object`, `commands.rs`). Ctrl+Backspace
+ostaje undo izabranog ukljucujuci segment. Selekcija: desni klik misa i dodir s dva prsta na touchpadu (Windows ga salje
+kao desni klik) su Ctrl+ (marker cijeli, traka pokrivalice = slot, pokrivalica, A1/A2), vec po mapi misa. Test
+`backspace_undoes_what_is_picked_and_otherwise_in_time`, conformance. Uzivo nije provjereno.

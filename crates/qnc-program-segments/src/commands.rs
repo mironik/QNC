@@ -149,6 +149,12 @@ impl ProgramSegments {
                 self.refresh_view(String::new());
             }
             SegmentCommand::UndoSelected { redo } => self.undo_selected(redo),
+            // Backspace with a picked marker or cover is its own undo (user 2026-10-30: "a selected
+            // object is undone with Backspace"); the selected segment alone does not count, it is
+            // always there.
+            SegmentCommand::Undo | SegmentCommand::Redo if self.picked_object().is_some() => {
+                self.undo_selected(matches!(command, SegmentCommand::Redo))
+            }
             SegmentCommand::Undo | SegmentCommand::Redo => {
                 // Everything taken goes: its frames belong to the story before the undo (audit
                 // 2026-10-25: a taken slot moved with stale frames after Undo).
@@ -219,6 +225,8 @@ impl ProgramSegments {
                     self.write(Operation::SelectSlot { slot_id: String::new() });
                 }
                 self.drop_selected_cover();
+                // Nothing picked stays picked, so Backspace is the undo in time again.
+                self.selected_marker = None;
                 self.cue_at(frame)
             }
             SegmentCommand::Marker => self.marker_at_playhead(),

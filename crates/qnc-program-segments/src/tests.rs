@@ -1106,3 +1106,19 @@ fn undo_selected_takes_the_selected_object() {
     segments.apply(SegmentCommand::TakeMarker("m2".into()));
     assert_eq!(segments.selected_object(), Some(("marker", "m2".to_string())), "the taken cut first");
 }
+
+/// User 2026-10-30: Backspace undoes the picked marker or cover alone; with only the segment
+/// selected (always there) it is the undo in time.
+#[test]
+fn backspace_undoes_what_is_picked_and_otherwise_in_time() {
+    let mut segments = component();
+    segments.stored_covers = vec![cover("c0", "S|m1", (0, 15))];
+    segments.selected = Some("b".into());
+    segments.refresh_view(String::new());
+    assert_eq!(segments.picked_object(), None, "a selected segment alone is not picked");
+    segments.selected_slot = Some("S|m1".into());
+    assert_eq!(segments.picked_object(), Some(("cover", "c0".to_string())));
+    segments.selected_marker = Some("m2".into());
+    segments.apply(SegmentCommand::Cue(30));
+    assert_eq!(segments.selected_marker, None, "a click lets go of the picked marker");
+}
