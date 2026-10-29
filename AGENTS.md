@@ -6933,3 +6933,11 @@ Vraceno 2026-10-29 (korisnik: "nevalja, analiziraj polozaj u zadnjoj pushanoj ve
 (`2627516`, 28. 10.) metar (kocka `qnc-level-meter`) je na traci panela Segmenti, u sredini, lijevo od NORM, iznad reda
 programa na dnu panela. Metar na traci source timelinea (dface57) uklonjen; stanje je kao u pushanoj verziji, uz traku i
 kad prica nema segmenata (8fa1de4).
+Izmjena 2026-10-29 (korisnik: "sada tu kocku prebaci na sredinu source timeline, zadrzi dimenzije zajedno s dugmetom
+NORM"): nova kocka `crates/qnc-level-bar` (+ ugovor `contracts/modules/level-bar.module.json`): metar (kocka
+`qnc-level-meter`) i NORM desno od njega, 240 x 22 kao na traci Segmenti, centrirano u retku koji pozivatelj da; klik na
+NORM je `toggle_loudness_normalize`. Kocka `qnc-source-timeline` je postavlja u sredinu svoje trake iznad timelinea, u
+svakoj formi; razine iz previewa (`SourceTimelineView.levels`), stanje NORM-a daje fokus Storyja/MA
+(`offer_normalize`, `qnc-panel-focus`), Ingest nema pricu pa je NORM ondje ugasen. Traka panela Segmenti vise nema metar
+ni NORM (srednja dugmad i dalje skrivena); `levels` uklonjen iz `qnc-segment-panel`, `qnc-right-panel` i Story ploce.
+Testovi, conformance, release build.

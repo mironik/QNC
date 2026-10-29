@@ -1,0 +1,12 @@
+[package]
+name = "qnc-level-bar"
+version = "0.1.0"
+edition = "2021"
+description = "QNC public passive UI piece: the level meter of the player's output A1/A2 with the NORM button beside it, one block a panel places"
+
+[dependencies]
+eframe = { workspace = true }
+qnc-level-meter = { workspace = true }
+qnc-timeline = { workspace = true }
+qnc-ui-kit = { workspace = true }
+qnc-ui-text = { workspace = true }

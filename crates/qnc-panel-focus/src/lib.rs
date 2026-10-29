@@ -142,6 +142,7 @@ impl PanelFocus {
         qnc_segments_keys::dropped(preview, wrap, segments); // another edit took over
         qnc_sync_session::poll(preview, wrap, segments); // an IN pressed while the source plays starts Sync
         preview.normalize_program(segments.normalization()); // the program's A1/A2 to the project's targets
+        self.source.offer_normalize(Some(segments.view().normalize)); // NORM on the source timeline's level bar
         if let Some(answer) = self.keyframes.take() {
             match (self.jump.take(), answer) {
                 (Some(Jump::SourceMark), Ok(frames)) => {

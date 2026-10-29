@@ -4465,6 +4465,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "qnc-level-bar"
+version = "0.1.0"
+dependencies = [
+ "eframe",
+ "qnc-level-meter",
+ "qnc-timeline",
+ "qnc-ui-kit",
+ "qnc-ui-text",
+]
+
+[[package]]
 name = "qnc-level-meter"
 version = "0.1.0"
 dependencies = [
@@ -5662,7 +5673,6 @@ dependencies = [
  "qnc-dev-diagnostics",
  "qnc-export-box",
  "qnc-export-choice",
- "qnc-level-meter",
  "qnc-program-filmstrip",
  "qnc-program-view",
  "qnc-program-waveform",
@@ -6057,6 +6067,7 @@ dependencies = [
  "qnc-dev-diagnostics",
  "qnc-key-intents",
  "qnc-lane-choice",
+ "qnc-level-bar",
  "qnc-source-channels",
  "qnc-source-dock",
  "qnc-source-mark-focus",

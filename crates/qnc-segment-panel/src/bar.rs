@@ -20,17 +20,15 @@ const TRANSPORT_GAP: f32 = 5.0;
 const TRANSPORT_CONTROLS_W: f32 = TRANSPORT_BTN_W * 7.0 + TRANSPORT_GAP * 6.0;
 const FONT_UI: f32 = 14.0;
 
-/// The middle buttons (previous/next segment, slot, marker, program start) are hidden: a
-/// level meter is in their place (user 2026-10-16: hidden, not deleted).
+/// The middle buttons (previous/next segment, slot, marker, program start) are hidden
+/// (user 2026-10-16: hidden, not deleted). The level meter with NORM that stood in their
+/// place is the level bar block in the middle of the source timeline's bar (user 2026-10-29).
 const SHOW_NAVIGATION: bool = false;
-/// The width of the NORM button beside the level meter.
-const NORM_W: f32 = 52.0;
 
 pub(crate) fn show(
     ui: &mut egui::Ui,
     segments: &SegmentsView,
     theme: TimelineTheme,
-    levels: [Option<f32>; 2],
 ) -> Option<ActionEvent> {
     let mut command: Option<&'static str> = None;
     let (row, _) = ui.allocate_exact_size(
@@ -45,24 +43,6 @@ pub(crate) fn show(
         Pos2::new(x, row.min.y),
         Vec2::new(TRANSPORT_CONTROLS_W, COMPACT_CTRL_H),
     );
-    if !SHOW_NAVIGATION {
-        // NORM right of the meter (user 2026-10-25): lit while the preview normalises the
-        // loudness; a click is the N key.
-        let norm = Rect::from_min_max(Pos2::new(transport.max.x - NORM_W, transport.min.y), transport.max);
-        let meter = Rect::from_min_max(transport.min, Pos2::new(norm.min.x - EDIT_ACTION_GAP, transport.max.y));
-        let style = qnc_level_meter::MeterStyle { background: theme.background, border: theme.border, text: theme.muted };
-        let lanes = [("A1", levels[0]), ("A2", levels[1])];
-        qnc_level_meter::show(ui, ui.make_persistent_id("qnc_segment_level_meter"), meter.shrink2(Vec2::new(0.0, 1.0)), &lanes, style);
-        in_rect(ui, norm, egui::Layout::left_to_right(egui::Align::Center), |ui| {
-            ui.spacing_mut().button_padding = Vec2::new(6.0, 1.0);
-            // The look of the B-roll | Sync/B-roll switch (user 2026-10-25): on in the focus colour.
-            let style = qnc_ui_kit::ChromeButtonStyle { text: theme.text, border: theme.border, focus: theme.focus, height: COMPACT_CTRL_H };
-            let button = qnc_ui_kit::chrome_button(ui, qnc_ui_text::text("story.ui.normalized"), true, segments.normalize, style);
-            if clicked(button.on_hover_text(qnc_ui_text::text("story.ui.normalize_hint"))) {
-                command = Some("toggle_loudness_normalize"); // the N key
-            }
-        });
-    }
     in_rect(
         ui,
         transport,

@@ -59,6 +59,11 @@ pub struct SourceTimelineView {
     pub timecode: Option<SourceTimecode>,
     /// What a taken lane does, for the form's status line (empty: nothing to say).
     pub message: String,
+    /// The peaks (dBFS) the player measured at its outputs A1 and A2, for the level bar in
+    /// the middle of the source timeline's bar (user 2026-10-29: in every form).
+    pub levels: [Option<f32>; 2],
+    /// NORM's state on that bar; `None` where the form has no story to normalise.
+    pub normalize: Option<bool>,
 }
 
 /// The state of the source timeline of one form.
@@ -103,7 +108,13 @@ impl SourceTimeline {
         self.apply_kept_sound(count, preview);
         let timecode = self.timecodes.for_clip(content, clip_id);
         self.refresh(timecode);
+        self.view.levels = preview.view().output_levels;
         &self.view
+    }
+
+    /// NORM's state for the level bar (a form with a story gives it; `None`: NORM off).
+    pub fn offer_normalize(&mut self, on: Option<bool>) {
+        self.view.normalize = on;
     }
 
     pub fn view(&self) -> &SourceTimelineView {
@@ -400,6 +411,8 @@ impl SourceTimeline {
             wave_over_video: wave_over_video(&self.lanes),
             timecode,
             message: self.message.clone(),
+            levels: self.view.levels,
+            normalize: self.view.normalize,
         };
     }
 }
@@ -449,10 +462,18 @@ pub fn show_with(
         .with_wave_over_video(view.wave_over_video);
     let mut answer = None;
     let slot = &mut answer;
+    let mut normalize = false;
+    // The level bar block (meter and NORM) in the middle of the bar above the timeline.
+    let header = |ui: &mut Ui| {
+        let row = ui.max_rect();
+        normalize = qnc_level_bar::show(ui, row, view.levels, view.normalize, &qnc_theme_styles::timeline(theme));
+        header(ui);
+    };
     let mut drawn = instead.map(|instead| move |ui: &mut Ui| *slot = instead(ui));
     let intent = qnc_source_dock::show_timeline_dock_with(ui, rect, style, title, header, timeline, drawn.as_mut().map(|draw| draw as &mut dyn FnMut(&mut Ui)));
     drop(drawn);
-    (intent, answer)
+    let norm = normalize.then(|| qnc_action_event::ActionEvent::key(qnc_level_bar::NORMALIZE));
+    (intent, answer.or(norm))
 }
 
 /// One action button of the header, as a form lists them (label, catalog action).

@@ -1,0 +1,37 @@
+{
+  "module_id": "qnc.module.level-bar",
+  "module_name": "Level bar",
+  "module_version": "0.1.0",
+  "module_kind": "ui_widget",
+  "capabilities": [
+    "ui.paint.level_bar"
+  ],
+  "input_contract_version": "0.1.0",
+  "output_contract_version": "0.1.0",
+  "supported_os": [
+    "windows",
+    "linux",
+    "macos"
+  ],
+  "supported_cpu": [
+    "x86_64",
+    "aarch64"
+  ],
+  "transport_protocol_version": "0.1.0",
+  "forbidden_calls": [
+    "application.start",
+    "business.db.write",
+    "database.read",
+    "workflow.run",
+    "media.process",
+    "filesystem.write",
+    "player.command"
+  ],
+  "forbidden_dependencies": [],
+  "state_policy": "stateless",
+  "database_write_policy": "no_db_writes",
+  "runtime_crate": "qnc-level-bar",
+  "input": "The peaks (dBFS) the player measured at its outputs A1 and A2, NORM's state (on, off, or not offered by the form), a row to centre in and theme colours.",
+  "output": "The level meter block with the NORM button right of it, 240 x 22, centred in the row; a click on NORM is the catalog action toggle_loudness_normalize.",
+  "specification": "User 2026-10-29: the meter and NORM are one block, moved from the Segments bar to the middle of the source timeline's bar, keeping their size."
+}
