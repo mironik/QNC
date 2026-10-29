@@ -7,7 +7,7 @@
 
 use eframe::egui::{self, RichText};
 use qnc_action_event::ActionEvent;
-use qnc_script::{SubsegmentView, JOIN_CUT, JOIN_GAP, PART_CHANNEL, PART_LEVEL, PART_OFF, SUBSEGMENT_CLOSE, SUBSEGMENT_CUE, TAKE_EDGE};
+use qnc_script::{SubsegmentView, DRAG_EDGE, JOIN_CUT, JOIN_GAP, PART_CHANNEL, PART_LEVEL, PART_OFF, SUBSEGMENT_CLOSE, SUBSEGMENT_CUE, TAKE_EDGE};
 use qnc_timeline::{
     AudioLane, TimelineFocusPaint, TimelineInput, TimelineIntent, TimelineLayerFlags, TimelineMarkerPart, TimelineMarkerPin,
     TimelineMetrics, TimelineProjection, TimelineTheme, TimelineVirtualSpan,
@@ -64,9 +64,14 @@ pub fn show(ui: &mut egui::Ui, view: &SubsegmentView, theme: TimelineTheme) -> O
     let markers: Vec<TimelineMarkerPin<'_>> = view
         .parts
         .iter()
-        .flat_map(|part| [part.start, part.end])
+        .enumerate()
+        .flat_map(|(index, part)| [(index, false, part.start), (index, true, part.end)])
         .zip(&edge_ids)
-        .map(|(frame, id)| TimelineMarkerPin { id, frame, taken: false, locked: false, part: TimelineMarkerPart::Whole, origin: None, sound_at: None })
+        // The taken edge is the one a drag drags (the mouse rule: only what is taken moves).
+        .map(|((index, out, frame), id)| {
+            let taken = view.trim.is_some_and(|(at, trim_out, _)| at == index && trim_out == out);
+            TimelineMarkerPin { id, frame, taken, locked: false, part: TimelineMarkerPart::Whole, origin: None, sound_at: None }
+        })
         .collect();
     // The edge being trimmed, as the trim playhead of a cover's edge.
     let trim_label = qnc_ui_text::text("subsegment.trimming");
@@ -111,6 +116,18 @@ pub fn show(ui: &mut egui::Ui, view: &SubsegmentView, theme: TimelineTheme) -> O
             )
         })
         .inner;
+    // A drag of the taken edge (user 2026-10-29): the edge follows the pointer as a draft;
+    // letting go keeps it, as Enter.
+    let dragging = egui::Id::new("qnc_subsegment_edge_drag");
+    let dragged = qnc_timeline::take_marker_drag(ui.ctx()).and_then(|(id, frame)| drag_target(&id, frame));
+    let was_dragging = ui.ctx().data(|d| d.get_temp::<bool>(dragging)).unwrap_or(false);
+    ui.ctx().data_mut(|d| d.insert_temp(dragging, dragged.is_some() || (was_dragging && ui.ctx().input(|i| i.pointer.primary_down()))));
+    let drag_event = match dragged {
+        Some(target) => Some(ActionEvent::key(DRAG_EDGE).with_target(target)),
+        None if was_dragging && !ui.ctx().input(|i| i.pointer.primary_down()) => Some(ActionEvent::key("activate_focused_item")),
+        None => None,
+    };
+    answer = answer.or(drag_event);
     let event = match intent {
         TimelineIntent::CueFrame(frame) => Some(ActionEvent::key(SUBSEGMENT_CUE).with_target(frame.to_string())),
         // A right click on a join takes the IN of the part after it, as Ctrl+I.
@@ -177,6 +194,13 @@ pub fn show(ui: &mut egui::Ui, view: &SubsegmentView, theme: TimelineTheme) -> O
     answer
 }
 
+/// The target of a drag of edge marker `id` ("edge-{part}-in|out") to `frame`: `part:in|out:frame`.
+pub fn drag_target(id: &str, frame: u64) -> Option<String> {
+    let mut parts = id.strip_prefix("edge-")?.split('-');
+    let (index, side) = (parts.next()?.parse::<usize>().ok()?, parts.next()?);
+    matches!(side, "in" | "out").then(|| format!("{index}:{side}:{frame}"))
+}
+
 /// The edge nearest to `frame`: its part and whether it is the OUT. An OUT lies past the part's
 /// last frame, an IN on its first; where an OUT and the next IN meet (a join without a pause),
 /// the frame before the join takes the OUT, the frame on or after it the IN.
@@ -207,5 +231,12 @@ mod tests {
         assert_eq!(nearest_edge(&view, 91), Some((1, true)), "an OUT before a pause");
         assert_eq!(nearest_edge(&view, 94), Some((2, false)), "an IN after a pause");
         assert_eq!(nearest_edge(&view, 140), Some((2, true)), "the last part's OUT");
+    }
+
+    #[test]
+    fn a_drag_of_an_edge_names_its_part_side_and_frame() {
+        assert_eq!(drag_target("edge-2-out", 120).as_deref(), Some("2:out:120"));
+        assert_eq!(drag_target("edge-0-in", 3).as_deref(), Some("0:in:3"));
+        assert_eq!(drag_target("part-1", 3), None);
     }
 }

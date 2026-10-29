@@ -72,6 +72,9 @@ pub const SUBSEGMENT_CLOSE: &str = "subsegment_close";
 /// An edge of a part is taken for trimming (a right click on its timeline): `target` is
 /// `part:in` or `part:out`.
 pub const TAKE_EDGE: &str = "subsegment_take_edge";
+/// The taken edge dragged by the mouse to a frame of the SubSegment's axis: `target` is
+/// `part:in:frame` or `part:out:frame`.
+pub const DRAG_EDGE: &str = "subsegment_drag_edge";
 /// The camera channel a part is heard on (A1): `target` is `block:part:channel` (zero based).
 pub const PART_CHANNEL: &str = "subsegment_part_channel";
 /// A part's A1 level one dB up or down: `target` is `block:part:1` or `-1`.
@@ -312,6 +315,9 @@ impl Script {
         if let Some(done) = self.sound_key(action_id, &block, &pieces, preview) {
             return Some(done);
         }
+        if action_id == DRAG_EDGE {
+            return self.drag_edge(target, &block, &pieces);
+        }
         let step = match action_id {
             "select_mark_in" | "select_mark_out" => {
                 let at = self.view.subsegment.as_ref().and_then(|view| view.playhead).unwrap_or(0);
@@ -363,6 +369,26 @@ impl Script {
             false => trim.from = trim.from.saturating_add_signed(step).min(trim.to - 1),
         }
         let drafted = self.drafted(block);
+        self.pieces_request = Some((view::piece_inputs(&drafted), self.edge_frame(&drafted).unwrap_or(0)));
+        Some(true)
+    }
+
+    /// The taken edge dragged by the mouse (user 2026-10-29): only the taken one moves (the
+    /// mouse rule: a drag drags what is taken), its part keeps at least a frame and its clip;
+    /// the draft plays at the edge as with the arrows. Letting go keeps it (as Enter).
+    fn drag_edge(&mut self, target: Option<&str>, block: &Block, pieces: &[Piece]) -> Option<bool> {
+        let mut parts = target?.split(':');
+        let (index, out, frame) = (parts.next()?.parse::<usize>().ok()?, parts.next()? == "out", parts.next()?.parse::<u64>().ok()?);
+        let trim = self.trim.as_mut().filter(|trim| trim.index == index && trim.out == out)?;
+        // The part's start on the axis does not move while its own edges move.
+        let start = view::subsegment_view(block, None).parts.get(index)?.start;
+        let piece = pieces.get(index)?;
+        let length = self.names.get(&piece.clip_id).map_or(u64::MAX, |(_, frames, _)| *frames);
+        match out {
+            true => trim.to = (trim.from + frame.saturating_sub(start)).clamp(trim.from + 1, length),
+            false => trim.from = (piece.from_frame as i64 + frame as i64 - start as i64).clamp(0, trim.to as i64 - 1) as u64,
+        }
+        let drafted = self.drafted(block.clone());
         self.pieces_request = Some((view::piece_inputs(&drafted), self.edge_frame(&drafted).unwrap_or(0)));
         Some(true)
     }

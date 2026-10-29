@@ -6879,3 +6879,8 @@ desnu IN sljedeceg (`subsegment_take_edge`); pomaknuti rub koji se napusti zapis
 nacrt. `qnc-program-view` `EditStill.click` (radnja kataloga i cilj; `None` drugdje, zoom pokrivalica isti), crta i
 klika `qnc-trim-overlay`. Test zooma prosiren (klikovi, OUT prethodnog dijela iza razmaka, prvi IN i zadnji OUT bez
 klika), conformance, `cargo check --workspace`. Uzivo nije provjereno.
+Dopuna 2026-10-29 (korisnik: "nastavi s povlacenjem ruba misem"): na SubSegment timelineu uzeti rub dijela (desni klik,
+Ctrl+I/O, klik na sliku zooma) vuce se lijevom tipkom misa, po pravilu misa samo uzeto: rub prati pokazivac kao nacrt
+(dio zadrzava barem jednu sliku i ostaje unutar svog klipa, player pokazuje sliku na rubu kao uz strelice), pustanje
+tipke ga sprema kao Enter. `qnc-subsegment-panel` (uzeti rub je `taken` marker, `drag_target`, test), `qnc-script`
+(`DRAG_EDGE`, `drag_edge`), katalog akcija `subsegment_drag_edge` (bez tipke). Testovi, conformance. Uzivo nije provjereno.

@@ -190,6 +190,9 @@
     "subsegment_take_edge": {
       "label": "Uzmi rub dijela SubSegmenta (desni klik: najblizi IN ili OUT)"
     },
+    "subsegment_drag_edge": {
+      "label": "Povuci uzeti rub dijela SubSegmenta misem (pustanje sprema)"
+    },
     "subsegment_part_channel": {
       "label": "Kanal kamere na A1 za dio SubSegmenta"
     },
