@@ -292,6 +292,16 @@ impl ProgramSegments {
         }
     }
 
+    /// The taken cut's sound for the trim zoom: both sides and the moving ones.
+    pub(crate) fn zoom_cut_sound(&self) -> Option<qnc_program_view::ZoomCutSound> {
+        if !self.cut_sound_taken() {
+            return None;
+        }
+        let (marker_id, cut) = self.marker_edit.clone()?;
+        let (tail, lead) = self.cut_sound_frames(&marker_id, cut);
+        Some(qnc_program_view::ZoomCutSound { marker_id, lead, tail, moving: self.cut_sound_trim_frames() })
+    }
+
     fn say_cut(&mut self, key: &'static str) -> bool {
         let (tail, lead, edge) = match self.cut_part {
             CutPart::Sound { draft, edge, .. } => (draft.tail, draft.lead, edge),

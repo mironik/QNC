@@ -162,10 +162,16 @@ impl ProgramSegments {
         let cut = cut_of(&view.edit_stills)?;
         let (num, den) = view.timebase?;
         let half = second((u64::from(num), u64::from(den)));
-        let (from, to) = (cut.saturating_sub(half), (cut + half).min(view.total_frames.max(cut + 1)));
+        // The taken cut's sound (user 2026-10-29: its J and L in the zoom): the window holds both
+        // sides with a second around them.
+        let cut_sound = self.zoom_cut_sound();
+        let (earliest, latest) = cut_sound.as_ref().map_or((cut, cut), |sound| {
+            (sound.lead.unwrap_or(cut).min(cut), sound.tail.unwrap_or(cut).max(cut))
+        });
+        let (from, to) = (earliest.saturating_sub(half), (latest + half).min(view.total_frames.max(latest + 1)));
         let (segments, covers) = view.wave_placements();
         let near = |placements: Vec<qnc_program_waveform::Placement>| placements.into_iter().filter(|at| at.program_start < to && from < at.program_end).collect();
-        Some(qnc_program_view::ZoomSound { from, to, cut, lanes: [near(segments), near(covers)], ..Default::default() })
+        Some(qnc_program_view::ZoomSound { from, to, cut, lanes: [near(segments), near(covers)], cut_sound, ..Default::default() })
     }
 
     /// Whether a segment edge taken from the segment panel waits for Enter or Escape.

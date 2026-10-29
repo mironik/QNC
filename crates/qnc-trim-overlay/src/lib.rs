@@ -11,7 +11,7 @@
 
 use eframe::egui::{self, Align2, Color32, FontId, Rect, Sense, Stroke, StrokeKind, Vec2};
 use qnc_action_event::ActionEvent;
-use qnc_program_view::{ClipEdge, EditStill, SegmentsView, ZoomSound};
+use qnc_program_view::{ClipEdge, EditStill, SegmentsView, ZoomCutSound, ZoomSound};
 
 pub const MODULE_ID: &str = "qnc.module.trim-overlay";
 pub const VERSION: &str = env!("CARGO_PKG_VERSION");
@@ -30,6 +30,13 @@ const LANES_GAP: f32 = 8.0;
 const WORDS_HEIGHT: f32 = 22.0;
 /// The thin line through the cut.
 const CUT_LINE: Color32 = Color32::from_rgb(230, 30, 30);
+/// The sides of the taken cut's sound on A2 (user 2026-10-29), as red as on the Wrap row; a
+/// click within `SIDE_REACH` pixels takes a side.
+const SIDE_LINE: Color32 = Color32::from_rgb(255, 64, 64);
+const SIDE_REACH: f32 = 40.0;
+/// The system actions of a side of the cut's sound (contracts/qnc-keyboard-shortcuts.json).
+const TAKE_SIDE: &str = "timeline_take_cut_edge";
+const DRAG_SIDE: &str = "timeline_drag_cut_edge";
 /// The voice no word was heard for: the cut line's red, faint.
 const UNHEARD_FILL: Color32 = Color32::from_rgba_premultiplied(70, 10, 10, 70);
 /// The share of the screen width the window may take.
@@ -89,9 +96,13 @@ pub fn show(ctx: &egui::Context, segments: &SegmentsView) -> Option<ActionEvent>
             }
             if let Some(sound) = sound {
                 let area = Rect::from_min_size(egui::pos2(top.x, top.y + picture.y + LABEL_HEIGHT + LANES_GAP), Vec2::new(row_width, 2.0 * LANE_HEIGHT + GAP / 2.0 + WORDS_HEIGHT));
+                let (word, side) = paint_sound(ui, area, sound, gap_at, top.y, &visuals);
                 // A double clicked word on a source timeline's zoom is a cut, as on the transcript.
-                if let Some((from, to)) = paint_sound(ui, area, sound, gap_at, top.y, &visuals).filter(|_| source) {
+                if let Some((from, to)) = word.filter(|_| source) {
                     turned = Some(ActionEvent::key(CUT_WORD).with_value(from).with_target(to.to_string()).at("source_timeline"));
+                }
+                if side.is_some() {
+                    turned = side;
                 }
             }
         });
@@ -112,8 +123,9 @@ fn shown_height(peak: u16) -> f32 {
 /// A1 and A2 around the cut, each a lane of its peaks mirrored about its middle, and the
 /// thin line of the cut: from between the pictures when it lies under that gap, across
 /// both lanes at the cut's place in the window.
-fn paint_sound(ui: &mut egui::Ui, area: Rect, sound: &ZoomSound, gap_at: Option<f32>, pictures_top: f32, visuals: &egui::Visuals) -> Option<(u64, u64)> {
+fn paint_sound(ui: &mut egui::Ui, area: Rect, sound: &ZoomSound, gap_at: Option<f32>, pictures_top: f32, visuals: &egui::Visuals) -> (Option<(u64, u64)>, Option<ActionEvent>) {
     let mut word = None;
+    let mut side = None;
     let span = (sound.to - sound.from) as f32;
     let cut_x = area.left() + area.width() * (sound.cut.saturating_sub(sound.from)) as f32 / span;
     let x_of = |frame: u64| area.left() + area.width() * (frame.saturating_sub(sound.from)) as f32 / span;
@@ -136,6 +148,11 @@ fn paint_sound(ui: &mut egui::Ui, area: Rect, sound: &ZoomSound, gap_at: Option<
             }
         }
         ui.painter().text(band.left_top() + Vec2::new(6.0, 4.0), Align2::LEFT_TOP, if lane == 0 { "A1" } else { "A2" }, FontId::proportional(12.0), visuals.text_color());
+        if lane == 1 {
+            if let Some(cut_sound) = &sound.cut_sound {
+                side = paint_cut_sound(ui, band, sound, cut_sound, &x_of);
+            }
+        }
     }
     // One thin line from between the pictures down through both waves when the cut is there.
     let from_top = match gap_at {
@@ -143,7 +160,45 @@ fn paint_sound(ui: &mut egui::Ui, area: Rect, sound: &ZoomSound, gap_at: Option<
         _ => area.top(),
     };
     ui.painter().line_segment([egui::pos2(cut_x, from_top), egui::pos2(cut_x, area.bottom())], Stroke::new(1.5, CUT_LINE));
-    word
+    (word, side)
+}
+
+/// The taken cut's A2 sound on the zoom's A2 (user 2026-10-29: "that option in the zoom too"):
+/// where the sound after starts (J) and where the sound before ends (L), red, the moving ones
+/// thick, joined at the top of A2. A click near a side takes it, a drag moves it, the same
+/// system actions as on the Wrap row.
+fn paint_cut_sound(ui: &mut egui::Ui, band: Rect, sound: &ZoomSound, cut_sound: &ZoomCutSound, x_of: &dyn Fn(u64) -> f32) -> Option<ActionEvent> {
+    let sides: Vec<u64> = cut_sound.lead.into_iter().chain(cut_sound.tail).filter(|frame| (sound.from..=sound.to).contains(frame)).collect();
+    let cut_x = x_of(sound.cut);
+    let (mut left, mut right) = (cut_x, cut_x);
+    for side in &sides {
+        let x = x_of(*side);
+        let width = if cut_sound.moving.contains(side) { 3.0 } else { 2.0 };
+        ui.painter().line_segment([egui::pos2(x, band.top()), egui::pos2(x, band.bottom())], Stroke::new(width, SIDE_LINE));
+        (left, right) = (left.min(x), right.max(x));
+    }
+    ui.painter().line_segment([egui::pos2(left, band.top()), egui::pos2(right, band.top())], Stroke::new(1.0, SIDE_LINE));
+    let response = ui.interact(band, ui.id().with("cut_sound"), Sense::click_and_drag());
+    let span = (sound.to - sound.from).max(1) as f32;
+    let frame_at = |x: f32| sound.from + (((x - band.left()) / band.width()).clamp(0.0, 1.0) * span).round() as u64;
+    let near = |x: f32| sides.iter().any(|side| (x_of(*side) - x).abs() <= SIDE_REACH);
+    let event = |action: &str, x: f32| ActionEvent::key(action).with_target(cut_sound.marker_id.clone()).with_value(frame_at(x)).at("segments");
+    if response.hovered() && response.hover_pos().is_some_and(|pos| near(pos.x)) {
+        ui.ctx().set_cursor_icon(egui::CursorIcon::ResizeHorizontal);
+    }
+    let drag_key = ui.id().with("cut_sound_drag");
+    if response.drag_started() {
+        let started = ui.ctx().input(|i| i.pointer.press_origin()).is_some_and(|pos| near(pos.x));
+        ui.ctx().data_mut(|d| d.insert_temp(drag_key, started));
+    }
+    let dragging = ui.ctx().data(|d| d.get_temp::<bool>(drag_key)).unwrap_or(false);
+    if response.dragged() && dragging {
+        return response.interact_pointer_pos().map(|pos| event(DRAG_SIDE, pos.x));
+    }
+    if response.drag_stopped() {
+        ui.ctx().data_mut(|d| d.remove::<bool>(drag_key));
+    }
+    response.clicked().then(|| response.interact_pointer_pos()).flatten().filter(|pos| near(pos.x)).map(|pos| event(TAKE_SIDE, pos.x))
 }
 
 /// The words said on A1 in the window, each from where it is said, cut where the next one

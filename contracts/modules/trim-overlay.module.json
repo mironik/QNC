@@ -15,6 +15,6 @@
   "database_write_policy": "no_db_writes",
   "runtime_crate": "qnc-trim-overlay",
   "input": "The program view: its edit pictures (a taken slot or marker) or source edit pictures (a taken segment edge), each with its name and decoded image.",
-  "output": "A window in the centre of the screen with those pictures large in one row, named, a line where the marker is; nothing when nothing is taken.",
+  "output": "A window in the centre of the screen with those pictures large in one row, named, a line where the marker is; with a cut's A2 sound taken its J and L red on A2, a click on one as timeline_take_cut_edge and a drag as timeline_drag_cut_edge (user 2026-10-29); nothing when nothing is taken.",
   "specification": "User 2026-10-10: the timeline has no room for four pictures; a window in the centre of the screen, a kind of quasi zoom, opened by the existing Ctrl keys (Ctrl+S, Ctrl+M, Ctrl+I/O), no new key."
 }

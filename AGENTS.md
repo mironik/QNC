@@ -6984,3 +6984,10 @@ tona, nikad sliku), `qnc-mouse-map` i `contracts/input/mouse.json` (`click_cut_e
 `the_j_and_the_l_of_a_cut_move_apart_and_are_written_together`, svi testovi dotaknutih kocki, conformance, release build.
 Uzivo nije provjereno. Nije izvedeno (sljedeci korak, korisnik: "ton moze biti A1 ili A2"): J i L tona na A1 (spoj dvaju
 segmenata), baza jos nema mjesta za njih.
+Dopuna 2026-10-29 (korisnik, sa slikom zooma: "treba tu opciju dodati i u zoom overlay"): dok je ton reza uzet (Ctrl+M
+pa Ctrl+2), prozor trim zooma na A2 pokazuje J (gdje ton pokrivalice poslije pocinje) i L (gdje ton pokrivalice prije
+zavrsava) crveno, uzetu stranu debelo, spojene na vrhu A2; prozor obuhvaca obje strane i sekundu oko njih. Klik blizu crte
+uzima tu stranu, povlacenje je pomice (iste sistemske radnje kao na Wrap retku: `timeline_take_cut_edge`,
+`timeline_drag_cut_edge`), kotacic kao strelice. `qnc-program-view` `ZoomSound.cut_sound` (`ZoomCutSound`),
+`qnc-program-segments` (`zoom_cut_sound`, prozor zooma), `qnc-trim-overlay` (`paint_cut_sound`), ugovor modula. Testovi,
+conformance, release build. Uzivo nije provjereno.

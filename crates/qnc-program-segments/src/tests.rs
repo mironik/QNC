@@ -893,6 +893,12 @@ fn the_j_and_the_l_of_a_cut_move_apart_and_are_written_together() {
     let marker = segments.view().markers.iter().find(|pin| pin.marker_id == "m1").cloned().unwrap();
     assert_eq!((marker.sound_lead, marker.sound_tail), (Some(11), Some(18)), "both drawn where they are going");
     assert_eq!(marker.taken_part, qnc_program_view::TakenPart::SoundLead);
+    // The trim zoom shows both sides too, the moving one marked (user 2026-10-29).
+    if let Some(sound) = &segments.view().zoom_sound {
+        let cut = sound.cut_sound.as_ref().expect("the cut's sound in the zoom");
+        assert_eq!((cut.lead, cut.tail, cut.moving.clone()), (Some(11), Some(18), vec![11]));
+        assert!(sound.from <= 11 && sound.to >= 18, "the window holds both sides");
+    }
     // Ctrl+2 again: both sides move together, the overlap keeps its length.
     assert!(segments.take_cut_part(None, false, 1));
     segments.apply_action("step_forward_frame");

@@ -105,6 +105,19 @@ pub struct ZoomSound {
     pub words: Vec<ZoomWord>,
     /// Voice on A1 no word was heard for (user 2026-10-26), on the zoom's axis.
     pub unheard: Vec<(u64, u64)>,
+    /// The taken cut's A2 sound (user 2026-10-29: its J and L in the zoom too).
+    pub cut_sound: Option<ZoomCutSound>,
+}
+
+/// The sides of the taken cut's A2 sound in the zoom: where the sound after starts (its J) and
+/// where the sound before ends (its L), on the zoom's axis (`None` for a side with no cover),
+/// and the sides that move.
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct ZoomCutSound {
+    pub marker_id: String,
+    pub lead: Option<u64>,
+    pub tail: Option<u64>,
+    pub moving: Vec<u64>,
 }
 
 /// A word of the zoom's window: its frames on the zoom's axis and what was said.
