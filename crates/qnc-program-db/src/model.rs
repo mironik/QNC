@@ -186,6 +186,12 @@ pub enum Operation {
     },
     /// The story as it was before the last edit comes back (UNDO).
     UndoStory,
+    /// Undo of the selected (user 2026-10-29): the newest change of one segment, M marker or
+    /// cover (`object_type` segment, marker, cover) is undone, that object alone, whenever it
+    /// was; a story edit itself (the undo in time takes it back).
+    UndoSelected { object_type: String, object_id: String },
+    /// Redo of the selected: what its last undo selected took comes back.
+    RedoSelected { object_type: String, object_id: String },
     /// The last undone story edit comes back (REDO).
     RedoStory,
     /// Removes an excluded segment for good; an active one cannot be purged.
@@ -301,6 +307,8 @@ impl Operation {
                 | Self::SetCutSoundEdges { .. }
                 | Self::SetJoinSound { .. }
                 | Self::SetJoinPicture { .. }
+                | Self::UndoSelected { .. }
+                | Self::RedoSelected { .. }
                 | Self::RollJoin { .. }
                 | Self::MoveSlot { .. }
                 | Self::TrimSlot { .. }

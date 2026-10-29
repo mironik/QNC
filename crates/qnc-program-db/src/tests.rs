@@ -548,3 +548,33 @@ fn the_picture_at_a_join_has_an_l_before_and_a_j_after() {
     assert_eq!(pictures(&mut store), vec![(0, 4), (0, 0), (0, 0)], "one Undo step");
     assert!(run(&mut store, Operation::SetJoinPicture { segment_id: users[0].clone(), tail_frames: 1, lead_frames: 0 }).is_err());
 }
+
+/// User 2026-10-29: two kinds of undo. Undo in time goes back along the edits; undo selected
+/// undoes the selected object's own changes, newest first, whenever they were, and redo
+/// selected brings them back. The undo in time takes an undo selected back too.
+#[test]
+fn undo_selected_takes_back_the_changes_of_one_object_whenever_they_were() {
+    let dir = tempfile::tempdir().unwrap();
+    let path = dir.path().join("db");
+    let mut store = imported_store(&path);
+    three_segments(&mut store);
+    let Data::Created(m5) = marker(&mut store, 5).unwrap() else { panic!() };
+    let Data::Created(m25) = marker(&mut store, 25).unwrap() else { panic!() };
+    run(&mut store, Operation::MoveMarker { marker_id: m5.clone(), program_frame: 7 }).unwrap();
+    run(&mut store, Operation::MoveMarker { marker_id: m25.clone(), program_frame: 22 }).unwrap();
+    run(&mut store, Operation::MoveMarker { marker_id: m5.clone(), program_frame: 9 }).unwrap();
+    run(&mut store, Operation::MoveMarker { marker_id: m25.clone(), program_frame: 21 }).unwrap();
+    let selected = |id: &str| Operation::UndoSelected { object_type: "marker".into(), object_id: id.into() };
+    run(&mut store, selected(&m5)).unwrap();
+    assert_eq!(markers(&mut store), vec![7, 21], "the newest change of m5 undone, m25 left");
+    run(&mut store, selected(&m5)).unwrap();
+    assert_eq!(markers(&mut store), vec![5, 21], "then the one before it");
+    run(&mut store, Operation::RedoSelected { object_type: "marker".into(), object_id: m5.clone() }).unwrap();
+    assert_eq!(markers(&mut store), vec![7, 21], "redo selected");
+    run(&mut store, Operation::UndoStory).unwrap();
+    assert_eq!(markers(&mut store), vec![5, 21], "the undo in time takes the redo selected back");
+    // A new change of m5 starts its own history again.
+    run(&mut store, Operation::MoveMarker { marker_id: m5.clone(), program_frame: 12 }).unwrap();
+    run(&mut store, selected(&m5)).unwrap();
+    assert_eq!(markers(&mut store), vec![5, 21]);
+}

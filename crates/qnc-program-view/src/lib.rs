@@ -176,6 +176,8 @@ pub struct SegmentsView {
     pub playhead: Option<u64>,
     /// Story edits that UNDO and REDO can take back and replay (from the database).
     pub undo_depth: u64,
+    /// Something is selected that undo selected can take back (user 2026-10-29).
+    pub has_selected_object: bool,
     pub redo_depth: u64,
     /// Last controlled error of a read or write; empty otherwise.
     pub message: String,
@@ -300,6 +302,7 @@ impl SegmentsView {
             Some(SegmentCommand::Cover { overwrite: true }) => self.overwrite_cover_slot().is_ok(),
             Some(SegmentCommand::Undo) => self.undo_depth > 0,
             Some(SegmentCommand::Redo) => self.redo_depth > 0,
+            Some(SegmentCommand::UndoSelected { .. }) => self.has_selected_object,
             // Covers need segments (user 2026-10-10).
             Some(SegmentCommand::CoverMode { .. } | SegmentCommand::ToggleSync) => !self.rows.is_empty(),
             _ => true,

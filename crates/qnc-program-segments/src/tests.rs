@@ -1089,3 +1089,20 @@ fn a_picture_cut_is_only_where_the_picture_changes() {
     assert!(segments.take_cut_part(None, false, 0), "its A1 cut is there");
     assert!(segments.cut_sound_taken());
 }
+
+/// User 2026-10-29 (undo selected): the selected object is the taken cut, else the selected
+/// cover, marker, the cover of the selected slot, else the selected segment; the catalog's
+/// Ctrl+Backspace action is the program's.
+#[test]
+fn undo_selected_takes_the_selected_object() {
+    let mut segments = component();
+    segments.stored_covers = vec![cover("c0", "S|m1", (0, 15))];
+    segments.refresh_view(String::new());
+    assert!(segments.handles("undo_selected") && segments.handles("redo_selected"));
+    segments.selected = Some("b".into());
+    assert_eq!(segments.selected_object(), Some(("segment", "b".to_string())));
+    segments.selected_slot = Some("S|m1".into());
+    assert_eq!(segments.selected_object(), Some(("cover", "c0".to_string())), "the cover of the slot");
+    segments.apply(SegmentCommand::TakeMarker("m2".into()));
+    assert_eq!(segments.selected_object(), Some(("marker", "m2".to_string())), "the taken cut first");
+}

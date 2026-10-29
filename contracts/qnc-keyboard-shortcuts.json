@@ -316,6 +316,12 @@
     "undo_object": {
       "label": "Poništi odabrani Story objekt"
     },
+    "undo_selected": {
+      "label": "Ponisti zadnju izmjenu odabranog objekta (segment, M marker, pokrivalica), bez obzira kad je bila"
+    },
+    "redo_selected": {
+      "label": "Vrati izmjenu odabranog objekta koju je ponistio Undo selected"
+    },
     "redo_object": {
       "label": "Vrati poništeni Story objekt"
     },
@@ -598,7 +604,7 @@
       { "keys": "Enter", "meaning": "Potvrda, uvijek u panelu u fokusu." },
       { "keys": "Esc", "meaning": "Odustani od onoga što nije zapisano, jedno po pritisku: pusti uzeto, odbaci nacrt Synca, zatvori uređivanje segmenta, zatvori uvećani slot." },
       { "keys": "Delete", "meaning": "Briše objekt, jedan po pritisku, samo ono uzeto (Ctrl ili desni klik): uzeti M marker, uzeti B-roll ili B-roll odabranog slota. Ctrl+Delete trajno briše isključeni segment." },
-      { "keys": "Backspace", "meaning": "Briše zadnju radnju (Undo); Shift+Backspace je vraća (Redo). U polju za upis teksta briše slovo; u pregledniku lokacija Ingesta znači Gore." },
+      { "keys": "Backspace", "meaning": "Briše zadnju radnju (Undo); Shift+Backspace je vraća (Redo). Ctrl+Backspace poništava zadnju izmjenu odabranog objekta bez obzira kad je bila (Undo selected), Ctrl+Shift+Backspace je vraća. U polju za upis teksta briše slovo; u pregledniku lokacija Ingesta znači Gore." },
       { "keys": "Tab / klik", "meaning": "Tipke djeluju samo na panel u fokusu; Tab ili klik mijenja panel." }
     ],
     "groups": [
@@ -609,7 +615,7 @@
       { "title": "Markeri i slotovi", "actions": ["add_marker", "add_marker_continue", "select_marker", "delete_marker", "select_current_marker_slot", "select_mark_in", "select_mark_out", "navigate_prev_object", "navigate_next_object"] },
       { "title": "Pokrivalice", "actions": ["quick_overwrite_cover", "overwrite_cover", "cover_mode_covers", "cover_mode_sync"] },
       { "title": "Pool i tabovi", "actions": ["save_virtual_shot", "page_prev", "page_next", "toggle_focused_item", "editorial_tab_all", "editorial_tab_virtual", "editorial_tab_broll", "editorial_tab_segment", "editorial_tab_transcript", "editorial_tab_subsegment"] },
-      { "title": "Općenito", "actions": ["undo_object", "redo_object", "focus_next", "focus_prev", "toggle_cheatsheet"] }
+      { "title": "Općenito", "actions": ["undo_object", "redo_object", "undo_selected", "redo_selected", "focus_next", "focus_prev", "toggle_cheatsheet"] }
     ]
   },
   "presets": {
@@ -1043,6 +1049,8 @@
             "shift": true
           }
         ],
+        "undo_selected": [{ "key": "Backspace", "ctrl": true, "shift": false }],
+        "redo_selected": [{ "key": "Backspace", "ctrl": true, "shift": true }],
         "toggle_cheatsheet": [
           {
             "key": "F1"

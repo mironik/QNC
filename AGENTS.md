@@ -7046,3 +7046,19 @@ slika programa mijenja (`qnc-program-segments` `no_picture_cut`): spoj dvaju kli
 (`story.msg.marker_no_picture_cut`); razdvojena slika spoja ispod pokrivalice se ne crta. Test
 `a_picture_cut_is_only_where_the_picture_changes`, conformance. Nije izvedeno: korak 2 (rez na rubu pokrivalice s istim
 dijelovima kao spoj: roll i slika prema segmentu ispod), korak 3 (prikaz). Uzivo nije provjereno.
+Izvedeno 2026-10-29 (korisnik: "nastavi s drugom tockom, ali dodaj da postoje dvije vrste undo: vremenski undo, vracanje po
+vremenskom slijedu, i undo selected: ako je nesto selektirano da se to undo ili redo bez obzira kad je bilo"): (1) Druga tocka
+(rez na rubu pokrivalice kao spoj klipova): uz overwrite pokrivalice postojece operacije vec to daju (cijeli rez M markera
+mijenja pokrivalicu i otkriva sliku segmenta ispod, samo slika `MoveMarkerPicture`, A2 J/L na strani s pokrivalicom); bez
+nove izmjene. (2) Undo selected (v5 `story/object_history.rs` je imao samo jednu razinu za pokrivalicu): `qnc-program-db`
+operacije `UndoSelected` / `RedoSelected` (`object_type` segment, marker, cover; novi modul `object_undo.rs`): koraci
+vremenskog undoa su povijest; undo selected trazi najnoviji korak koji je mijenjao taj objekt i vraca samo njegov red kakav je
+bio prije, sljedeci trazi stariji; redo selected vraca ono sto je undo uzeo; povijest objekta je u `story_object_history`
+(korak do kojeg je dosao i uzeti redovi), brise se kad ga druga izmjena promijeni, a sva kad se radi vremenski Undo/Redo. Undo
+selected je i sam izmjena price, pa ga vremenski Undo ponistava; nakon njega slotovi se slazu iznova, pravilo "bez rupe"
+vrijedi. Odabrani objekt (`qnc-program-segments` `selected_object`): uzeti rez (M marker; za spoj klip poslije), uzeta ili
+izabrana pokrivalica, izabrani marker, pokrivalica izabranog slota, izabrani segment. Katalog (QNC preset, storyboard):
+`undo_selected` Ctrl+Backspace, `redo_selected` Ctrl+Shift+Backspace, grupa pomoci "Općenito"; gumbi "Undo sel." i
+"Redo sel." u traci panela Segmenti lijevo od Undo/Redo (ukljuceni kad je nesto izabrano). Testovi
+`undo_selected_takes_back_the_changes_of_one_object_whenever_they_were`, `undo_selected_takes_the_selected_object`,
+conformance. Nije izvedeno: undo/redo misem. Uzivo nije provjereno.

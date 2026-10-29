@@ -8,6 +8,7 @@
 mod store;
 pub use store::story_per_source;
 mod undo;
+mod object_undo;
 mod model;
 pub use model::*;
 

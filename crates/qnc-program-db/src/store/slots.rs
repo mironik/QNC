@@ -483,3 +483,19 @@ pub(crate) fn normalize_story_selection(conn: &Connection) -> Result<()> {
     )
     .map_err(err)
 }
+
+impl Store {
+    /// Undo (`undo`) or redo selected of one object; the story around it follows (slots, markers
+    /// on one frame).
+    pub(crate) fn object_step(&mut self, object_type: &str, object_id: &str, undo: bool) -> Result<Data> {
+        if undo {
+            crate::object_undo::undo(&self.conn, object_type, object_id)?;
+        } else {
+            crate::object_undo::redo(&self.conn, object_type, object_id)?;
+        }
+        finalize_story(&self.conn)?;
+        merge_coincident_markers(&self.conn)?;
+        finalize_story(&self.conn)?;
+        Ok(Data::Changed)
+    }
+}

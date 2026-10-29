@@ -118,6 +118,7 @@ impl Store {
         if !operation.edits_story() {
             let data = self.dispatch(operation)?;
             if matches!(operation, Operation::UndoStory | Operation::RedoStory) {
+                crate::object_undo::forget_all(&self.conn)?;
                 bump_revision(&self.conn)?;
             }
             return Ok(data);
@@ -130,6 +131,9 @@ impl Store {
         // it. Such an edit is refused; the transaction takes it back whole.
         if let Some(refusal) = cover_hole(&short, &cover_shortfalls(&self.conn)?) {
             return Err(refusal);
+        }
+        if !matches!(operation, Operation::UndoSelected { .. } | Operation::RedoSelected { .. }) {
+            crate::object_undo::forget_changed(&self.conn, &before)?;
         }
         crate::undo::record(&self.conn, &before)?;
         bump_revision(&self.conn)?;
@@ -181,6 +185,8 @@ impl Store {
                 crate::undo::step(&self.conn, true)?;
                 Ok(Data::Changed)
             }
+            Operation::UndoSelected { object_type, object_id } => self.object_step(object_type, object_id, true),
+            Operation::RedoSelected { object_type, object_id } => self.object_step(object_type, object_id, false),
             Operation::RedoStory => {
                 crate::undo::step(&self.conn, false)?;
                 Ok(Data::Changed)

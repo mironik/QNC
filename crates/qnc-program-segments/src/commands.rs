@@ -148,6 +148,7 @@ impl ProgramSegments {
                 self.zoom_slot = None;
                 self.refresh_view(String::new());
             }
+            SegmentCommand::UndoSelected { redo } => self.undo_selected(redo),
             SegmentCommand::Undo | SegmentCommand::Redo => {
                 // Everything taken goes: its frames belong to the story before the undo (audit
                 // 2026-10-25: a taken slot moved with stale frames after Undo).

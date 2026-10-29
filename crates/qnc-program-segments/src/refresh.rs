@@ -10,6 +10,7 @@ impl ProgramSegments {
         }
         let mut view = program(&self.stored, self.selected.as_deref(), self.story_rate);
         (view.undo_depth, view.redo_depth) = self.history;
+        view.has_selected_object = self.selected_object().is_some();
         view.markers = resolve(&view, &self.stored_markers, self.selected_marker.as_deref());
         // The cuts between two clips on A1 where no M marker stands (user 2026-10-29).
         view.joins = qnc_program_view::join_pins(&view, &view.markers);

@@ -173,6 +173,9 @@ pub enum SegmentCommand {
     Undo,
     /// REDO: the last undone story edit again.
     Redo,
+    /// Undo selected (user 2026-10-29): the newest change of the selected object, whenever it
+    /// was; `redo` brings back what it took.
+    UndoSelected { redo: bool },
     /// Ctrl+click on V of a Wrap row: filmstrip or narrow video row (user 2026-10-15).
     ToggleWrapVideo,
     /// The preview normalises A1 and A2 of the program to the project's loudness targets, or
@@ -259,6 +262,8 @@ impl SegmentCommand {
             "navigate_next_object" => Self::NavigateObject { up: false },
             "undo_object" => Self::Undo,
             "redo_object" => Self::Redo,
+            "undo_selected" => Self::UndoSelected { redo: false },
+            "redo_selected" => Self::UndoSelected { redo: true },
             "toggle_wrap_video" => Self::ToggleWrapVideo,
             "toggle_loudness_normalize" => Self::ToggleNormalize,
             "wrap_zoom" => Self::Zoom { slot: None, frame: None },

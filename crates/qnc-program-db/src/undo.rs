@@ -169,6 +169,10 @@ fn to_json(value: Value) -> Json {
     }
 }
 
+pub(crate) fn value_from_json(value: Json) -> Value {
+    from_json(value)
+}
+
 fn from_json(value: Json) -> Value {
     let Json::Object(map) = value else {
         return Value::Null;

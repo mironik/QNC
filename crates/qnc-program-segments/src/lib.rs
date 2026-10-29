@@ -12,6 +12,7 @@
 
 mod confirm;
 mod delete;
+mod undo_selected;
 mod zoom;
 mod edit;
 mod nav;

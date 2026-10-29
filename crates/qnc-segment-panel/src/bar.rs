@@ -138,7 +138,13 @@ pub(crate) fn show(
                     command = Some("export_open");
                 }
                 // Right to left: Redo, then Undo, left of Export HI-res.
-                for (label, target) in [(qnc_ui_text::text("story.ui.redo"), "redo_object"), (qnc_ui_text::text("story.ui.undo"), "undo_object")] {
+                // Then, left of them, the undo of the selected (user 2026-10-29).
+                for (label, target) in [
+                    (qnc_ui_text::text("story.ui.redo"), "redo_object"),
+                    (qnc_ui_text::text("story.ui.undo"), "undo_object"),
+                    (qnc_ui_text::text("story.ui.redo_selected"), "redo_selected"),
+                    (qnc_ui_text::text("story.ui.undo_selected"), "undo_selected"),
+                ] {
                     let enabled = segments.action_enabled(target);
                     if clicked(action_button(ui, label, enabled, theme)) {
                         command = Some(target);
