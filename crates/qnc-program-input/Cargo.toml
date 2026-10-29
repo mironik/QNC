@@ -8,6 +8,7 @@ description = "QNC public component: read-only program input of an edited story 
 qnc-ui-text = { workspace = true }
 qnc-db-broker = { workspace = true }
 qnc-program-db = { workspace = true }
+qnc-clip-sound = { workspace = true }
 qnc-prerender-db = { workspace = true }
 serde_json = { workspace = true }
 qnc-frame-timebase = { workspace = true }

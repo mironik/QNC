@@ -175,6 +175,18 @@
     "script_open": {
       "label": "Otvori klip izjave scenarija"
     },
+    "subsegment_cue": {
+      "label": "Playhead SubSegmenta na kliknutu sliku"
+    },
+    "subsegment_join_gap": {
+      "label": "Razmak prije dijela SubSegmenta (slika vise ili manje)"
+    },
+    "subsegment_join_cut": {
+      "label": "Spoj dijela SubSegmenta: rez ili crossfade"
+    },
+    "subsegment_close": {
+      "label": "Zatvori SubSegment, vrati source timeline"
+    },
     "transcribe_fast": {
       "label": "Transkribiraj brzo (procesor)"
     },

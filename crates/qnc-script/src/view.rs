@@ -65,6 +65,8 @@ pub struct ScriptView {
     pub exported: Option<String>,
     /// An export is being written.
     pub exporting: bool,
+    /// The SubSegment open in place of the source timeline.
+    pub subsegment: Option<SubsegmentView>,
     pub message: String,
 }
 
@@ -250,4 +252,64 @@ impl FieldEdit {
     pub fn target(block: i64, field: &str, value: &str) -> String {
         serde_json::to_string(&Self { block, field: field.into(), value: value.into() }).unwrap_or_default()
     }
+}
+
+/// One part of the SubSegment open on the source timeline's place: its frames on the
+/// SubSegment's axis, its clip and length, and the pause and join before it.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct SubsegmentPart {
+    pub start: u64,
+    pub end: u64,
+    pub clip_name: String,
+    pub length: String,
+    pub gap_before: u64,
+    pub cut: bool,
+}
+
+/// The SubSegment open in place of the source timeline (user 2026-10-29): its parts one after
+/// another on V1 and A1 as the player plays them, the playhead of that player.
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct SubsegmentView {
+    pub block_id: i64,
+    pub parts: Vec<SubsegmentPart>,
+    pub total_frames: u64,
+    pub playhead: Option<u64>,
+}
+
+/// The parts of a clip block (its own range when it has no parts).
+pub fn block_pieces(block: &Block) -> Vec<Piece> {
+    if block.pieces.is_empty() { vec![Piece::of(block)] } else { block.pieces.clone() }
+}
+
+/// The parts as the player's program takes them.
+pub fn piece_inputs(block: &Block) -> Vec<qnc_source_preview::PieceInput> {
+    block_pieces(block)
+        .into_iter()
+        .enumerate()
+        .map(|(index, piece)| qnc_source_preview::PieceInput {
+            clip_id: piece.clip_id,
+            from_frame: piece.from_frame,
+            to_frame: piece.to_frame,
+            gap_before: if index == 0 { 0 } else { piece.gap_before },
+            crossfade: !piece.cut,
+        })
+        .collect()
+}
+
+/// The parts on the SubSegment's axis (a pause before a part moves it on).
+pub fn subsegment_view(block: &Block, playhead: Option<u64>) -> SubsegmentView {
+    let mut start = 0;
+    let parts = block_pieces(block)
+        .into_iter()
+        .enumerate()
+        .map(|(index, piece)| {
+            let gap = if index == 0 { 0 } else { piece.gap_before };
+            start += gap;
+            let end = start + piece.to_frame.saturating_sub(piece.from_frame);
+            let part = SubsegmentPart { start, end, clip_name: piece.clip_name, length: piece.length, gap_before: gap, cut: piece.cut };
+            start = end;
+            part
+        })
+        .collect();
+    SubsegmentView { block_id: block.id, parts, total_frames: start, playhead }
 }

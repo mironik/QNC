@@ -61,7 +61,7 @@ impl SidePieces {
     }
 
     /// Polls the pieces; a view is renewed only when its piece changed it.
-    pub fn poll(&mut self, preview: &SourcePreview, timeline: &TimelineProjection, clips: &mut [ClipRow]) {
+    pub fn poll(&mut self, preview: &mut SourcePreview, timeline: &TimelineProjection, clips: &mut [ClipRow]) {
         // The pool's ticks are the transcript's.
         if let Some(transcript) = &mut self.transcript {
             if transcript.poll(preview, timeline, clips) {
@@ -77,6 +77,7 @@ impl SidePieces {
             if script.poll(preview, timeline, clips) {
                 self.views.script = Arc::new(script.view().clone());
             }
+            play_pieces(script, preview);
         }
     }
 
@@ -91,6 +92,9 @@ impl SidePieces {
             let empty = TranscriptView::default();
             let transcript = self.transcript.as_ref().map_or(&empty, Transcript::view);
             if let Some(done) = script.act(action_id, target, (preview, timeline, timecode, transcript)) {
+                play_pieces(script, preview);
+                // What the action changed is seen at once (the next poll compares from here).
+                self.views.script = Arc::new(script.view().clone());
                 return Some(done);
             }
         }
@@ -138,5 +142,13 @@ mod tests {
         assert!(ai.transcript.is_some() && ai.shots.is_some() && ai.script.is_none());
         let audio = SidePieces::for_panels([SCRIPT_PANEL]);
         assert!(audio.transcript.is_some() && audio.shots.is_none() && audio.script.is_some());
+    }
+}
+
+/// The parts of the SubSegment the script opened, to the one player (user 2026-10-29: its
+/// program plays in the same Broadcast Player as the story).
+fn play_pieces(script: &mut Script, preview: &mut SourcePreview) {
+    if let Some((pieces, frame)) = script.take_pieces_request() {
+        preview.show_pieces(&pieces, frame);
     }
 }

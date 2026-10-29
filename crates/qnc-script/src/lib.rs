@@ -61,6 +61,14 @@ pub const MOVE_DOWN: &str = "script_move_down";
 pub const REMOVE: &str = "script_remove";
 /// A clip block opens its clip with its IN/OUT (target: its id).
 pub const OPEN: &str = "script_open";
+/// The playhead of the open SubSegment on frame `target` (a click on its timeline).
+pub const SUBSEGMENT_CUE: &str = "subsegment_cue";
+/// The pause before a part one frame longer or shorter: `target` is `block:part:1` or `-1`.
+pub const JOIN_GAP: &str = "subsegment_join_gap";
+/// The join before a part a cut or a crossfade: `target` is `block:part`.
+pub const JOIN_CUT: &str = "subsegment_join_cut";
+/// The SubSegment closes; the source timeline is back.
+pub const SUBSEGMENT_CLOSE: &str = "subsegment_close";
 /// A block of a recorded kind is recorded from the microphone, or its recording stops (target:
 /// its id; without one the chosen block). The catalog names it `record_toggle` (v4).
 pub const RECORD: &str = "record_toggle";
@@ -105,11 +113,15 @@ pub struct Script {
     taking: Option<(i64, mpsc::Receiver<TakeAnswer>)>,
     /// An export on its way to the export folder (piece `qnc-script-files`).
     exporting: Option<mpsc::Receiver<Result<String, String>>>,
+    /// The clip block open as a SubSegment in place of the source timeline.
+    open_subsegment: Option<i64>,
+    /// The parts the player should play and the frame it should show (once).
+    pieces_request: Option<(Vec<qnc_source_preview::PieceInput>, u64)>,
 }
 
 impl Default for Script {
     fn default() -> Self {
-        Self { view: ScriptView::default(), blocks: Vec::new(), project: None, reading: None, read_at: None, writing: None, source_request: None, names: HashMap::new(), words_per_second: Ok(0.0), take: None, taking: None, exporting: None }
+        Self { view: ScriptView::default(), blocks: Vec::new(), project: None, reading: None, read_at: None, writing: None, source_request: None, names: HashMap::new(), words_per_second: Ok(0.0), take: None, taking: None, exporting: None, open_subsegment: None, pieces_request: None }
     }
 }
 
@@ -136,6 +148,38 @@ impl Script {
     /// A clip and IN/OUT a chosen clip block opens on the source timeline, once.
     pub fn take_source_request(&mut self) -> Option<(String, u64, u64)> {
         self.source_request.take()
+    }
+
+    /// The parts the player should play and the frame to show, once (the open SubSegment).
+    pub fn take_pieces_request(&mut self) -> Option<(Vec<qnc_source_preview::PieceInput>, u64)> {
+        self.pieces_request.take()
+    }
+
+    fn block(&self, id: Option<i64>) -> Option<&Block> {
+        id.and_then(|id| self.blocks.iter().find(|block| block.id == id))
+    }
+
+    /// The open SubSegment as its block holds it now and the player plays it: a write that
+    /// changed a pause or a join plays again where it stands; a block gone closes it.
+    fn follow_subsegment(&mut self, preview: &SourcePreview) {
+        let Some(block) = self.block(self.open_subsegment).cloned() else {
+            if self.reading.is_none() && self.writing.is_none() {
+                (self.open_subsegment, self.view.subsegment) = (None, None);
+            }
+            return;
+        };
+        let playing = preview.shown_pieces();
+        if playing.is_none() && self.pieces_request.is_none() {
+            // The player opened something else (a clip of the pool): the source timeline is back.
+            (self.open_subsegment, self.view.subsegment) = (None, None);
+            return;
+        }
+        let inputs = view::piece_inputs(&block);
+        if playing.is_some_and(|playing| playing != inputs.as_slice()) && self.pieces_request.is_none() {
+            self.pieces_request = Some((inputs, preview.program_frame().unwrap_or(0)));
+        }
+        let playhead = playing.and_then(|_| preview.program_frame());
+        self.view.subsegment = Some(view::subsegment_view(&block, playhead));
     }
 
     /// The kind `code` of the project's profile.
@@ -262,6 +306,33 @@ impl Script {
                 let Some(block) = id() else { return Some(false) };
                 self.commit_fields(preview, block)
             }
+            // A block of several parts opens as a SubSegment in place of the source timeline.
+            OPEN if self.block(id()).is_some_and(|block| block.pieces.len() > 1) => {
+                let block = self.block(id())?.clone();
+                self.open_subsegment = Some(block.id);
+                self.pieces_request = Some((view::piece_inputs(&block), 0));
+                self.view.subsegment = Some(view::subsegment_view(&block, None));
+                true
+            }
+            SUBSEGMENT_CUE => {
+                let (Some(block), Some(frame)) = (self.block(self.open_subsegment), target.and_then(|frame| frame.parse::<u64>().ok())) else { return Some(false) };
+                self.pieces_request = Some((view::piece_inputs(block), frame));
+                true
+            }
+            SUBSEGMENT_CLOSE => {
+                (self.open_subsegment, self.view.subsegment) = (None, None);
+                true
+            }
+            JOIN_GAP | JOIN_CUT => {
+                let mut parts = target.unwrap_or_default().split(':');
+                let (Some(id), Some(index)) = (parts.next().and_then(|id| id.parse::<i64>().ok()), parts.next().and_then(|index| index.parse::<usize>().ok())) else { return Some(false) };
+                let Some(piece) = self.block(Some(id)).and_then(|block| block.pieces.get(index)).cloned() else { return Some(false) };
+                let (gap, cut) = match action_id {
+                    JOIN_GAP => (piece.gap_before.saturating_add_signed(parts.next().and_then(|step| step.parse::<i64>().ok()).unwrap_or(0)), piece.cut),
+                    _ => (piece.gap_before, !piece.cut),
+                };
+                self.write(preview, move |target| qnc_script_db::set_join(target, id, index, gap, cut).map(|_| None))
+            }
             OPEN => match id().and_then(|id| self.view.blocks.iter().find(|row| row.block.id == id && row.is_clip())) {
                 Some(row) => {
                     self.source_request = Some((row.block.clip_id.clone(), row.block.from_frame, row.block.to_frame));
@@ -328,6 +399,8 @@ impl Script {
             // The OUT is past the last frame: the end shown is the last frame of the part.
             end_tc: at(to.saturating_sub(1).max(from)),
             length: timecode.map_or_else(|| (to - from).to_string(), |tc| tc.duration_label(to - from)),
+            gap_before: 0,
+            cut: false,
         })
     }
 
@@ -474,6 +547,9 @@ impl Script {
         self.view.clip_seconds = sum(&|row| counts(row) == Some(Counts::Story) && row.is_clip());
         self.view.anchor_seconds = sum(&|row| counts(row) == Some(Counts::Anchor));
         (self.view.in_cue, self.view.out_cue) = story_cues(&self.view.blocks);
+        if self.open_subsegment.is_some() {
+            self.follow_subsegment(preview);
+        }
         self.refresh_editor();
         self.view != before
     }

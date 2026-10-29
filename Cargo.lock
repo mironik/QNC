@@ -3692,6 +3692,7 @@ dependencies = [
  "qnc-right-panel",
  "qnc-segment-panel",
  "qnc-source-timeline",
+ "qnc-subsegment-panel",
  "qnc-theme-styles",
  "qnc-timeline",
  "qnc-transcript",
@@ -5180,6 +5181,7 @@ name = "qnc-program-input"
 version = "0.1.0"
 dependencies = [
  "qnc-artifact-db",
+ "qnc-clip-sound",
  "qnc-db-broker",
  "qnc-frame-timebase",
  "qnc-loudness",
@@ -6111,6 +6113,17 @@ dependencies = [
  "qnc-editorial-desktop",
  "qnc-shell-desktop-api",
  "qnc-status-line",
+]
+
+[[package]]
+name = "qnc-subsegment-panel"
+version = "0.1.0"
+dependencies = [
+ "eframe",
+ "qnc-action-event",
+ "qnc-script",
+ "qnc-timeline",
+ "qnc-ui-text",
 ]
 
 [[package]]

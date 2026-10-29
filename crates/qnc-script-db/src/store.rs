@@ -51,6 +51,7 @@ impl Store {
             Operation::SetVoice { id, uri, seconds, tc } => self.set_voice(*id, uri, *seconds, tc),
             Operation::SetFields { id, fields } => self.set_fields(*id, fields),
             Operation::AddPiece { id, piece } => self.add_piece(*id, piece),
+            Operation::SetJoin { id, index, gap_before, cut } => self.set_join(*id, *index, *gap_before, *cut),
         }
     }
 
@@ -267,7 +268,22 @@ impl Store {
         if block.pieces.is_empty() {
             block.pieces.push(Piece::of(&block));
         }
-        block.pieces.push(piece.clone());
+        block.pieces.push(Piece { gap_before: 0, cut: false, ..piece.clone() });
+        self.store_pieces(id, block)
+    }
+
+    /// The pause before part `index` and its join; the first part has neither.
+    fn set_join(&mut self, id: i64, index: usize, gap_before: u64, cut: bool) -> Result<Data> {
+        let mut block = self.read()?.into_iter().find(|block| block.id == id).ok_or_else(|| qnc_ui_text::text("db.script_no_block").to_string())?;
+        let Some(piece) = block.pieces.get_mut(index).filter(|_| index > 0) else {
+            return Err(qnc_ui_text::text("db.script_no_join").into());
+        };
+        (piece.gap_before, piece.cut) = (gap_before, cut);
+        self.store_pieces(id, block)
+    }
+
+    /// The block made from its parts again, written.
+    fn store_pieces(&mut self, id: i64, mut block: Block) -> Result<Data> {
         block.from_pieces();
         let pieces = serde_json::to_string(&block.pieces).map_err(err)?;
         let tx = qnc_db_broker::begin_write(&mut self.conn).map_err(err)?;

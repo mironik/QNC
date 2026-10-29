@@ -166,7 +166,8 @@ fn paint_block(ui: &mut egui::Ui, row: &qnc_script::BlockRow, view: &ScriptView,
                         asked = Some(ActionEvent::key(action).with_target(id.clone()).at(PANEL));
                     }
                 }
-                if row.is_clip() && qnc_ui_kit::chrome_button(ui, qnc_ui_text::text("script.open"), true, false, style).clicked() {
+                let open = if row.block.pieces.len() > 1 { "script.open_subsegment" } else { "script.open" };
+                if row.is_clip() && qnc_ui_kit::chrome_button(ui, qnc_ui_text::text(open), true, false, style).clicked() {
                     asked = Some(ActionEvent::key(OPEN).with_target(id.clone()).at(PANEL));
                 }
                 // Rec on a block of a recorded kind; while it records, Stop (user 2026-10-28).

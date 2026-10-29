@@ -623,3 +623,48 @@ fn an_off_with_a1_off_is_black_and_silence_also_under_a_cover() {
     assert_eq!(playlist.items[0].sources[0].video_layer, Some(ProgramVideoLayer::Cover));
     assert!(playlist.items[1].sources.is_empty(), "black and silence");
 }
+
+#[test]
+fn a_subsegment_join_crosses_its_sound_and_a_pause_fades_its_edges() {
+    let timebase = tb(50);
+    // Two parts of one clip joined at 100 (a crossfade of 8), a third after a pause of 10.
+    let parts = vec![
+        segment("piece-0", "tonovi", "a", (0, 100), (100, 200), timebase),
+        segment("piece-1", "tonovi", "a", (100, 200), (300, 400), timebase),
+        ProgramSegmentInput { a1_off: true, ..segment("pause-2", "offovi", "a", (200, 210), (0, 10), timebase) },
+        segment("piece-2", "tonovi", "a", (210, 260), (50, 100), timebase),
+    ];
+    let mut playlist = build_flat_program_playlist(&input(260, parts), &mut resolver(&["a"], timebase)).unwrap();
+    join_a1(&mut playlist.items, &[A1Join { end: 100, start: 100, frames: 8 }, A1Join { end: 200, start: 210, frames: 8 }]).unwrap();
+    playlist.validate().unwrap();
+    let at = |frame: i64| playlist.items.iter().find(|item| item.record_range.in_frame <= frame && frame < item.record_range.out_frame).unwrap();
+    // Over 96..104 both parts are heard on A1: the one before falls on past its OUT, the one after rises from before its IN.
+    let crossing = at(97);
+    let a1: Vec<_> = crossing.sources.iter().filter(|source| source.audio_routes.iter().any(|route| route.output_channel == PROGRAM_AUDIO_OUTPUT_A1)).collect();
+    assert_eq!(a1.len(), 2, "two sounds cross at the join");
+    let lead = a1.iter().find(|source| source.source_id.ends_with(":lead")).unwrap();
+    assert_eq!(lead.source_range.source_in, 300 - 4 + (crossing.record_range.in_frame - 96));
+    assert_eq!(lead.audio_routes[0].fade_in, Some((96, 104)));
+    let after = at(102);
+    let tail = after.sources.iter().find(|source| source.source_id.ends_with(":tail")).unwrap();
+    assert_eq!(tail.source_range.source_in, 200 + (after.record_range.in_frame - 100), "the part before goes on after its OUT");
+    // The pause is silence; the part before it fades out, the part after it fades in.
+    assert!(at(205).sources.is_empty(), "a pause is black and silence");
+    let fade_out = at(198).sources.iter().flat_map(|source| &source.audio_routes).find_map(|route| route.fade_out);
+    assert_eq!(fade_out, Some((196, 200)));
+    let fade_in = at(211).sources.iter().flat_map(|source| &source.audio_routes).find_map(|route| route.fade_in);
+    assert_eq!(fade_in, Some((210, 214)));
+}
+
+#[test]
+fn a_cut_join_leaves_the_sound_as_it_is() {
+    let timebase = tb(50);
+    let parts = vec![
+        segment("piece-0", "tonovi", "a", (0, 100), (100, 200), timebase),
+        segment("piece-1", "tonovi", "a", (100, 200), (300, 400), timebase),
+    ];
+    let mut playlist = build_flat_program_playlist(&input(200, parts), &mut resolver(&["a"], timebase)).unwrap();
+    let before = playlist.clone();
+    join_a1(&mut playlist.items, &[A1Join { end: 100, start: 100, frames: 0 }]).unwrap();
+    assert_eq!(playlist, before);
+}

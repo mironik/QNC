@@ -105,12 +105,14 @@ mod build;
 mod load;
 mod media;
 mod normalize;
+mod pieces;
 
 pub use qnc_program_loudness::CoverRule;
 
 pub use build::*;
 pub use load::*;
 pub use media::*;
+pub use pieces::*;
 
 #[cfg(test)]
 mod tests;

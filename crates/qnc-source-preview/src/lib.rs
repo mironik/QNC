@@ -17,7 +17,7 @@ use qnc_content_read::ContentReader;
 use qnc_player_client::{Action, Player, View as PlayerView};
 use qnc_player_input::{InputReader, PlayerContentRead, ProgramInput};
 use qnc_player_launcher::SourceTransportBinding;
-pub use qnc_program_input::SoundDraft;
+pub use qnc_program_input::{PieceInput, SoundDraft};
 use qnc_source_bindings::{SourceBinding, TransportBindings};
 use qnc_timeline::{TimelineIntent, TimelineProjection};
 use qnc_timeline_assets::{
@@ -244,6 +244,8 @@ pub struct SourcePreview {
     activity_target: Option<qnc_content_store::ContentTarget>,
     /// The player plays a story program; the view keeps the source clip.
     program: bool,
+    /// The program the player plays is a SubSegment (its parts), not the story (user 2026-10-29).
+    pieces: Option<Vec<qnc_program_input::PieceInput>>,
     /// The channels of the shown clip heard on output 1 and 2 (A1, A2), when chosen, and
     /// their levels in percent (0: level 0, nothing heard).
     lead: Option<(String, [u16; 2], [u16; 2])>,
@@ -296,6 +298,7 @@ impl Default for SourcePreview {
             program: false,
             lead: None,
             program_draft: None,
+            pieces: None,
             cue_waiting: None,
             program_draft_reopened: false,
             normalize: None,
@@ -404,6 +407,7 @@ impl SourcePreview {
         (self.cue_in_flight, self.cue_next, self.cue_asked, self.cue_waiting) = (None, None, None, None);
         self.play_when_ready = false;
         self.program = false;
+        self.pieces = None;
         self.levels_sent = None;
         if let Some(player) = &self.player {
             player.close();
@@ -763,6 +767,8 @@ impl SourcePreview {
     /// program already plays, else (or when `reopen`: the story changed) the
     /// program is built and opened at that frame.
     pub fn show_program_frame(&mut self, frame: u64, reopen: bool) -> bool {
+        // A SubSegment program is not the story: the story opens in its place.
+        let reopen = reopen || self.pieces.take().is_some();
         if !reopen && self.program && self.player_view.has_confirmed_position() {
             return self.cue(frame);
         }
@@ -776,6 +782,33 @@ impl SourcePreview {
         let (project_id, rule) = (context.settings.project_id.clone(), self.cover_rule());
         self.open_story(frame, move |target| qnc_program_input::loader(target, project_id, rule))
     }
+    /// A SubSegment (user 2026-10-29): its parts one after another as a program, at `frame`.
+    /// The same parts already playing are cued; other parts (a pause or a join changed) open
+    /// the program again where it stands, playing on when it played.
+    pub fn show_pieces(&mut self, pieces: &[qnc_program_input::PieceInput], frame: u64) -> bool {
+        if self.program && self.pieces.as_deref() == Some(pieces) {
+            if self.player_view.has_confirmed_position() {
+                return self.cue(frame);
+            }
+            self.cue_waiting = Some(frame);
+            return true;
+        }
+        let Some(context) = &self.context else {
+            return true;
+        };
+        let playing = self.pieces.is_some() && (self.player_view.playing() || self.play_when_ready);
+        let (project_id, parts) = (context.settings.project_id.clone(), pieces.to_vec());
+        self.open_story(frame, move |target| qnc_program_input::pieces_loader(target, project_id, parts));
+        self.pieces = Some(pieces.to_vec());
+        self.play_when_ready = playing;
+        true
+    }
+
+    /// The SubSegment the player plays, while it plays one.
+    pub fn shown_pieces(&self) -> Option<&[qnc_program_input::PieceInput]> {
+        self.pieces.as_deref().filter(|_| self.program)
+    }
+
     /// The sound of a segment or cover drafted on the Wrap row is heard at once (user
     /// 2026-10-16). Its level or off against the stored sound (`stored`, the same part)
     /// is the level of its output A1 or A2, taken by the player at once; another channel,
@@ -958,6 +991,9 @@ impl SourcePreview {
 
     /// `levels` with the normalising gains on them, within what the output holds.
     fn normalized(&self, levels: [u16; 2]) -> [u16; 2] {
+        if self.pieces.is_some() {
+            return levels;
+        }
         let gains = self.normalize.unwrap_or_default();
         let level = |percent: u16, db: f64| (f64::from(percent) * qnc_gain::db_to_gain(db)).round().clamp(0.0, 400.0) as u16;
         [level(levels[0], gains[0]), level(levels[1], gains[1])]
@@ -978,6 +1014,9 @@ impl SourcePreview {
     /// `None`: as edited; A1 not measured keeps its level. A1 is heard at once; the covers open
     /// the playing program again with their gains where it stands. False when nothing changed.
     pub fn normalize_program(&mut self, measured: Option<[Option<f64>; 2]>) -> bool {
+        if self.pieces.is_some() {
+            return false; // a SubSegment is heard as recorded
+        }
         let targets = self.context.as_ref().and_then(|context| context.settings.audio_loudness().ok());
         let gains = measured.zip(targets).map(|(measured, targets)| {
             let a1 = measured[0].map_or(0.0, |lufs| (targets.a1_lufs - lufs).clamp(-NORMALIZE_MAX_DB, NORMALIZE_MAX_DB));

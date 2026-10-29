@@ -6812,3 +6812,27 @@ broj dijelova i ukupno trajanje, ispod svaki dio s klipom, TC-ovima i svojim tek
 Storyju iz bloka od vise dijelova (Ton segment), brisanje i redoslijed pojedinog dijela, izvoz scenarija po dijelovima
 (izvoz pise blok kao jedan raspon s tekstom svih dijelova). Testovi `qnc-script-db` (novi), `qnc-script`,
 `qnc-script-panel`, `qnc-editorial-application`, conformance, release build. Uzivo nije provjereno.
+Izvedeno 2026-10-29 (korisnik: "u SOT dodati dugme koje bi otvaralo video u source-SubSegment timeline... bazira se na
+kodu program-video-timelinea; vise dijelova istog klipa u jednu izjavu, koja bi se u Storyju ponasala kao jedan
+virtualni klip"; "ton se mora dobro sloziti: dodati prazne dijelove ako treba razmaknuti tonove; krosfade ili rez,
+testirat cemo; slazem se novi tab za njih"): korak 1-3 plana. Blok od vise dijelova ima dugme "Open SubSegment"
+(`script_open`): SubSegment se otvara na mjestu source timelinea (`qnc-editorial-blocks` jedan redak, isti broj redaka),
+a isti Broadcast Player pusta njegove dijelove kao program (player nije mijenjan). `qnc-program-input` `pieces.rs`
+(`load_pieces`, `pieces_loader`, `PieceInput`): dijelovi jedan iza drugoga na V1 i A1 kao Ton segmenti, razmak je Off s
+iskljucenim A1 (crno i tisina), A1 svakog klipa na kanalu i razini zadrzanoj na source timelineu (`qnc-clip-sound`,
+bez zapisa kanal 1), stopa je stopa prvog dijela (2:1 kao u prici). `qnc-program-playlist` `a1_joins.rs` (`join_a1`,
+`A1Join`): na spoju bez razmaka crossfade `audio.crossfade_frames` projekta (zvuk prethodnog dijela pada iza svog OUT-a,
+sljedeci raste prije svog IN-a, koliko izvor ima slika), uz razmak dio prije njega pada, a dio poslije raste preko pola
+tih slika; rez ne dira zvuk. `qnc-script-db`: `Piece.gap_before` (slike razmaka prije dijela) i `Piece.cut` (rez umjesto
+crossfadea, zadano crossfade), operacija `SetJoin` (prvi dio je nema); ugovor `script.database.json`. `qnc-script`
+(`subsegment_view`, `piece_inputs`, `SubsegmentView`; radnje `subsegment_cue`, `subsegment_join_gap`,
+`subsegment_join_cut`, `subsegment_close`, katalog bez tipki), `qnc-side-pieces` predaje dijelove previewu,
+`qnc-source-preview` (`show_pieces`, `shown_pieces`: isti dijelovi se samo cueaju, promijenjeni razmak ili spoj otvara
+program ponovno na istom mjestu; normalizacija price ne vrijedi za SubSegment; story/Wrap otvara pricu umjesto njega).
+Nova javna kocka `crates/qnc-subsegment-panel` (+ ugovor): dijelovi na jednom `qnc-timeline` s crtom na svakom spoju i
+playheadom playera, klik je playhead, ispod za svaki spoj razmak (-/+ jedna slika) i Cut | Crossfade, Close vraca source
+timeline; klik na klip u poolu ga takoder vraca. Nije izvedeno (sljedeci korak): val i filmstrip dijelova na tom
+timelineu, pomak IN/OUT pojedinog dijela, SubSegment kao virtualni klip u bazi (nova klasa u `virtual_shots`) i novi tab
+u poolu, Ton segment u Storyju iz SubSegmenta. Testovi `qnc-program-playlist` (2 nova: crossfade i razmak, rez ne dira
+zvuk), `qnc-script-db` (novi: razmak i spoj), `qnc-program-input`, `qnc-script`, `qnc-side-pieces`,
+`qnc-source-preview`, conformance. Uzivo nije provjereno.

@@ -120,12 +120,19 @@ pub struct Piece {
     /// The words said in it.
     #[serde(default)]
     pub text: String,
+    /// Frames of silence before the part (user 2026-10-29: "space the sounds out so the speech
+    /// sounds natural"), none before the first part.
+    #[serde(default)]
+    pub gap_before: u64,
+    /// The part's sound joins the part before with a cut, not the project's crossfade.
+    #[serde(default)]
+    pub cut: bool,
 }
 
 impl Piece {
     /// The block's own range as its first part (a clip block that had one range).
     pub fn of(block: &Block) -> Self {
-        Self { clip_id: block.clip_id.clone(), clip_name: block.clip_name.clone(), from_frame: block.from_frame, to_frame: block.to_frame, start_tc: block.start_tc.clone(), end_tc: block.end_tc.clone(), length: block.length.clone(), seconds: block.seconds, text: block.text.clone() }
+        Self { clip_id: block.clip_id.clone(), clip_name: block.clip_name.clone(), from_frame: block.from_frame, to_frame: block.to_frame, start_tc: block.start_tc.clone(), end_tc: block.end_tc.clone(), length: block.length.clone(), seconds: block.seconds, text: block.text.clone(), gap_before: 0, cut: false }
     }
 }
 
@@ -155,6 +162,8 @@ pub enum Operation {
     /// Clip block `id` gets `piece` as its next part (a block of one range keeps that range as
     /// its first part).
     AddPiece { id: i64, piece: Piece },
+    /// The pause before part `index` (frames) and whether its sound is cut (else crossed).
+    SetJoin { id: i64, index: usize, gap_before: u64, cut: bool },
 }
 
 impl Operation {
@@ -265,6 +274,11 @@ pub fn set_fields(target: &ProjectDbTarget, id: i64, fields: BTreeMap<String, St
 /// Clip block `id` gets `piece` as its next part.
 pub fn add_piece(target: &ProjectDbTarget, id: i64, piece: Piece) -> Result<()> {
     write(target, Operation::AddPiece { id, piece }).map(drop)
+}
+
+/// The pause before part `index` of block `id` and its join (cut or crossfade).
+pub fn set_join(target: &ProjectDbTarget, id: i64, index: usize, gap_before: u64, cut: bool) -> Result<()> {
+    write(target, Operation::SetJoin { id, index, gap_before, cut }).map(drop)
 }
 
 /// Block `id` leaves the script.

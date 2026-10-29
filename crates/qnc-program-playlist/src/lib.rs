@@ -16,12 +16,14 @@
 
 mod contract;
 mod crossfade;
+mod a1_joins;
 mod picture_lead;
 mod build;
 mod overlay;
 mod window;
 
 pub(crate) use build::*;
+pub use a1_joins::{join_a1, A1Join};
 pub use overlay::*;
 pub use window::*;
 

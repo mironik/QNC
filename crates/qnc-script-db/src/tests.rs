@@ -191,7 +191,7 @@ fn a_block_keeps_only_the_fields_of_its_kind_and_a_choice_only_one_of_its_choice
 }
 
 fn piece(clip: &str, from: u64, to: u64, text: &str) -> Piece {
-    Piece { clip_id: clip.into(), clip_name: clip.into(), from_frame: from, to_frame: to, start_tc: format!("tc{from}"), end_tc: format!("tc{to}"), length: "1:00".into(), seconds: 1.0, text: text.into() }
+    Piece { clip_id: clip.into(), clip_name: clip.into(), from_frame: from, to_frame: to, start_tc: format!("tc{from}"), end_tc: format!("tc{to}"), length: "1:00".into(), seconds: 1.0, text: text.into(), gap_before: 0, cut: false }
 }
 
 #[test]
@@ -211,4 +211,18 @@ fn a_subsegment_keeps_its_parts_their_words_one_under_another() {
     let new = add(&target, None, Block::of_pieces("sot", vec![piece("3396", 1, 51, "nova izjava")])).unwrap();
     let block = read(&target).unwrap().into_iter().find(|b| b.id == new).unwrap();
     assert_eq!((block.pieces.len(), block.text.as_str(), block.from_frame), (1, "nova izjava", 1));
+}
+
+#[test]
+fn a_join_keeps_its_pause_and_cut_the_first_part_has_none() {
+    let (_dir, target) = written();
+    let id = add(&target, None, sot("2002")).unwrap();
+    add_piece(&target, id, piece("2002", 500, 550, "a drugi dio")).unwrap();
+    set_join(&target, id, 1, 12, true).unwrap();
+    let block = read(&target).unwrap().remove(0);
+    assert_eq!((block.pieces[1].gap_before, block.pieces[1].cut), (12, true));
+    assert_eq!(block.text, "rekao je
+a drugi dio", "the words stay");
+    assert!(set_join(&target, id, 0, 5, false).is_err(), "the first part has no join");
+    assert!(set_join(&target, id, 2, 5, false).is_err(), "no such part");
 }
