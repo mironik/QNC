@@ -39,3 +39,22 @@ fn a_script_with_nothing_for_the_draft_says_so() {
     let rates = DraftRates { words_per_second: 2.5, fps: 50.0, clip_id: &clip_id };
     assert!(draft_pieces(&[block(1, "off", "Nije snimljen.")], &[], &general_tv(), &rates).is_err());
 }
+
+#[test]
+fn the_skeleton_is_the_script_as_story_segments_without_the_offs_not_recorded() {
+    let take = |take: u16, seconds: f64| VoiceTake { take, wav_uri: String::new(), seconds, tc: String::new(), text: String::new() };
+    let voices = [Voice { block_id: 2, name: "P_OFF1".into(), clip_uri: String::new(), chosen: 2, takes: vec![take(1, 4.0), take(2, 3.0)] }];
+    let blocks = [
+        block(1, "intro", "Najava se ne broji u prilog."),
+        block(2, "off", "Snimljeni off."),
+        sot(3, "c1", 100, 200),
+        block(4, "off", "Nije snimljen."),
+        sot(5, "c2", 10, 60),
+    ];
+    let clip_id = |name: &str| format!("voice-{name}");
+    let rates = DraftRates { words_per_second: 2.5, fps: 50.0, clip_id: &clip_id };
+    let parts = skeleton(&blocks, &voices, &general_tv(), &rates).unwrap();
+    let shown: Vec<_> = parts.iter().map(|p| (p.kind, p.clip_id.as_str(), p.from_frame, p.to_frame, p.origin.as_str())).collect();
+    assert_eq!(shown, vec![("offovi", "voice-P_OFF1", 0, 150, "script:2:0"), ("tonovi", "c1", 100, 200, "script:3:0"), ("tonovi", "c2", 10, 60, "script:5:0")]);
+    assert_eq!(parts[0].a1, Some((Some(1), 0, false)));
+}

@@ -100,5 +100,62 @@ pub fn draft_pieces(blocks: &[Block], voices: &[Voice], profile: &ScriptProfile,
     Ok(pieces)
 }
 
+/// One segment of the skeleton of a story (user 2026-10-31: "Send to Story"): a recorded OFF is
+/// an Off of its voice record, a part of a clip block a Ton.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct SkeletonPart {
+    /// `tonovi` or `offovi`, as the story keeps them.
+    pub kind: &'static str,
+    pub clip_id: String,
+    pub from_frame: u64,
+    pub to_frame: u64,
+    /// The part's own A1 (as `PieceInput::a1`); `None`: the sound kept for its clip.
+    pub a1: Option<(Option<u16>, i8, bool)>,
+    /// `script:<block>:<part>`: the block and part of the script it came from.
+    pub origin: String,
+}
+
+/// The skeleton of `blocks`: the parts of the draft as story segments, in reading order. An OFF
+/// not recorded yet is left out (user 2026-10-31), as are blocks that do not count in the story.
+pub fn skeleton(blocks: &[Block], voices: &[Voice], profile: &ScriptProfile, rates: &DraftRates<'_>) -> Result<Vec<SkeletonPart>, String> {
+    if !(rates.fps.is_finite() && rates.fps > 0.0) {
+        return Err(qnc_ui_text::text("voice.clip_rate").into());
+    }
+    let mut parts = Vec::new();
+    for block in blocks {
+        let Some(kind) = profile.kind(&block.kind) else { continue };
+        if kind.counts != Counts::Story {
+            continue;
+        }
+        match kind.role {
+            Role::Clip => parts.extend(piece_inputs(block).into_iter().enumerate().map(|(index, piece)| SkeletonPart {
+                kind: "tonovi",
+                clip_id: piece.clip_id,
+                from_frame: piece.from_frame,
+                to_frame: piece.to_frame,
+                a1: piece.a1,
+                origin: format!("script:{}:{index}", block.id),
+            })),
+            Role::Spoken => {
+                if let Some((voice, take)) = voices.iter().find(|voice| voice.block_id == block.id).and_then(|voice| Some((voice, voice.chosen_take()?))) {
+                    parts.push(SkeletonPart {
+                        kind: "offovi",
+                        clip_id: (rates.clip_id)(&voice.name),
+                        from_frame: 0,
+                        to_frame: ((take.seconds * rates.fps).round().max(1.0)) as u64,
+                        a1: Some((Some(take.take.saturating_sub(1)), 0, false)),
+                        origin: format!("script:{}:0", block.id),
+                    });
+                }
+            }
+            Role::Anchor | Role::Note => {}
+        }
+    }
+    if parts.is_empty() {
+        return Err(qnc_ui_text::text("script.draft_empty").into());
+    }
+    Ok(parts)
+}
+
 #[cfg(test)]
 mod tests;

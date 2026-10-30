@@ -149,6 +149,23 @@ pub struct StorySelection {
     pub story_fps: Option<(u32, u32)>,
 }
 
+/// One segment of a skeleton sent to the story (`AppendSegments`).
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct AppendSegment {
+    /// `tonovi` or `offovi`.
+    pub kind: String,
+    pub clip_id: String,
+    pub in_frame: u64,
+    pub out_frame: u64,
+    /// A1 and A2: source channel (zero based), level in dB, off.
+    pub a1: (u16, i8, bool),
+    pub a2: (u16, i8, bool),
+    /// Where the segment came from, e.g. `script:<block>:<part>`; kept with the segment so
+    /// the same part can later be sent again in its place.
+    pub origin: String,
+}
+
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(tag = "kind", content = "value", rename_all = "snake_case", deny_unknown_fields)]
 pub enum Operation {
@@ -179,6 +196,10 @@ pub enum Operation {
         #[serde(default)]
         a2_off: bool,
     },
+    /// Appends segments at the end of the program in one step (one Undo step): the skeleton
+    /// of a story sent from its script (user 2026-10-31). Each source's rate is the one
+    /// stored for its clip; each segment remembers where it came from (`origin`).
+    AppendSegments { project_id: String, segments: Vec<AppendSegment> },
     /// Takes a segment out of the program (v5 `delete_part`: `active = 0`); it stays
     /// listed where it was.
     DeleteSegment { segment_id: String },
@@ -319,6 +340,7 @@ impl Operation {
         matches!(
             self,
             Self::CreateSegment { .. }
+                | Self::AppendSegments { .. }
                 | Self::DeleteSegment { .. }
                 | Self::IncludeSegment { .. }
                 | Self::ReplaceSegment { .. }

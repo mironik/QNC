@@ -215,6 +215,7 @@ impl Store {
                     (*a2_source_channel, lane_level(*a2_level_db)?, *a2_off),
                 ],
             ),
+            Operation::AppendSegments { project_id, segments } => self.append_segments(project_id, segments),
             Operation::DeleteSegment { segment_id } => self.delete_segment(segment_id),
             Operation::IncludeSegment { segment_id } => self.include_segment(segment_id),
             Operation::ReplaceSegment {

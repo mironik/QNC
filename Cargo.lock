@@ -5571,11 +5571,13 @@ name = "qnc-script"
 version = "0.1.0"
 dependencies = [
  "qnc-clip-row",
+ "qnc-clip-sound",
  "qnc-db-broker",
  "qnc-dev-diagnostics",
  "qnc-export-launch",
  "qnc-image-assets",
  "qnc-newsroom-sheet-db",
+ "qnc-program-db",
  "qnc-program-filmstrip",
  "qnc-program-view",
  "qnc-program-waveform",

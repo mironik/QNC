@@ -104,6 +104,9 @@ pub const EXPORT: &str = "script_export";
 /// The draft story of the script is written as a Final Cut Pro 7 XML in the project's export
 /// folder (user 2026-10-30): recorded OFFs and statements in reading order.
 pub const DRAFT: &str = "script_draft";
+/// The skeleton of the script is added at the end of the story (user 2026-10-31): recorded
+/// OFFs as Offs, statements as Tons; OFFs not recorded yet are left out.
+pub const SEND_STORY: &str = "script_send_story";
 /// The exported A/V script is shown in the file browser of this OS.
 pub const OPEN_EXPORT: &str = "script_open_export";
 
@@ -162,6 +165,8 @@ pub struct Script {
     voice_request: Option<(String, u16)>,
     /// The take to hear once the write in progress is done.
     voice_after_write: Option<(String, u16)>,
+    /// What the panel says once the write in progress is done.
+    message_after_write: Option<String>,
 }
 
 /// The A1 of part `index` taken (Ctrl+1) as drafted: camera channel, level, off.
@@ -184,7 +189,7 @@ struct Trim {
 
 impl Default for Script {
     fn default() -> Self {
-        Self { view: ScriptView::default(), blocks: Vec::new(), project: None, reading: None, read_at: None, writing: None, source_request: None, names: HashMap::new(), words_per_second: Ok(0.0), take: None, taking: None, exporting: None, draft: Default::default(), open_subsegment: None, pieces_request: None, trim: None, waves: qnc_program_waveform::ProgramWaves::new(), filmstrips: qnc_program_filmstrip::ProgramFilmstrips::new(), waves_project: None, trim_stills: qnc_trim_stills::TrimStills::new(), zoom_follow: Default::default(), sound: None, voices: Vec::new(), voice_request: None, voice_after_write: None }
+        Self { view: ScriptView::default(), blocks: Vec::new(), project: None, reading: None, read_at: None, writing: None, source_request: None, names: HashMap::new(), words_per_second: Ok(0.0), take: None, taking: None, exporting: None, draft: Default::default(), open_subsegment: None, pieces_request: None, trim: None, waves: qnc_program_waveform::ProgramWaves::new(), filmstrips: qnc_program_filmstrip::ProgramFilmstrips::new(), waves_project: None, trim_stills: qnc_trim_stills::TrimStills::new(), zoom_follow: Default::default(), sound: None, voices: Vec::new(), voice_request: None, voice_after_write: None, message_after_write: None }
     }
 }
 
@@ -593,6 +598,7 @@ impl Script {
                 }
                 true
             }
+            SEND_STORY => self.send_story(preview),
             OPEN_EXPORT => {
                 if let Some(file) = &self.view.exported {
                     if let Err(error) = qnc_status_line::open(file) {
@@ -853,6 +859,71 @@ impl Script {
         true
     }
 
+    /// Sends the skeleton to the story (user 2026-10-31): the voice records go into the catalog
+    /// first (one made before the catalog knew voice clips is written there now), then the
+    /// segments are added at the end of the story in one step, each with the sound of its part
+    /// or the one kept for its clip, and where it came from.
+    fn send_story(&mut self, preview: &SourcePreview) -> bool {
+        let (Some(profile), Some(locator)) = (self.view.profile.clone(), preview.still_locator()) else {
+            self.view.message = qnc_ui_text::text("script.no_project").into();
+            return true;
+        };
+        let voices: Vec<Voice> = self.voices.iter().map(|(voice, _)| voice.clone()).collect();
+        let fps = match locator.settings().video_picture() {
+            Ok((_, _, fps)) => fps,
+            Err(error) => {
+                self.view.message = error.message;
+                return true;
+            }
+        };
+        let rates = qnc_script_draft::DraftRates { words_per_second: self.reading_speed(), fps, clip_id: &qnc_voice_take::clip_id };
+        let parts = match qnc_script_draft::skeleton(&self.blocks, &voices, &profile, &rates) {
+            Ok(parts) => parts,
+            Err(error) => {
+                self.view.message = error;
+                return true;
+            }
+        };
+        let project_id = locator.settings().project_id.clone();
+        self.message_after_write = Some(qnc_ui_text::fill("script.sent_story", &[("n", &parts.len().to_string())]));
+        self.view.message = qnc_ui_text::text("script.sending_story").into();
+        self.write(preview, move |target| {
+            for voice in voices.iter().filter(|voice| !voice.takes.is_empty()) {
+                let takes: Vec<f64> = voice.takes.iter().map(|take| take.seconds).collect();
+                let first_tc = voice.takes.first().map(|take| take.tc.clone()).unwrap_or_default();
+                let record = qnc_voice_take::describe_record(locator.settings(), &voice.name, &voice.clip_uri, &takes, &first_tc)?;
+                qnc_voice_catalog::publish_record(locator.reader(), locator.settings(), &voice.name, record)?;
+            }
+            let mut segments = Vec::with_capacity(parts.len());
+            for part in parts {
+                let kept = qnc_clip_sound::read(target, &part.clip_id)?;
+                let lane = |lane: Option<&qnc_clip_sound::LaneSound>, channel: u16| lane.map_or((channel, 0, false), |lane| (lane.channel, lane.level_db, lane.off));
+                let kept_a1 = lane(kept.as_ref().map(|sound| &sound.a1), 0);
+                let a1 = match part.a1 {
+                    Some((channel, level, off)) => (channel.unwrap_or(kept_a1.0), level, off),
+                    None => kept_a1,
+                };
+                // An Off's A2 is its own voice, off (the story hears an Off's A2 only where a
+                // Ton goes into it); a Ton keeps the A2 kept for its clip, else channel 2.
+                let a2 = match part.kind {
+                    "offovi" => (a1.0, 0, true),
+                    _ => lane(kept.as_ref().map(|sound| &sound.a2), 1),
+                };
+                segments.push(qnc_program_db::AppendSegment {
+                    kind: part.kind.into(),
+                    clip_id: part.clip_id,
+                    in_frame: part.from_frame,
+                    out_frame: part.to_frame,
+                    a1,
+                    a2,
+                    origin: part.origin,
+                });
+            }
+            qnc_program_db::StoryWriter::start(target.clone())?.call(&qnc_program_db::Operation::AppendSegments { project_id, segments })?;
+            Ok(None)
+        })
+    }
+
     fn reading_speed(&self) -> f64 {
         self.words_per_second.as_ref().copied().unwrap_or(0.0)
     }
@@ -964,10 +1035,11 @@ impl Script {
         if let Some(done) = &self.writing {
             if let Ok(result) = done.try_recv() {
                 let heard = self.voice_after_write.take();
+                let said = self.message_after_write.take();
                 match result {
                     Ok(added) => {
                         self.voice_request = heard;
-                        self.view.message.clear();
+                        self.view.message = said.unwrap_or_default();
                         if let Some(id) = added {
                             self.view.selected = Some(id);
                             // The editor's text is in the script now.

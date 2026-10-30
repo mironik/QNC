@@ -7222,3 +7222,18 @@ projekta umjesto lokatora slika, pa ih koriste i aplikacija i alat. Program slaz
 (pauza smije biti i prije prvog dijela). Nije izvedeno: pauza OFF-a bez snimke na samom kraju scenarija se izostavlja;
 pokrivalice (B-roll) nisu u nacrtu. Testovi `qnc-script-draft` (2), `qnc-script`, `qnc-voice-take`, `qnc-voice-catalog`,
 `qnc-program-input`, conformance. Uzivo nije provjereno.
+Izvedeno 2026-10-31 (korisnik: "da, Send to Story, preskoci nesnimljene, dodaj na kraj ili u MA Video... tu bi mogao fino
+podesiti kostur price, i tako posloženi poslati na Story... ako nesto zeznem u Storyju uvijek se mogu vratiti na MA Video i
+poslati ponovo cijeli kostur ili samo neki njegov dio (ako je samo dio onda je rewrite odabranog dijela)"): korak 1, slanje
+kostura na kraj price. Panel scenarija (MA Audio) ima uz Draft XML gumb "Send to Story" (akcija kataloga
+`script_send_story`, bez tipke): blokovi koji ulaze u trajanje priloga, redom citanja, dodaju se na kraj price u jednom
+koraku (jedan Undo vraca cijeli kostur): snimljeni OFF kao Off segment klipa zapisa glasa, A1 na kanalu izabrane snimke (A2
+isti kanal iskljucen), dio izjave kao Ton segment s A1 dijela ili zvukom zadrzanim za klip (`qnc-clip-sound`, bez zapisa A1
+kanal 1, A2 kanal 2). Nesnimljeni OFF se preskace. Zapisi glasa najprije idu u katalog (kao kod Draft XML-a).
+`qnc-script-draft` `skeleton`/`SkeletonPart`; `qnc-program-db` operacija `AppendSegments` (`AppendSegment`: vrsta, klip,
+IN/OUT, A1, A2, porijeklo; stopa izvora je spremljena stopa klipa; dio koji ne prode provjeru ne ostavlja nista) i stupac
+`story_items.origin` (`script:<blok>:<dio>`; prici napravljenoj prije dodaje se bez brisanja), za kasnije ponovno slanje
+dijela na njegovo mjesto; `qnc-script` (`send_story`, poruka nakon upisa), `qnc-script-panel`, rjecnik. Nije izvedeno
+(sljedeci koraci): kostur u MA Video (fino podesavanje prije slanja), slanje dijela kostura kao prepisivanje njegovih
+segmenata u prici (pokrivalice iznad njih trazi odluku). Testovi `qnc-script-draft` (novi `skeleton`), `qnc-program-db`
+(novi `a_skeleton_is_appended_in_one_step_...`), `qnc-script`, conformance. Uzivo nije provjereno.

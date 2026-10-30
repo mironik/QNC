@@ -165,6 +165,7 @@ pub(crate) fn ensure_story_schema(conn: &Connection) -> Result<()> {
             updated_at TEXT NOT NULL
          );
          CREATE INDEX IF NOT EXISTS idx_story_items_role_sort ON story_items(role, sort_index);
+         -- `origin` is added below to a story made before it (it keeps its rows).
          CREATE INDEX IF NOT EXISTS idx_story_items_slot ON story_items(slot_id);
          CREATE TABLE IF NOT EXISTS story_markers (
             marker_id TEXT PRIMARY KEY,
@@ -244,6 +245,11 @@ pub(crate) fn ensure_story_schema(conn: &Connection) -> Result<()> {
          FROM story_items WHERE role = 'cover';",
     )
     .map_err(err)?;
+    // Where a segment came from (user 2026-10-31: a part of the skeleton sent again replaces
+    // its own segments). Added to a story made before it; its rows stay.
+    if !table_columns(conn, "story_items")?.iter().any(|column| column == "origin") {
+        conn.execute_batch("ALTER TABLE story_items ADD COLUMN origin TEXT NOT NULL DEFAULT '';").map_err(err)?;
+    }
     // Cover identity is the marker pair. The seconds signature stays a column
     // from v5; this owner does not use it as the slot id.
     conn.execute(

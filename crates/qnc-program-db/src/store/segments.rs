@@ -1,6 +1,39 @@
 use super::*;
 
 impl Store {
+    /// Appends a skeleton (user 2026-10-31): every segment as `create_segment` makes it, in
+    /// the one transaction of this write, each with its source's stored rate and its origin.
+    pub(crate) fn append_segments(&mut self, project_id: &str, segments: &[AppendSegment]) -> Result<Data> {
+        if segments.is_empty() {
+            return Err(qnc_ui_text::text("story.skeleton_empty").into());
+        }
+        let mut created = Vec::with_capacity(segments.len());
+        for segment in segments {
+            let Some((_, rate)) = qnc_content_read::clip_timing_on(&self.conn, &segment.clip_id)? else {
+                return Err(qnc_ui_text::text("story.clip_timing_unknown").into());
+            };
+            let Data::Created(segment_id) = self.create_segment(
+                project_id,
+                &segment.kind,
+                &segment.clip_id,
+                (segment.in_frame, segment.out_frame),
+                rate,
+                [
+                    (segment.a1.0, lane_level(segment.a1.1)?, segment.a1.2),
+                    (segment.a2.0, lane_level(segment.a2.1)?, segment.a2.2),
+                ],
+            )?
+            else {
+                return Err(qnc_ui_text::text("story.invalid_reply_story").into());
+            };
+            self.conn
+                .execute("UPDATE story_items SET origin = ?1 WHERE item_id = ?2", params![segment.origin, segment_id])
+                .map_err(err)?;
+            created.push(segment_id);
+        }
+        Ok(Data::Created(created.join(",")))
+    }
+
     /// Appends a Ton or Off segment (docs/93 R8-R10). The range is copied from the
     /// source IN/OUT; a story has one timebase, a different one is refused.
     pub(crate) fn create_segment(

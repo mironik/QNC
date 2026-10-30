@@ -349,3 +349,40 @@ fn trimming_the_out_of_a_half_rate_segment_keeps_its_markers_on_their_frames() {
     let after = markers(&mut store);
     assert!(after.contains(&11) && after.contains(&13), "the markers stay on their pictures: {after:?}");
 }
+
+#[test]
+fn a_skeleton_is_appended_in_one_step_with_its_clips_rate_and_where_each_part_came_from() {
+    let dir = tempfile::tempdir().unwrap();
+    let path = dir.path().join("db");
+    let mut store = imported_store(&path);
+    create_segment(&mut store, "tonovi", (0, 50), (50, 1)).unwrap();
+    let part = |kind: &str, range: (u64, u64), origin: &str| AppendSegment {
+        kind: kind.into(),
+        clip_id: "c1".into(),
+        in_frame: range.0,
+        out_frame: range.1,
+        a1: (2, -3, false),
+        a2: (1, 0, true),
+        origin: origin.into(),
+    };
+    let segments_sent = vec![part("offovi", (100, 150), "script:2:0"), part("tonovi", (200, 260), "script:3:0")];
+    run(&mut store, Operation::AppendSegments { project_id: "p1".into(), segments: segments_sent }).unwrap();
+    let rows = segments(&mut store);
+    let shown: Vec<_> = rows.iter().map(|r| (r.kind.as_str(), r.in_frame, r.out_frame, r.a1_source_channel, r.a1_level_db)).collect();
+    assert_eq!(shown, vec![("tonovi", 0, 50, 0, 0), ("offovi", 100, 150, 2, -3), ("tonovi", 200, 260, 2, -3)]);
+    let conn = Connection::open(&path).unwrap();
+    let origins: Vec<String> = conn
+        .prepare("SELECT origin FROM story_items WHERE role = 'segment' AND lead = '' ORDER BY sort_index")
+        .unwrap()
+        .query_map([], |row| row.get(0))
+        .unwrap()
+        .collect::<rusqlite::Result<_>>()
+        .unwrap();
+    assert_eq!(origins, vec!["", "script:2:0", "script:3:0"]);
+    // One Undo step takes the whole skeleton back.
+    run(&mut store, Operation::UndoStory).unwrap();
+    assert_eq!(segments(&mut store).len(), 1);
+    // A part that cannot be added leaves nothing of the skeleton behind.
+    assert!(run(&mut store, Operation::AppendSegments { project_id: "p1".into(), segments: vec![part("tonovi", (0, 10), "a"), part("tonovi", (0, 200_000), "b")] }).is_err());
+    assert_eq!(segments(&mut store).len(), 1);
+}
