@@ -99,8 +99,12 @@ pub fn show(ctx: &egui::Context, segments: &SegmentsView) -> Option<ActionEvent>
                     ui.painter().line_segment([egui::pos2(x, pane.top() - 4.0), egui::pos2(x, pane.bottom() + 4.0)], Stroke::new(3.0, accent));
                 }
             }
+            // The buttons stand over the playhead: the cut's line through the sound, else the
+            // marker between the pictures (user 2026-10-30).
+            let mut centre = gap_at;
             if let Some(sound) = sound {
                 let area = Rect::from_min_size(egui::pos2(top.x, top.y + picture.y + LABEL_HEIGHT + BUTTONS_HEIGHT + LANES_GAP), Vec2::new(row_width, 2.0 * LANE_HEIGHT + GAP / 2.0 + WORDS_HEIGHT));
+                centre = Some(cut_line_x(area, sound));
                 let (word, side) = paint_sound(ui, area, sound, gap_at, top.y, &visuals);
                 // A double clicked word on a source timeline's zoom is a cut, as on the transcript.
                 if let Some((from, to)) = word.filter(|_| source) {
@@ -111,7 +115,7 @@ pub fn show(ctx: &egui::Context, segments: &SegmentsView) -> Option<ActionEvent>
                 }
             }
             let row = Rect::from_min_size(egui::pos2(top.x, top.y + picture.y + LABEL_HEIGHT), Vec2::new(row_width, BUTTONS_HEIGHT));
-            if let Some(pressed) = paint_buttons(ui, row, gap_at.unwrap_or(row.center().x)) {
+            if let Some(pressed) = paint_buttons(ui, row, centre.unwrap_or(row.center().x)) {
                 turned = Some(pressed);
             }
         });
@@ -148,11 +152,16 @@ fn shown_height(peak: u16) -> f32 {
 /// A1 and A2 around the cut, each a lane of its peaks mirrored about its middle, and the
 /// thin line of the cut: from between the pictures when it lies under that gap, across
 /// both lanes at the cut's place in the window.
+/// Where the thin line of the cut (the playhead of the zoom) crosses the lanes.
+fn cut_line_x(area: Rect, sound: &ZoomSound) -> f32 {
+    area.left() + area.width() * (sound.cut.saturating_sub(sound.from)) as f32 / (sound.to - sound.from) as f32
+}
+
 fn paint_sound(ui: &mut egui::Ui, area: Rect, sound: &ZoomSound, gap_at: Option<f32>, pictures_top: f32, visuals: &egui::Visuals) -> (Option<(u64, u64)>, Option<ActionEvent>) {
     let mut word = None;
     let mut side = None;
     let span = (sound.to - sound.from) as f32;
-    let cut_x = area.left() + area.width() * (sound.cut.saturating_sub(sound.from)) as f32 / span;
+    let cut_x = cut_line_x(area, sound);
     let x_of = |frame: u64| area.left() + area.width() * (frame.saturating_sub(sound.from)) as f32 / span;
     for lane in 0..2 {
         let top = area.top() + lane as f32 * (LANE_HEIGHT + GAP / 2.0 + WORDS_HEIGHT);
