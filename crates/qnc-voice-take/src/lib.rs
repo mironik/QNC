@@ -45,6 +45,8 @@ pub struct Take {
     width: u32,
     height: u32,
     fps: f64,
+    fields: Option<bool>,
+    rate: u32,
 }
 
 /// A finished take, as its block keeps it.
@@ -59,6 +61,9 @@ pub struct Recorded {
     pub wav_uri: String,
     pub seconds: f64,
     pub timecode: String,
+    /// The record's clip as the catalog keeps it, every take one channel (piece
+    /// `qnc-voice-clip`, what it asked the encoder for).
+    pub record: qnc_media_metadata::ClipMetadata,
 }
 
 /// The name of a record: the project's name and the block's mark (`OFF 2` is `OFF2`), as a
@@ -66,6 +71,27 @@ pub struct Recorded {
 pub fn record_name(project: &str, mark: &str) -> String {
     let mark: String = mark.chars().filter(|c| !c.is_whitespace()).collect();
     qnc_work_settings::export_file_name(&format!("{}_{mark}", project.trim()))
+}
+
+/// The catalog record of a voice record's clip as it stands (its takes' lengths, its first
+/// take's timecode), from the project's settings as saved: what `finish` wrote, nothing probed.
+/// A record made before the catalog knew voice clips is described the same way.
+pub fn describe_record(locator: &StillLocator, name: &str, clip_uri: &str, takes: &[f64], first_tc: &str) -> Result<qnc_media_metadata::ClipMetadata> {
+    let settings = locator.settings();
+    let (width, height, fps) = settings.video_picture().map_err(|e| e.message)?;
+    let fields = settings.video_fields().map_err(|e| e.message)?;
+    let sample_rate = settings.audio_sample_rate().map_err(|e| e.message)?;
+    let sounds = vec![PathBuf::new(); takes.len()];
+    let seconds = takes.iter().copied().fold(0.0, f64::max);
+    let clip = qnc_voice_clip::VoiceClip { sounds: &sounds, seconds, text: "", heading: "", width, height, fps, fields, sample_rate, timecode: first_tc, out: Path::new(""), project_dir: Path::new("") };
+    qnc_voice_clip::describe(&clip, &clip_id(name), clip_uri)
+}
+
+/// The catalog id of a record's clip: `voice-` and its name, with every character a clip id
+/// may not have as `_` (one record, one clip, whatever the blocks do).
+pub fn clip_id(name: &str) -> String {
+    let id: String = name.chars().map(|c| if c.is_ascii_alphanumeric() || c == '-' || c == '_' { c } else { '_' }).take(200).collect();
+    format!("voice-{id}")
 }
 
 impl Take {
@@ -78,6 +104,7 @@ impl Take {
         let (folder, base) = settings.voice_location(&project_dir).map_err(|e| e.message)?;
         let rate = settings.audio_sample_rate().map_err(|e| e.message)?;
         let (width, height, fps) = settings.video_picture().map_err(|e| e.message)?;
+        let fields = settings.video_fields().map_err(|e| e.message)?;
         let name = earlier.as_ref().map_or_else(|| record_name(&settings.project_name, mark), |earlier| earlier.name.clone());
         let taken = earlier.as_ref().map_or(0, |earlier| earlier.takes.len());
         if taken >= qnc_voice_clip::MAX_CHANNELS {
@@ -88,7 +115,7 @@ impl Take {
         let number = taken as u16 + 1;
         let wav = take_file(&name, number);
         let recorder = Recorder::start(folder.join(&wav), &project_dir, rate, fps, setting)?;
-        Ok(Self { recorder, folder, base: base.clone(), wav_uri: format!("{base}/{wav}"), name, number, earlier: earlier_files, first_tc: earlier.map(|earlier| earlier.first_tc), project_dir, width, height, fps })
+        Ok(Self { recorder, folder, base: base.clone(), wav_uri: format!("{base}/{wav}"), name, number, earlier: earlier_files, first_tc: earlier.map(|earlier| earlier.first_tc), project_dir, width, height, fps, fields, rate })
     }
 
     /// The take's number (the channel it becomes).
@@ -115,9 +142,11 @@ impl Take {
         let seconds = self.earlier.iter().map(|(_, seconds)| *seconds).fold(recording.seconds, f64::max);
         let timecode = self.first_tc.clone().unwrap_or_else(|| recording.timecode.clone());
         let out = self.folder.join(format!("{}.mxf", self.name));
-        let clip = qnc_voice_clip::VoiceClip { sounds: &sounds, seconds, text, heading, width: self.width, height: self.height, fps: self.fps, timecode: &timecode, out: &out, project_dir: &self.project_dir };
+        let clip = qnc_voice_clip::VoiceClip { sounds: &sounds, seconds, text, heading, width: self.width, height: self.height, fps: self.fps, fields: self.fields, sample_rate: self.rate, timecode: &timecode, out: &out, project_dir: &self.project_dir };
         qnc_voice_clip::make(&clip)?;
-        Ok(Recorded { clip_uri: format!("{}/{}.mxf", self.base, self.name), name: self.name, number: self.number, wav_uri: self.wav_uri, seconds: recording.seconds, timecode: recording.timecode })
+        let clip_uri = format!("{}/{}.mxf", self.base, self.name);
+        let record = qnc_voice_clip::describe(&clip, &clip_id(&self.name), &clip_uri)?;
+        Ok(Recorded { clip_uri, name: self.name, number: self.number, wav_uri: self.wav_uri, seconds: recording.seconds, timecode: recording.timecode, record })
     }
 
     /// Stops the take and throws it away (its file is left empty for the next take).

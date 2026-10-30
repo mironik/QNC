@@ -193,6 +193,18 @@ impl WorkSettings {
         }
     }
 
+    /// The project picture's scan (`video.field_order`: `progressive`, `upper_first`,
+    /// `lower_first`); `Some(true)` is the upper field first, `None` progressive. A missing
+    /// or unknown value is a controlled error.
+    pub fn video_fields(&self) -> Result<Option<bool>, ReadError> {
+        match self.video.get("field_order").and_then(Value::as_str) {
+            Some("progressive") => Ok(None),
+            Some("upper_first") => Ok(Some(true)),
+            Some("lower_first") => Ok(Some(false)),
+            _ => Err(ReadError::new("video_field_order", "The database holds no valid video.field_order.")),
+        }
+    }
+
     /// Frames of the crossfade on every A2 cut (user 2026-10-21); a project without it is
     /// completed when Project opens it, a missing value is a controlled error.
     pub fn audio_crossfade_frames(&self) -> Result<u16, ReadError> {

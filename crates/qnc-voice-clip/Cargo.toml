@@ -6,6 +6,8 @@ description = "QNC public module: a recorded voice-over (or sound brought from e
 
 [dependencies]
 qnc-decoder-catalog = { workspace = true }
+qnc-frame-timebase = { workspace = true }
+qnc-media-metadata = { workspace = true }
 qnc-title-card = { workspace = true }
 qnc-ui-text = { workspace = true }
 

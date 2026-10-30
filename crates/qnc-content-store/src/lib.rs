@@ -173,6 +173,8 @@ pub struct InventoryClip {
 )]
 pub enum Operation {
     Publish(Box<CatalogClip>),
+    /// A voice-over record of the script as a clip of kind `voice` (user 2026-10-30).
+    PublishVoice(Box<CatalogClip>),
     PublishBatch(Vec<CatalogClip>),
     Inventory {
         source_uri: String,

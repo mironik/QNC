@@ -153,6 +153,10 @@ pub struct Script {
     sound: Option<PartSound>,
     /// The voice records of the blocks as read, and whether their files are there.
     voices: Vec<(Voice, bool)>,
+    /// A take to hear: its record's clip and the channel (zero based), once.
+    voice_request: Option<(String, u16)>,
+    /// The take to hear once the write in progress is done.
+    voice_after_write: Option<(String, u16)>,
 }
 
 /// The A1 of part `index` taken (Ctrl+1) as drafted: camera channel, level, off.
@@ -175,7 +179,7 @@ struct Trim {
 
 impl Default for Script {
     fn default() -> Self {
-        Self { view: ScriptView::default(), blocks: Vec::new(), project: None, reading: None, read_at: None, writing: None, source_request: None, names: HashMap::new(), words_per_second: Ok(0.0), take: None, taking: None, exporting: None, open_subsegment: None, pieces_request: None, trim: None, waves: qnc_program_waveform::ProgramWaves::new(), filmstrips: qnc_program_filmstrip::ProgramFilmstrips::new(), waves_project: None, trim_stills: qnc_trim_stills::TrimStills::new(), zoom_follow: Default::default(), sound: None, voices: Vec::new() }
+        Self { view: ScriptView::default(), blocks: Vec::new(), project: None, reading: None, read_at: None, writing: None, source_request: None, names: HashMap::new(), words_per_second: Ok(0.0), take: None, taking: None, exporting: None, open_subsegment: None, pieces_request: None, trim: None, waves: qnc_program_waveform::ProgramWaves::new(), filmstrips: qnc_program_filmstrip::ProgramFilmstrips::new(), waves_project: None, trim_stills: qnc_trim_stills::TrimStills::new(), zoom_follow: Default::default(), sound: None, voices: Vec::new(), voice_request: None, voice_after_write: None }
     }
 }
 
@@ -202,6 +206,11 @@ impl Script {
     /// A clip and IN/OUT a chosen clip block opens on the source timeline, once.
     pub fn take_source_request(&mut self) -> Option<(String, u64, u64)> {
         self.source_request.take()
+    }
+
+    /// The take to hear (its record's clip in the catalog and its channel), once.
+    pub fn take_voice_request(&mut self) -> Option<(String, u16)> {
+        self.voice_request.take()
     }
 
     /// The parts the player should play and the frame to show, once (the open SubSegment).
@@ -546,7 +555,20 @@ impl Script {
             }
             VOICE_TAKE => {
                 let Some((block, take)) = target.and_then(|target| target.split_once(':')).and_then(|(block, take)| Some((block.parse::<i64>().ok()?, take.parse::<u16>().ok()?))) else { return Some(false) };
-                self.write(preview, move |target| qnc_script_db::set_voice_chosen(target, block, take).map(|_| None))
+                // The take is heard at once: its record's clip on the preview, A1 on its
+                // channel (user 2026-10-30: "clicking an OFF plays its sound").
+                // Its record goes into the catalog first (a record made before the catalog knew
+                // voice clips is written there now), then the take used is kept.
+                let voice = self.voices.iter().find(|(voice, _)| voice.block_id == block).map(|(voice, _)| voice.clone());
+                let (Some(voice), Some(locator)) = (voice, preview.still_locator()) else { return Some(false) };
+                self.voice_after_write = Some((qnc_voice_take::clip_id(&voice.name), take.saturating_sub(1)));
+                self.write(preview, move |target| {
+                    let takes: Vec<f64> = voice.takes.iter().map(|take| take.seconds).collect();
+                    let first_tc = voice.takes.first().map(|take| take.tc.clone()).unwrap_or_default();
+                    let record = qnc_voice_take::describe_record(&locator, &voice.name, &voice.clip_uri, &takes, &first_tc)?;
+                    qnc_voice_catalog::publish_record(&locator, &voice.name, record)?;
+                    qnc_script_db::set_voice_chosen(target, block, take).map(|_| None)
+                })
             }
             // Esc while a take records throws it away (user 2026-10-30).
             "clear_focus" if self.take.is_some() => self.cancel_take(),
@@ -706,9 +728,20 @@ impl Script {
             return true;
         }
         if let Some((id, take)) = self.take.take() {
-            let (text, heading) = self.view.blocks.iter().find(|row| row.block.id == id).map(|row| (row.block.text.clone(), row.mark.clone())).unwrap_or_default();
+            let mark = self.view.blocks.iter().find(|row| row.block.id == id).map(|row| row.mark.clone()).unwrap_or_default();
             self.view.message = qnc_ui_text::text("script.making_clip").into();
-            return self.spawn_take(id, move || TakeAnswer::Finished(take.finish(&text, &heading)));
+            let locator = preview.still_locator();
+            return self.spawn_take(id, move || {
+                // The picture of the record says which OFF it is (user 2026-10-30); the record
+                // goes into the catalog, so the Broadcast Player plays its takes.
+                let finished = take.finish(&mark, "");
+                if let (Ok(recorded), Some(locator)) = (&finished, locator) {
+                    if let Err(error) = qnc_voice_catalog::publish_record(&locator, &recorded.name, recorded.record.clone()) {
+                        qnc_dev_diagnostics::log_line(qnc_dev_diagnostics::DiagnosticsStream::Player, format!("voice-catalog {} refused: {error}", recorded.name));
+                    }
+                }
+                TakeAnswer::Finished(finished)
+            });
         }
         let Some(id) = block.filter(|id| self.view.blocks.iter().any(|row| row.block.id == *id && row.recorded)) else {
             self.view.message = qnc_ui_text::text("script.choose_to_record").into();
@@ -882,7 +915,7 @@ impl Script {
                         self.view.message = qnc_ui_text::text("script.recording").into();
                     }
                     // A finished take goes into its block's record as its next channel, the one used.
-                    TakeAnswer::Finished(Ok(Recorded { name, clip_uri, number, wav_uri, seconds, timecode })) => {
+                    TakeAnswer::Finished(Ok(Recorded { name, clip_uri, number, wav_uri, seconds, timecode, .. })) => {
                         let text = self.view.blocks.iter().find(|row| row.block.id == id).map(|row| row.block.text.clone()).unwrap_or_default();
                         let take = qnc_script_db::VoiceTake { take: number, wav_uri, seconds, tc: timecode, text };
                         self.write(preview, move |target| qnc_script_db::add_voice_take(target, id, name, clip_uri, take).map(|_| None));
@@ -910,8 +943,10 @@ impl Script {
         self.view.exporting = self.exporting.is_some();
         if let Some(done) = &self.writing {
             if let Ok(result) = done.try_recv() {
+                let heard = self.voice_after_write.take();
                 match result {
                     Ok(added) => {
+                        self.voice_request = heard;
                         self.view.message.clear();
                         if let Some(id) = added {
                             self.view.selected = Some(id);

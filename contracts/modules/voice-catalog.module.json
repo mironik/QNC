@@ -1,0 +1,21 @@
+{
+  "module_id": "qnc.module.voice-catalog",
+  "module_name": "Voice Catalog",
+  "module_version": "0.1.0",
+  "module_kind": "library",
+  "capabilities": ["voice.catalog.publish"],
+  "input_contract_version": "0.1.0",
+  "output_contract_version": "0.1.0",
+  "transport_protocol_version": "0.1.0",
+  "transport_scope": ["local", "lan", "intranet"],
+  "supported_os": ["windows", "linux", "macos"],
+  "supported_cpu": ["x86_64", "aarch64"],
+  "forbidden_calls": ["ffprobe", "media.probe.full", "playback.clock"],
+  "forbidden_dependencies": ["qnc.module.media-probe", "qnc.module.scanner", "qnc.module.broadcast-player-core"],
+  "state_policy": "session_local",
+  "database_write_policy": "public_ingest_content_write_transport_only",
+  "runtime_crate": "qnc-voice-catalog",
+  "input": "The project's settings on this computer, the name of a voice record and the record of its clip as qnc-voice-clip describes what it wrote.",
+  "output": "The voice record as a clip of kind voice in the project's content catalog (imported where it is, never selected or queued, no probe), written through the one writer of the content database; a record with one more take replaces the one before under the same id; a camera clip of that id is refused.",
+  "specification": "User 2026-10-30: clicking a take of an OFF plays it through the Broadcast Player (AGENTS.md)."
+}

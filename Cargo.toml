@@ -190,6 +190,7 @@ members = [
     "crates/qnc-script-export",
     "crates/qnc-script-profile-editor",
     "crates/qnc-voice-clip",
+    "crates/qnc-voice-catalog",
     "crates/qnc-newsroom-sheet",
     "tools/qnc-newsroom-sheet",
     "crates/qnc-still-locator",
@@ -464,6 +465,7 @@ qnc-script-profile = { path = "crates/qnc-script-profile" }
 qnc-script-export = { path = "crates/qnc-script-export" }
 qnc-script-profile-editor = { path = "crates/qnc-script-profile-editor" }
 qnc-voice-clip = { path = "crates/qnc-voice-clip" }
+qnc-voice-catalog = { path = "crates/qnc-voice-catalog" }
 qnc-newsroom-sheet = { path = "crates/qnc-newsroom-sheet" }
 qnc-still-locator = { path = "crates/qnc-still-locator" }
 qnc-clip-row = { path = "crates/qnc-clip-row" }

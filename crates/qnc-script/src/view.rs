@@ -153,6 +153,32 @@ impl ScriptView {
             .collect()
     }
 
+    /// The voice records of the script as cards of the pool's Voice tab (user 2026-10-30): the
+    /// block's mark, the take used and how many there are; the card's id is `block:take`, so a
+    /// click plays the take used (`VOICE_TAKE`).
+    pub fn voice_cards(&self) -> Vec<SubsegmentCard<'static>> {
+        self.blocks
+            .iter()
+            .filter_map(|row| Some((row, row.voice.as_ref()?)))
+            .map(|(row, voice)| SubsegmentCard {
+                id: format!("{}:{}", row.block.id, voice.chosen),
+                title: qnc_ui_text::fill("script.voice_card", &[("mark", &row.mark), ("take", &voice.chosen.to_string()), ("n", &voice.takes.len().to_string())]).into(),
+                seconds: voice.takes.iter().find(|take| take.take == voice.chosen).map_or(0.0, |take| take.seconds),
+                clip: None,
+            })
+            .collect()
+    }
+
+    /// The cards of the pool's SubSegment tab or Voice tab (`voice`) and the action a click
+    /// sends with the card's id.
+    pub fn tab_cards<'a>(&self, voice: bool, clips: &'a [qnc_clip_row::ClipRow]) -> (Vec<SubsegmentCard<'a>>, &'static str) {
+        if voice {
+            (self.voice_cards(), crate::VOICE_TAKE)
+        } else {
+            (self.pool_cards(clips), crate::OPEN)
+        }
+    }
+
     /// How many SubSegments the script has (the pool's SubSegment tab is grey without one).
     pub fn subsegment_count(&self) -> usize {
         self.blocks.iter().filter(|row| row.is_subsegment()).count()

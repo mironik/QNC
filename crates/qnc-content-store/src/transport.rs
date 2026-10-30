@@ -146,6 +146,13 @@ impl ContentClient {
             _ => Err("Neispravan odgovor baze.".into()),
         }
     }
+    /// A voice-over record of the script as a clip of kind `voice`.
+    pub fn publish_voice(&mut self, clip: CatalogClip) -> Result<StoredClip> {
+        match self.execute(Operation::PublishVoice(Box::new(clip)))? {
+            Data::Saved(clip) => Ok(*clip),
+            _ => Err("Neispravan odgovor baze.".into()),
+        }
+    }
     pub fn list(&mut self, after: Option<String>) -> Result<Vec<StoredClip>> {
         match self.execute(Operation::List { after })? {
             Data::Clips(clips) => {
@@ -420,6 +427,11 @@ impl ContentWriteTransport {
         self.send_operation(key, Operation::Lease { key: name, owner, act, max_age_seconds })
     }
 
+    /// A voice-over record of the script as a clip of kind `voice` (`Saved`).
+    pub fn publish_voice(&mut self, key: String, clip: CatalogClip) -> Result<()> {
+        self.send_operation(key, Operation::PublishVoice(Box::new(clip)))
+    }
+
     /// The poster made in the project for a clip that has none.
     pub fn set_poster(&mut self, key: String, clip_id: String, thumbnail_uri: String) -> Result<()> {
         self.send_operation(key, Operation::SetPoster { clip_id, thumbnail_uri })
@@ -592,6 +604,10 @@ fn execute_write_command(
         }
         Operation::SetPoster { clip_id, thumbnail_uri } => {
             client.set_poster(clip_id, thumbnail_uri)?;
+            Ok(ContentWriteData::Changed)
+        }
+        Operation::PublishVoice(clip) => {
+            client.publish_voice(*clip)?;
             Ok(ContentWriteData::Changed)
         }
         _ => Err("Nepodrzana content write transport operacija.".into()),

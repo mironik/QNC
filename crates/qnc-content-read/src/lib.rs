@@ -21,6 +21,12 @@ pub const MODULE_ID: &str = "qnc.module.content-read";
 const LISTED: &str = "(selected != 0 OR import_status IN ('queued', 'processing', 'original_ready',
     'generating_proxy', 'imported', 'done'))";
 
+/// The clips of the pool come from cameras; a voice record of the script (kind `voice`,
+/// user 2026-10-30) is shown by the script, not among them.
+fn camera_only(conn: &Connection) -> Result<&'static str, String> {
+    Ok(if has_column(conn, "public_clips", "clip_kind")? { "AND clip_kind = 'camera'" } else { "" })
+}
+
 pub const VERSION: &str = "0.1.0";
 
 const MAX_CLIPS: usize = 100_000;
@@ -173,10 +179,11 @@ impl ContentReader {
         } else {
             "NULL"
         };
+        let camera = camera_only(&conn)?;
         let mut statement = conn
             .prepare(&format!(
                 "SELECT clip_id, name, duration_seconds, {duration_frames}, import_status IN ('imported', 'done'), {poster}, import_status, imported_media_uri FROM public_clips
-                 WHERE {LISTED}
+                 WHERE {LISTED} {camera}
                  ORDER BY name, clip_id LIMIT ?1"
             ))
             .map_err(|error| error.to_string())?;
@@ -208,6 +215,7 @@ impl ContentReader {
         } else {
             "0"
         };
+        let camera = camera_only(&conn)?;
         conn.query_row(
             &format!(
                 "SELECT count(*), coalesce(sum(length(name)),0),
@@ -215,7 +223,7 @@ impl ContentReader {
                     coalesce(max(coalesce(created_at_utc,'')),''),
                     coalesce(sum(import_status IN ('imported', 'done')),0)
              FROM public_clips
-             WHERE {LISTED}"
+             WHERE {LISTED} {camera}"
             ),
             [],
             |row| {

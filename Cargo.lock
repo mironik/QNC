@@ -5584,6 +5584,7 @@ dependencies = [
  "qnc-transcript",
  "qnc-trim-stills",
  "qnc-ui-text",
+ "qnc-voice-catalog",
  "qnc-voice-record",
  "qnc-voice-take",
  "qnc-wheel-jog",
@@ -6489,10 +6490,28 @@ dependencies = [
 ]
 
 [[package]]
+name = "qnc-voice-catalog"
+version = "0.1.0"
+dependencies = [
+ "qnc-content-store",
+ "qnc-media-metadata",
+ "qnc-media-record-db",
+ "qnc-media-records",
+ "qnc-source-index-db",
+ "qnc-still-locator",
+ "qnc-ui-text",
+ "qnc-voice-clip",
+ "rusqlite",
+ "tempfile",
+]
+
+[[package]]
 name = "qnc-voice-clip"
 version = "0.1.0"
 dependencies = [
  "qnc-decoder-catalog",
+ "qnc-frame-timebase",
+ "qnc-media-metadata",
  "qnc-title-card",
  "qnc-ui-text",
  "tempfile",
@@ -6513,6 +6532,7 @@ dependencies = [
 name = "qnc-voice-take"
 version = "0.1.0"
 dependencies = [
+ "qnc-media-metadata",
  "qnc-still-locator",
  "qnc-ui-text",
  "qnc-voice-clip",

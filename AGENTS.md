@@ -7179,3 +7179,25 @@ snimke; klik bira snimku (radnja kataloga `script_voice_take`, bez tipke, cilj `
 niti uz scenarij, `VoiceRow`, `VoiceStatus`), `qnc-script-panel`, rjecnik. Testovi `qnc-script-db` (izbor snimke),
 `qnc-script` (stanje), conformance. Uzivo nije provjereno. Nije izvedeno: izbor snimke tipkama (strelice kao kod A1),
 preslusavanje izabranog kanala (zapis glasa nije u katalogu projekta), korak 3 Draft XML.
+Izvedeno 2026-10-30 (korisnik: "prije svega treba da klik na neki off pleja ton kako bi korisnik mogao odluciti koji ton
+ima prednost"; "da, A, i tab Voice u poolu... slika off (broj)"; "nije fiksno XDCAM, projekt moze biti XAVC, 50i ili
+50p"; "iz offa se koristi samo ton... bitan je ton i timecode i FPS"): zapis glasa je klip kataloga projekta vrste
+`voice` i pusta ga Broadcast Player. `qnc-content-store`: stupac `clips.clip_kind` (`camera`|`voice`, postojeci klipovi
+`camera`), `public_clips.clip_kind`, operacija `PublishVoice` (konacan zapis klipa vrste voice: uvezen gdje je, nikad
+odabran ni u redu uvoza; zapis s jos jednom snimkom zamjenjuje prethodni pod istim id-em; klip kamere istog id-a se
+odbija), popis i statistika kataloga i `qnc-content-read` (`summaries`, `signature`) ne pokazuju klipove glasa (pool kartica
+i Ingest ih ne vide). `qnc-media-metadata` `EvidenceKind::QncWritten` (datoteka koju je QNC sam zapisao, bez probea).
+`qnc-voice-clip`: `describe` (zapis kataloga iz onoga sto je zatrazeno od kodera: slika MPEG-2 4:2:2 BT.709 tocnog broja
+slika, mono PCM 24-bit po snimci iste duljine, timecode prve snimke), `sample_rate` (zvuk u frekvenciji projekta) i
+`fields`: slika slijedi projekt (`video.fps`, novi `qnc-work-settings` `video_fields` iz `video.field_order`; 1080i50 je
+25 slika, isprepleteno, gornje polje prvo). Slika je samo pregled ("OFF n" na crnom): od OFF-a se koristi ton, timecode i
+FPS, pa kodek slike ostaje XDCAM HD422 i za XAVC projekt (koder H.264 4:2:2 10-bit u ovom ffmpegu ne postoji). Nova kocka
+`crates/qnc-voice-catalog` (+ ugovor): zapis glasa kao klip kataloga kroz jedinog pisca baze sadrzaja.
+`qnc-voice-take` (`clip_id` = `voice-<naziv zapisa>`, `describe_record`). `qnc-script`: nakon snimke klip ulazi u katalog;
+klik na T1..Tn (i karticu taba Voice) upise zapis u katalog (i zapis napravljen prije ove promjene), izabere snimku i
+pusti klip na preview monitoru s A1 na kanalu te snimke (A2 isti kanal iskljucen); `qnc-source-timeline` `want_a1`
+(traka A1 pokazuje i pamti kanal koji se cuje, kao izabrani kanal klipa). Tab Voice u poolu MA Audio (grupa g,
+`editorial_tab_voice` bez tipke, `qnc-pool-tabs` `Voice`, kartica "OFF n · Tn (n takes)", prazna poruka u ugovoru).
+Testovi `qnc-voice-catalog` (klip je potpun, nova snimka zamjenjuje zapis, pool ga ne vidi), `qnc-pool-tabs`,
+conformance; probni 1080i50 klip: mpeg2video 4:2:2, field_order tt, 25/1. Uzivo nije provjereno. Nije izvedeno: izbor
+snimke tipkama, korak 3 Draft XML.

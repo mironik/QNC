@@ -48,6 +48,7 @@
     "virtual_empty_message": "@story.pool.subclip_empty",
     "transcript_empty_message": "@story.pool.transcript_empty",
     "subsegment_empty_message": "@story.pool.subsegment_empty",
+    "voice_empty_message": "@story.pool.voice_empty",
     "loading_message": "@story.pool.loading"
   },
   "pool_head": {
@@ -207,6 +208,10 @@
           {
             "label": "@pool.tab.subsegment",
             "action_id": "editorial_tab_subsegment"
+          },
+          {
+            "label": "@pool.tab.voice",
+            "action_id": "editorial_tab_voice"
           }
         ]
       },

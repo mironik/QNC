@@ -76,6 +76,8 @@ pub struct SourceTimeline {
     sounds: qnc_clip_sound::ClipSounds,
     /// The shown clip's kept sound is applied (or it has none).
     sound_known: bool,
+    /// A sound asked for a clip, applied when that clip is shown.
+    wanted: Option<qnc_clip_sound::ClipSound>,
     timecodes: qnc_source_timecode::SourceTimecodes,
     clip: Option<String>,
     message: String,
@@ -110,6 +112,19 @@ impl SourceTimeline {
         self.refresh(timecode);
         self.view.levels = preview.view().output_levels;
         &self.view
+    }
+
+    /// The sound `sound` names for its clip is heard and kept as soon as the clip is shown and
+    /// its channels are known (user 2026-10-30: a take of a voice record plays on its channel).
+    pub fn want_sound(&mut self, sound: qnc_clip_sound::ClipSound) {
+        self.wanted = Some(sound);
+    }
+
+    /// A1 of `clip_id` on `channel` (zero based), A2 the same channel turned off: one channel
+    /// heard, as a take of a voice record is (user 2026-10-30).
+    pub fn want_a1(&mut self, clip_id: &str, channel: u16) {
+        let lane = |off| qnc_clip_sound::LaneSound { channel, off, level_db: 0 };
+        self.want_sound(qnc_clip_sound::ClipSound { clip_id: clip_id.into(), a1: lane(false), a2: lane(true) });
     }
 
     /// NORM's state for the level bar (a form with a story gives it; `None`: NORM off).
@@ -355,6 +370,21 @@ impl SourceTimeline {
     /// unless a lane is taken; a channel the clip does not have is not taken. The preview
     /// hears it.
     fn apply_kept_sound(&mut self, count: Option<u16>, preview: &mut SourcePreview) {
+        // A sound asked for this clip (a take of a voice record: A1 on its channel) is what
+        // the lanes keep from now on, kept for the clip like a channel chosen.
+        if let (Some(wanted), Some(count)) = (self.wanted.as_ref(), count) {
+            if self.clip.as_deref() == Some(wanted.clip_id.as_str()) && !self.lane_taken() {
+                let wanted = self.wanted.take().unwrap();
+                if wanted.a1.channel < count && wanted.a2.channel < count {
+                    let lane = |sound: qnc_clip_sound::LaneSound| Lane { channel: sound.channel, off: sound.off, level_db: sound.level_db };
+                    self.lanes.keep(0, lane(wanted.a1));
+                    self.lanes.keep(1, lane(wanted.a2));
+                    self.sound_known = true;
+                    self.after_lane(true, preview);
+                    return;
+                }
+            }
+        }
         if self.sound_known || self.lane_taken() {
             return;
         }

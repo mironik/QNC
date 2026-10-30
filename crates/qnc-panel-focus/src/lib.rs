@@ -157,6 +157,17 @@ impl PanelFocus {
         }
         let button = (self.panel == Panel::SourceButtons).then(|| self.walk.chosen_in(qnc_focus_walk::SOURCE_BUTTONS).map(str::to_string)).flatten();
         self.side.poll(preview, timeline, clips);
+        // A take of a voice record clicked: its clip on the source timeline, A1 on its channel,
+        // played from its start.
+        if let Some((clip_id, channel)) = self.side.take_voice_request() {
+            self.source.want_a1(&clip_id, channel);
+            if !preview.open(&clip_id) {
+                preview.cue(0);
+            }
+            if !preview.view().playing {
+                preview.toggle_play();
+            }
+        }
         let side = self.side.views().clone();
         FocusView { panel: self.panel, button, pool_step: self.walk.last_step(), transcript: side.transcript, shots: side.shots, script: side.script }
     }

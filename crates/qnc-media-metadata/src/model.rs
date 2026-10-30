@@ -28,6 +28,9 @@ pub struct Evidence {
 pub enum EvidenceKind {
     CameraMetadata,
     Ffprobe,
+    /// A file QNC wrote itself (a voice-over clip of the script, user 2026-10-30): its facts are
+    /// what QNC asked the encoder for, no probe and no document of a camera.
+    QncWritten,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]

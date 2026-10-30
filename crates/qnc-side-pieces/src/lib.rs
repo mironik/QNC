@@ -113,6 +113,11 @@ impl SidePieces {
     }
 
     /// A clip and IN/OUT a chosen statement, usable part or script block opens (once).
+    /// The take of a voice record to hear (its clip and channel), once.
+    pub fn take_voice_request(&mut self) -> Option<(String, u16)> {
+        self.script.as_mut().and_then(Script::take_voice_request)
+    }
+
     pub fn take_source_request(&mut self) -> Option<(String, u64, u64)> {
         let transcript = self.transcript.as_mut().and_then(Transcript::take_source_request);
         let shots = || self.shots.as_mut().and_then(ClipShots::take_source_request);

@@ -105,7 +105,7 @@ fn pool(ui: &mut Ui, contracts: &EditorialContracts, theme: &Theme, view: &Edito
     };
     let clicked = match view.library_tab {
         // A SubSegment is a virtual clip of the script (user 2026-10-29): a click opens it in place of the source timeline.
-        LibraryTab::Subsegment => return qnc_media_pool_panel::show(ui, theme, &spec, &now, &view.focus.script.pool_cards(&view.clips).iter().collect::<Vec<_>>()).map(|(CardGridAction::Activate(id) | CardGridAction::ToggleSelection(id))| EditorialIntent::Action(qnc_action_event::ActionEvent::key(qnc_script::OPEN).with_target(id))),
+        tab @ (LibraryTab::Subsegment | LibraryTab::Voice) => { let (cards, action) = view.focus.script.tab_cards(tab == LibraryTab::Voice, &view.clips); return qnc_media_pool_panel::show(ui, theme, &spec, &now, &cards.iter().collect::<Vec<_>>()).map(|(CardGridAction::Activate(id) | CardGridAction::ToggleSelection(id))| EditorialIntent::Action(qnc_action_event::ActionEvent::key(action).with_target(id))) }
         _ if shot_tab => qnc_media_pool_panel::show(ui, theme, &spec, &now, &view.shorts.iter().filter(|shot| shot.b_roll == (view.library_tab == LibraryTab::Broll)).collect::<Vec<_>>()),
         tab => qnc_media_pool_panel::show(ui, theme, &spec, &now, &view.focus.transcript.pool_clips(tab == LibraryTab::Transcript, &view.clips)),
     };

@@ -21,6 +21,8 @@ use std::{
     process::Command,
 };
 
+use qnc_media_metadata::ClipMetadata;
+
 pub const MODULE_ID: &str = "qnc.module.voice-clip";
 
 /// The most channels a voice-over clip has (as many as an XDCAM card records).
@@ -42,6 +44,11 @@ pub struct VoiceClip<'a> {
     pub width: u32,
     pub height: u32,
     pub fps: f64,
+    /// The project's scan (user 2026-10-30: "a project may be 50i or 50p"): `None`
+    /// progressive, `Some(true)` interlaced upper field first, `Some(false)` lower first.
+    pub fields: Option<bool>,
+    /// The sample rate every channel is written at (the project's).
+    pub sample_rate: u32,
     /// The timecode of its first frame (`HH:MM:SS:FF`).
     pub timecode: &'a str,
     /// The clip to write (inside `project_dir`; one there already is written over).
@@ -77,8 +84,84 @@ pub fn make(clip: &VoiceClip<'_>) -> Result<PathBuf> {
     result.map(|()| clip.out.to_path_buf())
 }
 
+/// The record of the clip `make` writes, as the catalog keeps it (user 2026-10-30: the voice
+/// record is a clip of the project the Broadcast Player plays). Every fact is what this module
+/// asks the encoder for, so nothing is probed: stream 0 the XDCAM HD422 picture (BT.709, tv
+/// range, progressive, constant rate, its exact frame count), then one mono 24-bit PCM stream
+/// per sound, all as long as the picture and starting with it; the timecode of the first frame.
+pub fn describe(clip: &VoiceClip<'_>, clip_id: &str, media_uri: &str) -> Result<ClipMetadata> {
+    use qnc_media_metadata::*;
+    if !(clip.fps.is_finite() && clip.fps > 0.0) || clip.sample_rate == 0 {
+        return Err(qnc_ui_text::text("voice.clip_rate").into());
+    }
+    let rate = qnc_frame_timebase::rational_fps(clip.fps);
+    let frames = frames(clip.seconds, clip.fps);
+    fn fact<T>(value: T) -> Option<Fact<T>> {
+        Some(Fact { value, evidence_id: EVIDENCE.into(), locator: "qnc-voice-clip".into() })
+    }
+    let ticks = |per_second: i64| (frames as i64 * per_second * rate.fps_den + rate.fps_num - 1) / rate.fps_num;
+    let known = |text: &str| Signal::Known(text.to_string());
+    let picture = MediaStream {
+        index: fact(0),
+        codec: fact(known("mpeg2video")),
+        profile: fact("4:2:2".to_string()),
+        time_base: fact(Rational { numerator: rate.fps_den, denominator: rate.fps_num }),
+        start_pts: fact(0),
+        duration_ts: fact(frames as i64),
+        details: StreamDetails::Video(Box::new(VideoMetadata {
+            width: fact(clip.width),
+            height: fact(clip.height),
+            frame_rate: fact(rate),
+            frame_rate_mode: fact(FrameRateMode::Constant),
+            frame_count: fact(FrameCount::Exact(frames)),
+            scan_mode: fact(match clip.fields {
+                None => ScanMode::Progressive,
+                Some(true) => ScanMode::InterlacedTopFieldFirst,
+                Some(false) => ScanMode::InterlacedBottomFieldFirst,
+            }),
+            pixel_format: fact("yuv422p".to_string()),
+            sample_aspect_ratio: fact(Rational { numerator: 1, denominator: 1 }),
+            rotation_degrees: fact(Signal::Unspecified),
+            color: ColorMetadata { primaries: fact(known("bt709")), transfer: fact(known("bt709")), matrix: fact(known("bt709")), range: fact(known("tv")) },
+        })),
+    };
+    let sound = |index: u32| MediaStream {
+        index: fact(index),
+        codec: fact(known("pcm_s24le")),
+        profile: None,
+        time_base: fact(Rational { numerator: 1, denominator: clip.sample_rate as i64 }),
+        start_pts: fact(0),
+        duration_ts: fact(ticks(clip.sample_rate as i64)),
+        details: StreamDetails::Audio(Box::new(AudioMetadata {
+            sample_rate_hz: fact(clip.sample_rate),
+            channels: fact(1),
+            sample_format: fact(known("s32")),
+            channel_layout: fact(Signal::Unspecified),
+            bits_per_sample: fact(24),
+        })),
+    };
+    let streams = std::iter::once(picture).chain((1..=clip.sounds.len() as u32).map(sound)).collect();
+    Ok(ClipMetadata {
+        contract_id: CONTRACT_ID.into(),
+        contract_version: CONTRACT_VERSION.into(),
+        clip_id: clip_id.into(),
+        evidence: vec![Evidence { id: EVIDENCE.into(), kind: EvidenceKind::QncWritten, document_uri: media_uri.into(), media_uri: media_uri.into() }],
+        original: MediaRepresentation {
+            media_uri: media_uri.into(),
+            container: fact("mxf".to_string()),
+            duration_seconds: fact(Rational { numerator: frames as i64 * rate.fps_den, denominator: rate.fps_num }),
+            streams_complete: fact(true),
+            streams,
+            tags: [("timecode".to_string(), fact(clip.timecode.to_string()).unwrap())].into(),
+        },
+        proxy: None,
+    })
+}
+
+const EVIDENCE: &str = "qnc-written";
+
 /// The frames of the clip: the longest sound, rounded up to a whole frame.
-fn frames(seconds: f64, fps: f64) -> u64 {
+pub fn frames(seconds: f64, fps: f64) -> u64 {
     (seconds * fps - 1e-6).ceil().max(1.0) as u64
 }
 
@@ -102,8 +185,13 @@ fn run(ffmpeg: &Path, clip: &VoiceClip<'_>, card: &Path, out: &Path) -> Result<(
         .args(["-c:v", "mpeg2video", "-pix_fmt", "yuv422p", "-profile:v", "0", "-level:v", "2"])
         .args(["-b:v", "50M", "-minrate", "50M", "-maxrate", "50M", "-bufsize", "17825792", "-rc_init_occupancy", "17825792"])
         .args(["-g", "12", "-bf", "2", "-sc_threshold", "1000000000", "-dc", "10", "-intra_vlc", "1", "-non_linear_quant", "1", "-qmin", "1", "-qmax", "12"])
-        .args(["-color_primaries", "bt709", "-color_trc", "bt709", "-colorspace", "bt709", "-vf", "format=yuv422p,setsar=1"])
-        .args(["-c:a", "pcm_s24le", "-ac", "1"])
+        .args(["-color_primaries", "bt709", "-color_trc", "bt709", "-colorspace", "bt709", "-vf", "format=yuv422p,setsar=1"]);
+    if let Some(top) = clip.fields {
+        // Interlaced as the project: field DCT and motion, its field order (XDCAM HD422 50i).
+        command.args(["-flags", "+ildct+ilme", "-top", if top { "1" } else { "0" }, "-field_order", if top { "tt" } else { "bb" }]);
+    }
+    command
+        .args(["-c:a", "pcm_s24le", "-ac", "1", "-ar", &clip.sample_rate.to_string()])
         .args(["-timecode", clip.timecode])
         .args(["-f", "mxf"])
         .arg(out);
@@ -138,7 +226,7 @@ mod tests {
     use super::*;
 
     fn clip<'a>(sounds: &'a [PathBuf], out: &'a Path, project_dir: &'a Path) -> VoiceClip<'a> {
-        VoiceClip { sounds, seconds: 2.0, text: "x", heading: "", width: 1920, height: 1080, fps: 50.0, timecode: "10:00:00:00", out, project_dir }
+        VoiceClip { sounds, seconds: 2.0, text: "x", heading: "", width: 1920, height: 1080, fps: 50.0, fields: None, sample_rate: 48_000, timecode: "10:00:00:00", out, project_dir }
     }
 
     #[test]

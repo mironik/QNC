@@ -14,6 +14,8 @@ pub struct ContentStore {
     schema_ready: bool,
     has_thumbnail_uri: bool,
     has_copy_of: bool,
+    /// Whether the catalog says what kind each clip is (`camera` or `voice`).
+    has_kind: bool,
 }
 
 impl ContentStore {
@@ -125,6 +127,7 @@ impl ContentStore {
             let tx = conn
                 .transaction_with_behavior(rusqlite::TransactionBehavior::Immediate)
                 .map_err(err)?;
+            ensure_kind_column(&tx)?;
             ensure_summary_columns(&tx)?;
             ensure_lease_column(&tx)?;
             ensure_copy_column(&tx)?;
@@ -135,6 +138,7 @@ impl ContentStore {
         let has_copy_of = schema
             && has_column(&conn, "clips", "imported_copy_of")?
             && has_column(&conn, "clips", "optimized_json")?;
+        let has_kind = schema && has_column(&conn, "clips", "clip_kind")?;
         if access == Access::ReadOnly {
             conn.pragma_update(None, "query_only", true).map_err(err)?;
         }
@@ -164,6 +168,7 @@ impl ContentStore {
             schema_ready: schema,
             has_thumbnail_uri,
             has_copy_of,
+            has_kind,
         })
     }
 
@@ -218,6 +223,7 @@ impl ContentStore {
     fn dispatch(&mut self, operation: &Operation) -> Result<Data> {
         match operation {
             Operation::Publish(clip) => self.publish(clip),
+            Operation::PublishVoice(clip) => self.publish_voice(clip),
             Operation::PublishBatch(clips) => {
                 if clips.is_empty() || clips.len() > 16 {
                     return Err(qnc_ui_text::text("db.invalid_write_batch_size").into());
@@ -316,13 +322,15 @@ impl ContentStore {
                 } else {
                     "NULL"
                 };
+                // The camera clips the pool of a card shows; a voice record is the script's.
+                let camera = if self.has_kind { "AND c.clip_kind='camera'" } else { "" };
                 let sql = format!(
                     "SELECT c.clip_id,c.name,c.source_uri,s.source_name,s.serial_number,
                         s.volume_name,{thumbnail_expr},c.duration_seconds,c.selected,
                         c.import_status,c.import_error,c.imported_media_uri,c.revision,c.final
                      FROM clips c
                      JOIN clip_sources s ON s.clip_id=c.clip_id
-                     WHERE c.clip_id > ?1
+                     WHERE c.clip_id > ?1 {camera}
                      ORDER BY c.clip_id
                      LIMIT ?2"
                 );
@@ -581,10 +589,11 @@ impl ContentStore {
         } else {
             "NULL"
         };
+        let camera = if self.has_kind { "WHERE clip_kind='camera'" } else { "" };
         let sql = format!(
             "SELECT clip_id,revision,selected,import_status,import_error,
                 imported_media_uri,{thumbnail_expr},source_uri,original_uri
-             FROM clips
+             FROM clips {camera}
              ORDER BY clip_id"
         );
         let mut statement = self.conn.prepare(&sql).map_err(err)?;
@@ -630,6 +639,36 @@ impl ContentStore {
             .map_err(err)?;
         Self::write_clip(&tx, clip)?;
         let saved = tx.query_row(&format!("SELECT {} FROM clips WHERE clip_id=?1", stored_columns(self.has_copy_of)),[clip.id()],row).map_err(err)?;
+        tx.commit().map_err(err)?;
+        Ok(Data::Saved(Box::new(saved)))
+    }
+
+    /// A voice-over record the script made (user 2026-10-30): a clip of kind `voice`, imported
+    /// where it is (its file is in the project folder), never selected or queued. QNC wrote
+    /// the file, so its record is what QNC made, no probe; a record with one more take
+    /// replaces the one before under the same id. A camera clip of that id is refused.
+    fn publish_voice(&mut self, clip: &CatalogClip) -> Result<Data> {
+        if !self.has_kind {
+            return Err(qnc_ui_text::text("db.voice_needs_kind").into());
+        }
+        clip.validate()?;
+        if clip.snapshot.phase != Phase::Final {
+            return Err(qnc_ui_text::text("db.voice_record_final").into());
+        }
+        let tx = qnc_write_lease::begin_write(&mut self.conn).map_err(err)?;
+        let kind: Option<String> = tx.query_row("SELECT clip_kind FROM clips WHERE clip_id=?1", [clip.id()], |r| r.get(0)).optional().map_err(err)?;
+        if kind.as_deref().is_some_and(|kind| kind != "voice") {
+            return Err(qnc_ui_text::text("db.voice_id_is_a_camera_clip").into());
+        }
+        // The record before is the voice record's own: it is replaced, not kept as final.
+        tx.execute("UPDATE clips SET final=0 WHERE clip_id=?1", [clip.id()]).map_err(err)?;
+        Self::write_clip(&tx, clip)?;
+        tx.execute(
+            "UPDATE clips SET clip_kind='voice',selected=0,import_status='imported',import_error=NULL,imported_media_uri=original_uri WHERE clip_id=?1",
+            [clip.id()],
+        )
+        .map_err(err)?;
+        let saved = tx.query_row(&format!("SELECT {} FROM clips WHERE clip_id=?1", stored_columns(self.has_copy_of)), [clip.id()], row).map_err(err)?;
         tx.commit().map_err(err)?;
         Ok(Data::Saved(Box::new(saved)))
     }
@@ -904,6 +943,15 @@ fn ensure_lease_column(conn: &Connection) -> Result<()> {
     }
     Ok(())
 }
+/// The kind of a clip (user 2026-10-30): `camera` (from a card, by Select) or `voice` (a
+/// voice-over record the script made). The views are made again when it is added.
+fn ensure_kind_column(conn: &Connection) -> Result<()> {
+    if !has_column(conn, "clips", "clip_kind")? {
+        conn.execute("ALTER TABLE clips ADD COLUMN clip_kind TEXT NOT NULL DEFAULT 'camera' CHECK (clip_kind IN ('camera','voice'))", []).map_err(err)?;
+    }
+    Ok(())
+}
+
 fn ensure_summary_columns(conn: &Connection) -> Result<()> {
     let added_thumbnail = if !has_column(conn, "clips", "thumbnail_uri")? {
         conn.execute("ALTER TABLE clips ADD COLUMN thumbnail_uri TEXT", [])
@@ -914,12 +962,12 @@ fn ensure_summary_columns(conn: &Connection) -> Result<()> {
     };
     // `final`: whether the clip's record is complete (user 2026-10-18: a worker asks once a
     // second which records wait, without reading the records).
-    if added_thumbnail || !has_column(conn, "public_clips", "thumbnail_uri")? || !has_column(conn, "public_clips", "final")? {
+    if added_thumbnail || !has_column(conn, "public_clips", "thumbnail_uri")? || !has_column(conn, "public_clips", "final")? || !has_column(conn, "public_clips", "clip_kind")? {
         conn.execute_batch(
             "DROP VIEW IF EXISTS public_clips;
             CREATE VIEW public_clips AS SELECT clip_id,source_uri,original_uri,name,created_at_utc,
                 duration_seconds,duration_frames,fps_num,fps_den,selected,import_status,
-                imported_media_uri,import_error,thumbnail_uri,final FROM clips;",
+                imported_media_uri,import_error,thumbnail_uri,final,clip_kind FROM clips;",
         )
         .map_err(err)?;
     }
