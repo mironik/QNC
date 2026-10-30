@@ -91,9 +91,9 @@ pub struct SourcePick {
     /// The source mark taken on the source timeline: `Some(true)` IN, `Some(false)` OUT
     /// (user 2026-10-25: its trim zoom, as an M marker's).
     pub taken: Option<bool>,
-    /// While the player plays: whether it plays the program, and its confirmed frame
-    /// (user 2026-10-30: the trim zoom follows the play).
-    pub playing: Option<(bool, u64)>,
+    /// Whether the player plays the program, its confirmed frame and whether it plays
+    /// (user 2026-10-30: the trim zoom follows the play and stays where a pause stops it).
+    pub playing: Option<(bool, u64, bool)>,
 }
 
 impl SourcePick {
@@ -119,7 +119,7 @@ impl SourcePick {
     }
 
     /// What the player plays now and where (`SourcePreview::playing_at`).
-    pub fn with_playing(mut self, playing: Option<(bool, u64)>) -> Self {
+    pub fn with_playing(mut self, playing: Option<(bool, u64, bool)>) -> Self {
         self.playing = playing;
         self
     }
@@ -158,6 +158,8 @@ type LoudnessKey = (u64, (u32, u32), u64, Vec<qnc_program_waveform::Placement>, 
 /// The program of the active project: read, written and turned into a view.
 #[derive(Default)]
 pub struct ProgramSegments {
+    /// Where the trim zoom's playhead is: the play, and a pause until the cut moves.
+    zoom_follow: qnc_program_view::ZoomFollow,
     /// The last Cover slot / Overwrite asked for (see `SegmentsView::cover_pressed`).
     cover_pressed: Option<(bool, std::time::Instant)>,
     /// The project database of the active project (its story and virtual shots).

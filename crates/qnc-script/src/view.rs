@@ -425,7 +425,7 @@ pub fn subsegment_zoom(
     view: &SubsegmentView,
     pieces: &[Piece],
     (index, out): (usize, bool),
-    (rate, playhead): (u64, Option<u64>),
+    (rate, follow): (u64, Option<(&qnc_program_view::ZoomFollow, Option<(u64, bool)>)>),
     clip_frames: impl Fn(&str) -> Option<u64>,
 ) -> Option<qnc_program_view::SegmentsView> {
     use qnc_program_view::{EditStill, StillPicture};
@@ -458,8 +458,10 @@ pub fn subsegment_zoom(
     let before = EditStill { click: left.map(|(i, out)| edge(i, out)), ..before };
     let after = EditStill { click: right.map(|(i, out)| edge(i, out)), ..after };
     let half = rate.max(1);
+    let playhead = follow.and_then(|(follow, position)| follow.playhead(cut, position));
     let (from, to) = qnc_program_view::zoom_window(cut, cut, half, view.total_frames, playhead);
-    let lane = subsegment_placements(view, pieces).into_iter().filter(|at| at.program_start < to && from < at.program_end).collect();
+    let reach = qnc_program_view::zoom_reach(from, to, playhead);
+    let lane = subsegment_placements(view, pieces).into_iter().filter(|at| at.program_start < reach && from < at.program_end).collect();
     Some(qnc_program_view::SegmentsView {
         source_edit_stills: vec![before, after],
         zoom_sound: Some(qnc_program_view::ZoomSound { from, to, cut, lanes: [lane, Vec::new()], playhead, ..Default::default() }),

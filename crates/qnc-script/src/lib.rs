@@ -143,6 +143,8 @@ pub struct Script {
     waves_project: Option<String>,
     /// The pictures, fine wave and words of the trim zoom.
     trim_stills: qnc_trim_stills::TrimStills,
+    /// Where the trim zoom's playhead is: the play, and a pause until the cut moves.
+    zoom_follow: qnc_program_view::ZoomFollow,
     /// The A1 of a part taken with Ctrl+1, as drafted.
     sound: Option<PartSound>,
 }
@@ -167,7 +169,7 @@ struct Trim {
 
 impl Default for Script {
     fn default() -> Self {
-        Self { view: ScriptView::default(), blocks: Vec::new(), project: None, reading: None, read_at: None, writing: None, source_request: None, names: HashMap::new(), words_per_second: Ok(0.0), take: None, taking: None, exporting: None, open_subsegment: None, pieces_request: None, trim: None, waves: qnc_program_waveform::ProgramWaves::new(), filmstrips: qnc_program_filmstrip::ProgramFilmstrips::new(), waves_project: None, trim_stills: qnc_trim_stills::TrimStills::new(), sound: None }
+        Self { view: ScriptView::default(), blocks: Vec::new(), project: None, reading: None, read_at: None, writing: None, source_request: None, names: HashMap::new(), words_per_second: Ok(0.0), take: None, taking: None, exporting: None, open_subsegment: None, pieces_request: None, trim: None, waves: qnc_program_waveform::ProgramWaves::new(), filmstrips: qnc_program_filmstrip::ProgramFilmstrips::new(), waves_project: None, trim_stills: qnc_trim_stills::TrimStills::new(), zoom_follow: Default::default(), sound: None }
     }
 }
 
@@ -245,7 +247,7 @@ impl Script {
         // same pieces as a cover's (`qnc-trim-stills`).
         let pieces = view::block_pieces(&block);
         let rate = pieces.first().and_then(|piece| names.get(&piece.clip_id)).filter(|(_, _, seconds)| *seconds > 0.0).map_or(25, |(_, frames, seconds)| (*frames as f64 / seconds).round() as u64);
-        let zoom = self.trim.and_then(|trim| view::subsegment_zoom(&shown, &pieces, (trim.index, trim.out), (rate, preview.playing_at().filter(|(program, _)| *program).map(|(_, frame)| frame)), |clip| names.get(clip).map(|(_, frames, _)| *frames)));
+        let zoom = self.trim.and_then(|trim| view::subsegment_zoom(&shown, &pieces, (trim.index, trim.out), (rate, Some((&self.zoom_follow, preview.playing_at().filter(|(program, _, _)| *program).map(|(_, frame, playing)| (frame, playing))))), |clip| names.get(clip).map(|(_, frames, _)| *frames)));
         shown.zoom = zoom.map(|mut zoom| {
             self.trim_stills.fill(&mut zoom, preview.still_locator(), None);
             Box::new(zoom)

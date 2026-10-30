@@ -7088,3 +7088,10 @@ Wrap redove i SubSegment. `qnc-source-preview` `playing_at`, `qnc-program-view` 
 `qnc-program-segments` `SourcePick::with_playing`, `qnc-script` `subsegment_zoom` (rate, playhead), `qnc-trim-overlay`;
 aplikacija isti broj redaka. Fini val cita se s medija za prozor koji se mice, pa moze kasniti iza playa. Testovi,
 conformance. Uzivo nije provjereno.
+Popravak 2026-10-30 (korisnik: "kada se play pauzira, playhead na zumu treba stati na tom mjestu, a ne vratiti na IN marker...
+nisu sinhroni"; "kada pomicemo misem ili strelicama bude sinhroni, ali u playu nisu"; log: fini val citao se tek kad je prozor
+vec odmakao, 0,3-1,9 s po citanju, pa je val za vrijeme playa bio prazan): (1) nakon playa prozor ostaje na slici na kojoj je
+player stao, dok se rez ne pomakne (`qnc-program-view` `ZoomFollow`; `SourcePreview::playing_at` daje i stoji li player);
+pomak reza vraca prozor oko reza. (2) Dok prozor prati play, zvuk se cita deset prozora unaprijed (`zoom_reach`;
+`qnc-trim-stills`; source zoom ima cijeli klip kao komad, Wrap i SubSegment komade do tog dosega). Debug cache obrisan uz
+dozvolu korisnika (`cargo clean --profile dev`, 36,5 GiB). Uzivo nije provjereno.

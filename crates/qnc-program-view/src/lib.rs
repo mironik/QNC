@@ -115,6 +115,38 @@ pub struct ZoomSound {
     pub playhead: Option<u64>,
 }
 
+/// Where the trim zoom's playhead is (user 2026-10-30: "when the play pauses the zoom's
+/// playhead stops there, it does not go back to the IN"): the player's frame while it plays,
+/// and after a play the frame it stopped on until the cut moves; `None` otherwise, the window
+/// then lies around the cut.
+#[derive(Debug, Default)]
+pub struct ZoomFollow {
+    cut: std::cell::Cell<Option<u64>>,
+}
+
+impl ZoomFollow {
+    /// `position`: the player's confirmed frame on the zoom's axis and whether it plays.
+    pub fn playhead(&self, cut: u64, position: Option<(u64, bool)>) -> Option<u64> {
+        match position {
+            Some((frame, true)) => {
+                self.cut.set(Some(cut));
+                Some(frame)
+            }
+            Some((frame, false)) if self.cut.get() == Some(cut) => Some(frame),
+            _ => {
+                self.cut.set(None);
+                None
+            }
+        }
+    }
+}
+
+/// How far the sound of a zoom window `[from, to)` is read: ten windows ahead while it follows
+/// a playhead, so the wave is there before the play reaches it; the window itself otherwise.
+pub fn zoom_reach(from: u64, to: u64, playhead: Option<u64>) -> u64 {
+    if playhead.is_some() { to + to.saturating_sub(from) * 5 } else { to }
+}
+
 /// The window of the trim zoom on its axis: a second (`half` frames) on each side of the
 /// cut, or of the playhead while the player plays, so the wave moves with the play
 /// (user 2026-10-30); never past `total`.

@@ -146,15 +146,17 @@ impl ProgramSegments {
             let clip_id = self.source.clip_id.clone()?;
             let (num, den) = self.source.timebase?;
             let half = second((num.max(0) as u64, den.max(1) as u64));
-            let playhead = self.source.playing.filter(|(program, _)| !program).map(|(_, frame)| frame);
+            let position = self.source.playing.filter(|(program, _, _)| !program).map(|(_, frame, playing)| (frame, playing));
+            let playhead = self.zoom_follow.playhead(cut, position);
             let (from, to) = qnc_program_view::zoom_window(cut, cut, half, self.source.duration_frames, playhead);
+            // The whole clip, so a played window can read its sound ahead.
             let lane = |lane: &qnc_lane_choice::Lane| qnc_program_waveform::Placement {
                 clip_id: clip_id.clone(),
                 channel: lane.channel,
-                program_start: from,
-                program_end: to,
-                source_in: from,
-                source_out: to,
+                program_start: 0,
+                program_end: self.source.duration_frames.max(to),
+                source_in: 0,
+                source_out: self.source.duration_frames.max(to),
                 level_db: lane.level_db,
                 off: lane.off,
             };
@@ -169,10 +171,12 @@ impl ProgramSegments {
         let (earliest, latest) = cut_sound.as_ref().map_or((cut, cut), |sound| {
             (sound.lead.unwrap_or(cut).min(cut), sound.tail.unwrap_or(cut).max(cut))
         });
-        let playhead = self.source.playing.filter(|(program, _)| *program).map(|(_, frame)| frame);
+        let position = self.source.playing.filter(|(program, _, _)| *program).map(|(_, frame, playing)| (frame, playing));
+        let playhead = self.zoom_follow.playhead(cut, position);
         let (from, to) = qnc_program_view::zoom_window(earliest, latest, half, view.total_frames, playhead);
         let (segments, covers) = view.wave_placements();
-        let near = |placements: Vec<qnc_program_waveform::Placement>| placements.into_iter().filter(|at| at.program_start < to && from < at.program_end).collect();
+        let reach = qnc_program_view::zoom_reach(from, to, playhead);
+        let near = |placements: Vec<qnc_program_waveform::Placement>| placements.into_iter().filter(|at| at.program_start < reach && from < at.program_end).collect();
         let taken_cut = self.marker_edit.as_ref().map(|(id, _)| id.clone());
         Some(qnc_program_view::ZoomSound { from, to, cut, lanes: [near(segments), near(covers)], cut_sound, taken_cut, playhead, ..Default::default() })
     }
