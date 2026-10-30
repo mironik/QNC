@@ -1,0 +1,21 @@
+{
+  "module_id": "qnc.module.skeleton-panel",
+  "module_name": "Skeleton Panel",
+  "module_version": "0.1.0",
+  "module_kind": "library",
+  "capabilities": ["ui.skeleton.paint"],
+  "input_contract_version": "0.1.0",
+  "output_contract_version": "0.1.0",
+  "transport_protocol_version": "0.1.0",
+  "transport_scope": ["local", "lan", "intranet"],
+  "supported_os": ["windows", "linux", "macos"],
+  "supported_cpu": ["x86_64", "aarch64"],
+  "forbidden_calls": ["ffprobe", "media.decode", "database.read", "database.write", "playback.clock"],
+  "forbidden_dependencies": ["qnc.module.media-probe", "qnc.module.scanner"],
+  "state_policy": "stateless",
+  "database_write_policy": "no_db_writes",
+  "runtime_crate": "qnc-skeleton-panel",
+  "input": "The script view (its skeleton rows: every block in the length of the story with its parts on its own axis) and the application theme.",
+  "output": "The skeleton painted one row a block on the one qnc-timeline; a click on a row as script_open_subsegment with the block id, the Send to Story button as script_send_story.",
+  "specification": "User 2026-10-31: in Media Assist Video every SubSegment of the story is in its own row and can be edited before it is sent to Story (AGENTS.md)."
+}

@@ -5543,6 +5543,7 @@ dependencies = [
  "qnc-segment-panel",
  "qnc-shot-panel",
  "qnc-side-pieces",
+ "qnc-skeleton-panel",
  "qnc-source-timecode",
  "qnc-transcript",
  "qnc-transcript-panel",
@@ -5864,6 +5865,20 @@ dependencies = [
  "qnc-source-timecode",
  "qnc-timeline",
  "qnc-transcript",
+]
+
+[[package]]
+name = "qnc-skeleton-panel"
+version = "0.1.0"
+dependencies = [
+ "eframe",
+ "qnc-action-event",
+ "qnc-desktop-theme",
+ "qnc-script",
+ "qnc-theme-styles",
+ "qnc-timeline",
+ "qnc-ui-kit",
+ "qnc-ui-text",
 ]
 
 [[package]]

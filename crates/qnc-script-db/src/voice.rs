@@ -26,10 +26,25 @@ pub(crate) fn ensure_schema(conn: &Connection) -> Result<()> {
             text TEXT NOT NULL,
             recorded_at_utc TEXT NOT NULL,
             PRIMARY KEY (block_id, take));
-        CREATE VIEW IF NOT EXISTS public_script_voice AS
-            SELECT block_id, name, clip_uri, chosen, updated_at_utc FROM script_voice;
         CREATE VIEW IF NOT EXISTS public_script_voice_takes AS
             SELECT block_id, take, wav_uri, seconds, tc, text, recorded_at_utc FROM script_voice_takes;",
+    )
+    .map_err(err)?;
+    // The part of the take used and its A1 (user 2026-10-31: an OFF is trimmed as a SubSegment
+    // in MA Video); a record made before gets them as the whole take, as recorded.
+    let columns: Vec<String> = conn
+        .prepare("PRAGMA table_info(script_voice)")
+        .and_then(|mut s| s.query_map([], |r| r.get::<_, String>(1))?.collect())
+        .map_err(err)?;
+    for (column, kind) in [("range_from", "INTEGER NOT NULL DEFAULT 0"), ("range_to", "INTEGER NOT NULL DEFAULT 0"), ("a1_level_db", "INTEGER NOT NULL DEFAULT 0"), ("a1_off", "INTEGER NOT NULL DEFAULT 0")] {
+        if !columns.iter().any(|have| have == column) {
+            conn.execute_batch(&format!("ALTER TABLE script_voice ADD COLUMN {column} {kind};")).map_err(err)?;
+        }
+    }
+    conn.execute_batch(
+        "DROP VIEW IF EXISTS public_script_voice;
+        CREATE VIEW public_script_voice AS
+            SELECT block_id, name, clip_uri, chosen, range_from, range_to, a1_level_db, a1_off, updated_at_utc FROM script_voice;",
     )
     .map_err(err)
 }
@@ -49,9 +64,21 @@ impl Store {
             return Ok(Vec::new());
         }
         let mut voices: Vec<Voice> = {
-            let mut statement = conn.prepare("SELECT block_id, name, clip_uri, chosen FROM public_script_voice ORDER BY block_id").map_err(err)?;
+            let mut statement = conn.prepare("SELECT block_id, name, clip_uri, chosen, range_from, range_to, a1_level_db, a1_off FROM public_script_voice ORDER BY block_id").map_err(err)?;
             let rows = statement
-                .query_map([], |r| Ok(Voice { block_id: r.get(0)?, name: r.get(1)?, clip_uri: r.get(2)?, chosen: r.get::<_, i64>(3)?.clamp(1, u16::MAX as i64) as u16, takes: Vec::new() }))
+                .query_map([], |r| {
+                    Ok(Voice {
+                        block_id: r.get(0)?,
+                        name: r.get(1)?,
+                        clip_uri: r.get(2)?,
+                        chosen: r.get::<_, i64>(3)?.clamp(1, u16::MAX as i64) as u16,
+                        takes: Vec::new(),
+                        from_frame: r.get::<_, i64>(4)?.max(0) as u64,
+                        to_frame: r.get::<_, i64>(5)?.max(0) as u64,
+                        a1_level_db: r.get::<_, i64>(6)?.clamp(-40, 12) as i8,
+                        a1_off: r.get::<_, i64>(7)? != 0,
+                    })
+                })
                 .map_err(err)?;
             rows.collect::<std::result::Result<Vec<_>, _>>().map_err(err)?
         };
@@ -100,7 +127,7 @@ impl Store {
         .map_err(err)?;
         tx.execute(
             "INSERT INTO script_voice (block_id, name, clip_uri, chosen, updated_at_utc) VALUES (?1, ?2, ?3, ?4, strftime('%Y-%m-%dT%H:%M:%fZ','now'))
-             ON CONFLICT(block_id) DO UPDATE SET chosen = excluded.chosen, updated_at_utc = excluded.updated_at_utc",
+             ON CONFLICT(block_id) DO UPDATE SET chosen = excluded.chosen, range_from = 0, range_to = 0, updated_at_utc = excluded.updated_at_utc",
             params![id, name, clip_uri, take.take],
         )
         .map_err(err)?;
@@ -123,8 +150,32 @@ impl Store {
             .optional()
             .map_err(err)?
             .ok_or_else(|| qnc_ui_text::fill("db.script_voice_no_take", &[("take", &take.to_string())]))?;
-        tx.execute("UPDATE script_voice SET chosen = ?2, updated_at_utc = strftime('%Y-%m-%dT%H:%M:%fZ','now') WHERE block_id = ?1", params![id, take]).map_err(err)?;
+        // Another take is used whole (its trim belonged to the take before).
+        tx.execute("UPDATE script_voice SET chosen = ?2, range_from = 0, range_to = 0, updated_at_utc = strftime('%Y-%m-%dT%H:%M:%fZ','now') WHERE block_id = ?1", params![id, take]).map_err(err)?;
         tx.execute("UPDATE script_blocks SET voice_seconds = ?2, updated_at_utc = strftime('%Y-%m-%dT%H:%M:%fZ','now') WHERE block_id = ?1", params![id, seconds]).map_err(err)?;
+        tx.commit().map_err(err)?;
+        Ok(Data::Changed)
+    }
+}
+
+impl Store {
+    /// The part of the take used by block `id` and its A1 (user 2026-10-31: an OFF trimmed as a
+    /// SubSegment in MA Video): clip frames `[from, to)` of at least one frame (the caller keeps it within the take);
+    /// the level from -40 to +12 dB.
+    pub(crate) fn set_voice_part(&mut self, id: i64, (from, to): (u64, u64), level_db: i8, off: bool) -> Result<Data> {
+        if to <= from || !(-40..=12).contains(&level_db) {
+            return Err(qnc_ui_text::text("db.script_voice_invalid").into());
+        }
+        let tx = qnc_db_broker::begin_write(self.connection_mut()).map_err(err)?;
+        let changed = tx
+            .execute(
+                "UPDATE script_voice SET range_from = ?2, range_to = ?3, a1_level_db = ?4, a1_off = ?5, updated_at_utc = strftime('%Y-%m-%dT%H:%M:%fZ','now') WHERE block_id = ?1",
+                params![id, from as i64, to as i64, i64::from(level_db), off],
+            )
+            .map_err(err)?;
+        if changed == 0 {
+            return Err(qnc_ui_text::fill("db.script_voice_no_take", &[("take", "1")]));
+        }
         tx.commit().map_err(err)?;
         Ok(Data::Changed)
     }

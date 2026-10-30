@@ -42,6 +42,32 @@ pub fn piece_inputs(block: &Block) -> Vec<PieceInput> {
         .collect()
 }
 
+/// The part of its take a recorded block uses as a part of a SubSegment (user 2026-10-31: an
+/// OFF is trimmed in MA Video as a statement is): the voice record's clip, the take used as its
+/// A1 channel, the frames kept (the whole take until trimmed). `None` without a take.
+pub fn voice_piece(voice: &Voice, fps: f64, clip_id: &dyn Fn(&str) -> String) -> Option<Piece> {
+    let take = voice.chosen_take()?;
+    let whole = ((take.seconds * fps).round().max(1.0)) as u64;
+    let to = if voice.to_frame > voice.from_frame { voice.to_frame.min(whole) } else { whole };
+    let from = voice.from_frame.min(to.saturating_sub(1));
+    Some(Piece {
+        clip_id: clip_id(&voice.name),
+        clip_name: voice.name.clone(),
+        from_frame: from,
+        to_frame: to,
+        start_tc: take.tc.clone(),
+        end_tc: String::new(),
+        length: String::new(),
+        seconds: (to - from) as f64 / fps.max(1.0),
+        text: take.text.clone(),
+        gap_before: 0,
+        cut: false,
+        a1_channel: Some(take.take.saturating_sub(1)),
+        a1_level_db: voice.a1_level_db,
+        a1_off: voice.a1_off,
+    })
+}
+
 /// What the draft is made of besides the script itself.
 pub struct DraftRates<'a> {
     pub words_per_second: f64,
@@ -76,16 +102,16 @@ pub fn draft_pieces(blocks: &[Block], voices: &[Voice], profile: &ScriptProfile,
                 }
                 pause = 0;
             }
-            Role::Spoken => match voices.iter().find(|voice| voice.block_id == block.id).and_then(|voice| Some((voice, voice.chosen_take()?))) {
-                Some((voice, take)) => {
+            Role::Spoken => match voices.iter().find(|voice| voice.block_id == block.id).and_then(|voice| voice_piece(voice, rates.fps, rates.clip_id)) {
+                Some(piece) => {
                     pieces.push(PieceInput {
-                        clip_id: (rates.clip_id)(&voice.name),
-                        from_frame: 0,
-                        to_frame: frames(take.seconds).max(1),
+                        clip_id: piece.clip_id,
+                        from_frame: piece.from_frame,
+                        to_frame: piece.to_frame,
                         gap_before: pause,
                         crossfade: false,
                         // The take used is its channel of the record (user 2026-10-30).
-                        a1: Some((Some(take.take.saturating_sub(1)), 0, false)),
+                        a1: Some((piece.a1_channel, piece.a1_level_db, piece.a1_off)),
                     });
                     pause = 0;
                 }
@@ -137,13 +163,13 @@ pub fn skeleton(blocks: &[Block], voices: &[Voice], profile: &ScriptProfile, rat
                 origin: format!("script:{}:{index}", block.id),
             })),
             Role::Spoken => {
-                if let Some((voice, take)) = voices.iter().find(|voice| voice.block_id == block.id).and_then(|voice| Some((voice, voice.chosen_take()?))) {
+                if let Some(piece) = voices.iter().find(|voice| voice.block_id == block.id).and_then(|voice| voice_piece(voice, rates.fps, rates.clip_id)) {
                     parts.push(SkeletonPart {
                         kind: "offovi",
-                        clip_id: (rates.clip_id)(&voice.name),
-                        from_frame: 0,
-                        to_frame: ((take.seconds * rates.fps).round().max(1.0)) as u64,
-                        a1: Some((Some(take.take.saturating_sub(1)), 0, false)),
+                        clip_id: piece.clip_id,
+                        from_frame: piece.from_frame,
+                        to_frame: piece.to_frame,
+                        a1: Some((piece.a1_channel, piece.a1_level_db, piece.a1_off)),
                         origin: format!("script:{}:0", block.id),
                     });
                 }

@@ -253,7 +253,7 @@
         "show_export_hires": false,
         "show_quick_cover": false
       },
-      "right_panel": "none",
+      "right_panel": "skeleton_panel",
       "tab_order": [
         "pool_tabs",
         "pool",
