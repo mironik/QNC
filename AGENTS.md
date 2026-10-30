@@ -7144,3 +7144,9 @@ Isti put kao nacrt J/L pokrivalica: `qnc-program-input` `SoundDraft.overlaps` vr
 tablica, id-evi se ne preklapaju), `qnc-program-segments` `cut_sound_draft` daje dva klipa spoja s nacrtom. Testovi
 `the_a2_of_a_ton_goes_into_the_off_before_it_and_is_drafted_before_enter`, `a_sound_draft_changes_only_its_own_segment_or_cover`
 (prosiren), conformance. Uzivo nije provjereno.
+Dopuna 2026-10-30 (korisnik: "dodaj crtanje J/L A2 Tona na Wrap retku"): spremljeni J/L A2 Tona u Off crta se na Wrap
+retku kao kod pokrivalica: rez spoja crven preko slike, strana A2 crveno na traci A2 (`qnc-timeline`: rez dvaju klipova
+crta se i kad mu je A2 odmaknut, ne samo A1). Rez na granici redova crta se i na pocetku sljedeceg reda kad mu strana
+zvuka (L) ide u taj red (`qnc-segment-panel` `program.rs`; vrijedi i za L pokrivalice i A1). Strane dolaze iz
+`cut_sound_frames` (od prethodnog koraka). Test `the_stored_a2_of_a_ton_into_an_off_is_on_the_cut_between_them`,
+conformance. Uzivo nije provjereno.

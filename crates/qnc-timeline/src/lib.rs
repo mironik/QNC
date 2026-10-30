@@ -585,7 +585,8 @@ pub struct TimelineMarkerPin<'a> {
     pub sound_tail: Option<u64>,
     pub sound_lead: Option<u64>,
     /// The cut between two clips on A1 (user 2026-10-29: "every cut is a marker"), not an M
-    /// marker: drawn only while taken or while its A1 sound is split; it bounds no slot.
+    /// marker: drawn only while taken or while its sound is split (A1, or the A2 of a Ton into
+    /// an Off); it bounds no slot.
     pub join: bool,
     /// The two sides of its A1 sound when it lies between two clips: where the sound of the
     /// clip before ends (its L) and where the sound of the clip after starts (its J).
@@ -2266,8 +2267,9 @@ fn paint_markers(
             continue;
         }
         // A cut between two clips (user 2026-10-29) is drawn only while taken or while its
-        // A1 sound is away from its picture; it bounds no slot.
-        if marker.join && !marker.taken && !marker.split(0) {
+        // sound is away from its picture: its A1, or the A2 of a Ton going into the Off next to
+        // it (user 2026-10-30); it bounds no slot.
+        if marker.join && !marker.taken && !marker.split(0) && !marker.sound_split() {
             continue;
         }
         let x = x_for_frame(track, range_start, duration, marker.frame);

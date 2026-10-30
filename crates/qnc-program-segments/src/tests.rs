@@ -1003,6 +1003,21 @@ fn the_a1_sound_of_a_cut_between_two_clips_has_a_j_and_an_l() {
     }
 }
 
+/// User 2026-10-30: the stored A2 L of a Ton into the Off after it is drawn on the cut between
+/// them (its side on A2), so it shows without taking the cut.
+#[test]
+fn the_stored_a2_of_a_ton_into_an_off_is_on_the_cut_between_them() {
+    let mut segments = component();
+    let mut ton = stored("a", "tonovi", (100, 140));
+    ton.a2_tail_frames = 6;
+    segments.stored = vec![ton, stored("b", "offovi", (100, 160))];
+    segments.stored_markers.clear();
+    segments.refresh_view(String::new());
+    let join = segments.view().joins.iter().find(|pin| pin.frame == 40).expect("the cut").clone();
+    assert_eq!((join.sound_tail, join.sound_lead), (Some(46), None), "the L of the Ton's A2, no J from the Off");
+    assert_eq!(join.a1_tail, None, "the Ton's A1 has no side into the Off");
+}
+
 /// User 2026-10-30: at the cut of an Off and a Ton only the A2 of the Ton goes into the Off (a J
 /// of the Ton after it); its A1 does not. The A2 is drafted to the two clips before Enter.
 #[test]
