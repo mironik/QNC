@@ -103,7 +103,7 @@ fn the_zoom_of_a_subsegment_edge_shows_the_pictures_either_side_of_its_cut() {
     let shown = subsegment_view(&block, None);
     assert_eq!(shown.parts.iter().map(|p| (p.start, p.end)).collect::<Vec<_>>(), vec![(0, 50), (50, 90), (95, 145)]);
     // The IN of the second part: the last picture of the first part, then its own first, marked.
-    let zoom = subsegment_zoom(&shown, &pieces, (1, false), 50, |_| Some(1000)).unwrap();
+    let zoom = subsegment_zoom(&shown, &pieces, (1, false), (50, None), |_| Some(1000)).unwrap();
     let pictures: Vec<_> = zoom.source_edit_stills.iter().map(|s| (s.picture.as_ref().map(|p| (p.clip_id.as_str(), p.source_frame)), s.cut)).collect();
     assert_eq!(pictures, vec![(Some(("a", 149)), false), (Some(("a", 300)), true)]);
     let sound = zoom.zoom_sound.unwrap();
@@ -113,15 +113,15 @@ fn the_zoom_of_a_subsegment_edge_shows_the_pictures_either_side_of_its_cut() {
     let clicks: Vec<_> = zoom.source_edit_stills.iter().map(|s| s.click.as_ref().map(|(_, target)| target.as_str())).collect();
     assert_eq!(clicks, vec![Some("0:out"), Some("1:in")]);
     // The IN of the third part follows a pause: on the left is still the OUT of the part before.
-    let zoom = subsegment_zoom(&shown, &pieces, (2, false), 50, |_| Some(1000)).unwrap();
+    let zoom = subsegment_zoom(&shown, &pieces, (2, false), (50, None), |_| Some(1000)).unwrap();
     assert_eq!(zoom.source_edit_stills[0].picture.as_ref().map(|p| (p.clip_id.as_str(), p.source_frame)), Some(("a", 339)));
     // The OUT of the first part: its last picture, marked, then the next part's first.
-    let zoom = subsegment_zoom(&shown, &pieces, (0, true), 50, |_| Some(1000)).unwrap();
+    let zoom = subsegment_zoom(&shown, &pieces, (0, true), (50, None), |_| Some(1000)).unwrap();
     let pictures: Vec<_> = zoom.source_edit_stills.iter().map(|s| (s.picture.as_ref().map(|p| p.source_frame), s.cut)).collect();
     assert_eq!(pictures, vec![(Some(149), true), (Some(300), false)]);
     // The first part's IN has no OUT before it; the last part's OUT no IN after it.
-    let first = subsegment_zoom(&shown, &pieces, (0, false), 50, |_| Some(1000)).unwrap();
+    let first = subsegment_zoom(&shown, &pieces, (0, false), (50, None), |_| Some(1000)).unwrap();
     assert!(first.source_edit_stills[0].click.is_none());
-    let last = subsegment_zoom(&shown, &pieces, (2, true), 50, |_| Some(1000)).unwrap();
+    let last = subsegment_zoom(&shown, &pieces, (2, true), (50, None), |_| Some(1000)).unwrap();
     assert!(last.source_edit_stills[1].click.is_none());
 }

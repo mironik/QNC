@@ -967,6 +967,12 @@ impl SourcePreview {
         self.program
     }
 
+    /// While the player plays: whether it plays a program (a story or SubSegment) and the
+    /// frame it confirmed on that axis (user 2026-10-30: the trim zoom's wave follows the play).
+    pub fn playing_at(&self) -> Option<(bool, u64)> {
+        self.player_view.playing().then(|| self.player_view.confirmed_source_frame()).flatten().map(|frame| (self.program, frame))
+    }
+
     /// The program frame the player confirmed, while a program plays.
     pub fn program_frame(&self) -> Option<u64> {
         self.program

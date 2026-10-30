@@ -7078,3 +7078,13 @@ zooma (Wrap redovi, source timeline, SubSegment) ispod slika ima red Undo | Save
 prozora). Svako dugme je ista radnja kao tipka na panelu u fokusu: Undo = Backspace (`undo_object`), Save = Enter
 (`activate_focused_item`), Cancel = Esc (`clear_focus`). Naziv Save jer aplikacija Enter vec zove spremanjem.
 `qnc-trim-overlay` (`paint_buttons`, ovisi o `qnc-ui-text`), rjecnik `common.save`. Testovi, conformance. Uzivo nije provjereno.
+Popravak 2026-10-30 (korisnik: dugmad "treba biti centrirano iznad playheada"): Undo | Save | Cancel stoje iznad crvene crte
+reza kroz A1/A2 (`cut_line_x`), bez vala na crti izmedju slika.
+Dopuna 2026-10-30 (korisnik: "kada se pokrene play u zumu bi se trebao kretati sinhrono playhead"; "odnosno wave bi se trebao
+pomicati"; "playhead stoji, wave putuje u zumu"): dok player svira, prozor zooma (sekunda sa svake strane) je centriran na
+potvrdjenoj slici playera, pa bijela crta playheada stoji u sredini, a val i rijeci putuju ispod nje; crvena crta reza crta se
+samo dok je rez u prozoru. U pauzi prozor je opet oko reza. Os playera mora biti os zooma: klip za source IN/OUT, program za
+Wrap redove i SubSegment. `qnc-source-preview` `playing_at`, `qnc-program-view` `zoom_window` i `ZoomSound.playhead`,
+`qnc-program-segments` `SourcePick::with_playing`, `qnc-script` `subsegment_zoom` (rate, playhead), `qnc-trim-overlay`;
+aplikacija isti broj redaka. Fini val cita se s medija za prozor koji se mice, pa moze kasniti iza playa. Testovi,
+conformance. Uzivo nije provjereno.

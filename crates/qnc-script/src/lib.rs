@@ -245,7 +245,7 @@ impl Script {
         // same pieces as a cover's (`qnc-trim-stills`).
         let pieces = view::block_pieces(&block);
         let rate = pieces.first().and_then(|piece| names.get(&piece.clip_id)).filter(|(_, _, seconds)| *seconds > 0.0).map_or(25, |(_, frames, seconds)| (*frames as f64 / seconds).round() as u64);
-        let zoom = self.trim.and_then(|trim| view::subsegment_zoom(&shown, &pieces, (trim.index, trim.out), rate, |clip| names.get(clip).map(|(_, frames, _)| *frames)));
+        let zoom = self.trim.and_then(|trim| view::subsegment_zoom(&shown, &pieces, (trim.index, trim.out), (rate, preview.playing_at().filter(|(program, _)| *program).map(|(_, frame)| frame)), |clip| names.get(clip).map(|(_, frames, _)| *frames)));
         shown.zoom = zoom.map(|mut zoom| {
             self.trim_stills.fill(&mut zoom, preview.still_locator(), None);
             Box::new(zoom)

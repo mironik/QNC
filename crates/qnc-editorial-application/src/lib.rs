@@ -228,7 +228,7 @@ impl EditorialApplication {
             self.view.preview.timeline.visible_source_marks(),
             (timeline.source_in_frame, timeline.duration_frames),
             timebase.map(|timebase| (timebase.fps_num, timebase.fps_den)),
-        ).with_lanes(source.kept_lanes(), source.holds_enter()).with_taken(timeline.taken_source_mark()));
+        ).with_lanes(source.kept_lanes(), source.holds_enter()).with_taken(timeline.taken_source_mark()).with_playing(self.preview.playing_at()));
         // Source and Wrap stay apart (v5): the Wrap timeline plays the program in the same player.
         let seek = self.segments.take_seek();
         let total = self.segments.view().total_frames;

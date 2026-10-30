@@ -199,7 +199,15 @@ fn paint_sound(ui: &mut egui::Ui, area: Rect, sound: &ZoomSound, gap_at: Option<
         Some(x) if (x - cut_x).abs() < 2.0 => pictures_top - 4.0,
         _ => area.top(),
     };
-    ui.painter().line_segment([egui::pos2(cut_x, from_top), egui::pos2(cut_x, area.bottom())], Stroke::new(1.5, CUT_LINE));
+    // While the player plays the window follows it (user 2026-10-30): the cut line only
+    // while the cut is in the window, and the playhead, white, through both waves.
+    if (sound.from..=sound.to).contains(&sound.cut) {
+        ui.painter().line_segment([egui::pos2(cut_x, from_top), egui::pos2(cut_x, area.bottom())], Stroke::new(1.5, CUT_LINE));
+    }
+    if let Some(playhead) = sound.playhead.filter(|frame| (sound.from..=sound.to).contains(frame)) {
+        let x = x_of(playhead);
+        ui.painter().line_segment([egui::pos2(x, area.top()), egui::pos2(x, area.bottom())], Stroke::new(1.5, visuals.strong_text_color()));
+    }
     (word, side)
 }
 

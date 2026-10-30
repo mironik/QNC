@@ -146,7 +146,8 @@ impl ProgramSegments {
             let clip_id = self.source.clip_id.clone()?;
             let (num, den) = self.source.timebase?;
             let half = second((num.max(0) as u64, den.max(1) as u64));
-            let (from, to) = (cut.saturating_sub(half), (cut + half).min(self.source.duration_frames.max(cut + 1)));
+            let playhead = self.source.playing.filter(|(program, _)| !program).map(|(_, frame)| frame);
+            let (from, to) = qnc_program_view::zoom_window(cut, cut, half, self.source.duration_frames, playhead);
             let lane = |lane: &qnc_lane_choice::Lane| qnc_program_waveform::Placement {
                 clip_id: clip_id.clone(),
                 channel: lane.channel,
@@ -157,7 +158,7 @@ impl ProgramSegments {
                 level_db: lane.level_db,
                 off: lane.off,
             };
-            return Some(qnc_program_view::ZoomSound { from, to, cut, lanes: [vec![lane(&self.source.lanes[0])], vec![lane(&self.source.lanes[1])]], ..Default::default() });
+            return Some(qnc_program_view::ZoomSound { from, to, cut, lanes: [vec![lane(&self.source.lanes[0])], vec![lane(&self.source.lanes[1])]], playhead, ..Default::default() });
         }
         let cut = cut_of(&view.edit_stills)?;
         let (num, den) = view.timebase?;
@@ -168,11 +169,12 @@ impl ProgramSegments {
         let (earliest, latest) = cut_sound.as_ref().map_or((cut, cut), |sound| {
             (sound.lead.unwrap_or(cut).min(cut), sound.tail.unwrap_or(cut).max(cut))
         });
-        let (from, to) = (earliest.saturating_sub(half), (latest + half).min(view.total_frames.max(latest + 1)));
+        let playhead = self.source.playing.filter(|(program, _)| *program).map(|(_, frame)| frame);
+        let (from, to) = qnc_program_view::zoom_window(earliest, latest, half, view.total_frames, playhead);
         let (segments, covers) = view.wave_placements();
         let near = |placements: Vec<qnc_program_waveform::Placement>| placements.into_iter().filter(|at| at.program_start < to && from < at.program_end).collect();
         let taken_cut = self.marker_edit.as_ref().map(|(id, _)| id.clone());
-        Some(qnc_program_view::ZoomSound { from, to, cut, lanes: [near(segments), near(covers)], cut_sound, taken_cut, ..Default::default() })
+        Some(qnc_program_view::ZoomSound { from, to, cut, lanes: [near(segments), near(covers)], cut_sound, taken_cut, playhead, ..Default::default() })
     }
 
     /// Whether a segment edge taken from the segment panel waits for Enter or Escape.

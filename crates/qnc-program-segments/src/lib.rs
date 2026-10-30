@@ -91,6 +91,9 @@ pub struct SourcePick {
     /// The source mark taken on the source timeline: `Some(true)` IN, `Some(false)` OUT
     /// (user 2026-10-25: its trim zoom, as an M marker's).
     pub taken: Option<bool>,
+    /// While the player plays: whether it plays the program, and its confirmed frame
+    /// (user 2026-10-30: the trim zoom follows the play).
+    pub playing: Option<(bool, u64)>,
 }
 
 impl SourcePick {
@@ -111,7 +114,14 @@ impl SourcePick {
             lanes: [qnc_lane_choice::Lane::default(), qnc_lane_choice::Lane { channel: 1, ..Default::default() }],
             holds_enter: false,
             taken: None,
+            playing: None,
         }
+    }
+
+    /// What the player plays now and where (`SourcePreview::playing_at`).
+    pub fn with_playing(mut self, playing: Option<(bool, u64)>) -> Self {
+        self.playing = playing;
+        self
     }
 
     /// The source mark taken on the source timeline (IN `Some(true)`, OUT `Some(false)`).

@@ -110,6 +110,17 @@ pub struct ZoomSound {
     /// The taken cut (an M marker or a cut between two clips): a click on the zoom's A1 or A2
     /// takes its sound on that lane (user 2026-10-29: the lanes chosen in the zoom too).
     pub taken_cut: Option<String>,
+    /// The frame the player plays, on the zoom's axis, while it plays (user 2026-10-30: the
+    /// playhead moves in the zoom and the wave goes with it).
+    pub playhead: Option<u64>,
+}
+
+/// The window of the trim zoom on its axis: a second (`half` frames) on each side of the
+/// cut, or of the playhead while the player plays, so the wave moves with the play
+/// (user 2026-10-30); never past `total`.
+pub fn zoom_window(earliest: u64, latest: u64, half: u64, total: u64, playhead: Option<u64>) -> (u64, u64) {
+    let (earliest, latest) = playhead.map_or((earliest, latest), |frame| (frame, frame));
+    (earliest.saturating_sub(half), (latest + half).min(total.max(latest + 1)))
 }
 
 /// The sides of the taken cut's A2 sound in the zoom: where the sound after starts (its J) and
