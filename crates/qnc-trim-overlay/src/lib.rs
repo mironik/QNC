@@ -99,6 +99,13 @@ pub fn show(ctx: &egui::Context, segments: &SegmentsView) -> Option<ActionEvent>
                     ui.painter().line_segment([egui::pos2(x, pane.top() - 4.0), egui::pos2(x, pane.bottom() + 4.0)], Stroke::new(3.0, accent));
                 }
             }
+            // V over the pictures while a cut is taken (user 2026-10-30: J and L of the picture
+            // too): a click takes only the picture of the cut, as Ctrl+I there.
+            if let Some((sound, cut)) = sound.and_then(|sound| sound.taken_cut.as_deref().map(|cut| (sound, cut))) {
+                if let Some(clicked) = paint_take_button(ui, top, ("V", "select_mark_in"), cut, sound.picture_taken, &visuals) {
+                    turned = Some(clicked);
+                }
+            }
             // The buttons stand over the playhead: the cut's line through the sound, else the
             // marker between the pictures (user 2026-10-30).
             let mut centre = gap_at;
@@ -220,15 +227,22 @@ fn paint_lane_label(ui: &mut egui::Ui, band: Rect, lane: usize, taken_cut: Optio
         ui.painter().text(band.left_top() + Vec2::new(6.0, 4.0), Align2::LEFT_TOP, text, FontId::proportional(12.0), visuals.text_color());
         return None;
     };
-    let rect = Rect::from_min_size(band.left_top() + Vec2::new(4.0, 3.0), Vec2::new(26.0, 18.0));
-    let response = ui.interact(rect, ui.id().with(("zoom_lane_label", lane)), Sense::click());
-    let frame = if taken_lane { SIDE_LINE } else if response.hovered() { visuals.strong_text_color() } else { visuals.text_color() };
-    ui.painter().rect_stroke(rect, 2.0, Stroke::new(if taken_lane { 2.0 } else { 1.0 }, frame), egui::StrokeKind::Inside);
+    let action = if lane == 0 { "select_audio_a1" } else { "select_audio_a2" };
+    paint_take_button(ui, band.left_top(), (text, action), cut, taken_lane, visuals)
+}
+
+/// A button of the taken cut at `corner` (A1, A2 or V): a click takes that part of the cut, as
+/// its key does; the part taken has a red frame.
+fn paint_take_button(ui: &mut egui::Ui, corner: egui::Pos2, (text, action): (&str, &str), cut: &str, taken: bool, visuals: &egui::Visuals) -> Option<ActionEvent> {
+    let rect = Rect::from_min_size(corner + Vec2::new(4.0, 3.0), Vec2::new(26.0, 18.0));
+    let response = ui.interact(rect, ui.id().with(("zoom_take", text)), Sense::click());
+    let frame = if taken { SIDE_LINE } else if response.hovered() { visuals.strong_text_color() } else { visuals.text_color() };
+    ui.painter().rect_filled(rect, 2.0, visuals.window_fill);
+    ui.painter().rect_stroke(rect, 2.0, Stroke::new(if taken { 2.0 } else { 1.0 }, frame), egui::StrokeKind::Inside);
     ui.painter().text(rect.center(), Align2::CENTER_CENTER, text, FontId::proportional(12.0), visuals.text_color());
     if response.hovered() {
         ui.ctx().set_cursor_icon(egui::CursorIcon::PointingHand);
     }
-    let action = if lane == 0 { "select_audio_a1" } else { "select_audio_a2" };
     response.clicked().then(|| ActionEvent::key(action).with_target(cut.to_string()).at("segments"))
 }
 

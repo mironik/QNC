@@ -104,6 +104,18 @@ impl ProgramSegments {
         // Only the sound: the picture goes back to where it is stored.
         let cut = stored.unwrap_or(draft);
         if !self.cut_has_sound(lane, &marker_id, cut) {
+            // A1 of an M marker within one segment (user 2026-10-30): the cut of A1 nearest to it,
+            // where two clips meet, is taken instead of a refusal.
+            let nearest = self.view.joins.iter().min_by_key(|join| join.frame.abs_diff(cut)).map(|join| join.marker_id.clone());
+            // Only while nothing of the marker was moved (its draft would be lost).
+            let sound_moved = matches!(self.cut_part, CutPart::Sound { stored, draft, .. } if stored != draft);
+            if let Some(join) = nearest.filter(|join| lane == 0 && *join != marker_id && stored == Some(draft) && !sound_moved) {
+                if let Some(frame) = self.cut_frame(&join) {
+                    self.let_go_edits(false);
+                    self.start_marker_edit(join.clone(), frame);
+                    return self.take_cut_part(Some(join), false, 0);
+                }
+            }
             let words = if lane == 0 { "story.msg.a1_no_cut" } else { "story.cut_sound_no_cover" };
             self.refresh_view(qnc_ui_text::text(words).into());
             return true;

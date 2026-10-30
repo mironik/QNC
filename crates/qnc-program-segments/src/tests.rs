@@ -809,6 +809,18 @@ fn a_new_in_drops_a_paused_or_stopped_sync_and_another_clip_does_not_arm() {
 }
 
 #[test]
+fn a1_of_an_m_marker_within_a_segment_takes_the_nearest_cut_of_two_clips() {
+    // User 2026-10-30: J and L on A1 too; an M marker inside one segment has no A1 cut, so A1 in
+    // its zoom takes the nearest cut where two clips meet instead of refusing.
+    let mut segments = component();
+    segments.apply(SegmentCommand::TakeMarker("m1".into()));
+    assert!(segments.take_cut_part(Some("m1".into()), false, 0), "A1 of the zoom");
+    let join = segments.view().joins.iter().find(|pin| pin.frame == 10).expect("the cut a|b").marker_id.clone();
+    assert_eq!(segments.marker_edit.as_ref().map(|(id, _)| id.clone()), Some(join), "the nearest cut of two clips is taken");
+    assert_eq!(segments.taken_sound().map(|(lane, _)| lane), Some(0), "its A1 sound");
+}
+
+#[test]
 fn replace_exclude_or_a_new_segment_end_an_open_edit() {
     let mut segments = component();
     let id = segments.view().rows[0].segment_id.clone();

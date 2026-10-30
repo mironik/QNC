@@ -110,6 +110,8 @@ pub struct ZoomSound {
     /// The taken cut (an M marker or a cut between two clips): a click on the zoom's A1 or A2
     /// takes its sound on that lane (user 2026-10-29: the lanes chosen in the zoom too).
     pub taken_cut: Option<String>,
+    /// Only the picture of the taken cut is taken (its V button framed red).
+    pub picture_taken: bool,
     /// The frame the player plays, on the zoom's axis, while it plays (user 2026-10-30: the
     /// playhead moves in the zoom and the wave goes with it).
     pub playhead: Option<u64>,
