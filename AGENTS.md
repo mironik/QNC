@@ -7107,3 +7107,11 @@ drugom klipu se zaboravlja (`qnc-program-segments` `arm_sync_on_new_in`, `qnc-sy
 kazu Esc (rjecnik `sync_resumes`, `sync_at_end`, `sync_stopped`); Delete na svakom panelu dok Sync nacrt ceka kaze da ga
 odbacuje Esc (`qnc-panel-focus`). Test `a_new_in_drops_a_paused_or_stopped_sync_and_another_clip_does_not_arm`,
 zlatna tablica tipki, conformance. Uzivo nije provjereno.
+Dopuna 2026-10-30 (korisnik: "J marker radi samo na A2, treba raditi i na A1 i V, isto tako L"; log: A1 na M markeru izmedju
+dvije pokrivalice odbijen, "No two clips meet on A1 at this cut"; izbor "1, kreni"): (1) A1 u zoomu na M markeru unutar
+jednog segmenta uzima najblizi rez gdje se spajaju dva klipa i njegov A1 (J/L kao do sada: Ctrl+I J, Ctrl+O L, strelice,
+kotacic, Enter, Esc), umjesto odbijanja; samo dok na markeru nista nije pomaknuto (inace ostaje poruka kao prije)
+(`qnc-program-segments` `take_cut_part`). (2) Zoom reza ima gumb V gore lijevo na slikama dok je rez uzet: klik uzima samo
+sliku reza (`select_mark_in` na taj rez, isto kao Ctrl+I u zoomu); uzeta slika ima crveni okvir gumba
+(`qnc-program-view` `ZoomSound.picture_taken`, `qnc-trim-overlay` `paint_take_button`, isti za A1/A2/V). Test
+`a1_of_an_m_marker_within_a_segment_takes_the_nearest_cut_of_two_clips`, conformance. Uzivo nije provjereno.
