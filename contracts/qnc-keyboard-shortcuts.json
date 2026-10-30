@@ -166,6 +166,9 @@
     "script_field_set": {
       "label": "Izaberi vrijednost polja bloka scenarija"
     },
+    "script_voice_take": {
+      "label": "Izaberi snimku OFF-a (kanal zapisa glasa)"
+    },
     "script_export": {
       "label": "Izvezi scenarij (tekst, A/V, MOS)"
     },

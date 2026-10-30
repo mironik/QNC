@@ -9,7 +9,7 @@
 
 use eframe::egui::{self, RichText, Sense};
 use qnc_action_event::ActionEvent;
-use qnc_script::{seconds_label, FieldEdit, EXPORT, OPEN_EXPORT, Role, FIELD_COMMIT, FIELD_SET, FIELD_TEXT, ScriptView, ADD_CLIP, ADD_QUOTE, ADD_TEXT, CLEAR_EDITOR, EDITOR_TEXT, MOVE_DOWN, MOVE_UP, OPEN, PANEL, RECORD, REMOVE, REPLACE_TEXT, SELECT};
+use qnc_script::{seconds_label, FieldEdit, EXPORT, OPEN_EXPORT, Role, FIELD_COMMIT, FIELD_SET, FIELD_TEXT, ScriptView, ADD_CLIP, ADD_QUOTE, ADD_TEXT, CLEAR_EDITOR, EDITOR_TEXT, MOVE_DOWN, MOVE_UP, OPEN, PANEL, RECORD, REMOVE, REPLACE_TEXT, SELECT, VOICE_TAKE};
 use qnc_text_source_editor::{Answer, Editor, EditorButton};
 use qnc_transcript::TranscriptView;
 
@@ -185,6 +185,26 @@ fn paint_block(ui: &mut egui::Ui, row: &qnc_script::BlockRow, view: &ScriptView,
         // The first and last words of a block whose kind shows them (in-cue, out-cue).
         if row.cues && !block.text.trim().is_empty() {
             ui.label(RichText::new(qnc_ui_text::fill("script.block_cues", &[("in", &qnc_script::in_cue(&block.text)), ("out", &qnc_script::out_cue(&block.text))])).color(theme.text_muted).size(theme.font_ui));
+        }
+        // The voice record of a recorded block: its status and its takes, one of them used
+        // (user 2026-10-30: chosen as A1 of a camera clip).
+        if row.recorded && view.recording.is_none_or(|(recording, _, _)| recording != block.id) {
+            ui.horizontal_wrapped(|ui| {
+                let (status, color) = match row.voice.as_ref().map(|voice| voice.status) {
+                    None => (qnc_ui_text::text("script.voice_none"), theme.text_muted),
+                    Some(qnc_script::VoiceStatus::Recorded) => (qnc_ui_text::text("script.voice_recorded"), theme.focus),
+                    Some(qnc_script::VoiceStatus::TextChanged) => (qnc_ui_text::text("script.voice_text_changed"), theme.danger),
+                    Some(qnc_script::VoiceStatus::Missing) => (qnc_ui_text::text("script.voice_missing"), theme.danger),
+                };
+                ui.label(RichText::new(status).color(color).size(theme.font_ui));
+                for take in row.voice.iter().flat_map(|voice| voice.takes.iter().map(move |take| (voice.chosen, take))) {
+                    let (chosen, take) = take;
+                    let hint = qnc_ui_text::fill("script.voice_take_hint", &[("take", &take.take.to_string()), ("length", &seconds_label(take.seconds)), ("tc", &take.tc), ("text", &take.text)]);
+                    if qnc_ui_kit::chrome_button(ui, &format!("T{}", take.take), view.recording.is_none(), take.take == chosen, style).on_hover_text(hint).clicked() && take.take != chosen {
+                        asked = Some(ActionEvent::key(VOICE_TAKE).with_target(format!("{}:{}", block.id, take.take)).at(PANEL));
+                    }
+                }
+            });
         }
         // The take being recorded: its time and the microphone's level.
         if let Some((_, seconds, peak)) = view.recording.filter(|(recording, _, _)| *recording == block.id) {

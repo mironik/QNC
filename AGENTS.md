@@ -7169,3 +7169,13 @@ testovi `qnc-script-db` (2 nova), `qnc-voice-take`, `qnc-voice-clip`, conformanc
 3,3 s) u scratchpadu: 3 toka (MPEG-2 i dva mono PCM 24-bit), 3,3 s, kanal 1 tisina od 2 s, kanal 2 zvuk do kraja,
 ponovno pisanje preko klipa radi. Nije izvedeno (korak 2): izbor kanala i stanje snimke u panelu scenarija; (korak 3)
 Draft XML. Uzivo nije provjereno.
+Izvedeno 2026-10-30 (korisnik: "da, kreni s korakom 2"): izbor snimke i stanje zapisa glasa u panelu scenarija. Svaki OFF
+blok (snimana vrsta) ispod naslova pokazuje stanje: nije snimljen; snimljen; tekst promijenjen nakon izabrane snimke
+(tekst bloka nije tekst s kojim je izabrana snimka snimljena); snimka nije u mapi projekta (klip ili WAV izabrane snimke
+ne postoji na ovom racunalu). Uz stanje su gumbi T1..Tn, izabrana je osvijetljena, pod misem duljina, timecode i tekst
+snimke; klik bira snimku (radnja kataloga `script_voice_take`, bez tipke, cilj `blok:snimka`). `qnc-script-db` operacija
+`SetVoiceChosen` (samo snimka koju zapis ima; blok dobiva duljinu izabrane snimke), `qnc-voice-take` `voice_file`
+(datoteka zapisa u mapi glasa projekta, nista ne cita), `qnc-script` (citanje zapisa i provjera datoteka u pozadinskoj
+niti uz scenarij, `VoiceRow`, `VoiceStatus`), `qnc-script-panel`, rjecnik. Testovi `qnc-script-db` (izbor snimke),
+`qnc-script` (stanje), conformance. Uzivo nije provjereno. Nije izvedeno: izbor snimke tipkama (strelice kao kod A1),
+preslusavanje izabranog kanala (zapis glasa nije u katalogu projekta), korak 3 Draft XML.

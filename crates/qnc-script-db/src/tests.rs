@@ -132,6 +132,11 @@ fn every_take_of_an_off_is_one_more_channel_of_one_record_and_the_last_is_used()
     assert_eq!(voice.chosen_take().unwrap().text, "Prvi off, ispravljen.");
     let block = read(&target).unwrap().into_iter().find(|b| b.id == off_block).unwrap();
     assert_eq!((block.voice_uri.as_str(), block.voice_seconds, block.voice_tc.as_str()), (clip.as_str(), 4.0, "18:01:02:03"), "the clip starts at its first take, its length is the take used");
+    set_voice_chosen(&target, off_block, 1).unwrap();
+    assert!(set_voice_chosen(&target, off_block, 3).is_err(), "only a take the record has");
+    assert_eq!(read_voice(&target, off_block).unwrap().unwrap().chosen, 1);
+    let block = read(&target).unwrap().into_iter().find(|b| b.id == off_block).unwrap();
+    assert_eq!(block.voice_seconds, 4.5, "the length is the chosen take's");
     remove(&target, off_block).unwrap();
     assert!(read_voices(&target).unwrap().is_empty(), "a removed block takes its record");
 }

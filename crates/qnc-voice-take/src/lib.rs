@@ -126,6 +126,15 @@ impl Take {
     }
 }
 
+/// The file behind `uri`, a clip or a take in the voice folder of the project on this computer
+/// (to see that it is there). Reads no file.
+pub fn voice_file(locator: &StillLocator, uri: &str) -> Result<PathBuf> {
+    let settings = locator.settings();
+    let project_dir = locator.reader().local_workspace_dir(settings).map_err(|e| e.to_string())?.ok_or_else(|| qnc_ui_text::text("script.voice_local_only").to_string())?;
+    let (folder, base) = settings.voice_location(&project_dir).map_err(|e| e.message)?;
+    file_of(&folder, &base, uri)
+}
+
 /// The file of take `number` of record `name`.
 fn take_file(name: &str, number: u16) -> String {
     format!("{name}_T{number}.wav")

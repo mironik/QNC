@@ -3,7 +3,43 @@
 
 use std::collections::{BTreeMap, HashMap};
 
-pub use qnc_script_db::{Block, Counts, KindSpec, Piece, Role, ScriptProfile};
+pub use qnc_script_db::{Block, Counts, KindSpec, Piece, Role, ScriptProfile, Voice, VoiceTake};
+
+/// What the voice record of a recorded block is (user 2026-10-30: the application knows
+/// whether an OFF is recorded and where).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum VoiceStatus {
+    /// The take used is in the project folder and was recorded with the block's text.
+    Recorded,
+    /// The block's text was changed after the take used was recorded.
+    TextChanged,
+    /// The clip or the take used is not in the project folder.
+    Missing,
+}
+
+/// A recorded block's voice record as the panel shows it: its takes (the channels of its clip),
+/// the one used and its status.
+#[derive(Debug, Clone, PartialEq)]
+pub struct VoiceRow {
+    pub name: String,
+    pub takes: Vec<VoiceTake>,
+    pub chosen: u16,
+    pub status: VoiceStatus,
+}
+
+impl VoiceRow {
+    /// The record as it stands against its block's text and the files on this computer.
+    pub fn of(voice: &Voice, present: bool, text: &str) -> Self {
+        let status = if !present {
+            VoiceStatus::Missing
+        } else if voice.chosen_take().is_some_and(|take| take.text.trim() != text.trim()) {
+            VoiceStatus::TextChanged
+        } else {
+            VoiceStatus::Recorded
+        };
+        Self { name: voice.name.clone(), takes: voice.takes.clone(), chosen: voice.chosen, status }
+    }
+}
 
 /// One block as the panel shows it.
 #[derive(Debug, Clone, PartialEq)]
@@ -21,6 +57,8 @@ pub struct BlockRow {
     pub cues: bool,
     /// Whether it is in the length of the story.
     pub in_story: bool,
+    /// Its voice record (a recorded block that has none is not recorded yet).
+    pub voice: Option<VoiceRow>,
 }
 
 impl BlockRow {
@@ -245,7 +283,7 @@ pub fn rows(blocks: &[Block], profile: Option<&ScriptProfile>, words_per_second:
             } else {
                 kind.map_or_else(|| block.kind.to_uppercase(), |kind| kind.short.clone())
             };
-            BlockRow { seconds: block_seconds(block, kind, words_per_second), mark, role: kind.map(|kind| kind.role), recorded: kind.is_some_and(|kind| kind.recorded), cues: kind.is_some_and(|kind| kind.cues), in_story: kind.is_some_and(|kind| kind.counts == Counts::Story), block: block.clone() }
+            BlockRow { seconds: block_seconds(block, kind, words_per_second), mark, role: kind.map(|kind| kind.role), recorded: kind.is_some_and(|kind| kind.recorded), cues: kind.is_some_and(|kind| kind.cues), in_story: kind.is_some_and(|kind| kind.counts == Counts::Story), voice: None, block: block.clone() }
         })
         .collect()
 }

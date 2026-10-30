@@ -57,6 +57,7 @@ impl Store {
             Operation::RemovePiece { id, index } => self.remove_piece(*id, *index),
             Operation::ReadVoices => self.voices().map(Data::Voices),
             Operation::AddVoiceTake { id, name, clip_uri, take } => self.add_voice_take(*id, name, clip_uri, take),
+            Operation::SetVoiceChosen { id, take } => self.set_voice_chosen(*id, *take),
         }
     }
 

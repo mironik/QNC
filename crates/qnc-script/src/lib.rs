@@ -88,6 +88,9 @@ pub const PART_REMOVE: &str = "subsegment_part_remove";
 /// A block of a recorded kind is recorded from the microphone, or its recording stops (target:
 /// its id; without one the chosen block). The catalog names it `record_toggle` (v4).
 pub const RECORD: &str = "record_toggle";
+/// A take of a block's voice record becomes the one used (target: `block:take`; user
+/// 2026-10-30: the editor chooses the take as A1 of a camera clip).
+pub const VOICE_TAKE: &str = "script_voice_take";
 /// A field of a block is being typed (target: `{"block":id,"field":code,"value":text}`); the text is a
 /// draft on the screen until it is committed.
 pub const FIELD_TEXT: &str = "script_field_text";
@@ -148,6 +151,8 @@ pub struct Script {
     zoom_follow: qnc_program_view::ZoomFollow,
     /// The A1 of a part taken with Ctrl+1, as drafted.
     sound: Option<PartSound>,
+    /// The voice records of the blocks as read, and whether their files are there.
+    voices: Vec<(Voice, bool)>,
 }
 
 /// The A1 of part `index` taken (Ctrl+1) as drafted: camera channel, level, off.
@@ -170,7 +175,7 @@ struct Trim {
 
 impl Default for Script {
     fn default() -> Self {
-        Self { view: ScriptView::default(), blocks: Vec::new(), project: None, reading: None, read_at: None, writing: None, source_request: None, names: HashMap::new(), words_per_second: Ok(0.0), take: None, taking: None, exporting: None, open_subsegment: None, pieces_request: None, trim: None, waves: qnc_program_waveform::ProgramWaves::new(), filmstrips: qnc_program_filmstrip::ProgramFilmstrips::new(), waves_project: None, trim_stills: qnc_trim_stills::TrimStills::new(), zoom_follow: Default::default(), sound: None }
+        Self { view: ScriptView::default(), blocks: Vec::new(), project: None, reading: None, read_at: None, writing: None, source_request: None, names: HashMap::new(), words_per_second: Ok(0.0), take: None, taking: None, exporting: None, open_subsegment: None, pieces_request: None, trim: None, waves: qnc_program_waveform::ProgramWaves::new(), filmstrips: qnc_program_filmstrip::ProgramFilmstrips::new(), waves_project: None, trim_stills: qnc_trim_stills::TrimStills::new(), zoom_follow: Default::default(), sound: None, voices: Vec::new() }
     }
 }
 
@@ -539,6 +544,10 @@ impl Script {
                 let block = id().or(self.view.selected);
                 self.record(preview, block)
             }
+            VOICE_TAKE => {
+                let Some((block, take)) = target.and_then(|target| target.split_once(':')).and_then(|(block, take)| Some((block.parse::<i64>().ok()?, take.parse::<u16>().ok()?))) else { return Some(false) };
+                self.write(preview, move |target| qnc_script_db::set_voice_chosen(target, block, take).map(|_| None))
+            }
             // Esc while a take records throws it away (user 2026-10-30).
             "clear_focus" if self.take.is_some() => self.cancel_take(),
             FIELD_TEXT | FIELD_SET => {
@@ -830,7 +839,8 @@ impl Script {
         if let Some(project) = project.filter(|_| self.reading.is_none() && self.writing.is_none() && self.read_at.is_none_or(|at| at.elapsed() >= READ_EVERY)) {
             self.read_at = Some(Instant::now());
             let (send, read) = mpsc::channel();
-            if std::thread::Builder::new().name("qnc-script-read".into()).spawn(move || _ = send.send(read::read_script(&project))).is_ok() {
+            let locator = preview.still_locator();
+            if std::thread::Builder::new().name("qnc-script-read".into()).spawn(move || _ = send.send(read::read_script(&project, locator.as_ref()))).is_ok() {
                 self.reading = Some(read);
             }
         }
@@ -843,6 +853,9 @@ impl Script {
             }
         }
         self.view.blocks = rows(&self.blocks, self.view.profile.as_ref(), self.reading_speed());
+        for row in &mut self.view.blocks {
+            row.voice = self.voices.iter().find(|(voice, _)| voice.block_id == row.block.id).map(|(voice, present)| VoiceRow::of(voice, *present, &row.block.text));
+        }
         let profile = self.view.profile.as_ref();
         let counts = |row: &BlockRow| profile.and_then(|profile| profile.kind(&row.block.kind)).map(|kind| kind.counts);
         let sum = |keep: &dyn Fn(&BlockRow) -> bool| self.view.blocks.iter().filter(|row| keep(row)).map(|row| row.seconds).sum::<f64>();
@@ -917,10 +930,11 @@ impl Script {
         if let Some(reading) = &self.reading {
             if let Ok(result) = reading.try_recv() {
                 match result {
-                    Ok((blocks, profile, target)) => {
+                    Ok(read::Script { blocks, profile, target, voices }) => {
                         self.blocks = blocks;
                         self.view.profile = profile;
                         self.view.target_seconds = target;
+                        self.voices = voices;
                     }
                     Err(error) => self.view.message = error,
                 }

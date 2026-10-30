@@ -10,6 +10,17 @@ fn sot(text: &str) -> Block {
 }
 
 #[test]
+fn a_voice_record_says_whether_it_is_there_and_was_recorded_with_the_text() {
+    let take = |take: u16, text: &str| VoiceTake { take, wav_uri: format!("qnc://p/T{take}.wav"), seconds: 2.0, tc: "21:00:00:00".into(), text: text.into() };
+    let voice = Voice { block_id: 1, name: "P_OFF1".into(), clip_uri: "qnc://p/P_OFF1.mxf".into(), chosen: 2, takes: vec![take(1, "Stari tekst."), take(2, "Novi tekst.")] };
+    assert_eq!(VoiceRow::of(&voice, true, "Novi tekst. ").status, VoiceStatus::Recorded, "the take used was recorded with this text");
+    assert_eq!(VoiceRow::of(&voice, true, "Opet promijenjen.").status, VoiceStatus::TextChanged);
+    assert_eq!(VoiceRow::of(&voice, false, "Novi tekst.").status, VoiceStatus::Missing);
+    let first = Voice { chosen: 1, ..voice };
+    assert_eq!(VoiceRow::of(&first, true, "Novi tekst.").status, VoiceStatus::TextChanged, "the status follows the take used");
+}
+
+#[test]
 fn a_text_block_lasts_as_long_as_its_words_take_to_read() {
     assert_eq!(reading_seconds("jedan dva tri  cetiri pet", 2.5), 2.0);
     assert_eq!(reading_seconds("   ", 2.5), 0.0);

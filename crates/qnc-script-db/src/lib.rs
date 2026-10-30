@@ -194,6 +194,8 @@ pub enum Operation {
     /// Block `id` gets `take` as the next take of its voice record (named `name` at the first
     /// take, its clip at `clip_uri`); the take becomes the one used.
     AddVoiceTake { id: i64, name: String, clip_uri: String, take: VoiceTake },
+    /// Take `take` of block `id`'s voice record becomes the one used (its channel of the clip).
+    SetVoiceChosen { id: i64, take: u16 },
     /// The blocks in reading order.
     Read,
     /// The profile the project's script is written with (none yet: the script was never
@@ -345,6 +347,11 @@ pub fn read_voice(target: &ProjectDbTarget, id: i64) -> Result<Option<Voice>> {
 /// Block `id` gets `take` as the next take of its voice record.
 pub fn add_voice_take(target: &ProjectDbTarget, id: i64, name: String, clip_uri: String, take: VoiceTake) -> Result<()> {
     write(target, Operation::AddVoiceTake { id, name, clip_uri, take }).map(drop)
+}
+
+/// Take `take` of block `id` becomes the one used.
+pub fn set_voice_chosen(target: &ProjectDbTarget, id: i64, take: u16) -> Result<()> {
+    write(target, Operation::SetVoiceChosen { id, take }).map(drop)
 }
 
 /// The fields of block `id` become `fields`.

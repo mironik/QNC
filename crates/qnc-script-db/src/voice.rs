@@ -114,4 +114,18 @@ impl Store {
         tx.commit().map_err(err)?;
         Ok(Data::Changed)
     }
+
+    /// Take `take` of block `id` becomes the one used; the block keeps its length.
+    pub(crate) fn set_voice_chosen(&mut self, id: i64, take: u16) -> Result<Data> {
+        let tx = qnc_db_broker::begin_write(self.connection_mut()).map_err(err)?;
+        let seconds: f64 = tx
+            .query_row("SELECT seconds FROM script_voice_takes WHERE block_id = ?1 AND take = ?2", params![id, take], |r| r.get(0))
+            .optional()
+            .map_err(err)?
+            .ok_or_else(|| qnc_ui_text::fill("db.script_voice_no_take", &[("take", &take.to_string())]))?;
+        tx.execute("UPDATE script_voice SET chosen = ?2, updated_at_utc = strftime('%Y-%m-%dT%H:%M:%fZ','now') WHERE block_id = ?1", params![id, take]).map_err(err)?;
+        tx.execute("UPDATE script_blocks SET voice_seconds = ?2, updated_at_utc = strftime('%Y-%m-%dT%H:%M:%fZ','now') WHERE block_id = ?1", params![id, seconds]).map_err(err)?;
+        tx.commit().map_err(err)?;
+        Ok(Data::Changed)
+    }
 }
