@@ -35,6 +35,16 @@ fn a_voice_record_is_a_complete_clip_of_the_catalog_and_more_takes_replace_it() 
     let stored = reader.read("voice-P_OFF1").unwrap().unwrap();
     assert_eq!(stored.clip.snapshot.metadata.original.streams.len(), 4, "the record with one more take replaced the one before");
     assert_eq!(stored.imported_media_uri.as_deref(), Some(stored.clip.snapshot.binding.original_uri.as_str()));
+    // A record published with another form of its address takes the one written now.
+    let mut moved = entry(SOURCE, "P", "P_OFF1", record(3), 3).unwrap();
+    let uri = format!("{SOURCE}/file/products/voice/P%5FOFF1%2Emxf");
+    moved.snapshot.metadata.original.media_uri = uri.clone();
+    moved.snapshot.metadata.evidence[0].media_uri = uri.clone();
+    moved.snapshot.metadata.evidence[0].document_uri = uri.clone();
+    moved.snapshot.binding.original_uri = uri.clone();
+    moved.snapshot.report = qnc_media_records::inspect(&moved.snapshot.metadata, Phase::Final).unwrap();
+    publish(ContentTarget::from_owner_binding(&file, DB).unwrap(), moved).unwrap();
+    assert_eq!(reader.read("voice-P_OFF1").unwrap().unwrap().imported_media_uri, Some(uri));
     // A voice record is the script's, not a clip of a card in the pool.
     assert!(reader.list_summary(None).unwrap().is_empty());
 }

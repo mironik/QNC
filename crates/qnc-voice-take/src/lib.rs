@@ -84,7 +84,14 @@ pub fn describe_record(locator: &StillLocator, name: &str, clip_uri: &str, takes
     let sounds = vec![PathBuf::new(); takes.len()];
     let seconds = takes.iter().copied().fold(0.0, f64::max);
     let clip = qnc_voice_clip::VoiceClip { sounds: &sounds, seconds, text: "", heading: "", width, height, fps, fields, sample_rate, timecode: first_tc, out: Path::new(""), project_dir: Path::new("") };
-    qnc_voice_clip::describe(&clip, &clip_id(name), clip_uri)
+    qnc_voice_clip::describe(&clip, &clip_id(name), &canonical(clip_uri)?)
+}
+
+/// A file of the voice folder as the source reference of the catalog writes it (its path
+/// percent encoded), the form the player reads; the script keeps the plain form.
+fn canonical(uri: &str) -> Result<String> {
+    let (source, path) = uri.split_once("/file/").ok_or_else(|| format!("{uri}: {}", qnc_ui_text::text("voice.take_missing")))?;
+    qnc_source_contract::SourceReference::new(source, path).map(|reference| reference.uri()).map_err(|e| format!("{uri}: {e}"))
 }
 
 /// The catalog id of a record's clip: `voice-` and its name, with every character a clip id
@@ -145,7 +152,7 @@ impl Take {
         let clip = qnc_voice_clip::VoiceClip { sounds: &sounds, seconds, text, heading, width: self.width, height: self.height, fps: self.fps, fields: self.fields, sample_rate: self.rate, timecode: &timecode, out: &out, project_dir: &self.project_dir };
         qnc_voice_clip::make(&clip)?;
         let clip_uri = format!("{}/{}.mxf", self.base, self.name);
-        let record = qnc_voice_clip::describe(&clip, &clip_id(&self.name), &clip_uri)?;
+        let record = qnc_voice_clip::describe(&clip, &clip_id(&self.name), &canonical(&clip_uri)?)?;
         Ok(Recorded { clip_uri, name: self.name, number: self.number, wav_uri: self.wav_uri, seconds: recording.seconds, timecode: recording.timecode, record })
     }
 
@@ -184,6 +191,13 @@ mod tests {
         assert_eq!(record_name("Mironik teniski centar", "OFF 2"), "Mironik_teniski_centar_OFF2");
         assert_eq!(record_name("2026/10/30 Vijesti", "Take VO 1"), "2026_10_30_Vijesti_TakeVO1");
         assert_eq!(take_file("Mironik_OFF2", 3), "Mironik_OFF2_T3.wav");
+    }
+
+    #[test]
+    fn the_catalog_gets_the_clip_address_as_the_source_reference_writes_it() {
+        let uri = canonical("qnc://local/source/project-p1/file/products/voice/P_OFF1.mxf").unwrap();
+        assert_eq!(uri, "qnc://local/source/project-p1/file/products/voice/P%5FOFF1%2Emxf");
+        assert_eq!(qnc_source_contract::SourceReference::from_uri(&uri).unwrap().uri(), uri);
     }
 
     #[test]

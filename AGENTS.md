@@ -7201,3 +7201,10 @@ pusti klip na preview monitoru s A1 na kanalu te snimke (A2 isti kanal iskljucen
 Testovi `qnc-voice-catalog` (klip je potpun, nova snimka zamjenjuje zapis, pool ga ne vidi), `qnc-pool-tabs`,
 conformance; probni 1080i50 klip: mpeg2video 4:2:2, field_order tt, 25/1. Uzivo nije provjereno. Nije izvedeno: izbor
 snimke tipkama, korak 3 Draft XML.
+Popravak 2026-10-30 (korisnik: "pogledaj log"; monitor nakon klika na take: "Invalid QNC source reference"): adresa klipa
+snimke u katalogu nije bila u obliku koji izvor cita (`qnc-source-contract` trazi kodirani put: `_` je `%5F`, `.` je `%2E`),
+pa je izvor odbio otvaranje. `qnc-voice-take` (`canonical`): u katalog ide kodirana adresa, scenarij i dalje cuva obicnu.
+`qnc-content-store` `publish_voice`: zapis glasa koji je vec u katalogu s drugim oblikom adrese iste datoteke dobiva novu
+(prije je pravilo "isti klip ne smije promijeniti medij" odbilo ponovnu objavu); klipovi kamera i dalje ne smiju. Testovi
+`the_catalog_gets_the_clip_address_as_the_source_reference_writes_it`, `qnc-voice-catalog` (adresa se zamijenila),
+conformance. Uzivo nije provjereno.

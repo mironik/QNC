@@ -6533,6 +6533,7 @@ name = "qnc-voice-take"
 version = "0.1.0"
 dependencies = [
  "qnc-media-metadata",
+ "qnc-source-contract",
  "qnc-still-locator",
  "qnc-ui-text",
  "qnc-voice-clip",

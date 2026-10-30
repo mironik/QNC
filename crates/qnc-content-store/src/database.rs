@@ -660,8 +660,20 @@ impl ContentStore {
         if kind.as_deref().is_some_and(|kind| kind != "voice") {
             return Err(qnc_ui_text::text("db.voice_id_is_a_camera_clip").into());
         }
-        // The record before is the voice record's own: it is replaced, not kept as final.
+        // The record before is the voice record's own: it is replaced, not kept as final, and
+        // its media is where the script's record says now (a record published with another
+        // form of the same file's address takes the new one).
         tx.execute("UPDATE clips SET final=0 WHERE clip_id=?1", [clip.id()]).map_err(err)?;
+        let old_json: Option<String> = tx.query_row("SELECT catalog_json FROM clips WHERE clip_id=?1", [clip.id()], |r| r.get(0)).optional().map_err(err)?;
+        if let Some(old_json) = old_json {
+            let mut old: CatalogClip = serde_json::from_str(&old_json).map_err(err)?;
+            if old.source_uri != clip.source_uri || old.snapshot.binding != clip.snapshot.binding {
+                (old.source_uri, old.snapshot.binding) = (clip.source_uri.clone(), clip.snapshot.binding.clone());
+                let (json, media) = (serde_json::to_string(&old).map_err(err)?, &clip.snapshot.binding.original_uri);
+                tx.execute("UPDATE clips SET catalog_json=?2,source_uri=?3,original_uri=?4 WHERE clip_id=?1", params![clip.id(), json, clip.source_uri, media]).map_err(err)?;
+                tx.execute("UPDATE clip_sources SET source_uri=?2,original_uri=?3 WHERE clip_id=?1", params![clip.id(), clip.source_uri, media]).map_err(err)?;
+            }
+        }
         Self::write_clip(&tx, clip)?;
         tx.execute(
             "UPDATE clips SET clip_kind='voice',selected=0,import_status='imported',import_error=NULL,imported_media_uri=original_uri WHERE clip_id=?1",
