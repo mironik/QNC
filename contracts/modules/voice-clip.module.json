@@ -15,7 +15,7 @@
   "state_policy": "session_local",
   "database_write_policy": "no_db_writes",
   "runtime_crate": "qnc-voice-clip",
-  "input": "A sound file, the text and heading of its title card, the project picture size and frame rate, the timecode of its first frame, the clip to write inside the project folder.",
-  "output": "An MXF OP1a clip: XDCAM HD422 picture of the title card, the sound as 24-bit PCM, the timecode; written by the ffmpeg of the decoder catalog straight under its final name.",
+  "input": "One to eight sound files (one channel each) and the length of the longest, the text and heading of its title card, the project picture size and frame rate, the timecode of its first frame, the clip to write inside the project folder.",
+  "output": "An MXF OP1a clip: XDCAM HD422 picture of the title card, every sound as one mono 24-bit PCM channel from the clip's start (a shorter one ends in silence), the timecode; made by the ffmpeg of the decoder catalog in the system's temporary folder and written over its file in the project folder (no file there can be deleted or renamed).",
   "specification": "User 2026-10-28: a recorded or brought voice-over as a clip the Broadcast Player plays (AGENTS.md)."
 }

@@ -7150,3 +7150,22 @@ crta se i kad mu je A2 odmaknut, ne samo A1). Rez na granici redova crta se i na
 zvuka (L) ide u taj red (`qnc-segment-panel` `program.rs`; vrijedi i za L pokrivalice i A1). Strane dolaze iz
 `cut_sound_frames` (od prethodnog koraka). Test `the_stored_a2_of_a_ton_into_an_off_is_on_the_cut_between_them`,
 conformance. Uzivo nije provjereno.
+Izvedeno 2026-10-30 (korisnik: "aplikacija treba znati jesu li snimljeni i gdje offovi, mora ih imenovati pravilno kako bi
+ih mogla ukljuciti u draft"; "ako korisnik vise puta snima isti off, dosnimava ga kao drugi kanal, treci, cetvrti... jedan
+viskanalni zapis, a korisnik bira koji ce koristiti, kao A1 na video zapisu"; "da, kreni s prvim korakom"): korak 1, zapis
+glasa. Svaki OFF blok ima jedan zapis: ime se daje kod prve snimke, `<projekt>_<oznaka bloka>` (`Mironik_OFF2`), i ostaje
+kad se blokovi premjeste; svaka snimka je svoj WAV `<ime>_T<n>.wav`, a klip `<ime>.mxf` se iznova slozi poslije svake
+snimke sa svim snimkama kao mono kanalima (snimka n je kanal n, svi od pocetka klipa, kraca zavrsava tisinom, klip traje
+koliko najdulja, timecode prve snimke; najvise 8). Klip se radi u privremenoj mapi sustava i pise preko svoje datoteke u
+mapi projekta (mapa ne dopusta brisanje ni preimenovanje). Esc dok snimka traje baca je: nista se ne upisuje, njezina
+datoteka ostaje prazna i sljedeca snimka pise preko nje. `qnc-script-db`: tablice `script_voice` (ime, klip, izabrana
+snimka) i `script_voice_takes` (WAV, duljina, timecode, tekst bloka kad je snimano), pogledi, operacije `ReadVoices`,
+`AddVoiceTake` (samo sljedeci broj, najvise 8, ime i klip ostaju od prve snimke; nova snimka postaje izabrana; blok cuva
+klip, duljinu izabrane snimke i timecode prve), brisanje bloka brise i zapis (datoteke ostaju). `qnc-voice-take`
+(`Earlier`, `record_name`, `cancel`), `qnc-voice-clip` (vise zvukova, `MAX_CHANNELS`), `qnc-voice-record` (`cancel`, prazna
+ostavljena datoteka smije se pisati), `qnc-script` (snimka cita zapis bloka iz baze, upis kroz `add_voice_take`, Esc
+`clear_focus`). Ugovori `script.database.json` (`voice`), `script-db`, `voice-clip`, `voice-take`, rjecnik. Provjereno:
+testovi `qnc-script-db` (2 nova), `qnc-voice-take`, `qnc-voice-clip`, conformance; probni klip od dvije snimke (2 s i
+3,3 s) u scratchpadu: 3 toka (MPEG-2 i dva mono PCM 24-bit), 3,3 s, kanal 1 tisina od 2 s, kanal 2 zvuk do kraja,
+ponovno pisanje preko klipa radi. Nije izvedeno (korak 2): izbor kanala i stanje snimke u panelu scenarija; (korak 3)
+Draft XML. Uzivo nije provjereno.

@@ -112,6 +112,41 @@ fn only_a_block_of_a_recorded_kind_takes_a_recording() {
     assert_eq!((blocks[1].voice_seconds, blocks[1].voice_tc.as_str()), (4.5, "18:01:02:03"));
 }
 
+fn take(number: u16, seconds: f64, tc: &str, text: &str) -> VoiceTake {
+    VoiceTake { take: number, wav_uri: format!("qnc://local/source/project-p1/file/products/voice/P_OFF1_T{number}.wav"), seconds, tc: tc.into(), text: text.into() }
+}
+
+#[test]
+fn every_take_of_an_off_is_one_more_channel_of_one_record_and_the_last_is_used() {
+    let (_dir, target) = written();
+    let intro = add(&target, None, Block::written("intro", "Najava.")).unwrap();
+    let off_block = add(&target, None, off("Prvi off.")).unwrap();
+    let clip = "qnc://local/source/project-p1/file/products/voice/P_OFF1.mxf".to_string();
+    assert!(add_voice_take(&target, intro, "P_INTRO".into(), clip.clone(), take(1, 3.0, "18:00:00:00", "Najava.")).is_err(), "only a recorded kind");
+    assert!(add_voice_take(&target, off_block, "P_OFF1".into(), clip.clone(), take(2, 3.0, "18:00:00:00", "x")).is_err(), "takes come in order");
+    add_voice_take(&target, off_block, "P_OFF1".into(), clip.clone(), take(1, 4.5, "18:01:02:03", "Prvi off.")).unwrap();
+    add_voice_take(&target, off_block, "P_OFF1".into(), clip.clone(), take(2, 4.0, "18:05:00:00", "Prvi off, ispravljen.")).unwrap();
+    assert!(add_voice_take(&target, off_block, "P_OTHER".into(), clip.clone(), take(3, 4.0, "18:06:00:00", "x")).is_err(), "the name stays");
+    let voice = read_voice(&target, off_block).unwrap().unwrap();
+    assert_eq!((voice.name.as_str(), voice.chosen, voice.takes.len()), ("P_OFF1", 2, 2));
+    assert_eq!(voice.chosen_take().unwrap().text, "Prvi off, ispravljen.");
+    let block = read(&target).unwrap().into_iter().find(|b| b.id == off_block).unwrap();
+    assert_eq!((block.voice_uri.as_str(), block.voice_seconds, block.voice_tc.as_str()), (clip.as_str(), 4.0, "18:01:02:03"), "the clip starts at its first take, its length is the take used");
+    remove(&target, off_block).unwrap();
+    assert!(read_voices(&target).unwrap().is_empty(), "a removed block takes its record");
+}
+
+#[test]
+fn a_record_has_at_most_eight_takes() {
+    let (_dir, target) = written();
+    let off_block = add(&target, None, off("Off.")).unwrap();
+    let clip = "qnc://local/source/project-p1/file/products/voice/P_OFF1.mxf".to_string();
+    for number in 1..=8 {
+        add_voice_take(&target, off_block, "P_OFF1".into(), clip.clone(), take(number, 2.0, "18:00:00:00", "Off.")).unwrap();
+    }
+    assert!(add_voice_take(&target, off_block, "P_OFF1".into(), clip, take(9, 2.0, "18:00:00:00", "Off.")).is_err());
+}
+
 #[test]
 fn the_project_keeps_its_profile_and_writes_only_its_kinds() {
     let (_dir, target) = project();

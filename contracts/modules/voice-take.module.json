@@ -16,6 +16,6 @@
   "database_write_policy": "no_db_writes",
   "runtime_crate": "qnc-voice-take",
   "input": "The project's settings on this computer (voice folder, sample rate, picture) as saved, the block, the microphone setting of this computer.",
-  "output": "A take recorded into the voice folder of the project and its clip (title card of the block's text, timecode of the recording) as its block keeps it; a missing setting is a controlled error, never a guess.",
+  "output": "The next take of a block's voice record (named <project>_<mark> at its first take): its WAV <name>_T<n>.wav in the voice folder of the project and the record's clip <name>.mxf made again with every take as one channel (title card of the block's text, timecode of the first take); a cancelled take is thrown away (its file left empty); a missing setting is a controlled error, never a guess.",
   "specification": "Audit 2026-10-28 of the script pieces (AGENTS.md)."
 }

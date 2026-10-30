@@ -6517,6 +6517,7 @@ dependencies = [
  "qnc-ui-text",
  "qnc-voice-clip",
  "qnc-voice-record",
+ "qnc-work-settings",
 ]
 
 [[package]]

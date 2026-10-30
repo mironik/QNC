@@ -49,7 +49,8 @@ pub struct Recorder {
 }
 
 impl Recorder {
-    /// Starts recording into `path` (which must be inside `project_dir` and not exist yet) at
+    /// Starts recording into `path` (which must be inside `project_dir` and not exist yet, or be
+    /// the empty file a cancelled recording left: the project folder lets no file be deleted) at
     /// `sample_rate`; `fps` gives the timecode its frames. `setting` is the computer setting
     /// naming the microphone (`voice-input.json` beside the other settings of this computer).
     pub fn start(path: PathBuf, project_dir: &Path, sample_rate: u32, fps: f64, setting: &Path) -> Result<Self> {
@@ -92,6 +93,13 @@ impl Recorder {
     pub fn stop(mut self) -> Result<Recording> {
         self.stop.store(true, Ordering::SeqCst);
         self.thread.take().map_or_else(|| Err(qnc_ui_text::text("voice.no_answer").into()), |thread| thread.join().unwrap_or_else(|_| Err(qnc_ui_text::text("voice.no_answer").into())))
+    }
+
+    /// Stops and throws the recording away: its file is left empty (the project folder lets no
+    /// file be deleted) and the next recording under that name writes over it.
+    pub fn cancel(self) -> Result<()> {
+        let recording = self.stop()?;
+        std::fs::OpenOptions::new().write(true).truncate(true).open(&recording.path).map(drop).map_err(|e| format!("{}: {e}", recording.path.display()))
     }
 }
 
@@ -155,7 +163,9 @@ fn record(path: PathBuf, device_name: Option<String>, sample_rate: u32, fps: f64
     let channels = config.channels().max(1) as usize;
     let format = config.sample_format();
     let stream_config = config.config();
-    let file = match File::create_new(&path) {
+    let left_empty = std::fs::metadata(&path).is_ok_and(|meta| meta.is_file() && meta.len() == 0);
+    let opened = if left_empty { std::fs::OpenOptions::new().write(true).truncate(true).open(&path) } else { File::create_new(&path) };
+    let file = match opened {
         Ok(file) => file,
         Err(error) => return fail(format!("{}: {error}", path.display())),
     };

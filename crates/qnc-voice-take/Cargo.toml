@@ -9,3 +9,4 @@ qnc-still-locator = { workspace = true }
 qnc-ui-text = { workspace = true }
 qnc-voice-clip = { workspace = true }
 qnc-voice-record = { workspace = true }
+qnc-work-settings = { workspace = true }

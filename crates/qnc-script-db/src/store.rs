@@ -4,7 +4,7 @@ use crate::*;
 use rusqlite::{params, Connection, OptionalExtension};
 
 /// The tables this module owns; it writes no other.
-const OWNED: [&str; 2] = ["script_blocks", "script_profile"];
+const OWNED: [&str; 4] = ["script_blocks", "script_profile", "script_voice", "script_voice_takes"];
 
 pub(crate) struct Store {
     conn: Connection,
@@ -55,6 +55,8 @@ impl Store {
             Operation::SetPiece { id, index, piece } => self.set_piece(*id, *index, piece),
             Operation::MovePiece { id, index, earlier } => self.move_piece(*id, *index, *earlier),
             Operation::RemovePiece { id, index } => self.remove_piece(*id, *index),
+            Operation::ReadVoices => self.voices().map(Data::Voices),
+            Operation::AddVoiceTake { id, name, clip_uri, take } => self.add_voice_take(*id, name, clip_uri, take),
         }
     }
 
@@ -119,7 +121,7 @@ impl Store {
     }
 
     /// The kind `code` of the project's profile (a write needs both).
-    fn kind_spec(&self, code: &str) -> Result<KindSpec> {
+    pub(crate) fn kind_spec(&self, code: &str) -> Result<KindSpec> {
         let profile = profile(&self.conn)?.ok_or_else(|| qnc_ui_text::text("db.script_no_profile").to_string())?;
         profile.kind(code).cloned().ok_or_else(|| qnc_ui_text::fill("db.script_unknown_kind", &[("kind", code), ("profile", &profile.name)]))
     }
@@ -177,7 +179,7 @@ impl Store {
     }
 
     /// The kind code of block `id`.
-    fn kind_of_block(&self, id: i64) -> Result<String> {
+    pub(crate) fn kind_of_block(&self, id: i64) -> Result<String> {
         self.conn
             .query_row("SELECT kind FROM script_blocks WHERE block_id = ?1", params![id], |r| r.get(0))
             .optional()
@@ -350,6 +352,7 @@ impl Store {
     fn remove(&mut self, id: i64) -> Result<Data> {
         let tx = qnc_db_broker::begin_write(&mut self.conn).map_err(err)?;
         tx.execute("DELETE FROM script_blocks WHERE block_id = ?1", params![id]).map_err(err)?;
+        crate::voice::forget(&tx, id)?;
         renumber(&tx)?;
         tx.commit().map_err(err)?;
         Ok(Data::Changed)
@@ -357,6 +360,10 @@ impl Store {
 
     pub(crate) fn connection(&self) -> &Connection {
         &self.conn
+    }
+
+    pub(crate) fn connection_mut(&mut self) -> &mut Connection {
+        &mut self.conn
     }
 }
 
@@ -369,7 +376,7 @@ fn profile(conn: &Connection) -> Result<Option<ScriptProfile>> {
     json.map(|json| serde_json::from_str(&json).map_err(err)).transpose()
 }
 
-fn view_exists(conn: &Connection, name: &str) -> Result<bool> {
+pub(crate) fn view_exists(conn: &Connection, name: &str) -> Result<bool> {
     conn.query_row("SELECT EXISTS(SELECT 1 FROM sqlite_master WHERE type='view' AND name=?1)", params![name], |r| r.get(0)).map_err(err)
 }
 
@@ -456,7 +463,8 @@ fn ensure_schema(conn: &Connection) -> Result<()> {
         CREATE VIEW IF NOT EXISTS public_script_profile AS
             SELECT profile_id, profile_json, updated_at_utc FROM script_profile;"
     ))
-    .map_err(err)
+    .map_err(err)?;
+    crate::voice::ensure_schema(conn)
 }
 
 pub(crate) fn err(error: impl std::fmt::Display) -> String {

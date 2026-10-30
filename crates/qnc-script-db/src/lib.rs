@@ -11,11 +11,13 @@
 //! tables, is written only through that intermediary and knows no form or application.
 
 mod store;
+mod voice;
 
 use std::{collections::BTreeMap, sync::Arc};
 
 use qnc_db_broker::{Access, ProjectDbTarget, TableModuleFactory};
 pub use qnc_script_profile::{Counts, KindSpec, Role, ScriptProfile};
+pub use voice::MAX_TAKES;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
@@ -145,9 +147,53 @@ impl Piece {
     }
 }
 
+/// The voice record of a block of a recorded kind (user 2026-10-30): one clip of several mono
+/// channels, one take each, under one name given at the first take; one channel is the one
+/// used.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct Voice {
+    pub block_id: i64,
+    /// The name of the record's files (`<project>_<mark>`), given once.
+    pub name: String,
+    /// The clip of all the takes (QNC URI).
+    pub clip_uri: String,
+    /// The take used (its channel), from 1.
+    pub chosen: u16,
+    /// The takes in the order recorded; take `n` is channel `n` of the clip.
+    pub takes: Vec<VoiceTake>,
+}
+
+/// One take of a voice record.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct VoiceTake {
+    /// Its number and channel, from 1.
+    pub take: u16,
+    /// Its own recording (QNC URI of the WAV).
+    pub wav_uri: String,
+    pub seconds: f64,
+    /// The time of day it started.
+    pub tc: String,
+    /// The block's text as it was when the take was recorded.
+    pub text: String,
+}
+
+impl Voice {
+    /// The take used.
+    pub fn chosen_take(&self) -> Option<&VoiceTake> {
+        self.takes.iter().find(|take| take.take == self.chosen)
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(tag = "kind", content = "value", rename_all = "snake_case", deny_unknown_fields)]
 pub enum Operation {
+    /// The voice records of the script's blocks.
+    ReadVoices,
+    /// Block `id` gets `take` as the next take of its voice record (named `name` at the first
+    /// take, its clip at `clip_uri`); the take becomes the one used.
+    AddVoiceTake { id: i64, name: String, clip_uri: String, take: VoiceTake },
     /// The blocks in reading order.
     Read,
     /// The profile the project's script is written with (none yet: the script was never
@@ -184,7 +230,7 @@ pub enum Operation {
 
 impl Operation {
     pub fn is_write(&self) -> bool {
-        !matches!(self, Self::Read | Self::ReadProfile)
+        !matches!(self, Self::Read | Self::ReadProfile | Self::ReadVoices)
     }
 }
 
@@ -192,6 +238,7 @@ impl Operation {
 #[serde(tag = "kind", content = "data", rename_all = "snake_case")]
 pub enum Data {
     Blocks(Vec<Block>),
+    Voices(Vec<Voice>),
     Profile(Option<ScriptProfile>),
     Added(i64),
     Changed,
@@ -280,6 +327,24 @@ pub fn move_block(target: &ProjectDbTarget, id: i64, up: bool) -> Result<()> {
 /// Block `id` of a recorded kind got the recording at `uri`, `seconds` long, starting at `tc`.
 pub fn set_voice(target: &ProjectDbTarget, id: i64, uri: String, seconds: f64, tc: String) -> Result<()> {
     write(target, Operation::SetVoice { id, uri, seconds, tc }).map(drop)
+}
+
+/// The voice records of the script of the project behind `target`.
+pub fn read_voices(target: &ProjectDbTarget) -> Result<Vec<Voice>> {
+    match read_only(target, &Operation::ReadVoices)? {
+        Data::Voices(voices) => Ok(voices),
+        _ => Err(reply()),
+    }
+}
+
+/// The voice record of block `id`, if it has one.
+pub fn read_voice(target: &ProjectDbTarget, id: i64) -> Result<Option<Voice>> {
+    Ok(read_voices(target)?.into_iter().find(|voice| voice.block_id == id))
+}
+
+/// Block `id` gets `take` as the next take of its voice record.
+pub fn add_voice_take(target: &ProjectDbTarget, id: i64, name: String, clip_uri: String, take: VoiceTake) -> Result<()> {
+    write(target, Operation::AddVoiceTake { id, name, clip_uri, take }).map(drop)
 }
 
 /// The fields of block `id` become `fields`.

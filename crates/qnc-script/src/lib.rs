@@ -108,6 +108,7 @@ const READ_EVERY: Duration = Duration::from_secs(2);
 enum TakeAnswer {
     Started(Take),
     Finished(Result<Recorded, String>),
+    Cancelled(Result<(), String>),
 }
 
 pub struct Script {
@@ -538,6 +539,8 @@ impl Script {
                 let block = id().or(self.view.selected);
                 self.record(preview, block)
             }
+            // Esc while a take records throws it away (user 2026-10-30).
+            "clear_focus" if self.take.is_some() => self.cancel_take(),
             FIELD_TEXT | FIELD_SET => {
                 let Some(edit) = target.and_then(|target| serde_json::from_str::<FieldEdit>(target).ok()) else { return Some(false) };
                 let block = edit.block;
@@ -703,15 +706,33 @@ impl Script {
             return true;
         };
         let setting = qnc_dev_diagnostics::resolve_qnc_root().map(|root| qnc_dev_diagnostics::config_path(&root).with_file_name(qnc_voice_record::INPUT_SETTING));
-        let (Some(locator), Some(setting)) = (preview.still_locator(), setting) else {
+        let (Some(locator), Some(setting), Some(target)) = (preview.still_locator(), setting, preview.project_target().cloned()) else {
             self.view.message = qnc_ui_text::text("script.no_project").into();
             return true;
         };
+        let mark = self.view.blocks.iter().find(|row| row.block.id == id).map(|row| row.mark.clone()).unwrap_or_default();
         self.view.message = qnc_ui_text::text("script.record_starting").into();
-        self.spawn_take(id, move || match Take::start(&locator, id, &setting) {
-            Ok(take) => TakeAnswer::Started(take),
-            Err(error) => TakeAnswer::Finished(Err(error)),
+        // The block's record as the database keeps it: the next take is its next channel.
+        self.spawn_take(id, move || {
+            let earlier = match qnc_script_db::read_voice(&target, id) {
+                Ok(voice) => voice.map(|voice| qnc_voice_take::Earlier {
+                    first_tc: voice.takes.first().map(|take| take.tc.clone()).unwrap_or_default(),
+                    takes: voice.takes.iter().map(|take| (take.wav_uri.clone(), take.seconds)).collect(),
+                    name: voice.name,
+                }),
+                Err(error) => return TakeAnswer::Finished(Err(error)),
+            };
+            match Take::start(&locator, &mark, earlier, &setting) {
+                Ok(take) => TakeAnswer::Started(take),
+                Err(error) => TakeAnswer::Finished(Err(error)),
+            }
         })
+    }
+
+    /// The take that records is thrown away (Esc): nothing is kept.
+    fn cancel_take(&mut self) -> bool {
+        let Some((id, take)) = self.take.take() else { return false };
+        self.spawn_take(id, move || TakeAnswer::Cancelled(take.cancel()))
     }
 
     fn spawn_take(&mut self, id: i64, work: impl FnOnce() -> TakeAnswer + Send + 'static) -> bool {
@@ -847,11 +868,15 @@ impl Script {
                         self.take = Some((id, take));
                         self.view.message = qnc_ui_text::text("script.recording").into();
                     }
-                    // A finished take goes into its block: its clip, length and timecode.
-                    TakeAnswer::Finished(Ok(Recorded { uri, seconds, timecode })) => {
-                        self.write(preview, move |target| qnc_script_db::set_voice(target, id, uri, seconds, timecode).map(|_| None));
+                    // A finished take goes into its block's record as its next channel, the one used.
+                    TakeAnswer::Finished(Ok(Recorded { name, clip_uri, number, wav_uri, seconds, timecode })) => {
+                        let text = self.view.blocks.iter().find(|row| row.block.id == id).map(|row| row.block.text.clone()).unwrap_or_default();
+                        let take = qnc_script_db::VoiceTake { take: number, wav_uri, seconds, tc: timecode, text };
+                        self.write(preview, move |target| qnc_script_db::add_voice_take(target, id, name, clip_uri, take).map(|_| None));
                     }
                     TakeAnswer::Finished(Err(error)) => self.view.message = error,
+                    TakeAnswer::Cancelled(Ok(())) => self.view.message = qnc_ui_text::text("script.record_cancelled").into(),
+                    TakeAnswer::Cancelled(Err(error)) => self.view.message = error,
                 }
             }
         }
