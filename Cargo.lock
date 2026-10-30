@@ -3772,8 +3772,13 @@ dependencies = [
  "qnc-prerender-launch",
  "qnc-program-input",
  "qnc-program-render",
+ "qnc-script-db",
+ "qnc-script-draft",
  "qnc-source-bindings",
+ "qnc-ui-text",
  "qnc-unit-join",
+ "qnc-voice-catalog",
+ "qnc-voice-take",
  "qnc-work-settings",
  "serde_json",
 ]
@@ -5568,12 +5573,14 @@ dependencies = [
  "qnc-clip-row",
  "qnc-db-broker",
  "qnc-dev-diagnostics",
+ "qnc-export-launch",
  "qnc-image-assets",
  "qnc-newsroom-sheet-db",
  "qnc-program-filmstrip",
  "qnc-program-view",
  "qnc-program-waveform",
  "qnc-script-db",
+ "qnc-script-draft",
  "qnc-script-export",
  "qnc-script-files",
  "qnc-script-profile",
@@ -5606,6 +5613,17 @@ dependencies = [
  "serde",
  "serde_json",
  "tempfile",
+]
+
+[[package]]
+name = "qnc-script-draft"
+version = "0.1.0"
+dependencies = [
+ "qnc-program-input",
+ "qnc-script-db",
+ "qnc-script-profile",
+ "qnc-ui-text",
+ "serde_json",
 ]
 
 [[package]]
@@ -6498,9 +6516,9 @@ dependencies = [
  "qnc-media-record-db",
  "qnc-media-records",
  "qnc-source-index-db",
- "qnc-still-locator",
  "qnc-ui-text",
  "qnc-voice-clip",
+ "qnc-work-settings",
  "rusqlite",
  "tempfile",
 ]

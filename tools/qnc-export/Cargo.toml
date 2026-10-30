@@ -22,7 +22,12 @@ qnc-media-stream.workspace = true
 qnc-player-input.workspace = true
 qnc-program-input.workspace = true
 qnc-player-clip-content.workspace = true
+qnc-script-db.workspace = true
+qnc-script-draft.workspace = true
 qnc-source-bindings.workspace = true
+qnc-ui-text.workspace = true
+qnc-voice-catalog.workspace = true
+qnc-voice-take.workspace = true
 qnc-work-settings.workspace = true
 serde_json.workspace = true
 

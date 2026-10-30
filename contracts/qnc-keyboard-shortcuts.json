@@ -172,6 +172,9 @@
     "script_export": {
       "label": "Izvezi scenarij (tekst, A/V, MOS)"
     },
+    "script_draft": {
+      "label": "Draft price (FCP7 XML: snimljeni OFF-ovi i izjave)"
+    },
     "script_open_export": {
       "label": "Otvori izvezeni scenarij"
     },

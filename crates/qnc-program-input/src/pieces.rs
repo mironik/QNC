@@ -38,10 +38,12 @@ pub fn load_pieces(
     let crossfade = i64::from(clips.crossfade_frames()?);
     let (mut segments, mut joins, mut start) = (Vec::new(), Vec::new(), 0i64);
     for (index, piece) in pieces.iter().enumerate() {
-        let gap = if index == 0 { 0 } else { frame(piece.gap_before)? };
+        // A pause may come before the first part too (a draft story that starts with an OFF
+        // not recorded yet, user 2026-10-30).
+        let gap = frame(piece.gap_before)?;
         if gap > 0 {
             // The pause: an Off with A1 off, black and silence.
-            segments.push(gap_segment(index, &pieces[index - 1].clip_id, (start, start + gap), program_timebase)?);
+            segments.push(gap_segment(index, &pieces[index.saturating_sub(1)].clip_id, (start, start + gap), program_timebase)?);
         }
         let media = resolver.resolve(&piece.clip_id)?;
         let own = (u32::try_from(media.timebase.fps_num).unwrap_or(0), u32::try_from(media.timebase.fps_den).unwrap_or(0));

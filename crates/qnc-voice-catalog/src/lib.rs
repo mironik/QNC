@@ -11,7 +11,7 @@
 use qnc_content_store::{CatalogClip, ContentTarget, ContentWriteTransport};
 use qnc_media_metadata::ClipMetadata;
 use qnc_media_records::{Binding, Completeness, Phase, Snapshot};
-use qnc_still_locator::StillLocator;
+use qnc_work_settings::{SettingsReader, WorkSettings};
 
 pub const MODULE_ID: &str = "qnc.module.voice-catalog";
 
@@ -51,13 +51,12 @@ pub fn entry(source_uri: &str, project: &str, name: &str, record: ClipMetadata, 
 }
 
 /// Writes the voice record `name` (its clip described by `record`) into the catalog of the
-/// locator's project and waits for the writer. Call it off the form thread.
-pub fn publish_record(locator: &StillLocator, name: &str, record: ClipMetadata) -> Result<()> {
-    let settings = locator.settings();
+/// project of `settings` and waits for the writer. Call it off the form thread.
+pub fn publish_record(reader: &SettingsReader, settings: &WorkSettings, name: &str, record: ClipMetadata) -> Result<()> {
     let source_uri = settings.project_media_source_uri().map_err(|e| e.message)?;
     let now = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).map_or(0, |d| d.as_millis() as u64);
     let clip = entry(&source_uri, &settings.project_name, name, record, now)?;
-    publish(ContentTarget::for_project(locator.reader(), settings)?, clip)
+    publish(ContentTarget::for_project(reader, settings)?, clip)
 }
 
 /// Writes `clip` into the catalog of `target` and waits for the writer.

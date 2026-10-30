@@ -7208,3 +7208,17 @@ pa je izvor odbio otvaranje. `qnc-voice-take` (`canonical`): u katalog ide kodir
 (prije je pravilo "isti klip ne smije promijeniti medij" odbilo ponovnu objavu); klipovi kamera i dalje ne smiju. Testovi
 `the_catalog_gets_the_clip_address_as_the_source_reference_writes_it`, `qnc-voice-catalog` (adresa se zamijenila),
 conformance. Uzivo nije provjereno.
+Izvedeno 2026-10-30 (korisnik: "kreni s korakom 3, Draft XML"): nacrt price iz scenarija MA Audio. Gumb "Draft XML" uz
+Export u panelu scenarija (akcija kataloga `script_draft`, bez tipke) pokrece `tools/qnc-export --draft` izvan niti
+sucelja (`qnc-export-launch`); izlaz je FCP7 XML `<projekt>_draft.xml` u mapi exporta projekta, isti zapis kao Export to
+XML, a status daje link na datoteku. Nova kocka `crates/qnc-script-draft` (+ ugovor `contracts/modules/script-draft.module.json`;
+nista ne cita ni pise): blokovi koji ulaze u trajanje priloga redom citanja postaju dijelovi jednog programa: snimljeni OFF
+je klip svog zapisa glasa s izabranom snimkom na A1 (njezin kanal), OFF bez snimke je pauza njegova vremena citanja (crno i
+tisina), izjava je raspon svog klipa ili dijelovi SubSegmenta (unutar bloka spojevi kao u SubSegmentu, izmedju blokova rez);
+najava, odjava i biljeske se izostavljaju. `block_pieces`, `piece_inputs` i `reading_seconds` premjesteni su iz `qnc-script`
+u tu kocku. Alat prije slaganja upisuje sve zapise glasa u katalog (zapis napravljen prije nego je katalog znao glas dobiva
+ga sada) kroz `qnc-voice-catalog`; `qnc-voice-take::describe_record` i `qnc-voice-catalog::publish_record` primaju postavke
+projekta umjesto lokatora slika, pa ih koriste i aplikacija i alat. Program slaze `qnc-program-input::pieces_loader`
+(pauza smije biti i prije prvog dijela). Nije izvedeno: pauza OFF-a bez snimke na samom kraju scenarija se izostavlja;
+pokrivalice (B-roll) nisu u nacrtu. Testovi `qnc-script-draft` (2), `qnc-script`, `qnc-voice-take`, `qnc-voice-catalog`,
+`qnc-program-input`, conformance. Uzivo nije provjereno.

@@ -9,7 +9,7 @@
 
 use eframe::egui::{self, RichText, Sense};
 use qnc_action_event::ActionEvent;
-use qnc_script::{seconds_label, FieldEdit, EXPORT, OPEN_EXPORT, Role, FIELD_COMMIT, FIELD_SET, FIELD_TEXT, ScriptView, ADD_CLIP, ADD_QUOTE, ADD_TEXT, CLEAR_EDITOR, EDITOR_TEXT, MOVE_DOWN, MOVE_UP, OPEN, PANEL, RECORD, REMOVE, REPLACE_TEXT, SELECT, VOICE_TAKE};
+use qnc_script::{seconds_label, FieldEdit, DRAFT, EXPORT, OPEN_EXPORT, Role, FIELD_COMMIT, FIELD_SET, FIELD_TEXT, ScriptView, ADD_CLIP, ADD_QUOTE, ADD_TEXT, CLEAR_EDITOR, EDITOR_TEXT, MOVE_DOWN, MOVE_UP, OPEN, PANEL, RECORD, REMOVE, REPLACE_TEXT, SELECT, VOICE_TAKE};
 use qnc_text_source_editor::{Answer, Editor, EditorButton};
 use qnc_transcript::TranscriptView;
 
@@ -55,6 +55,9 @@ fn paint_script(ui: &mut egui::Ui, view: &ScriptView, transcript: &TranscriptVie
         ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
             if qnc_ui_kit::chrome_button(ui, qnc_ui_text::text("script.export"), !view.blocks.is_empty() && !view.exporting, false, style).on_hover_text(qnc_ui_text::text("script.export_hint")).clicked() {
                 asked = Some(ActionEvent::key(EXPORT).at(PANEL));
+            }
+            if qnc_ui_kit::chrome_button(ui, qnc_ui_text::text("script.draft"), !view.blocks.is_empty() && !view.exporting, false, style).on_hover_text(qnc_ui_text::text("script.draft_hint")).clicked() {
+                asked = Some(ActionEvent::key(DRAFT).at(PANEL));
             }
             if qnc_ui_kit::chrome_button(ui, qnc_ui_text::text("script.copy"), !view.blocks.is_empty(), false, style).clicked() {
                 ui.ctx().copy_text(view.text());

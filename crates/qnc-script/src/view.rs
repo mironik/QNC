@@ -285,13 +285,7 @@ pub fn story_cues(rows: &[BlockRow]) -> (String, String) {
     (spoken().next().map(|row| in_cue(&row.block.text)).unwrap_or_default(), spoken().last().map(|row| out_cue(&row.block.text)).unwrap_or_default())
 }
 
-/// Seconds `text` takes to read at `words_per_second`.
-pub fn reading_seconds(text: &str, words_per_second: f64) -> f64 {
-    if words_per_second <= 0.0 {
-        return 0.0;
-    }
-    text.split_whitespace().count() as f64 / words_per_second
-}
+pub use qnc_script_draft::{block_pieces, piece_inputs, reading_seconds};
 
 /// The rows of `blocks`: their lengths, marks (numbered among the blocks of their kind) and
 /// what their kinds are.
@@ -405,28 +399,6 @@ pub struct SubsegmentView {
     pub zoom: Option<Box<qnc_program_view::SegmentsView>>,
     /// The part whose A1 is taken (Ctrl+1), as drafted.
     pub sound: Option<usize>,
-}
-
-/// The parts of a clip block (its own range when it has no parts).
-pub fn block_pieces(block: &Block) -> Vec<Piece> {
-    if block.pieces.is_empty() { vec![Piece::of(block)] } else { block.pieces.clone() }
-}
-
-/// The parts as the player's program takes them.
-pub fn piece_inputs(block: &Block) -> Vec<qnc_source_preview::PieceInput> {
-    block_pieces(block)
-        .into_iter()
-        .enumerate()
-        .map(|(index, piece)| qnc_source_preview::PieceInput {
-            clip_id: piece.clip_id,
-            from_frame: piece.from_frame,
-            to_frame: piece.to_frame,
-            gap_before: if index == 0 { 0 } else { piece.gap_before },
-            crossfade: !piece.cut,
-            // The part's own A1 once any of it is set; else its clip's kept sound.
-            a1: (piece.a1_channel.is_some() || piece.a1_level_db != 0 || piece.a1_off).then_some((piece.a1_channel, piece.a1_level_db, piece.a1_off)),
-        })
-        .collect()
 }
 
 /// The parts on the SubSegment's axis (a pause before a part moves it on).

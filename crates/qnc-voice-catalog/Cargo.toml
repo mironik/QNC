@@ -10,7 +10,7 @@ qnc-media-metadata = { workspace = true }
 qnc-media-record-db = { workspace = true }
 qnc-media-records = { workspace = true }
 qnc-source-index-db = { workspace = true }
-qnc-still-locator = { workspace = true }
+qnc-work-settings = { workspace = true }
 qnc-ui-text = { workspace = true }
 
 [dev-dependencies]

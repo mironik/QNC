@@ -14,7 +14,12 @@
 //! Express is, always from the originals (user 2026-10-24: never the prerender); an
 //! interlaced delivery (50i) is encoded once from lossless progressive units.
 //!
-//! `qnc-export (--xml | --express | --render <id>) [--root <QNC root>]`
+//! `--draft`: the draft story of the script (MA Audio, user 2026-10-30) as the same XML,
+//! `<project>_draft.xml`: recorded OFFs as their voice records (the take used), statements as
+//! their clips, an OFF not recorded a pause of its reading time. Its voice records are written
+//! into the catalog through its writer first; nothing else is written.
+//!
+//! `qnc-export (--xml | --draft | --express | --render <id>) [--root <QNC root>]`
 
 use std::{collections::BTreeMap, path::PathBuf, sync::Arc};
 
@@ -45,13 +50,13 @@ fn run() -> Result<PathBuf> {
     let (mut root, mut what) = (std::env::var_os("QNC_ROOT").map(PathBuf::from), None);
     while let Some(arg) = args.next() {
         match arg.as_str() {
-            "--xml" | "--express" => what = Some(arg),
+            "--xml" | "--express" | "--draft" => what = Some(arg),
             "--render" => what = Some(format!("--render={}", args.next().ok_or("--render needs an export setting")?)),
             "--root" => root = Some(PathBuf::from(args.next().ok_or("--root needs a value")?)),
             other => return Err(format!("unknown argument {other}")),
         }
     }
-    let what = what.ok_or("--xml, --express or --render <id>")?;
+    let what = what.ok_or("--xml, --draft, --express or --render <id>")?;
     // Only the root it is given (audit 2026-10-25: found beside the executable, a test that
     // started it wrote into the real active project).
     let root = root.ok_or("QNC root missing (--root or QNC_ROOT)")?;
@@ -65,7 +70,10 @@ fn run() -> Result<PathBuf> {
     // Every cover's A2 on its own within the project's loudness rule (user 2026-10-24).
     let loudness = settings.audio_loudness().map_err(|e| e.to_string())?;
     let rule = qnc_program_input::CoverRule { target_lufs: loudness.a2_lufs, tolerance_lu: loudness.tolerance_lu, limit_dbtp: loudness.true_peak_dbtp };
-    let program = qnc_program_input::loader(target.clone(), settings.project_id.clone(), Some(rule))(&inputs, &settings.workspace_db_uri)?;
+    let program = match what.as_str() {
+        "--draft" => draft_program(&reader, &settings, &target, &inputs)?,
+        _ => qnc_program_input::loader(target.clone(), settings.project_id.clone(), Some(rule))(&inputs, &settings.workspace_db_uri)?,
+    };
 
     let bindings = qnc_source_bindings::load(&root)?;
     let mut roots: Vec<(String, PathBuf)> = bindings.sources.iter().filter_map(|b| b.file.clone().map(|file| (b.uri.clone(), file))).collect();
@@ -111,11 +119,47 @@ fn run() -> Result<PathBuf> {
     }
     let start = settings.export_start_timecode().map_err(|e| e.to_string())?;
     let rate = program.project_audio.sample_rate_hz;
-    let base = format!("{}_{}", qnc_work_settings::export_file_name(&settings.project_name), program.playlist.revision);
+    let name = qnc_work_settings::export_file_name(&settings.project_name);
+    let base = match what.as_str() {
+        "--draft" => format!("{name}_draft"),
+        _ => format!("{name}_{}", program.playlist.revision),
+    };
     let text = qnc_fcp7_xml::sequence(&settings.project_name, &program.playlist, &files, &start, rate)?;
     let path = folder.join(format!("{base}.xml"));
     std::fs::write(&path, text).map_err(|e| format!("{}: {e}", path.display()))?;
     Ok(path)
+}
+
+/// The draft story of the script (user 2026-10-30): the blocks that count in the story in
+/// reading order, a recorded OFF its voice record with the take used on A1, an OFF not recorded
+/// a pause of its reading time, a statement its clip's range or SubSegment parts. Every voice
+/// record goes into the catalog first (one made before the catalog knew voice clips is written
+/// there now), so its clip is a clip of the program.
+fn draft_program(
+    reader: &SettingsReader,
+    settings: &qnc_work_settings::WorkSettings,
+    target: &qnc_db_broker::ProjectDbTarget,
+    inputs: &InputReader,
+) -> Result<qnc_player_input::ProgramInput> {
+    let blocks = qnc_script_db::read(target)?;
+    let voices = qnc_script_db::read_voices(target)?;
+    let profile = qnc_script_db::read_profile(target)?.ok_or_else(|| qnc_ui_text::text("script.draft_empty").to_string())?;
+    for voice in &voices {
+        let takes: Vec<f64> = voice.takes.iter().map(|take| take.seconds).collect();
+        if takes.is_empty() {
+            continue;
+        }
+        let first_tc = voice.takes.first().map(|take| take.tc.clone()).unwrap_or_default();
+        let record = qnc_voice_take::describe_record(settings, &voice.name, &voice.clip_uri, &takes, &first_tc)?;
+        qnc_voice_catalog::publish_record(reader, settings, &voice.name, record)?;
+    }
+    let rates = qnc_script_draft::DraftRates {
+        words_per_second: settings.reading_words_per_second().map_err(|e| e.message)?,
+        fps: settings.video_picture().map_err(|e| e.message)?.2,
+        clip_id: &qnc_voice_take::clip_id,
+    };
+    let pieces = qnc_script_draft::draft_pieces(&blocks, &voices, &profile, &rates)?;
+    qnc_program_input::pieces_loader(target.clone(), settings.project_id.clone(), pieces)(inputs, &settings.workspace_db_uri)
 }
 
 /// The picture and sound of the story itself: the frame size of its first picture, its rate,

@@ -101,6 +101,9 @@ pub const FIELD_SET: &str = "script_field_set";
 /// The script is written out to the project's export folder: clean text, the two-column A/V script
 /// and a MOS story (user 2026-10-28: the field crew sends it to the editor and the proofreader).
 pub const EXPORT: &str = "script_export";
+/// The draft story of the script is written as a Final Cut Pro 7 XML in the project's export
+/// folder (user 2026-10-30): recorded OFFs and statements in reading order.
+pub const DRAFT: &str = "script_draft";
 /// The exported A/V script is shown in the file browser of this OS.
 pub const OPEN_EXPORT: &str = "script_open_export";
 
@@ -133,6 +136,8 @@ pub struct Script {
     taking: Option<(i64, mpsc::Receiver<TakeAnswer>)>,
     /// An export on its way to the export folder (piece `qnc-script-files`).
     exporting: Option<mpsc::Receiver<Result<String, String>>>,
+    /// The draft story being written (`qnc-export --draft`).
+    draft: qnc_export_launch::ExportRun,
     /// The clip block open as a SubSegment in place of the source timeline.
     open_subsegment: Option<i64>,
     /// The parts the player should play and the frame it should show (once).
@@ -179,7 +184,7 @@ struct Trim {
 
 impl Default for Script {
     fn default() -> Self {
-        Self { view: ScriptView::default(), blocks: Vec::new(), project: None, reading: None, read_at: None, writing: None, source_request: None, names: HashMap::new(), words_per_second: Ok(0.0), take: None, taking: None, exporting: None, open_subsegment: None, pieces_request: None, trim: None, waves: qnc_program_waveform::ProgramWaves::new(), filmstrips: qnc_program_filmstrip::ProgramFilmstrips::new(), waves_project: None, trim_stills: qnc_trim_stills::TrimStills::new(), zoom_follow: Default::default(), sound: None, voices: Vec::new(), voice_request: None, voice_after_write: None }
+        Self { view: ScriptView::default(), blocks: Vec::new(), project: None, reading: None, read_at: None, writing: None, source_request: None, names: HashMap::new(), words_per_second: Ok(0.0), take: None, taking: None, exporting: None, draft: Default::default(), open_subsegment: None, pieces_request: None, trim: None, waves: qnc_program_waveform::ProgramWaves::new(), filmstrips: qnc_program_filmstrip::ProgramFilmstrips::new(), waves_project: None, trim_stills: qnc_trim_stills::TrimStills::new(), zoom_follow: Default::default(), sound: None, voices: Vec::new(), voice_request: None, voice_after_write: None }
     }
 }
 
@@ -200,7 +205,7 @@ impl Script {
 
     /// Whether a read or a write of this process runs (the form repaints soon).
     pub fn busy(&self) -> bool {
-        self.reading.is_some() || self.writing.is_some() || self.take.is_some() || self.taking.is_some() || self.exporting.is_some() || self.trim_stills.loading() || self.filmstrips.reading()
+        self.reading.is_some() || self.writing.is_some() || self.take.is_some() || self.taking.is_some() || self.exporting.is_some() || self.draft.running() || self.trim_stills.loading() || self.filmstrips.reading()
     }
 
     /// A clip and IN/OUT a chosen clip block opens on the source timeline, once.
@@ -565,8 +570,8 @@ impl Script {
                 self.write(preview, move |target| {
                     let takes: Vec<f64> = voice.takes.iter().map(|take| take.seconds).collect();
                     let first_tc = voice.takes.first().map(|take| take.tc.clone()).unwrap_or_default();
-                    let record = qnc_voice_take::describe_record(&locator, &voice.name, &voice.clip_uri, &takes, &first_tc)?;
-                    qnc_voice_catalog::publish_record(&locator, &voice.name, record)?;
+                    let record = qnc_voice_take::describe_record(locator.settings(), &voice.name, &voice.clip_uri, &takes, &first_tc)?;
+                    qnc_voice_catalog::publish_record(locator.reader(), locator.settings(), &voice.name, record)?;
                     qnc_script_db::set_voice_chosen(target, block, take).map(|_| None)
                 })
             }
@@ -582,6 +587,12 @@ impl Script {
                 true
             }
             EXPORT => self.export(preview),
+            DRAFT => {
+                if self.draft.start(&["--draft"]) {
+                    self.view.message = qnc_ui_text::text("script.drafting").into();
+                }
+                true
+            }
             OPEN_EXPORT => {
                 if let Some(file) = &self.view.exported {
                     if let Err(error) = qnc_status_line::open(file) {
@@ -736,7 +747,7 @@ impl Script {
                 // goes into the catalog, so the Broadcast Player plays its takes.
                 let finished = take.finish(&mark, "");
                 if let (Ok(recorded), Some(locator)) = (&finished, locator) {
-                    if let Err(error) = qnc_voice_catalog::publish_record(&locator, &recorded.name, recorded.record.clone()) {
+                    if let Err(error) = qnc_voice_catalog::publish_record(locator.reader(), locator.settings(), &recorded.name, recorded.record.clone()) {
                         qnc_dev_diagnostics::log_line(qnc_dev_diagnostics::DiagnosticsStream::Player, format!("voice-catalog {} refused: {error}", recorded.name));
                     }
                 }
@@ -940,7 +951,16 @@ impl Script {
                 self.exporting = None;
             }
         }
-        self.view.exporting = self.exporting.is_some();
+        if let Some(outcome) = self.draft.take() {
+            match outcome {
+                Ok(file) => {
+                    self.view.message.clear();
+                    self.view.exported = Some(file);
+                }
+                Err(error) => self.view.message = error,
+            }
+        }
+        self.view.exporting = self.exporting.is_some() || self.draft.running();
         if let Some(done) = &self.writing {
             if let Ok(result) = done.try_recv() {
                 let heard = self.voice_after_write.take();

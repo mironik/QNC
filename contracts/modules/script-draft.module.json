@@ -1,0 +1,21 @@
+{
+  "module_id": "qnc.module.script-draft",
+  "module_name": "Script Draft",
+  "module_version": "0.1.0",
+  "module_kind": "library",
+  "capabilities": ["script.draft.pieces"],
+  "input_contract_version": "0.1.0",
+  "output_contract_version": "0.1.0",
+  "transport_protocol_version": "0.1.0",
+  "transport_scope": ["local", "lan", "intranet"],
+  "supported_os": ["windows", "linux", "macos"],
+  "supported_cpu": ["x86_64", "aarch64"],
+  "forbidden_calls": ["ffprobe", "media.probe.full", "playback.clock"],
+  "forbidden_dependencies": ["qnc.module.media-probe", "qnc.module.scanner", "qnc.module.broadcast-player-core"],
+  "state_policy": "stateless",
+  "database_write_policy": "no_db_writes",
+  "runtime_crate": "qnc-script-draft",
+  "input": "The script's blocks, voice records and profile as qnc-script-db reads them, the project's reading speed and frame rate, and the catalog id of a voice record's clip by its name.",
+  "output": "The parts of one program in reading order for qnc-program-input: a recorded OFF its voice record's clip with the take used on A1, an OFF not recorded a pause of its reading time, a statement its clip's range or SubSegment parts; blocks that do not count in the story are left out. It reads and writes nothing.",
+  "specification": "User 2026-10-30: the draft story (Draft XML) from the results of MA Audio (AGENTS.md)."
+}

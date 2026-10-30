@@ -76,8 +76,7 @@ pub fn record_name(project: &str, mark: &str) -> String {
 /// The catalog record of a voice record's clip as it stands (its takes' lengths, its first
 /// take's timecode), from the project's settings as saved: what `finish` wrote, nothing probed.
 /// A record made before the catalog knew voice clips is described the same way.
-pub fn describe_record(locator: &StillLocator, name: &str, clip_uri: &str, takes: &[f64], first_tc: &str) -> Result<qnc_media_metadata::ClipMetadata> {
-    let settings = locator.settings();
+pub fn describe_record(settings: &qnc_work_settings::WorkSettings, name: &str, clip_uri: &str, takes: &[f64], first_tc: &str) -> Result<qnc_media_metadata::ClipMetadata> {
     let (width, height, fps) = settings.video_picture().map_err(|e| e.message)?;
     let fields = settings.video_fields().map_err(|e| e.message)?;
     let sample_rate = settings.audio_sample_rate().map_err(|e| e.message)?;
