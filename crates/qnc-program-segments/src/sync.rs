@@ -25,6 +25,7 @@ pub enum SyncSpace {
 impl ProgramSegments {
     /// Source IN pressed while Sync is on arms it (v5 `mark_in_action`).
     pub(crate) fn arm_sync_on_new_in(&mut self, previous_in: Option<u64>) {
+        self.sync.forget_other_clip(self.source.clip_id.as_deref());
         let source = &self.source;
         let (Some(clip_id), Some(source_in), Some((num, den))) =
             (&source.clip_id, source.in_mark, source.timebase)
@@ -36,12 +37,21 @@ impl ProgramSegments {
         if (previous_in == Some(source_in) && !pressed) || !self.sync.enabled() {
             return;
         }
+        // A Sync that runs or waits for Enter keeps its IN until the user presses a new one:
+        // choosing another clip with its own IN does not arm (live 2026-10-30: a clip opened from
+        // the pool armed a Sync nobody asked for, and Space then played that one).
+        // (`previous_in` is set only for the same clip: its IN pressed or moved.)
+        if !pressed && previous_in.is_none() && (self.sync.is_active() || self.sync.waits()) {
+            return;
+        }
         self.sync_flight_ready = flight;
-        // An IN on the fly while a Sync already plays starts it again from this IN (live
-        // 2026-10-24: the IN reached the running Sync as Space, paused the source and left a
-        // cover of one frame).
-        if flight && self.sync.is_active() && !self.sync.stopped() {
-            self.sync.cancel();
+        // A new IN starts the Sync again from it (live 2026-10-24: the IN on the fly reached
+        // the running Sync as Space; live 2026-10-30: an IN pressed while a Sync was paused or
+        // stopped was kept aside, Space played on the old one and Enter wrote the old IN). The
+        // old draft goes, nothing of it was written.
+        if self.sync.is_active() || self.sync.waits() {
+            self.sync.discard();
+            self.program_changed = true;
         }
         let rate = |value: i64| u32::try_from(value).unwrap_or(0);
         self.sync.arm(SyncSource {

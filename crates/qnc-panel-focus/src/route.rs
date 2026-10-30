@@ -361,6 +361,9 @@ impl PanelFocus {
                 Panel::SourceTimeline => return self.source.route(action_id, preview, timeline),
                 Panel::Pool | Panel::PoolTabs | Panel::SourceButtons => false, // the keys act on the panel in focus only
             },
+            // Delete on any panel while a Sync draft waits says Esc drops it (live 2026-10-30:
+            // Delete in the pool did nothing and said nothing).
+            "delete_marker" if segments.sync_drafting() || segments.sync_waiting() => segments.apply_action(action_id),
             action if SOURCE_TO_PROGRAM.contains(&action) => segments.apply_action(action),
             action if segments.handles(action) => on_segments && segments.apply_action(action),
             _ => return None,

@@ -780,6 +780,35 @@ fn an_in_on_the_fly_while_a_sync_plays_starts_it_again_from_that_in() {
 }
 
 #[test]
+fn a_new_in_drops_a_paused_or_stopped_sync_and_another_clip_does_not_arm() {
+    // Live 2026-10-30: an IN pressed while a Sync was paused was kept aside; Space played on the
+    // old Sync and Enter wrote the old IN. A clip opened from the pool armed a Sync by itself.
+    let mut segments = component();
+    segments.set_playhead(Some(20));
+    segments.apply(SegmentCommand::ToggleSync);
+    segments.arm_sync(false);
+    segments.set_source(marked(13));
+    let SyncSpace::Start(first) = segments.sync_space(false) else { panic!("Sync starts") };
+    assert_eq!(first.source_in, 13);
+    segments.sync_stop();
+    segments.arm_sync(false);
+    segments.set_source(marked(17));
+    assert!(!segments.sync_drafting(), "the old draft is gone");
+    let SyncSpace::Start(again) = segments.sync_space(false) else { panic!("Space starts the new Sync") };
+    assert_eq!(again.source_in, 17, "from the new IN");
+    // Another clip with its own IN, no I pressed: the running Sync stays as it is.
+    segments.set_source(SourcePick::new(Some("clip-y"), Some("Y"), Some((5, 40)), (Some(5), 60), Some((50, 1))));
+    assert!(segments.sync_drafting(), "the Sync is not dropped by choosing a clip");
+    // An IN armed on one clip is forgotten when another clip is shown without an IN.
+    segments.discard_sync();
+    segments.arm_sync(false);
+    segments.set_source(marked(13));
+    assert!(segments.sync_armed());
+    segments.set_source(SourcePick::new(Some("clip-y"), Some("Y"), None, (None, 60), Some((50, 1))));
+    assert!(!segments.sync_armed(), "Space plays the shown clip, not a Sync of another");
+}
+
+#[test]
 fn replace_exclude_or_a_new_segment_end_an_open_edit() {
     let mut segments = component();
     let id = segments.view().rows[0].segment_id.clone();

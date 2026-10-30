@@ -7095,3 +7095,15 @@ player stao, dok se rez ne pomakne (`qnc-program-view` `ZoomFollow`; `SourcePrev
 pomak reza vraca prozor oko reza. (2) Dok prozor prati play, zvuk se cita deset prozora unaprijed (`zoom_reach`;
 `qnc-trim-stills`; source zoom ima cijeli klip kao komad, Wrap i SubSegment komade do tog dosega). Debug cache obrisan uz
 dozvolu korisnika (`cargo clean --profile dev`, 36,5 GiB). Uzivo nije provjereno.
+Audit 2026-10-30 (korisnik: "store sync/b-roll nekad prihvati nekad ne, nije stabilno, provjeri procedure i log"): log
+zadnjih Syncova: Enter je svaki put spremio pokrivalicu kad je pritisnut (13:20 i 13:24, program ponovno otvoren nakon
+upisa); neuspjesi su bili prije Entera. (1) IN pritisnut dok je Sync pauziran ili zaustavljen bio je odlozen: Space je
+nastavio stari Sync, a Enter bi spremio stari IN (playhead 0 umjesto 56 i 94). (2) Klip otvoren iz poola s vlastitim IN-om
+naoruzavao je Sync bez pritiska I, a IN naoruzan na jednom klipu ostajao je kad se pokaze drugi, pa je Space pustao Sync
+tudjeg IN-a na prikazanom klipu. (3) Poruke su govorile "Delete discards", a od 21. 10. Sync nacrt odbacuje Esc; Delete u
+poolu nije radio nista i nista nije rekao. Popravljeno: novi IN (I, rez ili pomak IN-a istog klipa) odbacuje stari Sync
+(nista nije bilo upisano) i naoruzava novi; izbor drugog klipa ne dira Sync koji radi ili ceka Enter, a IN naoruzan na
+drugom klipu se zaboravlja (`qnc-program-segments` `arm_sync_on_new_in`, `qnc-sync-cover` `forget_other_clip`); poruke
+kazu Esc (rjecnik `sync_resumes`, `sync_at_end`, `sync_stopped`); Delete na svakom panelu dok Sync nacrt ceka kaze da ga
+odbacuje Esc (`qnc-panel-focus`). Test `a_new_in_drops_a_paused_or_stopped_sync_and_another_clip_does_not_arm`,
+zlatna tablica tipki, conformance. Uzivo nije provjereno.

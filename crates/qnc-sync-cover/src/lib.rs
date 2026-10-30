@@ -126,6 +126,14 @@ impl SyncCover {
         }
     }
 
+    /// An IN armed on another clip than `clip_id` (the one shown now) is forgotten: Space must
+    /// not play a Sync of a clip that is not shown (live 2026-10-30: it played from the old IN).
+    pub fn forget_other_clip(&mut self, clip_id: Option<&str>) {
+        if self.armed.as_ref().is_some_and(|armed| Some(armed.clip_id.as_str()) != clip_id) {
+            self.armed = None;
+        }
+    }
+
     /// Whether Space starts a Sync play: Sync on, a source armed, no play running.
     pub fn wants_space(&self) -> bool {
         self.enabled && self.armed.is_some() && self.active.is_none()
