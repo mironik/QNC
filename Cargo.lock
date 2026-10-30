@@ -6382,6 +6382,7 @@ dependencies = [
  "qnc-program-view",
  "qnc-touchpad",
  "qnc-ui-kit",
+ "qnc-ui-text",
  "qnc-wheel-jog",
 ]
 

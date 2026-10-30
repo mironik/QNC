@@ -39,6 +39,11 @@ const TAKE_SIDE: &str = "timeline_take_cut_edge";
 const DRAG_SIDE: &str = "timeline_drag_cut_edge";
 /// The voice no word was heard for: the cut line's red, faint.
 const UNHEARD_FILL: Color32 = Color32::from_rgba_premultiplied(70, 10, 10, 70);
+/// The row of Undo, Save and Cancel under the pictures, centred on the cut (user 2026-10-30:
+/// "so placing the playhead and saving are not confused"); each is its key's action.
+const BUTTONS_HEIGHT: f32 = 30.0;
+const BUTTON_SIZE: Vec2 = Vec2::new(78.0, 24.0);
+const BUTTONS: [(&str, &str); 3] = [("story.ui.undo", "undo_object"), ("common.save", "activate_focused_item"), ("common.cancel", "clear_focus")];
 /// The share of the screen width the window may take.
 const SCREEN_SHARE: f32 = 0.92;
 
@@ -59,7 +64,7 @@ pub fn show(ctx: &egui::Context, segments: &SegmentsView) -> Option<ActionEvent>
     let picture = Vec2::new(width.max(16.0), width.max(16.0) * 9.0 / 16.0);
     let sound = segments.zoom_sound.as_ref().filter(|sound| sound.to > sound.from);
     let lanes = if sound.is_some() { LANES_GAP + 2.0 * LANE_HEIGHT + GAP / 2.0 + WORDS_HEIGHT } else { 0.0 };
-    let size = Vec2::new(count * picture.x + GAP * (count - 1.0), picture.y + LABEL_HEIGHT + lanes) + Vec2::splat(2.0 * MARGIN);
+    let size = Vec2::new(count * picture.x + GAP * (count - 1.0), picture.y + LABEL_HEIGHT + BUTTONS_HEIGHT + lanes) + Vec2::splat(2.0 * MARGIN);
     egui::Area::new(egui::Id::new("qnc_trim_overlay"))
         .order(egui::Order::Foreground)
         .anchor(Align2::CENTER_CENTER, Vec2::ZERO)
@@ -95,7 +100,7 @@ pub fn show(ctx: &egui::Context, segments: &SegmentsView) -> Option<ActionEvent>
                 }
             }
             if let Some(sound) = sound {
-                let area = Rect::from_min_size(egui::pos2(top.x, top.y + picture.y + LABEL_HEIGHT + LANES_GAP), Vec2::new(row_width, 2.0 * LANE_HEIGHT + GAP / 2.0 + WORDS_HEIGHT));
+                let area = Rect::from_min_size(egui::pos2(top.x, top.y + picture.y + LABEL_HEIGHT + BUTTONS_HEIGHT + LANES_GAP), Vec2::new(row_width, 2.0 * LANE_HEIGHT + GAP / 2.0 + WORDS_HEIGHT));
                 let (word, side) = paint_sound(ui, area, sound, gap_at, top.y, &visuals);
                 // A double clicked word on a source timeline's zoom is a cut, as on the transcript.
                 if let Some((from, to)) = word.filter(|_| source) {
@@ -105,8 +110,28 @@ pub fn show(ctx: &egui::Context, segments: &SegmentsView) -> Option<ActionEvent>
                     turned = side;
                 }
             }
+            let row = Rect::from_min_size(egui::pos2(top.x, top.y + picture.y + LABEL_HEIGHT), Vec2::new(row_width, BUTTONS_HEIGHT));
+            if let Some(pressed) = paint_buttons(ui, row, gap_at.unwrap_or(row.center().x)) {
+                turned = Some(pressed);
+            }
         });
     turned
+}
+
+/// Undo, Save and Cancel in one row centred on the cut (kept inside the window); a press is the
+/// same system action as Backspace, Enter or Escape on the panel in focus.
+fn paint_buttons(ui: &mut egui::Ui, row: Rect, centre: f32) -> Option<ActionEvent> {
+    let width = BUTTONS.len() as f32 * BUTTON_SIZE.x + (BUTTONS.len() as f32 - 1.0) * GAP;
+    let left = (centre - width / 2.0).clamp(row.left(), (row.right() - width).max(row.left()));
+    let mut pressed = None;
+    for (index, (text, action)) in BUTTONS.iter().enumerate() {
+        let at = egui::pos2(left + index as f32 * (BUTTON_SIZE.x + GAP), row.center().y - BUTTON_SIZE.y / 2.0);
+        let button = egui::Button::new(qnc_ui_text::text(text)).min_size(BUTTON_SIZE);
+        if ui.put(Rect::from_min_size(at, BUTTON_SIZE), button).clicked() {
+            pressed = Some(ActionEvent::key(*action));
+        }
+    }
+    pressed
 }
 
 /// How high a peak (per mille of full scale) is drawn, 0 to 1: on a dB scale from

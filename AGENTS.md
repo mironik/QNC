@@ -7072,3 +7072,9 @@ pokrivalicu, pa Backspace opet radi vremenski undo. `qnc-program-segments` (`pic
 ostaje undo izabranog ukljucujuci segment. Selekcija: desni klik misa i dodir s dva prsta na touchpadu (Windows ga salje
 kao desni klik) su Ctrl+ (marker cijeli, traka pokrivalice = slot, pokrivalica, A1/A2), vec po mapi misa. Test
 `backspace_undoes_what_is_picked_and_otherwise_in_time`, conformance. Uzivo nije provjereno.
+Dopuna 2026-10-30 (korisnik: "u zumu na sredini playheada ispod slika postavi tri dugmeta Undo OK Cancel, tako cemo
+izbjeci zabune postavljanja playheada i spremanja"; "OK ili Save ili Done, zavisi koju terminologiju koristis"): prozor trim
+zooma (Wrap redovi, source timeline, SubSegment) ispod slika ima red Undo | Save | Cancel, centriran na crti reza (unutar
+prozora). Svako dugme je ista radnja kao tipka na panelu u fokusu: Undo = Backspace (`undo_object`), Save = Enter
+(`activate_focused_item`), Cancel = Esc (`clear_focus`). Naziv Save jer aplikacija Enter vec zove spremanjem.
+`qnc-trim-overlay` (`paint_buttons`, ovisi o `qnc-ui-text`), rjecnik `common.save`. Testovi, conformance. Uzivo nije provjereno.
