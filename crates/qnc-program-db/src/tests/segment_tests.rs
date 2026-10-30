@@ -177,8 +177,8 @@ fn deleting_a_segment_deactivates_it_shifts_markers_and_moves_the_selection() {
     let conn = Connection::open(&path).unwrap();
     let (active, selected): (i64, String) = conn
         .query_row(
-            "SELECT p.active, s.selected_part_id FROM story_parts p, story_state s
-             WHERE p.part_id = ?1",
+            "SELECT p.active, s.selected_part_id FROM story_items p, story_state s
+             WHERE p.role = 'segment' AND p.item_id = ?1",
             [&ids[1]],
             |row| Ok((row.get(0)?, row.get(1)?)),
         )

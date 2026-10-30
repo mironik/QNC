@@ -6,7 +6,7 @@ impl Store {
         let now = story_now();
         let tx = self.conn.savepoint().map_err(err)?;
         let deleted = tx
-            .execute("DELETE FROM story_covers WHERE cover_id = ?1", [cover_id])
+            .execute("DELETE FROM story_items WHERE role = 'cover' AND item_id = ?1", [cover_id])
             .map_err(err)?;
         if deleted == 0 {
             return Err(format!("cover not found: {cover_id}"));
@@ -30,7 +30,7 @@ impl Store {
             || self
                 .conn
                 .query_row(
-                    "SELECT EXISTS(SELECT 1 FROM story_covers WHERE cover_id = ?1)",
+                    "SELECT EXISTS(SELECT 1 FROM story_items WHERE role = 'cover' AND item_id = ?1)",
                     [cover_id],
                     |row| row.get(0),
                 )
@@ -115,20 +115,20 @@ impl Store {
             return Err(format!("slot not found: {slot_id}"));
         };
         let created = unique_stamp();
-        tx.execute("DELETE FROM story_covers WHERE slot_id = ?1", [slot_id])
+        tx.execute("DELETE FROM story_items WHERE role = 'cover' AND slot_id = ?1", [slot_id])
             .map_err(err)?;
         let cover_id = format!("cover_{created:x}");
         let now = story_now();
         let (in_frame, out_frame) = (in_frame as i64, out_frame as i64);
         let fps = f64::from(fps_num) / f64::from(fps_den);
         tx.execute(
-            "INSERT INTO story_covers (
-                cover_id, slot_id, timeline_start_frame, timeline_end_frame,
+            "INSERT INTO story_items (
+                role, item_id, slot_id, timeline_start_frame, timeline_end_frame,
                 timeline_start_sec, timeline_end_sec, slot_signature, slot_index,
                 clip_id, virtual_shot_id, title, note, in_tc, out_tc, in_seconds, out_seconds,
                 source_in_frame, source_out_frame, source_fps, source_fps_num, source_fps_den,
                 sort_index, a2_source_channel, created_at, updated_at, a2_level_db, a2_off
-             ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, '', '', ?11, ?12, ?13, ?14,
+             ) VALUES ('cover', ?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, '', '', ?11, ?12, ?13, ?14,
                        ?15, ?16, ?17, ?18, ?19, 0, ?21, ?20, ?20, ?22, ?23)",
             params![
                 cover_id,

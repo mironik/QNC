@@ -255,6 +255,9 @@ fn create_segment(
             a1_source_channel: 0,
             a1_level_db: 0,
             a1_off: false,
+            a2_source_channel: 1,
+            a2_level_db: 0,
+            a2_off: false,
         },
     )
 }
@@ -365,9 +368,9 @@ fn put_cover(path: &std::path::Path, cover_id: &str, slot_id: &str) {
         )
         .unwrap();
     conn.execute(
-        "INSERT INTO story_covers (cover_id, slot_id, timeline_start_frame, timeline_end_frame,
+        "INSERT INTO story_items (role, item_id, slot_id, timeline_start_frame, timeline_end_frame,
             clip_id, source_in_frame, source_out_frame, created_at, updated_at)
-         VALUES (?1, ?2, ?3, ?4, 'c1', 0, 100, ?1, ?1)",
+         VALUES ('cover', ?1, ?2, ?3, ?4, 'c1', 0, 100, ?1, ?1)",
         rusqlite::params![cover_id, slot_id, start, end],
     )
     .unwrap();
@@ -378,8 +381,8 @@ fn cover_row(path: &std::path::Path, cover_id: &str) -> (String, i64, i64) {
     Connection::open(path)
         .unwrap()
         .query_row(
-            "SELECT slot_id, timeline_start_frame, timeline_end_frame FROM story_covers
-             WHERE cover_id = ?1",
+            "SELECT slot_id, timeline_start_frame, timeline_end_frame FROM story_items
+             WHERE role = 'cover' AND item_id = ?1",
             [cover_id],
             |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?)),
         )
@@ -389,7 +392,7 @@ fn cover_row(path: &std::path::Path, cover_id: &str) -> (String, i64, i64) {
 fn cover_count(path: &std::path::Path) -> i64 {
     Connection::open(path)
         .unwrap()
-        .query_row("SELECT count(*) FROM story_covers", [], |row| row.get(0))
+        .query_row("SELECT count(*) FROM story_items WHERE role = 'cover'", [], |row| row.get(0))
         .unwrap()
 }
 

@@ -82,6 +82,11 @@ fn segment(
         v_tail_frames: 0,
         a1_lead_frames: 0,
         a1_tail_frames: 0,
+        a2_source_channel: 1,
+        a2_level_db: 0,
+        a2_off: false,
+        a2_lead_frames: 0,
+        a2_tail_frames: 0,
     }
 }
 
@@ -725,4 +730,41 @@ fn the_picture_of_a_join_goes_on_past_its_sound_and_an_off_is_black() {
     assert_eq!(picture(&playlist, 39), Some(("speaker".into(), 10)));
     assert_eq!(picture(&playlist, 40), None, "the Off's black starts 10 early");
     assert_eq!(sound(&playlist, 45).as_deref(), Some("speaker"), "the speaker is still heard");
+}
+
+/// User 2026-10-30 ("only the A2 of the Ton goes into the Off, as a J or an L"): the A2 of a Ton
+/// is silent under the Ton and heard only where it goes into an Off, on its own channel and from
+/// its clip's frames after OUT (an L) or before IN (a J); a cover in the Off keeps A2.
+#[test]
+fn the_a2_of_a_ton_is_heard_only_where_it_goes_into_an_off() {
+    let timebase = tb(50);
+    let a2 = |playlist: &FlatProgramPlaylist, frame: i64| {
+        let item = playlist.items.iter().find(|item| item.record_range.in_frame <= frame && frame < item.record_range.out_frame).unwrap();
+        item.sources
+            .iter()
+            .filter(|source| source.audio_routes.iter().any(|route| route.output_channel == PROGRAM_AUDIO_OUTPUT_A2))
+            .map(|source| (source.clip_id.clone(), source.source_range.source_in))
+            .collect::<Vec<_>>()
+    };
+    let mut ton = segment("ton", "tonovi", "speaker", (0, 50), (10, 60), timebase);
+    ton.a2_tail_frames = 20;
+    let off = segment("off", "offovi", "voice", (50, 100), (100, 150), timebase);
+    let playlist = build_flat_program_playlist(&input(100, vec![ton.clone(), off.clone()]), &mut resolver(&["voice", "speaker"], timebase)).unwrap();
+    assert!(a2(&playlist, 40).is_empty(), "silent under the Ton");
+    assert_eq!(a2(&playlist, 55), vec![("speaker".to_string(), 60)], "the L: the Ton's A2 from its OUT (its item from 50)");
+    assert!(a2(&playlist, 75).is_empty(), "after the L the Off alone");
+    // The J of a Ton after an Off.
+    let mut ton_after = segment("ton", "tonovi", "speaker", (50, 100), (100, 150), timebase);
+    ton_after.a2_lead_frames = 10;
+    let off_before = segment("off", "offovi", "voice", (0, 50), (100, 150), timebase);
+    let playlist = build_flat_program_playlist(&input(100, vec![off_before.clone(), ton_after.clone()]), &mut resolver(&["voice", "speaker"], timebase)).unwrap();
+    assert!(a2(&playlist, 39).is_empty());
+    assert_eq!(a2(&playlist, 45), vec![("speaker".to_string(), 90)], "the J: the Ton's A2 10 before its IN (its item from 40)");
+    assert!(a2(&playlist, 60).is_empty(), "silent under the Ton");
+    // A cover in the Off overwrites A2: the Ton's J is not heard under it.
+    let mut covered = off_before;
+    covered.covers.push(cover("c1", "broll", (40, 50), (0, 10), timebase));
+    let playlist = build_flat_program_playlist(&input(100, vec![covered, ton_after]), &mut resolver(&["voice", "speaker", "broll"], timebase)).unwrap();
+    assert_eq!(a2(&playlist, 45).len(), 1, "one sound on A2");
+    assert_eq!(a2(&playlist, 45)[0].0, "broll", "the cover keeps A2");
 }

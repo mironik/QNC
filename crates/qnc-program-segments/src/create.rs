@@ -14,6 +14,9 @@ impl ProgramSegments {
             a1_source_channel: segment.a1_source_channel,
             a1_level_db: segment.a1_level_db,
             a1_off: segment.a1_off,
+            a2_source_channel: segment.a2_source_channel,
+            a2_level_db: segment.a2_level_db,
+            a2_off: segment.a2_off,
         });
         if key.is_some() {
             self.pending_create = key;
@@ -38,6 +41,9 @@ impl ProgramSegments {
             a1_source_channel: self.source.lanes[0].channel,
             a1_level_db: self.source.lanes[0].level_db,
             a1_off: self.source.lanes[0].off,
+            a2_source_channel: self.source.lanes[1].channel,
+            a2_level_db: self.source.lanes[1].level_db,
+            a2_off: self.source.lanes[1].off,
         });
     }
 

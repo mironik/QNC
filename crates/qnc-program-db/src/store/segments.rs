@@ -10,7 +10,7 @@ impl Store {
         clip_id: &str,
         (in_frame, out_frame): (u64, u64),
         (fps_num, fps_den): (u32, u32),
-        (a1_source_channel, a1_level_db, a1_off): (u16, i8, bool),
+        [(a1_source_channel, a1_level_db, a1_off), (a2_source_channel, a2_level_db, a2_off)]: [(u16, i8, bool); 2],
     ) -> Result<Data> {
         let kind = story_kind(kind)?;
         qnc_media_records::valid_id(clip_id).map_err(err)?;
@@ -46,7 +46,7 @@ impl Store {
         let story_fps = f64::from(rate.0) / f64::from(rate.1);
         let next: i64 = tx
             .query_row(
-                "SELECT COALESCE(MAX(sort_index) + 1, 0) FROM story_parts WHERE lead = ''",
+                "SELECT COALESCE(MAX(sort_index) + 1, 0) FROM story_items WHERE role = 'segment' AND lead = ''",
                 [],
                 |row| row.get(0),
             )
@@ -61,8 +61,8 @@ impl Store {
         tx.execute(
             "UPDATE story_markers SET system_role = ''
              WHERE system_role = 'program_end'
-               AND EXISTS (SELECT 1 FROM story_covers
-                           WHERE slot_id LIKE '%|' || story_markers.marker_id)",
+               AND EXISTS (SELECT 1 FROM story_items
+                           WHERE role = 'cover' AND slot_id LIKE '%|' || story_markers.marker_id)",
             [],
         )
         .map_err(err)?;
@@ -71,13 +71,14 @@ impl Store {
         let (out_frame, duration) = story_length(in_frame, out_frame as i64, per_source)?;
         let fps = f64::from(fps_num) / f64::from(fps_den);
         tx.execute(
-            "INSERT INTO story_parts (
-                part_id, kind, sort_index, title, text, clip_id, virtual_shot_id,
-                in_tc, out_tc, in_seconds, out_seconds, fps, source_fps_num, source_fps_den,
-                in_frame, out_frame, duration_frames, duration_label, duration_color_key,
-                active, created_at, updated_at, a1_source_channel, a1_level_db, a1_off
-             ) VALUES (?1, ?2, ?3, '', '', ?4, '', ?5, ?6, ?7, ?8, ?9, ?10, ?11,
-                       ?12, ?13, ?14, ?15, ?16, 1, ?17, ?17, ?18, ?19, ?20)",
+            "INSERT INTO story_items (
+                role, item_id, kind, sort_index, title, text, clip_id, virtual_shot_id,
+                in_tc, out_tc, in_seconds, out_seconds, source_fps, source_fps_num, source_fps_den,
+                source_in_frame, source_out_frame, duration_frames, duration_label, duration_color_key,
+                active, created_at, updated_at, a1_source_channel, a1_level_db, a1_off,
+                a2_source_channel, a2_level_db, a2_off
+             ) VALUES ('segment', ?1, ?2, ?3, '', '', ?4, '', ?5, ?6, ?7, ?8, ?9, ?10, ?11,
+                       ?12, ?13, ?14, ?15, ?16, 1, ?17, ?17, ?18, ?19, ?20, ?21, ?22, ?23)",
             params![
                 segment_id,
                 kind,
@@ -98,7 +99,10 @@ impl Store {
                 now,
                 a1_source_channel,
                 a1_level_db,
-                a1_off
+                a1_off,
+                a2_source_channel,
+                a2_level_db,
+                a2_off
             ],
         )
         .map_err(err)?;
@@ -119,7 +123,7 @@ impl Store {
         let tx = self.conn.savepoint().map_err(err)?;
         let deleted_sort: i64 = tx
             .query_row(
-                "SELECT sort_index FROM story_parts WHERE part_id = ?1 AND active = 1",
+                "SELECT sort_index FROM story_items WHERE role = 'segment' AND item_id = ?1 AND active = 1",
                 [segment_id],
                 |row| row.get(0),
             )
@@ -129,7 +133,7 @@ impl Store {
         let fps = require_story_fps(&tx).ok();
         let window = segment_window(&tx, segment_id)?;
         tx.execute(
-            "UPDATE story_parts SET active = 0, updated_at = ?2 WHERE part_id = ?1",
+            "UPDATE story_items SET active = 0, updated_at = ?2 WHERE role = 'segment' AND item_id = ?1",
             params![segment_id, story_now()],
         )
         .map_err(err)?;
@@ -192,7 +196,7 @@ impl Store {
             let neighbour: String = tx
                 .query_row(
                     // Never a lead (audit 2026-10-25): they go and come with the segments.
-                    "SELECT part_id FROM story_parts WHERE part_id != ?1 AND active != 0 AND lead = ''
+                    "SELECT item_id FROM story_items WHERE role = 'segment' AND item_id != ?1 AND active != 0 AND lead = ''
                      ORDER BY ABS(sort_index - ?2) ASC, sort_index ASC LIMIT 1",
                     params![segment_id, deleted_sort],
                     |row| row.get(0),
@@ -220,7 +224,7 @@ impl Store {
         let tx = self.conn.savepoint().map_err(err)?;
         let changed = tx
             .execute(
-                "UPDATE story_parts SET active = 1, updated_at = ?2 WHERE part_id = ?1 AND active = 0",
+                "UPDATE story_items SET active = 1, updated_at = ?2 WHERE role = 'segment' AND item_id = ?1 AND active = 0",
                 params![segment_id, story_now()],
             )
             .map_err(err)?;
@@ -297,7 +301,7 @@ impl Store {
         // story gives it the rate of its new source.
         let others: bool = tx
             .query_row(
-                "SELECT EXISTS(SELECT 1 FROM story_parts WHERE active = 1 AND part_id != ?1)",
+                "SELECT EXISTS(SELECT 1 FROM story_items WHERE role = 'segment' AND active = 1 AND item_id != ?1)",
                 [segment_id],
                 |row| row.get(0),
             )
@@ -341,12 +345,12 @@ impl Store {
         }
         let now = story_now();
         tx.execute(
-            "UPDATE story_parts SET clip_id = ?2, virtual_shot_id = '', in_tc = ?3, out_tc = ?4,
-                in_seconds = ?5, out_seconds = ?6, fps = ?7, source_fps_num = ?8,
-                source_fps_den = ?9, in_frame = ?10, out_frame = ?11, duration_frames = ?12,
+            "UPDATE story_items SET clip_id = ?2, virtual_shot_id = '', in_tc = ?3, out_tc = ?4,
+                in_seconds = ?5, out_seconds = ?6, source_fps = ?7, source_fps_num = ?8,
+                source_fps_den = ?9, source_in_frame = ?10, source_out_frame = ?11, duration_frames = ?12,
                 duration_label = ?13, duration_color_key = ?14, a1_source_channel = 0, a1_level_db = 0, a1_off = 0,
                 updated_at = ?15
-             WHERE part_id = ?1 AND active = 1",
+             WHERE role = 'segment' AND item_id = ?1 AND active = 1",
             params![
                 segment_id,
                 clip_id,
@@ -386,8 +390,8 @@ impl Store {
         let tx = self.conn.savepoint().map_err(err)?;
         let (old_in, fps_num, fps_den, clip_id): (i64, u32, u32, String) = tx
             .query_row(
-                "SELECT in_frame, source_fps_num, source_fps_den, clip_id FROM story_parts
-                 WHERE part_id = ?1 AND active = 1",
+                "SELECT source_in_frame, source_fps_num, source_fps_den, clip_id FROM story_items
+                 WHERE role = 'segment' AND item_id = ?1 AND active = 1",
                 [segment_id],
                 |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?, row.get(3)?)),
             )
@@ -427,10 +431,10 @@ impl Store {
             set_marker_frame(&tx, &marker_id, frame, story_fps)?;
         }
         tx.execute(
-            "UPDATE story_parts SET in_tc = ?2, out_tc = ?3, in_seconds = ?4, out_seconds = ?5,
-                in_frame = ?6, out_frame = ?7, duration_frames = ?8, duration_label = ?9,
+            "UPDATE story_items SET in_tc = ?2, out_tc = ?3, in_seconds = ?4, out_seconds = ?5,
+                source_in_frame = ?6, source_out_frame = ?7, duration_frames = ?8, duration_label = ?9,
                 duration_color_key = ?10, updated_at = ?11
-             WHERE part_id = ?1 AND active = 1",
+             WHERE role = 'segment' AND item_id = ?1 AND active = 1",
             params![
                 segment_id,
                 frame_timecode(in_frame, fps),
@@ -460,7 +464,7 @@ impl Store {
         let tx = self.conn.savepoint().map_err(err)?;
         let removed = tx
             .execute(
-                "DELETE FROM story_parts WHERE part_id = ?1 AND active = 0",
+                "DELETE FROM story_items WHERE role = 'segment' AND item_id = ?1 AND active = 0",
                 [segment_id],
             )
             .map_err(err)?;
@@ -521,7 +525,7 @@ impl Store {
             let (in_frame, out_frame, num, den): (i64, i64, u32, u32) = self
                 .conn
                 .query_row(
-                    "SELECT in_frame, out_frame, source_fps_num, source_fps_den FROM story_parts WHERE part_id = ?1 AND active = 1",
+                    "SELECT source_in_frame, source_out_frame, source_fps_num, source_fps_den FROM story_items WHERE role = 'segment' AND item_id = ?1 AND active = 1",
                     [id],
                     |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?, row.get(3)?)),
                 )

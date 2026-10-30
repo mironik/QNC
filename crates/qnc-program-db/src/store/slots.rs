@@ -98,7 +98,7 @@ pub(crate) fn delete_markers_with_slots(conn: &Connection, marker_ids: &[String]
     }
     let covers = {
         let mut statement = conn
-            .prepare("SELECT cover_id, slot_id FROM story_covers")
+            .prepare("SELECT item_id, slot_id FROM story_items WHERE role = 'cover'")
             .map_err(err)?;
         let rows = statement
             .query_map([], |row| {
@@ -112,7 +112,7 @@ pub(crate) fn delete_markers_with_slots(conn: &Connection, marker_ids: &[String]
     for (cover_id, slot) in covers {
         let (start, end) = slot.split_once('|').unwrap_or(("", ""));
         if marker_ids.iter().any(|id| id == start || id == end) {
-            conn.execute("DELETE FROM story_covers WHERE cover_id = ?1", [cover_id])
+            conn.execute("DELETE FROM story_items WHERE role = 'cover' AND item_id = ?1", [cover_id])
                 .map_err(err)?;
         }
     }
@@ -143,8 +143,8 @@ pub(crate) fn roll_cover(conn: &Connection, start_marker_id: &str, shift: i64) -
     let covers = {
         let mut statement = conn
             .prepare(
-                "SELECT cover_id, source_in_frame, source_out_frame, source_fps_num, source_fps_den
-                 FROM story_covers WHERE substr(slot_id, 1, length(?1) + 1) = ?1 || '|'",
+                "SELECT item_id, source_in_frame, source_out_frame, source_fps_num, source_fps_den
+                 FROM story_items WHERE role = 'cover' AND substr(slot_id, 1, length(?1) + 1) = ?1 || '|'",
             )
             .map_err(err)?;
         let rows = statement
@@ -165,10 +165,10 @@ pub(crate) fn roll_cover(conn: &Connection, start_marker_id: &str, shift: i64) -
         let new_out = new_in + (source_out - source_in);
         let fps = f64::from(fps_num) / f64::from(fps_den.max(1));
         conn.execute(
-            "UPDATE story_covers
+            "UPDATE story_items
              SET source_in_frame = ?1, source_out_frame = ?2, in_seconds = ?3, out_seconds = ?4,
                  in_tc = ?5, out_tc = ?6, updated_at = ?7
-             WHERE cover_id = ?8",
+             WHERE role = 'cover' AND item_id = ?8",
             params![
                 new_in,
                 new_out,
@@ -209,7 +209,8 @@ pub(crate) fn merge_coincident_markers(conn: &Connection) -> Result<()> {
         match &kept {
             Some((keep, at)) if *at == frame => {
                 let covers = {
-                    let mut statement = conn.prepare("SELECT cover_id, slot_id FROM story_covers").map_err(err)?;
+                    let mut statement =
+                        conn.prepare("SELECT item_id, slot_id FROM story_items WHERE role = 'cover'").map_err(err)?;
                     let rows = statement
                         .query_map([], |row| Ok((row.get::<_, String>(0)?, row.get::<_, String>(1)?)))
                         .map_err(err)?
@@ -222,10 +223,11 @@ pub(crate) fn merge_coincident_markers(conn: &Connection) -> Result<()> {
                     let swap = |id: &str| if id == marker_id { keep.as_str() } else { id }.to_string();
                     let (a, b) = (swap(a), swap(b));
                     if a == b {
-                        conn.execute("DELETE FROM story_covers WHERE cover_id = ?1", [&cover_id]).map_err(err)?;
+                        conn.execute("DELETE FROM story_items WHERE role = 'cover' AND item_id = ?1", [&cover_id])
+                            .map_err(err)?;
                     } else if format!("{a}|{b}") != slot {
                         conn.execute(
-                            "UPDATE story_covers SET slot_id = ?1 WHERE cover_id = ?2",
+                            "UPDATE story_items SET slot_id = ?1 WHERE role = 'cover' AND item_id = ?2",
                             params![slot_id(&a, &b), cover_id],
                         )
                         .map_err(err)?;
@@ -258,8 +260,8 @@ pub(crate) fn split_cover_at(conn: &Connection, marker_id: &str, frame: i64) -> 
     };
     let cover: Option<(String, i64, i64, u32, u32)> = conn
         .query_row(
-            "SELECT cover_id, source_in_frame, source_out_frame, source_fps_num, source_fps_den
-             FROM story_covers WHERE slot_id = ?1",
+            "SELECT item_id, source_in_frame, source_out_frame, source_fps_num, source_fps_den
+             FROM story_items WHERE role = 'cover' AND slot_id = ?1",
             [&covered],
             |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?, row.get(3)?, row.get(4)?)),
         )
@@ -277,17 +279,17 @@ pub(crate) fn split_cover_at(conn: &Connection, marker_id: &str, frame: i64) -> 
     let created = unique_stamp();
     let now = story_now();
     conn.execute(
-        "INSERT INTO story_covers (
-            cover_id, slot_id, timeline_start_frame, timeline_end_frame, timeline_start_sec,
+        "INSERT INTO story_items (
+            role, item_id, slot_id, timeline_start_frame, timeline_end_frame, timeline_start_sec,
             timeline_end_sec, slot_signature, slot_index, clip_id, virtual_shot_id, title, note,
             in_tc, out_tc, in_seconds, out_seconds, source_in_frame, source_out_frame, source_fps,
             source_fps_num, source_fps_den, sort_index, a2_source_channel, a2_level_db, a2_off,
             a2_lead_frames, a2_tail_frames, created_at, updated_at)
-         SELECT ?1, ?2, ?3, timeline_end_frame, ?4, timeline_end_sec, slot_signature, slot_index,
+         SELECT 'cover', ?1, ?2, ?3, timeline_end_frame, ?4, timeline_end_sec, slot_signature, slot_index,
             clip_id, virtual_shot_id, title, note, ?5, out_tc, ?6, out_seconds, ?7, source_out_frame,
             source_fps, source_fps_num, source_fps_den, sort_index, a2_source_channel, a2_level_db,
             a2_off, 0, a2_tail_frames, ?8, ?8
-         FROM story_covers WHERE cover_id = ?9",
+         FROM story_items WHERE role = 'cover' AND item_id = ?9",
         params![
             format!("cover_{created:x}"),
             slot_id(marker_id, &end_marker),
@@ -302,8 +304,8 @@ pub(crate) fn split_cover_at(conn: &Connection, marker_id: &str, frame: i64) -> 
     )
     .map_err(err)?;
     conn.execute(
-        "UPDATE story_covers SET source_out_frame = ?1, a2_tail_frames = 0, out_tc = ?2, out_seconds = ?3, updated_at = ?4
-         WHERE cover_id = ?5",
+        "UPDATE story_items SET source_out_frame = ?1, a2_tail_frames = 0, out_tc = ?2, out_seconds = ?3, updated_at = ?4
+         WHERE role = 'cover' AND item_id = ?5",
         params![split.min(source_out), frame_timecode(split, fps), timeline_sec(split, fps), now, cover_id],
     )
     .map_err(err)?;
@@ -322,9 +324,10 @@ pub(crate) fn cover_shortfalls(conn: &Connection) -> Result<std::collections::Ha
     let rows = {
         let mut statement = conn
             .prepare(
-                "SELECT c.cover_id, c.clip_id, c.source_in_frame, s.end_frame - s.start_frame,
+                "SELECT c.item_id, c.clip_id, c.source_in_frame, s.end_frame - s.start_frame,
                         c.source_fps_num, c.source_fps_den
-                 FROM story_covers c JOIN story_marker_slots s ON s.slot_id = c.slot_id",
+                 FROM story_items c JOIN story_marker_slots s ON s.slot_id = c.slot_id
+                 WHERE c.role = 'cover'",
             )
             .map_err(err)?;
         let rows = statement
@@ -405,7 +408,7 @@ pub(crate) fn rebind_covers(conn: &Connection) -> Result<()> {
     };
     let covers = {
         let mut statement = conn
-            .prepare("SELECT cover_id, slot_id FROM story_covers ORDER BY created_at, cover_id")
+            .prepare("SELECT item_id, slot_id FROM story_items WHERE role = 'cover' ORDER BY created_at, item_id")
             .map_err(err)?;
         let rows = statement
             .query_map([], |row| {
@@ -439,11 +442,11 @@ pub(crate) fn rebind_covers(conn: &Connection) -> Result<()> {
             Some(slot) => {
                 taken.push(slot.slot_id.as_str());
                 conn.execute(
-                    "UPDATE story_covers
+                    "UPDATE story_items
                      SET slot_id = ?1, slot_signature = ?2, slot_index = ?3,
                          timeline_start_frame = ?4, timeline_end_frame = ?5,
                          timeline_start_sec = ?6, timeline_end_sec = ?7
-                     WHERE cover_id = ?8",
+                     WHERE role = 'cover' AND item_id = ?8",
                     params![
                         slot.slot_id,
                         slot.signature,
@@ -459,9 +462,9 @@ pub(crate) fn rebind_covers(conn: &Connection) -> Result<()> {
             }
             None => {
                 conn.execute(
-                    "UPDATE story_covers
+                    "UPDATE story_items
                      SET timeline_end_frame = timeline_start_frame, timeline_end_sec = timeline_start_sec
-                     WHERE cover_id = ?1",
+                     WHERE role = 'cover' AND item_id = ?1",
                     [cover_id],
                 )
                 .map_err(err)?;
@@ -479,7 +482,7 @@ pub(crate) fn normalize_story_selection(conn: &Connection) -> Result<()> {
            AND selected_slot_id NOT IN (SELECT slot_id FROM story_marker_slots);
          UPDATE story_state SET selected_cover_id = ''
          WHERE id = 1 AND selected_cover_id != ''
-           AND selected_cover_id NOT IN (SELECT cover_id FROM story_covers);",
+           AND selected_cover_id NOT IN (SELECT item_id FROM story_items WHERE role = 'cover');",
     )
     .map_err(err)
 }

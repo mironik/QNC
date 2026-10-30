@@ -16,9 +16,8 @@ use crate::Result;
 /// An object that can be undone alone: its table and its key column.
 fn table_of(object_type: &str) -> Result<(&'static str, &'static str)> {
     match object_type.trim() {
-        "segment" => Ok(("story_parts", "part_id")),
+        "segment" | "cover" => Ok(("story_items", "item_id")),
         "marker" => Ok(("story_markers", "marker_id")),
-        "cover" => Ok(("story_covers", "cover_id")),
         other => Err(format!("undo selected: unknown object type {other}")),
     }
 }

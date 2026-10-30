@@ -52,7 +52,7 @@ pub(crate) fn require_story_fps(conn: &Connection) -> Result<f64> {
 /// as v5. `None` for a story without segments.
 pub(crate) fn story_rate(conn: &Connection) -> Result<Option<(u32, u32)>> {
     let any: bool = conn
-        .query_row("SELECT EXISTS(SELECT 1 FROM story_parts WHERE active = 1)", [], |row| row.get(0))
+        .query_row("SELECT EXISTS(SELECT 1 FROM story_items WHERE role = 'segment' AND active = 1)", [], |row| row.get(0))
         .map_err(err)?;
     if !any {
         return Ok(None);
@@ -66,8 +66,8 @@ pub(crate) fn story_rate(conn: &Connection) -> Result<Option<(u32, u32)>> {
         return Ok(Some(kept));
     }
     conn.query_row(
-        "SELECT source_fps_num, source_fps_den FROM story_parts
-         WHERE active = 1 AND source_fps_num > 0 AND source_fps_den > 0
+        "SELECT source_fps_num, source_fps_den FROM story_items
+         WHERE role = 'segment' AND active = 1 AND source_fps_num > 0 AND source_fps_den > 0
          ORDER BY sort_index LIMIT 1",
         [],
         |row| Ok((row.get(0)?, row.get(1)?)),

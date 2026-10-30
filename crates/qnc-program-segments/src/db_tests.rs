@@ -53,6 +53,9 @@ fn store_with_story(file: &std::path::Path) -> Vec<String> {
                 a1_source_channel: 0,
                 a1_level_db: 0,
                 a1_off: false,
+                a2_source_channel: 1,
+                a2_level_db: 0,
+                a2_off: false,
             })
             .unwrap()
         else {

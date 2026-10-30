@@ -18,6 +18,7 @@ mod contract;
 mod crossfade;
 mod a1_joins;
 mod picture_lead;
+mod ton_a2;
 mod build;
 mod overlay;
 mod window;
@@ -105,6 +106,14 @@ pub struct ProgramSegmentInput {
     /// before its picture and goes on `a1_tail_frames` after it, crossing the sound next to it.
     pub a1_lead_frames: i64,
     pub a1_tail_frames: i64,
+    /// The A2 of a Ton (user 2026-10-30): silent under the Ton, heard only where it goes into
+    /// the Off next to it, `a2_lead_frames` before its start (a J) and `a2_tail_frames` after
+    /// its end (an L), on this channel and level.
+    pub a2_source_channel: u16,
+    pub a2_level_db: i8,
+    pub a2_off: bool,
+    pub a2_lead_frames: i64,
+    pub a2_tail_frames: i64,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -159,6 +168,8 @@ pub fn build_flat_program_playlist(
         .collect();
     let end = items.iter().map(|item| item.record_range.out_frame).max().unwrap_or(0);
     crossfade::crossfade_a2(&mut items, input.a2_crossfade_frames, |id| asked.get(id).copied().unwrap_or_default(), end)?;
+    // After the covers' own A2: a cover overwrites A2 where it lies.
+    ton_a2::ton_a2_into_offs(&mut items, &input.segments, input.a2_crossfade_frames, resolver)?;
     let playlist = FlatProgramPlaylist {
         playlist_id: input.playlist_id.clone(),
         project_id: input.project_id.clone(),

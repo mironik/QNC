@@ -3,20 +3,20 @@ use super::*;
 impl Store {
     /// v5 `delete_cover`: the selection is cleared when it was this cover.
     /// The source channel, level and on/off of A1 of a segment or A2 of a cover.
-    pub(crate) fn set_sound(&mut self, table: &str, key: &str, lane: &str, id: &str, (channel, level_db, off): (u16, i8, bool)) -> Result<Data> {
+    pub(crate) fn set_sound(&mut self, role: &str, lane: &str, id: &str, (channel, level_db, off): (u16, i8, bool)) -> Result<Data> {
         let now = story_now();
         let changed = self
             .conn
             .execute(
                 &format!(
-                    "UPDATE {table} SET {lane}_source_channel = ?1, {lane}_level_db = ?2, {lane}_off = ?3,
-                        updated_at = ?4 WHERE {key} = ?5"
+                    "UPDATE story_items SET {lane}_source_channel = ?1, {lane}_level_db = ?2, {lane}_off = ?3,
+                        updated_at = ?4 WHERE role = ?6 AND item_id = ?5"
                 ),
-                params![channel, level_db, off, now, id.trim()],
+                params![channel, level_db, off, now, id.trim(), role],
             )
             .map_err(err)?;
         if changed == 0 {
-            return Err(format!("{key} not found: {}", id.trim()));
+            return Err(format!("{role} not found: {}", id.trim()));
         }
         Ok(Data::Changed)
     }
@@ -29,7 +29,7 @@ impl Store {
         let side = |filter: &str, column: &str| -> Result<Option<(String, i64)>> {
             self.conn
                 .query_row(
-                    &format!("SELECT cover_id, {column} FROM story_covers WHERE {filter} LIMIT 1"),
+                    &format!("SELECT item_id, {column} FROM story_items WHERE role = 'cover' AND {filter} LIMIT 1"),
                     [marker_id],
                     |row| Ok((row.get(0)?, row.get(1)?)),
                 )
@@ -54,7 +54,7 @@ impl Store {
         if let Some(cover) = before {
             self.conn
                 .execute(
-                    "UPDATE story_covers SET a2_tail_frames = ?1, updated_at = ?2 WHERE cover_id = ?3",
+                    "UPDATE story_items SET a2_tail_frames = ?1, updated_at = ?2 WHERE role = 'cover' AND item_id = ?3",
                     params![offset.clamp(0, bound), now, cover],
                 )
                 .map_err(err)?;
@@ -62,7 +62,7 @@ impl Store {
         if let Some(cover) = after {
             self.conn
                 .execute(
-                    "UPDATE story_covers SET a2_lead_frames = ?1, updated_at = ?2 WHERE cover_id = ?3",
+                    "UPDATE story_items SET a2_lead_frames = ?1, updated_at = ?2 WHERE role = 'cover' AND item_id = ?3",
                     params![(-offset).clamp(0, bound), now, cover],
                 )
                 .map_err(err)?;
@@ -76,7 +76,11 @@ impl Store {
         let marker_id = marker_id.trim();
         let side = |filter: &str, column: &str| -> Result<Option<i64>> {
             self.conn
-                .query_row(&format!("SELECT {column} FROM story_covers WHERE {filter} LIMIT 1"), [marker_id], |row| row.get(0))
+                .query_row(
+                    &format!("SELECT {column} FROM story_items WHERE role = 'cover' AND {filter} LIMIT 1"),
+                    [marker_id],
+                    |row| row.get(0),
+                )
                 .optional()
                 .map_err(err)
         };
@@ -99,12 +103,12 @@ impl Store {
         let now = story_now();
         if let Some(cover) = before {
             self.conn
-                .execute("UPDATE story_covers SET a2_tail_frames = ?1, updated_at = ?2 WHERE cover_id = ?3", params![tail, now, cover])
+                .execute("UPDATE story_items SET a2_tail_frames = ?1, updated_at = ?2 WHERE role = 'cover' AND item_id = ?3", params![tail, now, cover])
                 .map_err(err)?;
         }
         if let Some(cover) = after {
             self.conn
-                .execute("UPDATE story_covers SET a2_lead_frames = ?1, updated_at = ?2 WHERE cover_id = ?3", params![lead, now, cover])
+                .execute("UPDATE story_items SET a2_lead_frames = ?1, updated_at = ?2 WHERE role = 'cover' AND item_id = ?3", params![lead, now, cover])
                 .map_err(err)?;
         }
         Ok(Data::Changed)
@@ -134,7 +138,22 @@ impl Store {
     /// segment before it and the J of it. A lead has no join of its own; the segment must have
     /// one before it.
     pub(crate) fn set_join_sound(&mut self, segment_id: &str, tail: u32, lead: u32) -> Result<Data> {
+        // The A1 of a Ton never goes into an Off (user 2026-10-30): only its A2 does.
+        let (before, after) = join_kinds(&self.conn, segment_id)?;
+        if tail > 0 && before == "tonovi" && after == "offovi" || lead > 0 && before == "offovi" && after == "tonovi" {
+            return Err(qnc_ui_text::text("story.ton_a1_not_into_off").into());
+        }
         self.set_join_sides(segment_id, ("a1_tail_frames", tail), ("a1_lead_frames", lead))
+    }
+
+    /// The A2 of a Ton at its join with an Off (user 2026-10-30): an L of the Ton before an Off,
+    /// a J of the Ton after one; a join of anything else takes none.
+    pub(crate) fn set_join_a2(&mut self, segment_id: &str, tail: u32, lead: u32) -> Result<Data> {
+        let (before, after) = join_kinds(&self.conn, segment_id)?;
+        if tail > 0 && !(before == "tonovi" && after == "offovi") || lead > 0 && !(before == "offovi" && after == "tonovi") {
+            return Err(qnc_ui_text::text("story.ton_a2_only_into_off").into());
+        }
+        self.set_join_sides(segment_id, ("a2_tail_frames", tail), ("a2_lead_frames", lead))
     }
 
     /// The picture at the join before `segment_id` (user 2026-10-29): the picture L of the
@@ -152,12 +171,17 @@ impl Store {
         let before = join_before(&self.conn, segment_id)?;
         let now = story_now();
         self.conn
-            .execute(&format!("UPDATE story_parts SET {tail_column} = ?1, updated_at = ?2 WHERE part_id = ?3"), params![tail, now, before])
+            .execute(
+                &format!("UPDATE story_items SET {tail_column} = ?1, updated_at = ?2 WHERE role = 'segment' AND item_id = ?3"),
+                params![tail, now, before],
+            )
             .map_err(err)?;
         let changed = self
             .conn
             .execute(
-                &format!("UPDATE story_parts SET {lead_column} = ?1, updated_at = ?2 WHERE part_id = ?3 AND active = 1"),
+                &format!(
+                    "UPDATE story_items SET {lead_column} = ?1, updated_at = ?2 WHERE role = 'segment' AND item_id = ?3 AND active = 1"
+                ),
                 params![lead, now, segment_id],
             )
             .map_err(err)?;
@@ -175,8 +199,8 @@ impl Store {
         let changed = self
             .conn
             .execute(
-                "UPDATE story_covers SET a2_lead_frames = ?1, a2_tail_frames = ?2, updated_at = ?3
-                 WHERE cover_id = ?4",
+                "UPDATE story_items SET a2_lead_frames = ?1, a2_tail_frames = ?2, updated_at = ?3
+                 WHERE role = 'cover' AND item_id = ?4",
                 params![lead, tail, story_now(), cover_id.trim()],
             )
             .map_err(err)?;
@@ -187,13 +211,25 @@ impl Store {
     }
 }
 
+/// The kinds (`tonovi` / `offovi`) of the segment before the join and of `segment_id` after it.
+fn join_kinds(conn: &Connection, segment_id: &str) -> Result<(String, String)> {
+    let segment_id = segment_id.trim();
+    let before = join_before(conn, segment_id)?;
+    let kind = |id: &str| -> Result<String> {
+        conn.query_row("SELECT kind FROM story_items WHERE role = 'segment' AND item_id = ?1", [id], |row| row.get(0))
+            .map_err(err)
+    };
+    Ok((kind(&before)?, kind(segment_id)?))
+}
+
 /// The active segment before `segment_id` at their join; a lead has no join of its own.
 pub(crate) fn join_before(conn: &Connection, segment_id: &str) -> Result<String> {
     leads::refuse_lead(conn, segment_id)?;
     let before: Option<String> = conn
         .query_row(
-            "SELECT part_id FROM story_parts
-             WHERE active = 1 AND sort_index < (SELECT sort_index FROM story_parts WHERE part_id = ?1)
+            "SELECT item_id FROM story_items
+             WHERE role = 'segment' AND active = 1
+               AND sort_index < (SELECT sort_index FROM story_items WHERE role = 'segment' AND item_id = ?1)
              ORDER BY sort_index DESC LIMIT 1",
             [segment_id],
             |row| row.get(0),

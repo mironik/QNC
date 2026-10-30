@@ -101,7 +101,7 @@ fn reads_list_deleted_segments_all_markers_slots_and_the_selection() {
 }
 
 #[test]
-fn a_development_story_without_the_audio_channel_columns_is_removed_on_open() {
+fn a_development_story_of_an_older_shared_table_is_removed_on_open() {
     let dir = tempfile::tempdir().unwrap();
     let path = dir.path().join("db");
     let mut store = imported_store(&path);
@@ -111,7 +111,8 @@ fn a_development_story_without_the_audio_channel_columns_is_removed_on_open() {
     Connection::open(&path)
         .unwrap()
         .execute_batch(
-            "DROP VIEW public_story_parts; ALTER TABLE story_parts DROP COLUMN a1_source_channel;",
+            "DROP VIEW public_story_items; DROP VIEW public_story_parts; DROP VIEW public_story_covers;
+             ALTER TABLE story_items DROP COLUMN a2_tail_frames;",
         )
         .unwrap();
     let mut store = reopen(&path);
@@ -172,10 +173,10 @@ fn a_story_of_an_older_schema_is_not_read_until_the_owner_brings_it_up() {
     let mut store = imported_store(&path);
     three_segments(&mut store);
     drop(store);
-    // A story from before the A1 level (2026-10-16).
+    // A story from before segments and covers shared one table (2026-10-30).
     Connection::open(&path)
         .unwrap()
-        .execute_batch("DROP VIEW public_story_parts; ALTER TABLE story_parts DROP COLUMN a1_level_db; ALTER TABLE story_parts DROP COLUMN a1_off;")
+        .execute_batch("CREATE TABLE story_parts (part_id TEXT PRIMARY KEY);")
         .unwrap();
     let read_only = |path: &Path| store::Store::attach(Connection::open(path).unwrap(), Access::ReadOnly);
     let refused = read_only(&path).err().expect("an older story is not read");
@@ -185,8 +186,7 @@ fn a_story_of_an_older_schema_is_not_read_until_the_owner_brings_it_up() {
     let Data::Segments(rows) = run(&mut reader, Operation::ListSegments).unwrap() else {
         panic!()
     };
-    assert_eq!(rows.len(), 3);
-    assert!(rows.iter().all(|row| row.a1_level_db == 0), "as recorded");
+    assert!(rows.is_empty(), "an older story is removed, not converted");
 }
 
 #[test]

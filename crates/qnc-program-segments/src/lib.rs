@@ -150,6 +150,10 @@ pub struct NewSegment {
     pub a1_source_channel: u16,
     pub a1_level_db: i8,
     pub a1_off: bool,
+    /// The A2 kept on the source timeline: heard only where a Ton's A2 goes into an Off.
+    pub a2_source_channel: u16,
+    pub a2_level_db: i8,
+    pub a2_off: bool,
 }
 
 /// What a measured loudness belongs to: program length, rate, waves read, A1 and A2 parts.

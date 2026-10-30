@@ -275,7 +275,7 @@ fn a_b_roll_shorter_than_its_slot_splits_it_with_an_m_marker() {
     assert_eq!(markers(&mut store), vec![12], "an M marker where the B-roll ends");
     let covers: Vec<(i64, i64)> = Connection::open(&path)
         .unwrap()
-        .prepare("SELECT timeline_start_frame, timeline_end_frame FROM story_covers")
+        .prepare("SELECT timeline_start_frame, timeline_end_frame FROM story_items WHERE role = 'cover'")
         .unwrap()
         .query_map([], |row| Ok((row.get(0)?, row.get(1)?)))
         .unwrap()
@@ -307,7 +307,7 @@ fn a_new_segment_keeps_the_last_slot_of_a_cover_and_gets_an_empty_slot() {
     assert_eq!(markers(&mut store), vec![25, 30], "the old end stays as an M marker");
     let cover_slot: (i64, i64) = Connection::open(&path)
         .unwrap()
-        .query_row("SELECT timeline_start_frame, timeline_end_frame FROM story_covers", [], |row| Ok((row.get(0)?, row.get(1)?)))
+        .query_row("SELECT timeline_start_frame, timeline_end_frame FROM story_items WHERE role = 'cover'", [], |row| Ok((row.get(0)?, row.get(1)?)))
         .unwrap();
     assert_eq!(cover_slot, (25, 30), "the cover keeps its slot");
 }

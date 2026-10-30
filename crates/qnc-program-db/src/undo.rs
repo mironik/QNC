@@ -11,11 +11,10 @@ use crate::store::err;
 use crate::Result;
 
 /// The story tables a step restores, in an order that keeps no stale row behind.
-const STORY_TABLES: [&str; 5] = [
-    "story_parts",
+const STORY_TABLES: [&str; 4] = [
+    "story_items",
     "story_markers",
     "story_marker_slots",
-    "story_covers",
     "story_state",
 ];
 

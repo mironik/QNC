@@ -301,7 +301,7 @@ impl Store {
             .map(|duration| duration.as_secs())
             .unwrap_or(0);
         let before = now.saturating_sub(older_than) as i64;
-        let covers = object_exists(&self.conn, "table", "story_covers")?;
+        let covers = object_exists(&self.conn, "view", "public_story_covers")?;
         let tx = self
             .conn
             .transaction_with_behavior(rusqlite::TransactionBehavior::Immediate)
@@ -310,7 +310,7 @@ impl Store {
             tx.execute(
                 "UPDATE virtual_shots SET cover_pending = 0
                  WHERE class = 'b_roll' AND cover_pending = 1 AND created_at_utc < ?1
-                   AND shot_id IN (SELECT virtual_shot_id FROM story_covers)",
+                   AND shot_id IN (SELECT virtual_shot_id FROM public_story_covers)",
                 [before],
             )
             .map_err(err)?;
@@ -326,10 +326,10 @@ impl Store {
 
     /// A B-roll shot no cover uses goes (its cover was refused); one in use stays.
     fn forget_cover_shot(&mut self, shot_id: &str) -> Result<Data> {
-        let used = object_exists(&self.conn, "table", "story_covers")?
+        let used = object_exists(&self.conn, "view", "public_story_covers")?
             && self
                 .conn
-                .query_row("SELECT EXISTS(SELECT 1 FROM story_covers WHERE virtual_shot_id = ?1)", [shot_id], |row| row.get(0))
+                .query_row("SELECT EXISTS(SELECT 1 FROM public_story_covers WHERE virtual_shot_id = ?1)", [shot_id], |row| row.get(0))
                 .map_err(err)?;
         if !used {
             self.conn

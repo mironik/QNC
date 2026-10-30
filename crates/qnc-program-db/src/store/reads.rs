@@ -40,7 +40,8 @@ impl Store {
             .prepare(
                 "SELECT segment_id, kind, sort_index, clip_id, in_frame, out_frame, fps_num,
                         fps_den, active, a1_source_channel, duration_frames, a1_level_db, a1_off,
-                        v_lead_frames, lead, a1_lead_frames, a1_tail_frames, v_tail_frames
+                        v_lead_frames, lead, a1_lead_frames, a1_tail_frames, v_tail_frames,
+                        a2_source_channel, a2_level_db, a2_off, a2_lead_frames, a2_tail_frames
                  FROM public_story_parts ORDER BY sort_index, segment_id",
             )
             .map_err(err)?;
@@ -71,6 +72,11 @@ impl Store {
                     a1_lead_frames: row.get::<_, i64>(15)?.clamp(0, i64::from(MAX_OVERLAP_FRAMES)) as u32,
                     a1_tail_frames: row.get::<_, i64>(16)?.clamp(0, i64::from(MAX_OVERLAP_FRAMES)) as u32,
                     v_tail_frames: row.get::<_, i64>(17)?.clamp(0, i64::from(MAX_OVERLAP_FRAMES)) as u32,
+                    a2_source_channel: channel(row.get(18)?),
+                    a2_level_db: level(row.get(19)?),
+                    a2_off: row.get::<_, i64>(20)? != 0,
+                    a2_lead_frames: row.get::<_, i64>(21)?.clamp(0, i64::from(MAX_OVERLAP_FRAMES)) as u32,
+                    a2_tail_frames: row.get::<_, i64>(22)?.clamp(0, i64::from(MAX_OVERLAP_FRAMES)) as u32,
                 })
             })
             .map_err(err)?
@@ -191,7 +197,7 @@ impl Store {
             let exists: bool = self
                 .conn
                 .query_row(
-                    "SELECT EXISTS(SELECT 1 FROM story_parts WHERE part_id = ?1)",
+                    "SELECT EXISTS(SELECT 1 FROM story_items WHERE role = 'segment' AND item_id = ?1)",
                     [part_id],
                     |row| row.get(0),
                 )

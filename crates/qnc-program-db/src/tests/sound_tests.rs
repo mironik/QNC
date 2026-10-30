@@ -18,8 +18,8 @@ fn a_segment_hears_source_channel_one_on_a1_and_covers_are_read_with_their_a2_ch
     Connection::open(&path)
         .unwrap()
         .execute(
-            "UPDATE story_covers SET a2_source_channel = 1, source_fps_num = 50,
-                virtual_shot_id = 'shot' WHERE cover_id = 'cover-1'",
+            "UPDATE story_items SET a2_source_channel = 1, source_fps_num = 50,
+                virtual_shot_id = 'shot' WHERE role = 'cover' AND item_id = 'cover-1'",
             [],
         )
         .unwrap();
@@ -66,6 +66,9 @@ fn a_new_segment_keeps_the_source_channel_chosen_for_a1() {
             a1_source_channel: 1,
             a1_level_db: -6,
             a1_off: false,
+            a2_source_channel: 1,
+            a2_level_db: 0,
+            a2_off: false,
         },
     )
     .unwrap();
@@ -135,4 +138,31 @@ fn a_new_cover_keeps_the_source_channel_chosen_for_a2() {
     assert!(run(&mut store, Operation::SetCoverOverlap { cover_id: changed.cover_id.clone(), lead_frames: 360_001, tail_frames: 0 }).is_err());
     run(&mut store, Operation::UndoStory).unwrap();
     assert_eq!((covers(&mut store)[0].a2_lead_frames, covers(&mut store)[0].a2_tail_frames), (0, 0));
+}
+
+/// User 2026-10-30: "the A1 of the Ton cannot go into the Off, only its A2 as a J or an L".
+#[test]
+fn only_the_a2_of_a_ton_goes_into_an_off_its_a1_does_not() {
+    let dir = tempfile::tempdir().unwrap();
+    let path = dir.path().join("db");
+    let mut store = imported_store(&path);
+    for (kind, start) in [("offovi", 0), ("tonovi", 100), ("offovi", 200)] {
+        create_segment(&mut store, kind, (start, start + 10), (50, 1)).unwrap();
+    }
+    let users: Vec<String> = segments(&mut store).into_iter().filter(|row| row.lead.is_empty()).map(|row| row.segment_id).collect();
+    assert_eq!(segments(&mut store).iter().find(|row| row.segment_id == users[1]).unwrap().a2_source_channel, 1, "A2 as kept");
+    // Off -> Ton: the Ton's A1 J into the Off is refused, its A2 J is taken; the Off's A1 L stays.
+    let refused = run(&mut store, Operation::SetJoinSound { segment_id: users[1].clone(), tail_frames: 0, lead_frames: 4 });
+    assert_eq!(refused.err().as_deref(), Some(qnc_ui_text::text("story.ton_a1_not_into_off")));
+    run(&mut store, Operation::SetJoinSound { segment_id: users[1].clone(), tail_frames: 3, lead_frames: 0 }).unwrap();
+    run(&mut store, Operation::SetJoinA2 { segment_id: users[1].clone(), tail_frames: 0, lead_frames: 6 }).unwrap();
+    assert!(run(&mut store, Operation::SetJoinA2 { segment_id: users[1].clone(), tail_frames: 2, lead_frames: 0 }).is_err(), "an Off has no A2 to give");
+    // Ton -> Off: the Ton's A1 L is refused, its A2 L is taken.
+    assert!(run(&mut store, Operation::SetJoinSound { segment_id: users[2].clone(), tail_frames: 2, lead_frames: 0 }).is_err());
+    run(&mut store, Operation::SetJoinA2 { segment_id: users[2].clone(), tail_frames: 5, lead_frames: 0 }).unwrap();
+    let ton = segments(&mut store).into_iter().find(|row| row.segment_id == users[1]).unwrap();
+    assert_eq!((ton.a2_lead_frames, ton.a2_tail_frames, ton.a1_lead_frames), (6, 5, 0));
+    run(&mut store, Operation::UndoStory).unwrap();
+    let ton = segments(&mut store).into_iter().find(|row| row.segment_id == users[1]).unwrap();
+    assert_eq!((ton.a2_lead_frames, ton.a2_tail_frames), (6, 0), "one Undo step");
 }

@@ -302,9 +302,19 @@ impl ProgramSegments {
 
     /// Whether the cut has something with sound before it and after it on `lane`.
     pub(crate) fn cut_sides(&self, lane: u8, marker_id: &str, cut: u64) -> (bool, bool) {
+        // The A1 of a Ton never goes into an Off, only its A2 does (user 2026-10-30): at the join
+        // of a Ton and an Off, A1 has no side into the Off and A2 has only that side.
+        let kinds = |before: &qnc_program_db::ProgramSegment, after: &qnc_program_db::ProgramSegment| {
+            (before.kind == "tonovi" && after.kind == "offovi", before.kind == "offovi" && after.kind == "tonovi")
+        };
         if lane == 0 {
-            let both = self.join_clips(cut).is_some();
-            return (both, both);
+            return self.join_clips(cut).map_or((false, false), |(before, after)| {
+                let (ton_off, off_ton) = kinds(before, after);
+                (!ton_off, !off_ton)
+            });
+        }
+        if qnc_program_view::join_segment(marker_id).is_some() {
+            return self.join_pair(marker_id).map_or((false, false), |(before, after)| kinds(before, after));
         }
         let (before, after) = self.cut_covers(marker_id);
         (before.is_some(), after.is_some())
@@ -321,6 +331,9 @@ impl ProgramSegments {
     pub(crate) fn stored_cut_sound(&self, lane: u8, marker_id: &str, cut: u64) -> CutSound {
         if lane == 0 {
             return self.join_clips(cut).map_or_else(CutSound::default, |(before, after)| CutSound { tail: before.a1_tail_frames, lead: after.a1_lead_frames });
+        }
+        if qnc_program_view::join_segment(marker_id).is_some() {
+            return self.join_pair(marker_id).map_or_else(CutSound::default, |(before, after)| CutSound { tail: before.a2_tail_frames, lead: after.a2_lead_frames });
         }
         let (before, after) = self.cut_covers(marker_id);
         CutSound { tail: before.map_or(0, |cover| cover.a2_tail_frames), lead: after.map_or(0, |cover| cover.a2_lead_frames) }
@@ -379,6 +392,14 @@ impl ProgramSegments {
             self.marker_committing = true;
             return self.write(Operation::SetJoinSound { segment_id, tail_frames: draft.tail, lead_frames: draft.lead });
         }
+        // The A2 of a Ton at its join with an Off (user 2026-10-30).
+        if let (CutPart::Sound { lane: 1, stored, draft, .. }, Some(segment_id)) = (part, join.clone()) {
+            if stored == draft {
+                return self.refresh_view(String::new());
+            }
+            self.marker_committing = true;
+            return self.write(Operation::SetJoinA2 { segment_id, tail_frames: draft.tail, lead_frames: draft.lead });
+        }
         // A cut between two clips (user 2026-10-29): whole, the OUT before and the IN after move
         // together (a roll); its picture alone, a picture L before or J after.
         if let Some(segment_id) = join {
@@ -417,7 +438,8 @@ impl ProgramSegments {
             return None;
         };
         let (marker_id, _) = self.marker_edit.as_ref()?;
-        if stored == draft {
+        // The A2 of a Ton at a join is heard after Enter (no cover to draft).
+        if stored == draft || qnc_program_view::join_segment(marker_id).is_some() {
             return None;
         }
         let (before, after) = self.cut_covers(marker_id);

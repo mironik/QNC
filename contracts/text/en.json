@@ -930,6 +930,8 @@
     "story.ui.redo_selected": "Redo sel.",
     "story.join_past_marker": "The cut cannot move past an M marker: take that marker first, or move the cut on the other side of it.",
     "story.join_none": "There is no cut before this clip on A1: its J and L have nothing to cross with.",
+    "story.ton_a1_not_into_off": "The A1 of a Ton does not go into an Off; its A2 can (Ctrl+2).",
+    "story.ton_a2_only_into_off": "The A2 of a Ton goes only into an Off next to it, as a J or an L.",
     "app.group_a_needs_app": "Group a must have a chosen application.",
     "story.marker_inside_story": "An M marker must be inside the length of the story ({seconds} s).",
     "story.marker_between_neighbours": "An M marker moves only between its neighbouring markers.",

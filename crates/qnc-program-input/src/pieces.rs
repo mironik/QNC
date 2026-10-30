@@ -76,6 +76,11 @@ pub fn load_pieces(
             v_tail_frames: 0,
             a1_lead_frames: 0,
             a1_tail_frames: 0,
+            a2_source_channel: 0,
+            a2_level_db: 0,
+            a2_off: false,
+            a2_lead_frames: 0,
+            a2_tail_frames: 0,
         });
         start = record_range.out_frame;
     }
@@ -111,6 +116,11 @@ fn gap_segment(index: usize, clip_id: &str, (from, to): (i64, i64), timebase: Fr
         v_tail_frames: 0,
         a1_lead_frames: 0,
         a1_tail_frames: 0,
+        a2_source_channel: 0,
+        a2_level_db: 0,
+        a2_off: false,
+        a2_lead_frames: 0,
+        a2_tail_frames: 0,
     })
 }
 

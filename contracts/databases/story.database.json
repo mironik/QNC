@@ -7,15 +7,15 @@
   "qnc_uri": "qnc://local/db/story/{story_instance}",
   "tables": [
     "story_state",
-    "story_parts",
+    "story_items",
     "story_markers",
     "story_marker_slots",
-    "story_covers",
     "story_object_history",
     "story_undo"
   ],
   "public_read_views": [
     "public_story_state",
+    "public_story_items",
     "public_story_parts",
     "public_story_markers",
     "public_story_marker_slots",
@@ -28,6 +28,8 @@
   "updated_at": "2026-09-26T00:00:00Z",
   "rules": {
     "source": "QNC_v5/.cursor/rules/qnc-story-segment-timeline.mdc (the rule wins over the v5 code)",
+    "story_items": "user 2026-10-30 (\"the table can be shared, a clip-kind column says what it is\"): segments and covers are rows of one table story_items, role segment | cover; a segment (kind tonovi | offovi) lies in sort_index order and carries A1, a cover lies in the slot between two M markers (slot_id, timeline_*) and overwrites the picture and A2 there; every row has its source (clip_id, source_in_frame, source_out_frame, source_fps_*), a picture J/L (v_lead_frames, v_tail_frames) and a sound per lane (a1_*, a2_*: channel, level, off, J, L). The rules below that name story_parts mean its segment rows, story_covers its cover rows. A story of the former separate tables is removed, not converted (no migration, user 2026-10-30).",
+    "ton_into_off": "user 2026-10-30: at the join of a Ton and an Off the picture of the Ton may go into the Off (v_lead_frames / v_tail_frames); the A1 of a Ton never goes into the Off (SetJoinSound refuses it); only the A2 of the Ton goes into the Off, as an L of a Ton before an Off (a2_tail_frames) or a J of a Ton after an Off (a2_lead_frames), SetJoinA2, one undo step. A Ton's A2 is silent under the Ton itself; a cover in the Off keeps A2 where it lies (a cover overwrites A2). A new segment takes the A2 channel, level and off kept on the source timeline.",
     "story_parts": "TON/OFF segments (kind tonovi | offovi) in sort_index order; the program is their sum; delete sets active = 0; a1_source_channel is the source channel heard on A1 (zero based, 0 = channel 1 as in v5), chosen on the Wrap segment; a1_level_db (dB, 0 as recorded, -40..+12) and a1_off (silent) are the level of A1, kept for the program, the prerender and the export (user 2026-10-16)",
     "slot_move": "user 2026-10-10 (not in v5): MoveSlot moves both markers of a slot by the same frames, so it keeps its length, its marker pair and its cover; a neighbouring slot grows or shrinks; never up to a neighbouring marker, never the locked start or end; one UNDO step",
     "cover_split": "user 2026-10-13 (not v5): a new marker inside a covered slot splits the cover in two: the cover keeps the part before the marker (its OUT is the marker), a second cover of the same clip and shot plays on from the marker in the slot after it; the picture does not change and each part can be changed. One edit, one UNDO step.",

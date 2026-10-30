@@ -29,8 +29,8 @@ pub(crate) struct StoryPartSpan {
 pub(crate) fn active_part_spans(conn: &Connection) -> Result<Vec<StoryPartSpan>> {
     let mut statement = conn
         .prepare(
-            "SELECT part_id, duration_frames, in_frame, out_frame FROM story_parts
-             WHERE active = 1 ORDER BY sort_index",
+            "SELECT item_id, duration_frames, source_in_frame, source_out_frame FROM story_items
+             WHERE role = 'segment' AND active = 1 ORDER BY sort_index",
         )
         .map_err(err)?;
     let rows = statement
@@ -67,7 +67,7 @@ pub(crate) fn ensure_boundary_markers(conn: &Connection) -> Result<()> {
     let duration: i64 = parts.iter().map(|part| part.frames).sum();
     if duration <= 0 {
         conn.execute_batch(
-            "DELETE FROM story_covers;
+            "DELETE FROM story_items WHERE role = 'cover';
              DELETE FROM story_marker_slots;
              DELETE FROM story_markers;
              UPDATE story_state SET selected_slot_id = '' WHERE id = 1;",

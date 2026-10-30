@@ -50,6 +50,19 @@ pub struct ProgramSegment {
     /// frames after its sound, over the start of the segment after (black for an Off); 0 none.
     #[serde(default)]
     pub v_tail_frames: u32,
+    /// The A2 of a Ton (user 2026-10-30): silent under the Ton, heard only where it goes into
+    /// the Off next to it, `a2_lead_frames` before its start and `a2_tail_frames` after its
+    /// end, on this channel (zero based) and level.
+    #[serde(default)]
+    pub a2_source_channel: u16,
+    #[serde(default)]
+    pub a2_level_db: i8,
+    #[serde(default)]
+    pub a2_off: bool,
+    #[serde(default)]
+    pub a2_lead_frames: u32,
+    #[serde(default)]
+    pub a2_tail_frames: u32,
 }
 
 /// An M marker on the program axis (v5 `story_markers`). `system_role` is
@@ -157,6 +170,14 @@ pub enum Operation {
         a1_level_db: i8,
         #[serde(default)]
         a1_off: bool,
+        /// The A2 of the segment as kept on the source timeline (user 2026-10-30): heard only
+        /// where a Ton's A2 goes into the Off next to it.
+        #[serde(default)]
+        a2_source_channel: u16,
+        #[serde(default)]
+        a2_level_db: i8,
+        #[serde(default)]
+        a2_off: bool,
     },
     /// Takes a segment out of the program (v5 `delete_part`: `active = 0`); it stays
     /// listed where it was.
@@ -221,6 +242,10 @@ pub enum Operation {
     /// `tail_frames` the L of the segment before, `lead_frames` the J of `segment_id`, the
     /// segment after. One UNDO step.
     SetJoinSound { segment_id: String, tail_frames: u32, lead_frames: u32 },
+    /// The A2 of a Ton at the join of a Ton and an Off (user 2026-10-30: "only the A2 of the Ton
+    /// goes into the Off, as a J or an L"): `tail_frames` the L of the Ton before an Off,
+    /// `lead_frames` the J of `segment_id`, a Ton after an Off. One UNDO step.
+    SetJoinA2 { segment_id: String, tail_frames: u32, lead_frames: u32 },
     /// Only the picture at the join of two segments moves (user 2026-10-29: the cut is the
     /// picture and sound timecodes of the clip before and after): `tail_frames` the picture L
     /// of the segment before (its picture goes on over the one after), `lead_frames` the
@@ -306,6 +331,7 @@ impl Operation {
                 | Self::SetCutSound { .. }
                 | Self::SetCutSoundEdges { .. }
                 | Self::SetJoinSound { .. }
+                | Self::SetJoinA2 { .. }
                 | Self::SetJoinPicture { .. }
                 | Self::UndoSelected { .. }
                 | Self::RedoSelected { .. }

@@ -30,12 +30,11 @@ pub(crate) use schema::*;
 pub(crate) use slots::*;
 pub(crate) use spans::*;
 
-const OWNED: [&str; 8] = [
+const OWNED: [&str; 7] = [
     "story_revision",
-    "story_parts",
+    "story_items",
     "story_markers",
     "story_marker_slots",
-    "story_covers",
     "story_state",
     "story_object_history",
     "story_undo",
@@ -202,13 +201,19 @@ impl Store {
                 a1_source_channel,
                 a1_level_db,
                 a1_off,
+                a2_source_channel,
+                a2_level_db,
+                a2_off,
             } => self.create_segment(
                 project_id,
                 kind,
                 clip_id,
                 (*in_frame, *out_frame),
                 (*fps_num, *fps_den),
-                (*a1_source_channel, lane_level(*a1_level_db)?, *a1_off),
+                [
+                    (*a1_source_channel, lane_level(*a1_level_db)?, *a1_off),
+                    (*a2_source_channel, lane_level(*a2_level_db)?, *a2_off),
+                ],
             ),
             Operation::DeleteSegment { segment_id } => self.delete_segment(segment_id),
             Operation::IncludeSegment { segment_id } => self.include_segment(segment_id),
@@ -245,6 +250,9 @@ impl Store {
             Operation::SetCutSound { marker_id, offset } => self.set_cut_sound(marker_id, *offset),
             Operation::SetJoinSound { segment_id, tail_frames, lead_frames } => {
                 self.set_join_sound(segment_id, *tail_frames, *lead_frames)
+            }
+            Operation::SetJoinA2 { segment_id, tail_frames, lead_frames } => {
+                self.set_join_a2(segment_id, *tail_frames, *lead_frames)
             }
             Operation::SetJoinPicture { segment_id, tail_frames, lead_frames } => {
                 self.set_join_picture(segment_id, *tail_frames, *lead_frames)
@@ -284,10 +292,10 @@ impl Store {
                 (*a2_source_channel, lane_level(*a2_level_db)?, *a2_off),
             ),
             Operation::SetSegmentSound { segment_id, channel, level_db, off } => {
-                self.set_sound("story_parts", "part_id", "a1", segment_id, (*channel, lane_level(*level_db)?, *off))
+                self.set_sound("segment", "a1", segment_id, (*channel, lane_level(*level_db)?, *off))
             }
             Operation::SetCoverSound { cover_id, channel, level_db, off } => {
-                self.set_sound("story_covers", "cover_id", "a2", cover_id, (*channel, lane_level(*level_db)?, *off))
+                self.set_sound("cover", "a2", cover_id, (*channel, lane_level(*level_db)?, *off))
             }
             Operation::SetCoverOverlap { cover_id, lead_frames, tail_frames } => {
                 self.set_cover_overlap(cover_id, *lead_frames, *tail_frames)

@@ -7115,3 +7115,26 @@ kotacic, Enter, Esc), umjesto odbijanja; samo dok na markeru nista nije pomaknut
 sliku reza (`select_mark_in` na taj rez, isto kao Ctrl+I u zoomu); uzeta slika ima crveni okvir gumba
 (`qnc-program-view` `ZoomSound.picture_taken`, `qnc-trim-overlay` `paint_take_button`, isti za A1/A2/V). Test
 `a1_of_an_m_marker_within_a_segment_takes_the_nearest_cut_of_two_clips`, conformance. Uzivo nije provjereno.
+Izvedeno 2026-10-30 (korisnik: "po novome baza ti moze biti zajednicka, a stupac vrsta klipa ti govori sto je"; "slika
+tona moze uci u off i na pocetku i na kraju, audio tona A1 ne moze uci u off, samo A2 kao J ili L"; odluke: A2 Tona je
+tih dok se ne produlji u Off, mijesanje s pokrivalicom provjerit ce se u testu, flat playlista, nema migracije): stanje
+prije je pushano (oznake `v-2026-10-30-pre-shared-clip-table`, `v-2026-10-30-db-schema`). (1) Segmenti i pokrivalice su
+redovi jedne tablice `story_items` (`role` segment | cover; segment: `kind` tonovi/offovi, `sort_index`, `lead`, `active`;
+pokrivalica: `slot_id`, `timeline_*`; oba: izvor `source_in_frame`/`source_out_frame`/`source_fps_*`, slika J/L, zvuk A1 i
+A2 s kanalom, razinom, off, J i L); `story_parts` i `story_covers` uklonjene, javni pogledi `public_story_parts` i
+`public_story_covers` ostaju (citaju `story_items`), novi `public_story_items`. Prica starijih tablica se brise, ne pretvara
+(i njezini markeri, slotovi, povijest i undo koraci). `qnc-program-db` (svi SQL upisi i citanja, undo i undo izabranog na
+novoj tablici), `qnc-virtual-shots` cita pokrivalice kroz `public_story_covers`. (2) Novi segment pamti A2 zadrzan na source
+timelineu (`CreateSegment.a2_*`, `NewSegment`). A1 Tona ne ulazi u Off: `SetJoinSound` odbija L Tona prije Offa i J Tona
+poslije Offa (`story.ton_a1_not_into_off`), a uredivanje reza A1 na tom spoju nema tu stranu (`qnc-program-segments`
+`cut_sides`). A2 Tona ulazi u Off kao L (Ton prije Offa, `a2_tail_frames`) ili J (Ton poslije Offa, `a2_lead_frames`):
+nova operacija `SetJoinA2` (jedan Undo korak; drugi spojevi odbijeni `story.ton_a2_only_into_off`); u zoomu reza spoja
+Ctrl+2 (ili A2) uzima taj zvuk, strelice/kotacic/Ctrl+I/O kao kod M markera, Enter zapisuje. `qnc-program-playlist`
+`ton_a2.rs`: A2 Tona je tih ispod Tona i cuje se samo u Offu, iz izvora iza OUT-a (L) ili prije IN-a (J), na svom kanalu i
+razini, s fadeom na vanjskom kraju (`audio.crossfade_frames`); gdje A2 drzi pokrivalica, ona ostaje (pokrivalica radi
+overwrite A2). Slika Tona u Off vec postoji (J/L slike spoja, 29. 10.). Ugovori `story.database.json` (`story_items`,
+`ton_into_off`), `program-db`, `program-input`, `program-segments`, rjecnik. Testovi `qnc-program-db` (52, novi
+`only_the_a2_of_a_ton_goes_into_an_off_its_a1_does_not`), `qnc-program-playlist` (23, novi
+`the_a2_of_a_ton_is_heard_only_where_it_goes_into_an_off`), `qnc-program-segments` (68), conformance. Nije izvedeno: nacrt A2
+Tona prije Entera (cuje se nakon upisa), mijesanje A2 Tona s pokrivalicom u istom Offu (sada pokrivalica preuzima), crtanje
+J/L A2 Tona na Wrap retku. Uzivo nije provjereno.

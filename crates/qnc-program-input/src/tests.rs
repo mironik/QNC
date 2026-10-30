@@ -22,6 +22,11 @@ fn part(id: &str, kind: &str, clip: &str, range: (u64, u64), active: bool) -> Pr
         a1_tail_frames: 0,
         v_tail_frames: 0,
         lead: String::new(),
+        a2_source_channel: 0,
+        a2_level_db: 0,
+        a2_off: false,
+        a2_lead_frames: 0,
+        a2_tail_frames: 0,
     }
 }
 

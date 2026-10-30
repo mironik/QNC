@@ -211,7 +211,7 @@ impl Store {
         let empty: Option<(i64, i64)> = tx
             .query_row(
                 "SELECT start_frame, end_frame FROM story_marker_slots
-                 WHERE start_frame >= ?1 AND slot_id NOT IN (SELECT slot_id FROM story_covers)
+                 WHERE start_frame >= ?1 AND slot_id NOT IN (SELECT slot_id FROM story_items WHERE role = 'cover')
                  ORDER BY start_frame LIMIT 1",
                 [slot_end],
                 |row| Ok((row.get(0)?, row.get(1)?)),

@@ -3,8 +3,8 @@ use super::*;
 /// Program length in frames: the segments one after another.
 pub(crate) fn program_length(conn: &Connection) -> Result<i64> {
     conn.query_row(
-        "SELECT COALESCE(SUM(CASE WHEN duration_frames > 0 THEN duration_frames ELSE out_frame - in_frame END), 0)
-         FROM story_parts WHERE active = 1",
+        "SELECT COALESCE(SUM(CASE WHEN duration_frames > 0 THEN duration_frames ELSE source_out_frame - source_in_frame END), 0)
+         FROM story_items WHERE role = 'segment' AND active = 1",
         [],
         |row| row.get(0),
     )
@@ -15,9 +15,9 @@ pub(crate) fn program_length(conn: &Connection) -> Result<i64> {
 pub(crate) fn segment_window(conn: &Connection, segment_id: &str) -> Result<Option<(u64, u64)>> {
     let mut statement = conn
         .prepare(
-            "SELECT part_id, CASE WHEN duration_frames > 0 THEN duration_frames ELSE out_frame - in_frame END
-             FROM story_parts
-             WHERE active = 1 ORDER BY sort_index",
+            "SELECT item_id, CASE WHEN duration_frames > 0 THEN duration_frames ELSE source_out_frame - source_in_frame END
+             FROM story_items
+             WHERE role = 'segment' AND active = 1 ORDER BY sort_index",
         )
         .map_err(err)?;
     let rows = statement
@@ -130,7 +130,7 @@ pub(crate) fn shift_markers_from(conn: &Connection, from: i64, delta: i64, fps: 
 /// excluded segment comes back where it was.
 pub(crate) fn all_segment_order(conn: &Connection) -> Result<Vec<(String, bool)>> {
     let mut statement = conn
-        .prepare("SELECT part_id, active FROM story_parts WHERE lead = '' ORDER BY sort_index, rowid")
+        .prepare("SELECT item_id, active FROM story_items WHERE role = 'segment' AND lead = '' ORDER BY sort_index, rowid")
         .map_err(err)?;
     let rows = statement
         .query_map([], |row| {
@@ -146,7 +146,7 @@ pub(crate) fn write_segment_order(conn: &Connection, ids: &[String]) -> Result<(
     let now = story_now();
     for (sort_index, id) in ids.iter().enumerate() {
         conn.execute(
-            "UPDATE story_parts SET sort_index = ?1, updated_at = ?3 WHERE part_id = ?2",
+            "UPDATE story_items SET sort_index = ?1, updated_at = ?3 WHERE role = 'segment' AND item_id = ?2",
             params![sort_index as i64, id, now],
         )
         .map_err(err)?;

@@ -3,7 +3,7 @@
 //! `export.tail_seconds`). Before an Off they are black and silence; before a Ton the picture of
 //! its clip starts there (the frames before its IN) and the sound starts with the segment. After
 //! the last segment the same, mirrored. Where the clip has fewer frames, the rest is black.
-//! They are rows of `story_parts` marked `lead`, kept by the owner after every edit; the user
+//! They are segment rows of `story_items` marked `lead`, kept by the owner after every edit; the user
 //! does not edit them, but slots and covers run over them like over any segment.
 
 use super::*;
@@ -40,7 +40,7 @@ struct Neighbour {
 pub(crate) fn sync_leads(conn: &Connection) -> Result<()> {
     let real = real_parts(conn)?;
     let (Some(first), Some(last)) = (real.first(), real.last()) else {
-        conn.execute("DELETE FROM story_parts WHERE lead != ''", []).map_err(err)?;
+        conn.execute("DELETE FROM story_items WHERE role = 'segment' AND lead != ''", []).map_err(err)?;
         return Ok(());
     };
     let rate = story_rate(conn)?.ok_or_else(|| qnc_ui_text::text("story.timeline_fps_invalid_story_program_valid"))?;
@@ -54,18 +54,18 @@ pub(crate) fn sync_leads(conn: &Connection) -> Result<()> {
     }
     let lead_in = |pieces: &[Piece]| pieces.iter().filter(|piece| piece.lead == "in").map(|piece| piece.frames).sum::<i64>();
     let delta = lead_in(&wanted) - lead_in(&stored);
-    conn.execute("DELETE FROM story_parts WHERE lead != ''", []).map_err(err)?;
+    conn.execute("DELETE FROM story_items WHERE role = 'segment' AND lead != ''", []).map_err(err)?;
     let now = story_now();
     for piece in &wanted {
         let fps = f64::from(piece.fps.0) / f64::from(piece.fps.1);
         let story_fps = f64::from(rate.0) / f64::from(rate.1);
         conn.execute(
-            "INSERT INTO story_parts (
-                part_id, kind, sort_index, title, text, clip_id, virtual_shot_id,
-                in_tc, out_tc, in_seconds, out_seconds, fps, source_fps_num, source_fps_den,
-                in_frame, out_frame, duration_frames, duration_label, duration_color_key,
+            "INSERT INTO story_items (
+                role, item_id, kind, sort_index, title, text, clip_id, virtual_shot_id,
+                in_tc, out_tc, in_seconds, out_seconds, source_fps, source_fps_num, source_fps_den,
+                source_in_frame, source_out_frame, duration_frames, duration_label, duration_color_key,
                 active, created_at, updated_at, a1_source_channel, a1_level_db, a1_off, lead
-             ) VALUES (?1, ?2, ?3, '', '', ?4, '', ?5, ?6, ?7, ?8, ?9, ?10, ?11,
+             ) VALUES ('segment', ?1, ?2, ?3, '', '', ?4, '', ?5, ?6, ?7, ?8, ?9, ?10, ?11,
                        ?12, ?13, ?14, ?15, ?16, 1, ?17, ?17, ?18, 0, 1, ?19)",
             params![
                 piece.part_id,
@@ -178,8 +178,8 @@ fn lead_seconds(conn: &Connection) -> Result<(f64, f64)> {
 fn real_parts(conn: &Connection) -> Result<Vec<Neighbour>> {
     let mut statement = conn
         .prepare(
-            "SELECT kind, clip_id, in_frame, out_frame, source_fps_num, source_fps_den, a1_source_channel
-             FROM story_parts WHERE active = 1 AND lead = '' ORDER BY sort_index, rowid",
+            "SELECT kind, clip_id, source_in_frame, source_out_frame, source_fps_num, source_fps_den, a1_source_channel
+             FROM story_items WHERE role = 'segment' AND active = 1 AND lead = '' ORDER BY sort_index, rowid",
         )
         .map_err(err)?;
     let rows = statement
@@ -202,9 +202,9 @@ fn real_parts(conn: &Connection) -> Result<Vec<Neighbour>> {
 fn stored_pieces(conn: &Connection) -> Result<Vec<Piece>> {
     let mut statement = conn
         .prepare(
-            "SELECT part_id, lead, sort_index, kind, clip_id, in_frame, out_frame, duration_frames,
+            "SELECT item_id, lead, sort_index, kind, clip_id, source_in_frame, source_out_frame, duration_frames,
                     source_fps_num, source_fps_den, a1_source_channel
-             FROM story_parts WHERE lead != '' ORDER BY sort_index",
+             FROM story_items WHERE role = 'segment' AND lead != '' ORDER BY sort_index",
         )
         .map_err(err)?;
     let rows = statement
@@ -233,7 +233,7 @@ fn stored_pieces(conn: &Connection) -> Result<Vec<Piece>> {
 /// A lead-in or lead-out is kept by the owner, never edited by the user.
 pub(crate) fn refuse_lead(conn: &Connection, part_id: &str) -> Result<()> {
     let lead: Option<String> = conn
-        .query_row("SELECT lead FROM story_parts WHERE part_id = ?1", [part_id.trim()], |row| row.get(0))
+        .query_row("SELECT lead FROM story_items WHERE role = 'segment' AND item_id = ?1", [part_id.trim()], |row| row.get(0))
         .optional()
         .map_err(err)?;
     if lead.is_some_and(|lead| !lead.is_empty()) {

@@ -49,6 +49,11 @@ pub fn build_input(
             v_tail_frames: i64::from(segment.v_tail_frames),
             a1_lead_frames: i64::from(segment.a1_lead_frames),
             a1_tail_frames: i64::from(segment.a1_tail_frames),
+            a2_source_channel: segment.a2_source_channel,
+            a2_level_db: segment.a2_level_db,
+            a2_off: segment.a2_off,
+            a2_lead_frames: i64::from(segment.a2_lead_frames),
+            a2_tail_frames: i64::from(segment.a2_tail_frames),
         });
         start += frames;
     }
