@@ -1003,6 +1003,35 @@ fn the_a1_sound_of_a_cut_between_two_clips_has_a_j_and_an_l() {
     }
 }
 
+/// User 2026-10-30: at the cut of an Off and a Ton only the A2 of the Ton goes into the Off (a J
+/// of the Ton after it); its A1 does not. The A2 is drafted to the two clips before Enter.
+#[test]
+fn the_a2_of_a_ton_goes_into_the_off_before_it_and_is_drafted_before_enter() {
+    let mut segments = component();
+    segments.stored = vec![stored("a", "offovi", (100, 140)), stored("b", "tonovi", (100, 160))];
+    segments.stored_markers.clear();
+    segments.refresh_view(String::new());
+    let join = segments.view().joins.iter().find(|pin| pin.frame == 40).expect("the cut").marker_id.clone();
+    segments.apply(SegmentCommand::TakeMarker(join));
+    segments.set_playhead(Some(45));
+    segments.apply_action("wrap_zoom");
+    // A1: the Ton's sound cannot start under the Off.
+    assert!(segments.take_cut_part(None, false, 0));
+    segments.apply_action("step_back_frame");
+    assert!(segments.join_sound_draft().is_none(), "no J of the Ton's A1 into the Off");
+    // A2: the Ton's sound starts under the Off.
+    assert!(segments.take_cut_part(None, false, 1), "the A2 of the join taken");
+    segments.apply_action("step_back_frame");
+    segments.apply_action("step_back_frame");
+    let draft = segments.cut_sound_draft().expect("the A2 draft");
+    assert!(draft.contains(&("b".to_string(), (2, 0))) && draft.contains(&("a".to_string(), (0, 0))), "{draft:?}");
+    for _ in 0..3 {
+        segments.apply_action("step_forward_frame");
+    }
+    let draft = segments.cut_sound_draft();
+    assert!(draft.is_none() || draft.as_ref().is_some_and(|d| d.contains(&("a".to_string(), (0, 0)))), "an Off has no A2 to give: {draft:?}");
+}
+
 
 #[test]
 fn a_double_click_enlarges_a_cover_with_its_neighbours_else_the_segment_and_the_program_row_the_program() {

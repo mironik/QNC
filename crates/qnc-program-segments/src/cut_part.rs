@@ -438,9 +438,17 @@ impl ProgramSegments {
             return None;
         };
         let (marker_id, _) = self.marker_edit.as_ref()?;
-        // The A2 of a Ton at a join is heard after Enter (no cover to draft).
-        if stored == draft || qnc_program_view::join_segment(marker_id).is_some() {
+        if stored == draft {
             return None;
+        }
+        // The A2 of a Ton at its join with an Off (user 2026-10-30): the two clips with their A2
+        // J and L as drafted, heard before Enter.
+        if qnc_program_view::join_segment(marker_id).is_some() {
+            let (before, after) = self.join_pair(marker_id)?;
+            return Some(vec![
+                (before.segment_id.clone(), (before.a2_lead_frames, draft.tail)),
+                (after.segment_id.clone(), (draft.lead, after.a2_tail_frames)),
+            ]);
         }
         let (before, after) = self.cut_covers(marker_id);
         let mut covers = Vec::new();

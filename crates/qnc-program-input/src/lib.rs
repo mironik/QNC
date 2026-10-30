@@ -71,8 +71,9 @@ pub struct SoundDraft {
     pub channel: u16,
     pub level_db: i8,
     pub off: bool,
-    /// Covers with their J and L as drafted on the Wrap row (user 2026-10-21: the sound of an
-    /// M marker's cut), story frames; the others keep theirs.
+    /// Covers with their A2 J and L as drafted on the Wrap row (user 2026-10-21: the sound of an
+    /// M marker's cut), or Tons with the A2 J and L they go into an Off with (user 2026-10-30),
+    /// story frames; the others keep theirs.
     pub overlaps: Vec<(String, (u32, u32))>,
     /// Clips with the J and L of their picture as drafted at a cut (user 2026-10-29: only the
     /// picture of the cut moves), story frames; the others keep theirs.
@@ -103,9 +104,14 @@ impl SoundDraft {
                 (segment.v_lead_frames, segment.v_tail_frames) = (*lead, *tail);
             }
         }
+        // The A2 J and L of a cover, or of a Ton going into the Off next to it (user 2026-10-30);
+        // segments and covers are rows of one table, so an id names one of them.
         for (id, (lead, tail)) in &self.overlaps {
             for cover in covers.iter_mut().filter(|cover| &cover.cover_id == id) {
                 (cover.a2_lead_frames, cover.a2_tail_frames) = (*lead, *tail);
+            }
+            for segment in segments.iter_mut().filter(|segment| &segment.segment_id == id) {
+                (segment.a2_lead_frames, segment.a2_tail_frames) = (*lead, *tail);
             }
         }
     }

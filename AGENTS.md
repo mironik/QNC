@@ -7138,3 +7138,9 @@ overwrite A2). Slika Tona u Off vec postoji (J/L slike spoja, 29. 10.). Ugovori 
 `the_a2_of_a_ton_is_heard_only_where_it_goes_into_an_off`), `qnc-program-segments` (68), conformance. Nije izvedeno: nacrt A2
 Tona prije Entera (cuje se nakon upisa), mijesanje A2 Tona s pokrivalicom u istom Offu (sada pokrivalica preuzima), crtanje
 J/L A2 Tona na Wrap retku. Uzivo nije provjereno.
+Dopuna 2026-10-30 (korisnik: "dodaj nacrt A2 Tona prije Entera"): dok je A2 spoja Ton/Off uzet u zoomu, svaki korak
+(strelice, kotacic, povlacenje strane) odmah svira pricu s nacrtom J/L A2 Tona; Esc vraca spremljeno, Enter zapisuje.
+Isti put kao nacrt J/L pokrivalica: `qnc-program-input` `SoundDraft.overlaps` vrijedi za pokrivalice i segmente (jedna
+tablica, id-evi se ne preklapaju), `qnc-program-segments` `cut_sound_draft` daje dva klipa spoja s nacrtom. Testovi
+`the_a2_of_a_ton_goes_into_the_off_before_it_and_is_drafted_before_enter`, `a_sound_draft_changes_only_its_own_segment_or_cover`
+(prosiren), conformance. Uzivo nije provjereno.
