@@ -134,8 +134,6 @@ pub struct ScriptView {
     pub exporting: bool,
     /// The SubSegment open in place of the source timeline.
     pub subsegment: Option<SubsegmentView>,
-    /// The skeleton of the story, one row a block (MA Video).
-    pub skeleton: Vec<SkeletonRow>,
     pub message: String,
 }
 
@@ -401,21 +399,6 @@ pub struct SubsegmentView {
     pub zoom: Option<Box<qnc_program_view::SegmentsView>>,
     /// The part whose A1 is taken (Ctrl+1), as drafted.
     pub sound: Option<usize>,
-}
-
-/// One block of the skeleton of the story (user 2026-10-31, MA Video: "every SubSegment in its
-/// own row").
-#[derive(Debug, Clone, Default, PartialEq)]
-pub struct SkeletonRow {
-    pub block_id: i64,
-    pub mark: String,
-    pub seconds: f64,
-    /// Its text (an OFF's words, a statement's words said).
-    pub text: String,
-    /// Its parts on its own axis; `None` for an OFF not recorded yet.
-    pub parts: Option<SubsegmentView>,
-    /// Whether it is the SubSegment open in place of the source timeline.
-    pub open: bool,
 }
 
 /// The parts on the SubSegment's axis (a pause before a part moves it on).

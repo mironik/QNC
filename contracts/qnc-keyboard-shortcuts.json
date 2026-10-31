@@ -178,9 +178,6 @@
     "script_send_story": {
       "label": "Posalji kostur price u Story (na kraj)"
     },
-    "script_open_subsegment": {
-      "label": "Otvori blok kostura kao SubSegment (MA Video)"
-    },
     "script_open_export": {
       "label": "Otvori izvezeni scenarij"
     },

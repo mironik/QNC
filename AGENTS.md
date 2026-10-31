@@ -7237,18 +7237,3 @@ dijela na njegovo mjesto; `qnc-script` (`send_story`, poruka nakon upisa), `qnc-
 (sljedeci koraci): kostur u MA Video (fino podesavanje prije slanja), slanje dijela kostura kao prepisivanje njegovih
 segmenata u prici (pokrivalice iznad njih trazi odluku). Testovi `qnc-script-draft` (novi `skeleton`), `qnc-program-db`
 (novi `a_skeleton_is_appended_in_one_step_...`), `qnc-script`, conformance. Uzivo nije provjereno.
-Izvedeno 2026-10-31 (korisnik: "volio bi da posaljes na MA Video.. on bi mogao biti kao Story, ali bez lead-in; Story nam ne
-dozvoljava sredivati OFF 1"; "u MA Video svi dolaze kao subsegmenti koje je moguce uredivati.. svaki subsegment u svoj red"):
-korak 2, kostur u MA Video. Grupa l ima desni panel `skeleton_panel` (`contracts/ui/editorial.layout.json`; conformance:
-l mora imati skeleton_panel). Nova kocka `crates/qnc-skeleton-panel` (+ ugovor): blokovi koji ulaze u trajanje priloga redom
-citanja, svaki u svom retku sa svojim dijelovima na `qnc-timeline` (bez lead-ina), nesnimljeni OFF oznacen i izostavljen;
-klik na redak otvara blok kao SubSegment na mjestu source timelinea (akcija kataloga `script_open_subsegment`, bez tipke),
-gdje se uredjuje postojecim alatima SubSegmenta (rubovi, A1, zoom); Send to Story u zaglavlju. `qnc-script`: `edit_block`
-(izjava od jednog raspona je svoj jedini dio, snimljeni OFF je dio svoje snimke), `write_piece` (dio OFF-a ide u zapis glasa,
-drugi kanal je druga snimka), `skeleton_rows`/`SkeletonRow`, `frames_of`, brzina projekta iz citanja scenarija.
-`qnc-script-db`: zapis glasa pamti dio snimke i A1 (`script_voice.range_from`, `range_to`, `a1_level_db`, `a1_off`, stari
-zapis dobiva cijelu snimku; operacija `SetVoicePart`; izbor druge snimke vraca cijelu), `set_piece` na izjavi od jednog
-raspona. `qnc-script-draft` `voice_piece`: Draft XML i Send to Story uzimaju dio snimke i razinu. `qnc-side-pieces`
-`SKELETON_PANEL` (donosi scenarij), `qnc-right-panel`. Testovi `qnc-script-db` (2 nova), `qnc-script`, `qnc-script-draft`,
-conformance. Uzivo nije provjereno. Nije izvedeno: val i filmstrip u retcima kostura, slanje dijela kostura kao prepisivanje
-u prici.

@@ -58,7 +58,6 @@ impl Store {
             Operation::ReadVoices => self.voices().map(Data::Voices),
             Operation::AddVoiceTake { id, name, clip_uri, take } => self.add_voice_take(*id, name, clip_uri, take),
             Operation::SetVoiceChosen { id, take } => self.set_voice_chosen(*id, *take),
-            Operation::SetVoicePart { id, from_frame, to_frame, a1_level_db, a1_off } => self.set_voice_part(*id, (*from_frame, *to_frame), *a1_level_db, *a1_off),
         }
     }
 
@@ -293,11 +292,6 @@ impl Store {
     /// clip, a range of at least one frame; its pause and join stay.
     fn set_piece(&mut self, id: i64, index: usize, piece: &Piece) -> Result<Data> {
         let mut block = self.read()?.into_iter().find(|block| block.id == id).ok_or_else(|| qnc_ui_text::text("db.script_no_block").to_string())?;
-        // A clip block of one range is its own one part (user 2026-10-31: every statement is a
-        // SubSegment in MA Video).
-        if block.pieces.is_empty() && !block.clip_id.is_empty() && self.kind_spec(&block.kind)?.role == Role::Clip {
-            block.pieces.push(Piece::of(&block));
-        }
         let Some(stored) = block.pieces.get_mut(index) else {
             return Err(qnc_ui_text::text("db.script_no_join").into());
         };

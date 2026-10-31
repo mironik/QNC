@@ -331,9 +331,12 @@ fn validate_editorial_layout_composition(root: &Path) -> CheckResult {
             ));
         }
     }
-    // Media Assist Video edits the skeleton of the story (user 2026-10-31).
-    if editorial["groups"]["l"]["right_panel"] != "skeleton_panel" {
-        report.error("editorial.layout.json: group 'l' (Video) must use skeleton_panel".to_string());
+    for group in ["l"] {
+        if editorial["groups"][group]["right_panel"] != "none" {
+            report.error(format!(
+                "editorial.layout.json: group '{group}' must keep the right panel empty (none)"
+            ));
+        }
     }
     if editorial["groups"]["g"]["right_panel"] != "script_panel" {
         report.error("editorial.layout.json: group 'g' (Audio) must use script_panel".to_string());

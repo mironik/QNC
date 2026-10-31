@@ -69,9 +69,6 @@ pub const JOIN_GAP: &str = "subsegment_join_gap";
 pub const JOIN_CUT: &str = "subsegment_join_cut";
 /// The SubSegment closes; the source timeline is back.
 pub const SUBSEGMENT_CLOSE: &str = "subsegment_close";
-/// Any block of the story opens as a SubSegment in place of the source timeline (user 2026-10-31:
-/// MA Video, "every SubSegment in its own row"), a recorded OFF as the part of its take it uses.
-pub const OPEN_SUBSEGMENT: &str = "script_open_subsegment";
 /// An edge of a part is taken for trimming (a right click on its timeline): `target` is
 /// `part:in` or `part:out`.
 pub const TAKE_EDGE: &str = "subsegment_take_edge";
@@ -164,8 +161,6 @@ pub struct Script {
     sound: Option<PartSound>,
     /// The voice records of the blocks as read, and whether their files are there.
     voices: Vec<(Voice, bool)>,
-    /// The project's frame rate, read with the script.
-    fps: Option<f64>,
     /// A take to hear: its record's clip and the channel (zero based), once.
     voice_request: Option<(String, u16)>,
     /// The take to hear once the write in progress is done.
@@ -194,7 +189,7 @@ struct Trim {
 
 impl Default for Script {
     fn default() -> Self {
-        Self { view: ScriptView::default(), blocks: Vec::new(), project: None, reading: None, read_at: None, writing: None, source_request: None, names: HashMap::new(), words_per_second: Ok(0.0), take: None, taking: None, exporting: None, draft: Default::default(), open_subsegment: None, pieces_request: None, trim: None, waves: qnc_program_waveform::ProgramWaves::new(), filmstrips: qnc_program_filmstrip::ProgramFilmstrips::new(), waves_project: None, trim_stills: qnc_trim_stills::TrimStills::new(), zoom_follow: Default::default(), sound: None, voices: Vec::new(), voice_request: None, voice_after_write: None, message_after_write: None, fps: None }
+        Self { view: ScriptView::default(), blocks: Vec::new(), project: None, reading: None, read_at: None, writing: None, source_request: None, names: HashMap::new(), words_per_second: Ok(0.0), take: None, taking: None, exporting: None, draft: Default::default(), open_subsegment: None, pieces_request: None, trim: None, waves: qnc_program_waveform::ProgramWaves::new(), filmstrips: qnc_program_filmstrip::ProgramFilmstrips::new(), waves_project: None, trim_stills: qnc_trim_stills::TrimStills::new(), zoom_follow: Default::default(), sound: None, voices: Vec::new(), voice_request: None, voice_after_write: None, message_after_write: None }
     }
 }
 
@@ -237,74 +232,10 @@ impl Script {
         id.and_then(|id| self.blocks.iter().find(|block| block.id == id))
     }
 
-    /// The voice record of a block, when it has a take.
-    fn voice_of(&self, id: i64) -> Option<&Voice> {
-        self.voices.iter().map(|(voice, _)| voice).find(|voice| voice.block_id == id && voice.chosen_take().is_some())
-    }
-
-    /// Block `id` as a SubSegment edits it (user 2026-10-31: every story block is a SubSegment
-    /// in MA Video): a clip block its parts (its own range as one), a recorded block the part of
-    /// its take it uses. `None` for a block that has neither.
-    fn edit_block(&self, id: Option<i64>) -> Option<Block> {
-        let mut block = self.block(id)?.clone();
-        let role = self.kind(&block.kind).map(|kind| kind.role);
-        if role == Some(Role::Spoken) {
-            let piece = qnc_script_draft::voice_piece(self.voice_of(block.id)?, self.fps?, &qnc_voice_take::clip_id)?;
-            block.pieces = vec![piece];
-        } else if role != Some(Role::Clip) {
-            return None;
-        } else if block.pieces.is_empty() {
-            block.pieces = vec![Piece::of(&block)];
-        }
-        Some(block)
-    }
-
-    /// Part `index` of block `id` written as edited: a recorded block keeps the part of its take
-    /// and its A1 in its voice record (another channel is another take, used whole).
-    fn write_piece(&mut self, preview: &SourcePreview, id: i64, index: usize, piece: Piece) -> bool {
-        if let Some(voice) = self.voice_of(id) {
-            let take = piece.a1_channel.map_or(voice.chosen, |channel| channel + 1);
-            if take != voice.chosen {
-                return self.write(preview, move |target| qnc_script_db::set_voice_chosen(target, id, take).map(|_| None));
-            }
-            let (range, level, off) = ((piece.from_frame, piece.to_frame), piece.a1_level_db, piece.a1_off);
-            return self.write(preview, move |target| qnc_script_db::set_voice_part(target, id, range, level, off).map(|_| None));
-        }
-        self.write(preview, move |target| qnc_script_db::set_piece(target, id, index, piece).map(|_| None))
-    }
-
-    /// The skeleton of the story as MA Video shows it (user 2026-10-31: "every SubSegment in its
-    /// own row"): the blocks in the length of the story in reading order, each with its parts
-    /// as a SubSegment lays them out; an OFF not recorded yet has none.
-    fn skeleton_rows(&self) -> Vec<SkeletonRow> {
-        self.view
-            .blocks
-            .iter()
-            .filter(|row| row.in_story)
-            .map(|row| SkeletonRow {
-                block_id: row.block.id,
-                mark: row.mark.clone(),
-                seconds: row.seconds,
-                text: row.block.text.clone(),
-                parts: self.edit_block(Some(row.block.id)).map(|block| view::subsegment_view(&block, None)),
-                open: self.open_subsegment == Some(row.block.id),
-            })
-            .collect()
-    }
-
-    /// Frames of clip `clip_id`: a clip of the pool's, a voice record's its take used.
-    fn frames_of(&self, clip_id: &str) -> u64 {
-        if let Some((_, frames, _)) = self.names.get(clip_id) {
-            return *frames;
-        }
-        let whole = |voice: &Voice| Some(((voice.chosen_take()?.seconds * self.fps?).round().max(1.0)) as u64);
-        self.voices.iter().map(|(voice, _)| voice).find(|voice| qnc_voice_take::clip_id(&voice.name) == clip_id).and_then(whole).unwrap_or(u64::MAX)
-    }
-
     /// The open SubSegment as its block holds it now and the player plays it: a write that
     /// changed a pause or a join plays again where it stands; a block gone closes it.
     fn follow_subsegment(&mut self, preview: &SourcePreview) {
-        let Some(block) = self.edit_block(self.open_subsegment) else {
+        let Some(block) = self.block(self.open_subsegment).cloned() else {
             if self.reading.is_none() && self.writing.is_none() {
                 (self.open_subsegment, self.view.subsegment) = (None, None);
             }
@@ -395,7 +326,7 @@ impl Script {
                 let mut piece = pieces.get(sound.index)?.clone();
                 (piece.a1_channel, piece.a1_level_db, piece.a1_off) = (sound.channel, sound.level_db, sound.off);
                 let id = block.id;
-                return Some(self.write_piece(preview, id, sound.index, piece));
+                return Some(self.write(preview, move |target| qnc_script_db::set_piece(target, id, sound.index, piece).map(|_| None)));
             }
             qnc_timeline::LaneKey::Drop => {
                 self.sound = None;
@@ -414,7 +345,7 @@ impl Script {
     /// on a join takes the IN after it), arrows and the wheel move it a frame, Enter keeps it,
     /// Esc gives it up. Every move plays the draft at the edge. `None` for any other key.
     fn trim_key(&mut self, action_id: &str, target: Option<&str>, preview: &SourcePreview) -> Option<bool> {
-        let block = self.edit_block(self.open_subsegment)?;
+        let block = self.block(self.open_subsegment)?.clone();
         let pieces = view::block_pieces(&block);
         let take = |index: usize, out: bool| pieces.get(index).map(|piece| Trim { index, out, from: piece.from_frame, to: piece.to_frame });
         if let Some(done) = self.sound_key(action_id, &block, &pieces, preview) {
@@ -442,7 +373,7 @@ impl Script {
                     Some(old) => {
                         if pieces.get(old.index).is_some_and(|piece| (piece.from_frame, piece.to_frame) != (old.from, old.to)) {
                             let (piece, id) = (self.trimmed_piece(&pieces[old.index], old), block.id);
-                            self.write_piece(preview, id, old.index, piece);
+                            self.write(preview, move |target| qnc_script_db::set_piece(target, id, old.index, piece).map(|_| None));
                         }
                         take(index, out)
                     }
@@ -458,7 +389,7 @@ impl Script {
                 let trim = self.trim.take()?;
                 let piece = self.trimmed_piece(&pieces[trim.index], trim);
                 let id = block.id;
-                return Some(self.write_piece(preview, id, trim.index, piece));
+                return Some(self.write(preview, move |target| qnc_script_db::set_piece(target, id, trim.index, piece).map(|_| None)));
             }
             "clear_focus" if self.trim.is_some() => {
                 self.trim = None;
@@ -467,8 +398,8 @@ impl Script {
             }
             _ => return None,
         };
-        let length = self.frames_of(&pieces[self.trim?.index].clip_id);
         let trim = self.trim.as_mut()?;
+        let length = self.names.get(&pieces[trim.index].clip_id).map_or(u64::MAX, |(_, frames, _)| *frames);
         match trim.out {
             true => trim.to = trim.to.saturating_add_signed(step).clamp(trim.from + 1, length),
             false => trim.from = trim.from.saturating_add_signed(step).min(trim.to - 1),
@@ -484,11 +415,11 @@ impl Script {
     fn drag_edge(&mut self, target: Option<&str>, block: &Block, pieces: &[Piece]) -> Option<bool> {
         let mut parts = target?.split(':');
         let (index, out, frame) = (parts.next()?.parse::<usize>().ok()?, parts.next()? == "out", parts.next()?.parse::<u64>().ok()?);
-        let length = self.frames_of(&pieces.get(index)?.clip_id);
         let trim = self.trim.as_mut().filter(|trim| trim.index == index && trim.out == out)?;
         // The part's start on the axis does not move while its own edges move.
         let start = view::subsegment_view(block, None).parts.get(index)?.start;
         let piece = pieces.get(index)?;
+        let length = self.names.get(&piece.clip_id).map_or(u64::MAX, |(_, frames, _)| *frames);
         match out {
             true => trim.to = (trim.from + frame.saturating_sub(start)).clamp(trim.from + 1, length),
             false => trim.from = (piece.from_frame as i64 + frame as i64 - start as i64).clamp(0, trim.to as i64 - 1) as u64,
@@ -681,16 +612,16 @@ impl Script {
                 self.commit_fields(preview, block)
             }
             // A block of several parts opens as a SubSegment in place of the source timeline.
-            OPEN_SUBSEGMENT | OPEN if action_id == OPEN_SUBSEGMENT || self.block(id()).is_some_and(|block| block.pieces.len() > 1) => {
-                let block = self.edit_block(id())?;
+            OPEN if self.block(id()).is_some_and(|block| block.pieces.len() > 1) => {
+                let block = self.block(id())?.clone();
                 self.open_subsegment = Some(block.id);
                 self.pieces_request = Some((view::piece_inputs(&block), 0));
                 self.view.subsegment = Some(view::subsegment_view(&block, None));
                 true
             }
             SUBSEGMENT_CUE => {
-                let (Some(block), Some(frame)) = (self.edit_block(self.open_subsegment), target.and_then(|frame| frame.parse::<u64>().ok())) else { return Some(false) };
-                self.pieces_request = Some((view::piece_inputs(&block), frame));
+                let (Some(block), Some(frame)) = (self.block(self.open_subsegment), target.and_then(|frame| frame.parse::<u64>().ok())) else { return Some(false) };
+                self.pieces_request = Some((view::piece_inputs(block), frame));
                 true
             }
             SUBSEGMENT_CLOSE => {
@@ -701,14 +632,14 @@ impl Script {
             PART_CHANNEL | PART_LEVEL | PART_OFF => {
                 let mut parts = target.unwrap_or_default().split(':');
                 let (Some(id), Some(index)) = (parts.next().and_then(|id| id.parse::<i64>().ok()), parts.next().and_then(|index| index.parse::<usize>().ok())) else { return Some(false) };
-                let Some(mut piece) = self.edit_block(Some(id)).map(|block| view::block_pieces(&block)).and_then(|pieces| pieces.get(index).cloned()) else { return Some(false) };
+                let Some(mut piece) = self.block(Some(id)).map(view::block_pieces).and_then(|pieces| pieces.get(index).cloned()) else { return Some(false) };
                 let value = parts.next().and_then(|value| value.parse::<i64>().ok()).unwrap_or(0);
                 match action_id {
                     PART_CHANNEL => piece.a1_channel = u16::try_from(value).ok(),
                     PART_LEVEL => piece.a1_level_db = (i64::from(piece.a1_level_db) + value).clamp(-40, 12) as i8,
                     _ => piece.a1_off = !piece.a1_off,
                 }
-                self.write_piece(preview, id, index, piece)
+                self.write(preview, move |target| qnc_script_db::set_piece(target, id, index, piece).map(|_| None))
             }
             // A part's place and its leaving (user 2026-10-29): written at once, the SubSegment
             // plays it again; a taken edge or sound is let go (its part may have moved).
@@ -1047,7 +978,6 @@ impl Script {
         self.view.clip_seconds = sum(&|row| counts(row) == Some(Counts::Story) && row.is_clip());
         self.view.anchor_seconds = sum(&|row| counts(row) == Some(Counts::Anchor));
         (self.view.in_cue, self.view.out_cue) = story_cues(&self.view.blocks);
-        self.view.skeleton = self.skeleton_rows();
         if self.open_subsegment.is_some() {
             self.follow_subsegment(preview);
         }
@@ -1127,8 +1057,7 @@ impl Script {
         if let Some(reading) = &self.reading {
             if let Ok(result) = reading.try_recv() {
                 match result {
-                    Ok(read::Script { blocks, profile, target, voices, fps }) => {
-                        self.fps = fps;
+                    Ok(read::Script { blocks, profile, target, voices }) => {
                         self.blocks = blocks;
                         self.view.profile = profile;
                         self.view.target_seconds = target;

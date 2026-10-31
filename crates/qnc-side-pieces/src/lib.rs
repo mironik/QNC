@@ -24,9 +24,6 @@ pub const TRANSCRIPT_PANEL: &str = "transcript_panel";
 pub const VIDEO_AI_PANEL: &str = "video_ai_panel";
 /// The script of the story (Media Assist Audio, user 2026-10-28).
 pub const SCRIPT_PANEL: &str = "script_panel";
-/// The skeleton of the story, every SubSegment in its own row (Media Assist Video, user
-/// 2026-10-31); it is the script's.
-pub const SKELETON_PANEL: &str = "skeleton_panel";
 
 /// What the right panel pieces show; empty for a piece the form does not have.
 #[derive(Debug, Clone, Default, PartialEq)]
@@ -54,7 +51,7 @@ impl SidePieces {
         Self {
             transcript: (has(TRANSCRIPT_PANEL) || has(SCRIPT_PANEL)).then(Transcript::new),
             shots: has(VIDEO_AI_PANEL).then(ClipShots::default),
-            script: (has(SCRIPT_PANEL) || has(SKELETON_PANEL)).then(Script::new),
+            script: has(SCRIPT_PANEL).then(Script::new),
             views: SideViews::default(),
         }
     }

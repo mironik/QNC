@@ -150,7 +150,7 @@ impl Piece {
 /// The voice record of a block of a recorded kind (user 2026-10-30): one clip of several mono
 /// channels, one take each, under one name given at the first take; one channel is the one
 /// used.
-#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct Voice {
     pub block_id: i64,
@@ -162,17 +162,6 @@ pub struct Voice {
     pub chosen: u16,
     /// The takes in the order recorded; take `n` is channel `n` of the clip.
     pub takes: Vec<VoiceTake>,
-    /// The part of the take used (user 2026-10-31: an OFF is trimmed as a SubSegment in MA
-    /// Video): clip frames `[from, to)`; `to` 0 is the whole take. Another take is used whole.
-    #[serde(default)]
-    pub from_frame: u64,
-    #[serde(default)]
-    pub to_frame: u64,
-    /// Its A1 level in dB (0 as recorded) and whether its A1 is off.
-    #[serde(default)]
-    pub a1_level_db: i8,
-    #[serde(default)]
-    pub a1_off: bool,
 }
 
 /// One take of a voice record.
@@ -239,8 +228,6 @@ pub enum Operation {
     MovePiece { id: i64, index: usize, earlier: bool },
     /// Part `index` leaves its block (the last part stays: the block is removed as a whole).
     RemovePiece { id: i64, index: usize },
-    /// The part of the take block `id` uses and its A1 (an OFF trimmed as a SubSegment).
-    SetVoicePart { id: i64, from_frame: u64, to_frame: u64, a1_level_db: i8, a1_off: bool },
 }
 
 impl Operation {
@@ -360,11 +347,6 @@ pub fn read_voice(target: &ProjectDbTarget, id: i64) -> Result<Option<Voice>> {
 /// Block `id` gets `take` as the next take of its voice record.
 pub fn add_voice_take(target: &ProjectDbTarget, id: i64, name: String, clip_uri: String, take: VoiceTake) -> Result<()> {
     write(target, Operation::AddVoiceTake { id, name, clip_uri, take }).map(drop)
-}
-
-/// The part of its take block `id` uses (clip frames `[from, to)`) and its A1.
-pub fn set_voice_part(target: &ProjectDbTarget, id: i64, (from_frame, to_frame): (u64, u64), a1_level_db: i8, a1_off: bool) -> Result<()> {
-    write(target, Operation::SetVoicePart { id, from_frame, to_frame, a1_level_db, a1_off }).map(drop)
 }
 
 /// Take `take` of block `id` becomes the one used.

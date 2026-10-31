@@ -305,28 +305,3 @@ fn a_trimmed_part_keeps_its_clip_pause_and_join() {
     assert!(set_piece(&target, id, 1, piece("2679", 1, 9, "")).is_err(), "a part keeps its clip");
     assert!(set_piece(&target, id, 1, piece("2002", 9, 9, "")).is_err(), "a part keeps at least one frame");
 }
-
-#[test]
-fn an_off_keeps_the_part_of_its_take_and_another_take_is_used_whole() {
-    let (_dir, target) = written();
-    let id = add(&target, None, off("Prvi off.")).unwrap();
-    let clip = "qnc://local/source/project-p1/file/products/voice/P_OFF1.mxf".to_string();
-    add_voice_take(&target, id, "P_OFF1".into(), clip.clone(), take(1, 4.0, "18:00:00:00", "Prvi off.")).unwrap();
-    add_voice_take(&target, id, "P_OFF1".into(), clip, take(2, 5.0, "18:01:00:00", "Prvi off.")).unwrap();
-    set_voice_part(&target, id, (12, 180), -3, false).unwrap();
-    let voice = read_voice(&target, id).unwrap().unwrap();
-    assert_eq!((voice.from_frame, voice.to_frame, voice.a1_level_db, voice.a1_off), (12, 180, -3, false));
-    assert!(set_voice_part(&target, id, (20, 20), 0, false).is_err(), "at least one frame");
-    set_voice_chosen(&target, id, 1).unwrap();
-    let voice = read_voice(&target, id).unwrap().unwrap();
-    assert_eq!((voice.from_frame, voice.to_frame), (0, 0), "another take is used whole");
-}
-
-#[test]
-fn a_statement_of_one_range_is_trimmed_as_its_one_part() {
-    let (_dir, target) = written();
-    let id = add(&target, None, sot("2002")).unwrap();
-    set_piece(&target, id, 0, piece("2002", 110, 340, "rekao je")).unwrap();
-    let block = read(&target).unwrap().remove(0);
-    assert_eq!((block.from_frame, block.to_frame, block.pieces.len()), (110, 340, 1));
-}

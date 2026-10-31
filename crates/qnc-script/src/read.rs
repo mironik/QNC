@@ -13,8 +13,6 @@ pub(crate) struct Script {
     pub target: Option<f64>,
     /// Every voice record, and whether its clip and the take used are in the project folder.
     pub voices: Vec<(Voice, bool)>,
-    /// The project's frame rate (a voice record is made at it).
-    pub fps: Option<f64>,
 }
 
 pub(crate) type Read = Result<Script, String>;
@@ -51,6 +49,5 @@ pub(crate) fn read_script(target: &ProjectDbTarget, locator: Option<&StillLocato
             (voice, present)
         })
         .collect();
-    let fps = locator.and_then(|locator| locator.settings().video_picture().ok()).map(|(_, _, fps)| fps);
-    Ok(Script { blocks, profile, target: length, voices, fps })
+    Ok(Script { blocks, profile, target: length, voices })
 }
