@@ -83,9 +83,20 @@ pub struct FocusView {
     pub shots: std::sync::Arc<qnc_clip_shots::ShotsView>,
     /// The script of the story (Media Assist Audio).
     pub script: std::sync::Arc<qnc_script::ScriptView>,
+    /// The versions of the S-Story.
+    pub versions: std::sync::Arc<qnc_skeleton_versions::VersionsView>,
 }
 
 impl FocusView {
+    /// The cards of a pool tab the right panel's pieces fill (SubSegment, Voice, Stories) and
+    /// the action a click sends with the card's id.
+    pub fn tab_cards<'a>(&self, tab: qnc_pool_tabs::LibraryTab, clips: &'a [qnc_clip_row::ClipRow]) -> (Vec<qnc_clip_row::TabCard<'a>>, &'static str) {
+        match tab {
+            qnc_pool_tabs::LibraryTab::Stories => (self.versions.cards(clips), qnc_skeleton_versions::OPEN),
+            tab => self.script.tab_cards(tab == qnc_pool_tabs::LibraryTab::Voice, clips),
+        }
+    }
+
     /// The catalog scope that reads the keys first: the source timeline's own while it (or
     /// its buttons) has the keyboard (piece `qnc-source-timeline`).
     pub fn key_scope(&self) -> Option<&'static str> {

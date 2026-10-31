@@ -1,0 +1,12 @@
+[package]
+name = "qnc-skeleton-versions"
+version = "0.1.0"
+edition = "2021"
+description = "QNC public piece: the versions of the S-Story of the project on the preview, read outside the UI thread from qnc-skeleton-db, as cards of the pool's Stories tab and which one is open; it writes nothing"
+
+[dependencies]
+qnc-clip-row = { workspace = true }
+qnc-db-broker = { workspace = true }
+qnc-skeleton-db = { workspace = true }
+qnc-source-preview = { workspace = true }
+qnc-ui-text = { workspace = true }

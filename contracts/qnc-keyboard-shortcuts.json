@@ -496,6 +496,12 @@
     "editorial_tab_voice": {
       "label": "Pool: tab Voice"
     },
+    "editorial_tab_stories": {
+      "label": "Pool: tab Stories"
+    },
+    "skeleton_open_version": {
+      "label": "Otvori verziju S-Storyja"
+    },
     "ingest_clear_selection": {
       "label": "Očisti Ingest izbor"
     },

@@ -186,6 +186,7 @@ members = [
     "crates/qnc-script-panel",
     "crates/qnc-subsegment-panel",
     "crates/qnc-skeleton-db",
+    "crates/qnc-skeleton-versions",
     "crates/qnc-text-source-editor",
     "crates/qnc-voice-record",
     "crates/qnc-title-card",
@@ -464,6 +465,7 @@ qnc-script = { path = "crates/qnc-script" }
 qnc-script-panel = { path = "crates/qnc-script-panel" }
 qnc-subsegment-panel = { path = "crates/qnc-subsegment-panel" }
 qnc-skeleton-db = { path = "crates/qnc-skeleton-db" }
+qnc-skeleton-versions = { path = "crates/qnc-skeleton-versions" }
 qnc-text-source-editor = { path = "crates/qnc-text-source-editor" }
 qnc-voice-record = { path = "crates/qnc-voice-record" }
 qnc-title-card = { path = "crates/qnc-title-card" }

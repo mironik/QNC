@@ -4877,10 +4877,12 @@ dependencies = [
  "qnc-focus-walk",
  "qnc-key-list",
  "qnc-keyframe-nav",
+ "qnc-pool-tabs",
  "qnc-program-segments",
  "qnc-script",
  "qnc-segments-keys",
  "qnc-side-pieces",
+ "qnc-skeleton-versions",
  "qnc-source-mark-focus",
  "qnc-source-panel",
  "qnc-source-preview",
@@ -5883,6 +5885,7 @@ dependencies = [
  "qnc-clip-shots",
  "qnc-db-broker",
  "qnc-script",
+ "qnc-skeleton-versions",
  "qnc-source-preview",
  "qnc-source-timecode",
  "qnc-timeline",
@@ -5899,6 +5902,17 @@ dependencies = [
  "serde",
  "serde_json",
  "tempfile",
+]
+
+[[package]]
+name = "qnc-skeleton-versions"
+version = "0.1.0"
+dependencies = [
+ "qnc-clip-row",
+ "qnc-db-broker",
+ "qnc-skeleton-db",
+ "qnc-source-preview",
+ "qnc-ui-text",
 ]
 
 [[package]]

@@ -10,6 +10,7 @@ use std::sync::Arc;
 use qnc_clip_row::ClipRow;
 use qnc_clip_shots::{ClipShots, ShotsView};
 use qnc_script::{Script, ScriptView};
+use qnc_skeleton_versions::{SkeletonVersions, VersionsView};
 use qnc_source_preview::SourcePreview;
 use qnc_source_timecode::SourceTimecode;
 use qnc_timeline::TimelineProjection;
@@ -34,6 +35,7 @@ pub struct SideViews {
     pub transcript: Arc<TranscriptView>,
     pub shots: Arc<ShotsView>,
     pub script: Arc<ScriptView>,
+    pub versions: Arc<VersionsView>,
 }
 
 /// The pieces of the panels a form has.
@@ -42,6 +44,7 @@ pub struct SidePieces {
     transcript: Option<Transcript>,
     shots: Option<ClipShots>,
     script: Option<Script>,
+    versions: Option<SkeletonVersions>,
     views: SideViews,
     /// The form's segment panel shows the draft story.
     draft_story: bool,
@@ -57,6 +60,7 @@ impl SidePieces {
             transcript: (has(TRANSCRIPT_PANEL) || has(SCRIPT_PANEL)).then(Transcript::new),
             shots: has(VIDEO_AI_PANEL).then(ClipShots::default),
             script: has(SCRIPT_PANEL).then(Script::new),
+            versions: has(DRAFT_SEGMENT_PANEL).then(SkeletonVersions::new),
             views: SideViews::default(),
             draft_story: has(DRAFT_SEGMENT_PANEL),
         }
@@ -95,6 +99,11 @@ impl SidePieces {
             }
             play_pieces(script, preview);
         }
+        if let Some(versions) = &mut self.versions {
+            if versions.poll(preview) {
+                self.views.versions = Arc::new(versions.view().clone());
+            }
+        }
     }
 
     /// The pieces' own actions; `None` for any other.
@@ -111,6 +120,12 @@ impl SidePieces {
                 play_pieces(script, preview);
                 // What the action changed is seen at once (the next poll compares from here).
                 self.views.script = Arc::new(script.view().clone());
+                return Some(done);
+            }
+        }
+        if let Some(versions) = &mut self.versions {
+            if let Some(done) = versions.act(action_id, target) {
+                self.views.versions = Arc::new(versions.view().clone());
                 return Some(done);
             }
         }
@@ -142,7 +157,7 @@ impl SidePieces {
 
     /// Whether a read or write of a piece runs (the form repaints soon).
     pub fn busy(&self) -> bool {
-        self.transcript.as_ref().is_some_and(Transcript::busy) || self.script.as_ref().is_some_and(Script::busy)
+        self.transcript.as_ref().is_some_and(Transcript::busy) || self.script.as_ref().is_some_and(Script::busy) || self.versions.as_ref().is_some_and(SkeletonVersions::busy)
     }
 
     /// Whether a transcription of this process runs in the background.
@@ -162,7 +177,9 @@ mod tests {
         let ai = SidePieces::for_panels([TRANSCRIPT_PANEL, VIDEO_AI_PANEL]);
         assert!(ai.transcript.is_some() && ai.shots.is_some() && ai.script.is_none());
         let audio = SidePieces::for_panels([SCRIPT_PANEL]);
-        assert!(audio.transcript.is_some() && audio.shots.is_none() && audio.script.is_some());
+        assert!(audio.transcript.is_some() && audio.shots.is_none() && audio.script.is_some() && audio.versions.is_none());
+        let s_story = SidePieces::for_panels([DRAFT_SEGMENT_PANEL]);
+        assert!(s_story.versions.is_some() && s_story.script.is_none() && s_story.draft_story());
     }
 }
 

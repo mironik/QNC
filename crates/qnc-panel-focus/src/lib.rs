@@ -182,7 +182,7 @@ impl PanelFocus {
             }
         }
         let side = self.side.views().clone();
-        FocusView { panel: self.panel, button, pool_step: self.walk.last_step(), transcript: side.transcript, shots: side.shots, script: side.script }
+        FocusView { panel: self.panel, button, pool_step: self.walk.last_step(), transcript: side.transcript, shots: side.shots, script: side.script, versions: side.versions }
     }
 
     /// Whether a key picture search runs (the caller repaints soon).

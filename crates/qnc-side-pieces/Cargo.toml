@@ -9,6 +9,7 @@ qnc-clip-row = { workspace = true }
 qnc-clip-shots = { workspace = true }
 qnc-db-broker = { workspace = true }
 qnc-script = { workspace = true }
+qnc-skeleton-versions = { workspace = true }
 qnc-source-preview = { workspace = true }
 qnc-source-timecode = { workspace = true }
 qnc-timeline = { workspace = true }

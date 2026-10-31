@@ -7308,3 +7308,12 @@ Audio "Send to S-Story" (`qnc-script`) svaki put pravi novu verziju; scenarij i 
 `qnc-skeleton-db` (3), `qnc-script`, conformance. Nije izvedeno (koraci 3-6): tab Stories u poolu S-Storyja, redovi verzije
 u desnom panelu, otvaranje stavke uvecane na mjestu source timelinea, Send to Story; S-Story zasad i dalje pokazuje
 kopiju Storyja (`story-draft.db`), koja se uklanja u koraku 4.
+Izvedeno 2026-10-31 (korisnik: "automatski verzija 1, 2..., uvijek nova verzija, kreni"; korak 3 plana S-Storyja): pool S-Storyja
+(grupa k) ima prvi tab Stories (`editorial_tab_stories`, bez tipke) s verzijama price: kartica "Version n · m elements", duljina
+elemenata po stopi njihovih klipova, poster prvog klipa; tab je siv bez verzija. Klik na karticu (`skeleton_open_version`, cilj id
+verzije) otvara verziju (zasad se samo pamti; desni panel s redovima verzije je korak 4). Nova kocka `crates/qnc-skeleton-versions`
+(+ ugovor `contracts/modules/skeleton-versions.module.json`): verzije i njihovi elementi iz `qnc-skeleton-db` citani izvan niti
+sucelja svake 2 s, kartice, otvorena verzija; nista ne pise. Drzi je `qnc-side-pieces` kad forma ima panel S-Storyja;
+`FocusView::tab_cards` daje kartice SubSegment, Voice i Stories (ploca isti broj redaka). Kartica koja nije klip je jedna
+neutralna `qnc_clip_row::TabCard` (premjestena iz `qnc-script` `SubsegmentCard`, koji je sada njezino ime). Testovi
+`qnc-skeleton-versions`, `qnc-pool-tabs`, `qnc-side-pieces`, `qnc-panel-focus`, conformance. Uzivo nije provjereno.

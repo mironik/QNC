@@ -74,27 +74,7 @@ impl BlockRow {
 
 /// A SubSegment as a card of the pool, a virtual clip (user 2026-10-29): its block id, its mark
 /// with its first clip and number of parts, its length, and the poster of its first clip.
-pub struct SubsegmentCard<'a> {
-    pub id: String,
-    pub title: String,
-    pub seconds: f64,
-    pub clip: Option<&'a qnc_clip_row::ClipRow>,
-}
-
-impl qnc_clip_row::PoolItem for SubsegmentCard<'_> {
-    fn card_id(&self) -> &str {
-        &self.id
-    }
-    fn card_title(&self) -> &str {
-        &self.title
-    }
-    fn card_poster(&self) -> (Option<&str>, Option<&qnc_image_assets::RgbaImage>) {
-        self.clip.map_or((None, None), |clip| clip.card_poster())
-    }
-    fn card_seconds(&self) -> f64 {
-        self.seconds
-    }
-}
+pub use qnc_clip_row::TabCard as SubsegmentCard;
 
 /// What the script panel shows.
 #[derive(Debug, Clone, Default, PartialEq)]

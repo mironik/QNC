@@ -14,6 +14,8 @@ pub const TRANSCRIPT: &str = "editorial_tab_transcript";
 pub const SUBSEGMENT: &str = "editorial_tab_subsegment";
 /// The voice records of the script, one card per OFF (user 2026-10-30, Media Assist Audio).
 pub const VOICE: &str = "editorial_tab_voice";
+/// The versions of the S-Story (user 2026-10-31).
+pub const STORIES: &str = "editorial_tab_stories";
 
 /// Ingest's one tab of the pool: its clips.
 pub const INGEST_ALL: &str = "ingest_tab_all";
@@ -29,6 +31,7 @@ pub struct Contents {
     pub transcribed: usize,
     pub subsegments: usize,
     pub voices: usize,
+    pub stories: usize,
 }
 
 impl Contents {
@@ -42,6 +45,7 @@ impl Contents {
             LibraryTab::Transcript => self.transcribed,
             LibraryTab::Subsegment => self.subsegments,
             LibraryTab::Voice => self.voices,
+            LibraryTab::Stories => self.stories,
         };
         Some(count > 0)
     }
@@ -59,6 +63,7 @@ pub enum LibraryTab {
     Transcript,
     Subsegment,
     Voice,
+    Stories,
 }
 
 impl LibraryTab {
@@ -71,6 +76,7 @@ impl LibraryTab {
             TRANSCRIPT => Some(Self::Transcript),
             SUBSEGMENT => Some(Self::Subsegment),
             VOICE => Some(Self::Voice),
+            STORIES => Some(Self::Stories),
             _ => None,
         }
     }
@@ -87,7 +93,7 @@ mod tests {
 
     #[test]
     fn every_tab_comes_from_its_action_and_only_virtual_and_broll_list_shots() {
-        for (action, tab) in [(ALL, LibraryTab::All), (VIRTUAL, LibraryTab::Virtual), (BROLL, LibraryTab::Broll), (SEGMENT, LibraryTab::Segment), (TRANSCRIPT, LibraryTab::Transcript), (SUBSEGMENT, LibraryTab::Subsegment), (VOICE, LibraryTab::Voice)] {
+        for (action, tab) in [(ALL, LibraryTab::All), (VIRTUAL, LibraryTab::Virtual), (BROLL, LibraryTab::Broll), (SEGMENT, LibraryTab::Segment), (TRANSCRIPT, LibraryTab::Transcript), (SUBSEGMENT, LibraryTab::Subsegment), (VOICE, LibraryTab::Voice), (STORIES, LibraryTab::Stories)] {
             assert_eq!(LibraryTab::from_action(action), Some(tab));
         }
         assert_eq!(LibraryTab::from_action("play_pause"), None);
@@ -108,6 +114,8 @@ mod tests {
         assert_eq!(Contents { subsegments: 1, ..contents }.has(SUBSEGMENT), Some(true));
         assert_eq!(contents.has(VOICE), Some(false));
         assert_eq!(Contents { voices: 2, ..contents }.has(VOICE), Some(true));
+        assert_eq!(contents.has(STORIES), Some(false));
+        assert_eq!(Contents { stories: 1, ..contents }.has(STORIES), Some(true));
         assert_eq!(contents.has("play_pause"), None);
     }
 }

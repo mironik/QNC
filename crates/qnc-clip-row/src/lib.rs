@@ -117,6 +117,30 @@ impl ClipRow {
     }
 }
 
+/// A card of a pool tab that is not a clip (a SubSegment, a voice record, a story version):
+/// its id, title, length and the poster of the clip it starts with.
+pub struct TabCard<'a> {
+    pub id: String,
+    pub title: String,
+    pub seconds: f64,
+    pub clip: Option<&'a ClipRow>,
+}
+
+impl PoolItem for TabCard<'_> {
+    fn card_id(&self) -> &str {
+        &self.id
+    }
+    fn card_title(&self) -> &str {
+        &self.title
+    }
+    fn card_poster(&self) -> (Option<&str>, Option<&RgbaImage>) {
+        self.clip.map_or((None, None), |clip| clip.card_poster())
+    }
+    fn card_seconds(&self) -> f64 {
+        self.seconds
+    }
+}
+
 impl PoolItem for ClipRow {
     fn card_id(&self) -> &str {
         &self.clip_id
