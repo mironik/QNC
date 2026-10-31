@@ -21,6 +21,16 @@ impl PanelFocus {
         if let Some(done) = self.side.act(action_id, event.value, event.target.as_deref(), pieces.0, pieces.3, self.source.view().timecode.as_ref()) {
             return Some(done);
         }
+        // The S-Story's rows are its open version, never the Story (user 2026-10-31): a pointer
+        // on them and the keys while they have the focus go to it.
+        let row_key = matches!(action_id, "play_pause" | "step_back_frame" | "step_forward_frame");
+        let on_rows = event.at.as_deref() == Some(qnc_segment_panel::PANEL) || (event.at.is_none() && panel == Panel::Segments && row_key);
+        if on_rows && self.side.has_versions() {
+            if event.at.is_some() {
+                self.panel = Panel::Segments;
+            }
+            return self.side.act_on_rows(&event, pieces.0);
+        }
         // A double click on a word is a cut (user 2026-10-26): IN at its start, OUT at the end
         // of a word after the first cut; the source timeline keeps the pair as for scissors.
         if action_id == qnc_transcript::CUT_WORD {

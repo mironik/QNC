@@ -2,11 +2,17 @@
 name = "qnc-skeleton-versions"
 version = "0.1.0"
 edition = "2021"
-description = "QNC public piece: the versions of the S-Story of the project on the preview, read outside the UI thread from qnc-skeleton-db, as cards of the pool's Stories tab and which one is open; it writes nothing"
+description = "QNC public piece: the versions of the S-Story of the project on the preview, read outside the UI thread from qnc-skeleton-db, as cards of the pool's Stories tab; the open version as Wrap rows of SubClips (no markers, slots or covers) played as a SubSegment; it writes nothing"
 
 [dependencies]
+qnc-action-event = { workspace = true }
 qnc-clip-row = { workspace = true }
 qnc-db-broker = { workspace = true }
+qnc-program-commands = { workspace = true }
+qnc-program-filmstrip = { workspace = true }
+qnc-program-input = { workspace = true }
+qnc-program-view = { workspace = true }
+qnc-program-waveform = { workspace = true }
 qnc-skeleton-db = { workspace = true }
 qnc-source-preview = { workspace = true }
 qnc-ui-text = { workspace = true }

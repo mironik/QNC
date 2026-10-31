@@ -4880,6 +4880,7 @@ dependencies = [
  "qnc-pool-tabs",
  "qnc-program-segments",
  "qnc-script",
+ "qnc-segment-panel",
  "qnc-segments-keys",
  "qnc-side-pieces",
  "qnc-skeleton-versions",
@@ -5547,6 +5548,7 @@ dependencies = [
  "qnc-segment-panel",
  "qnc-shot-panel",
  "qnc-side-pieces",
+ "qnc-skeleton-versions",
  "qnc-source-timecode",
  "qnc-transcript",
  "qnc-transcript-panel",
@@ -5881,6 +5883,7 @@ dependencies = [
 name = "qnc-side-pieces"
 version = "0.1.0"
 dependencies = [
+ "qnc-action-event",
  "qnc-clip-row",
  "qnc-clip-shots",
  "qnc-db-broker",
@@ -5908,8 +5911,14 @@ dependencies = [
 name = "qnc-skeleton-versions"
 version = "0.1.0"
 dependencies = [
+ "qnc-action-event",
  "qnc-clip-row",
  "qnc-db-broker",
+ "qnc-program-commands",
+ "qnc-program-filmstrip",
+ "qnc-program-input",
+ "qnc-program-view",
+ "qnc-program-waveform",
  "qnc-skeleton-db",
  "qnc-source-preview",
  "qnc-ui-text",

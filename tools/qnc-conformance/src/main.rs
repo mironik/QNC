@@ -336,8 +336,8 @@ fn validate_editorial_layout_composition(root: &Path) -> CheckResult {
     }
     // S-Story is a copy of the Story without its lead-in and lead-out, on the project's draft
     // story (user 2026-10-31).
-    if editorial["groups"]["k"]["right_panel"] != "draft_segment_panel" {
-        report.error("editorial.layout.json: group 'k' (S-Story) must use draft_segment_panel".to_string());
+    if editorial["groups"]["k"]["right_panel"] != "skeleton_panel" {
+        report.error("editorial.layout.json: group 'k' (S-Story) must use skeleton_panel (its versions as rows)".to_string());
     }
     if editorial["groups"]["g"]["right_panel"] != "script_panel" {
         report.error("editorial.layout.json: group 'g' (Audio) must use script_panel".to_string());

@@ -5,6 +5,7 @@ edition = "2021"
 description = "QNC public module: the pieces of the right panel of an editorial board (transcript, Video AI shots, script), made only for the panels the form's layout has; their polls, actions and views"
 
 [dependencies]
+qnc-action-event = { workspace = true }
 qnc-clip-row = { workspace = true }
 qnc-clip-shots = { workspace = true }
 qnc-db-broker = { workspace = true }

@@ -28,6 +28,8 @@ pub const TRANSCRIPT_PANEL: &str = "transcript_panel";
 pub const VIDEO_AI_PANEL: &str = "video_ai_panel";
 /// The script of the story (Media Assist Audio, user 2026-10-28).
 pub const SCRIPT_PANEL: &str = "script_panel";
+/// The S-Story (user 2026-10-31): the open version of its story as Wrap rows of SubClips.
+pub const SKELETON_PANEL: &str = "skeleton_panel";
 
 /// What the right panel pieces show; empty for a piece the form does not have.
 #[derive(Debug, Clone, Default, PartialEq)]
@@ -60,9 +62,10 @@ impl SidePieces {
             transcript: (has(TRANSCRIPT_PANEL) || has(SCRIPT_PANEL)).then(Transcript::new),
             shots: has(VIDEO_AI_PANEL).then(ClipShots::default),
             script: has(SCRIPT_PANEL).then(Script::new),
-            versions: has(DRAFT_SEGMENT_PANEL).then(SkeletonVersions::new),
+            versions: has(SKELETON_PANEL).then(SkeletonVersions::new),
             views: SideViews::default(),
-            draft_story: has(DRAFT_SEGMENT_PANEL),
+            // Under the S-Story too the segment pieces read the draft story, never the Story.
+            draft_story: has(DRAFT_SEGMENT_PANEL) || has(SKELETON_PANEL),
         }
     }
 
@@ -100,7 +103,7 @@ impl SidePieces {
             play_pieces(script, preview);
         }
         if let Some(versions) = &mut self.versions {
-            if versions.poll(preview) {
+            if versions.poll(preview, clips) {
                 self.views.versions = Arc::new(versions.view().clone());
             }
         }
@@ -143,6 +146,19 @@ impl SidePieces {
         None
     }
 
+    /// Whether the form's rows are the S-Story's versions, not the Story's segments.
+    pub fn has_versions(&self) -> bool {
+        self.versions.is_some()
+    }
+
+    /// An action on the rows of the S-Story's open version; `None` without the S-Story.
+    pub fn act_on_rows(&mut self, event: &qnc_action_event::ActionEvent, preview: &mut SourcePreview) -> Option<bool> {
+        let versions = self.versions.as_mut()?;
+        let done = versions.act_on_rows(event, preview);
+        self.views.versions = Arc::new(versions.view().clone());
+        Some(done)
+    }
+
     /// A clip and IN/OUT a chosen statement, usable part or script block opens (once).
     /// The take of a voice record to hear (its clip and channel), once.
     pub fn take_voice_request(&mut self) -> Option<(String, u16)> {
@@ -178,7 +194,7 @@ mod tests {
         assert!(ai.transcript.is_some() && ai.shots.is_some() && ai.script.is_none());
         let audio = SidePieces::for_panels([SCRIPT_PANEL]);
         assert!(audio.transcript.is_some() && audio.shots.is_none() && audio.script.is_some() && audio.versions.is_none());
-        let s_story = SidePieces::for_panels([DRAFT_SEGMENT_PANEL]);
+        let s_story = SidePieces::for_panels([SKELETON_PANEL]);
         assert!(s_story.versions.is_some() && s_story.script.is_none() && s_story.draft_story());
     }
 }

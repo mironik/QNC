@@ -7317,3 +7317,17 @@ sucelja svake 2 s, kartice, otvorena verzija; nista ne pise. Drzi je `qnc-side-p
 `FocusView::tab_cards` daje kartice SubSegment, Voice i Stories (ploca isti broj redaka). Kartica koja nije klip je jedna
 neutralna `qnc_clip_row::TabCard` (premjestena iz `qnc-script` `SubsegmentCard`, koji je sada njezino ime). Testovi
 `qnc-skeleton-versions`, `qnc-pool-tabs`, `qnc-side-pieces`, `qnc-panel-focus`, conformance. Uzivo nije provjereno.
+Izvedeno 2026-10-31 (korak 4 plana S-Storyja; korisnik: "elementi S-Storyja imaju status SubClipa, ne segmenta; nema M markera,
+slotova ni pokrivalica, samo poredak"): desni panel S-Storyja (grupa k) je `skeleton_panel`: otvorena verzija price kao Wrap
+redovi jedan ispod drugoga, istim panelom kao Story (`qnc-segment-panel`), red po elementu (Ton ili Off po tome sto je), pauza
+prije elementa ga pomice, bez markera, slotova i pokrivalica; val A1 i filmstrip elementa istim citacima kao SubSegment
+(`qnc-program-waveform`, `qnc-program-filmstrip`, 1:1 slike na osi verzije). Bez izabrane verzije prikazuje se najnovija.
+Elementi sviraju jedan iza drugoga u istom Broadcast Playeru kao SubSegment (`preview.show_pieces`); klik na red je playhead,
+Space play/pauza, strelice korak. Sve s redova S-Storyja (mis i te tipke dok redovi imaju fokus) ide verziji, nikad Storyju
+(`qnc-panel-focus` prije svega ostalog; `qnc-side-pieces` `act_on_rows`); ostale tipke (Tab...) rade kao do sada, a dijelovi
+price ispod S-Storyja i dalje citaju praznu radnu pricu, ne Story. `qnc-skeleton-versions` (`lay_out`, `act_on_rows`,
+`piece_inputs`), `qnc-right-panel` (`SKELETON_PANEL`, `Shown.versions`), raspored grupe k: tabovi Stories, All, SubClip,
+B-roll, u docku samo Add SubClip; conformance: k mora imati skeleton_panel. Nije izvedeno: zoom elementa na mjestu source
+timelinea (korak 5), uredivanje (gore/dolje, brisanje, pauza/rez), Send to Story (korak 6); dugmad trake panela (Undo,
+Export...) na redovima S-Storyja ne rade nista. Testovi `qnc-skeleton-versions` (2), `qnc-side-pieces`, `qnc-panel-focus`
+(zlatna tablica tipki), conformance, release build. Uzivo nije provjereno.
