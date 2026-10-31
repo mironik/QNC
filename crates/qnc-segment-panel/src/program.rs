@@ -100,14 +100,11 @@ pub(crate) fn paint_program(
         .markers
         .iter()
         .chain(&segments.joins)
-        // v5 `local_marker_frame`: a marker on a segment border is drawn at the end
-        // of the earlier row; only the first row shows frame 0. A border cut whose sound goes on
-        // into this row (an L, user 2026-10-30: the A2 of a Ton into the Off after it) is drawn
-        // at its start too, so its sound's side shows where it is.
-        .filter(|pin| {
-            let reaches_in = [pin.sound_tail, pin.a1_tail].into_iter().flatten().any(|side| start < side && side <= end);
-            (start..=end).contains(&pin.frame) && (pin.frame != start || start == 0 || reaches_in)
-        })
+        // A cut on a segment border belongs to both rows (user 2026-10-31): it is the OUT of the
+        // clip of the earlier row and the IN of the clip of this one, so a right click on either
+        // row takes the nearer of its own IN and OUT (v5 `local_marker_frame` drew it only at the
+        // end of the earlier row, so every row could take only its end).
+        .filter(|pin| (start..=end).contains(&pin.frame))
         .map(|pin| TimelineMarkerPin {
             id: &pin.marker_id,
             frame: local(pin.frame),
@@ -136,7 +133,7 @@ pub(crate) fn paint_program(
     let trim_labels: Vec<(u64, String)> = segments
         .trim_frames
         .iter()
-        .filter(|frame| (start..=end).contains(*frame) && (**frame != start || start == 0))
+        .filter(|frame| (start..=end).contains(*frame))
         .map(|frame| (local(*frame), segments.timecode(*frame)))
         .collect();
     let trim_playheads: Vec<(u64, &str)> = trim_labels.iter().map(|(frame, label)| (*frame, label.as_str())).collect();

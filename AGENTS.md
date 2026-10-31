@@ -7348,3 +7348,11 @@ Story" salje segmente otvorene verzije na kraj Storyja. Ugovori `skeleton.databa
 `qnc-skeleton-versions`, `qnc-side-pieces`, `qnc-panel-focus` (zlatna tablica tipki), `qnc-program-db`,
 `qnc-program-segments`, `qnc-script`, `qnc-source-preview`, `qnc-editorial-application`, conformance. Debug cache obrisan
 (`cargo clean --profile dev`, 34,8 GiB; disk je imao 1,8 GB slobodno). Uzivo nije provjereno.
+Popravak 2026-10-31 (korisnik: "desni klik misa (Ctrl+) pozicionira se na kraj wrap reda, a pravilo je da se pozicionira na
+blizi marker... ovdje su subklipovi, svaki ima IN/OUT markere"): log: desni klikovi na 87, 120, 130 i 147 uzeli su isti rez na
+kraju reda. Wrap red je crtao samo rezove unutar sebe bez reza na svom pocetku (v5 `local_marker_frame`: rez na granici samo
+na kraju ranijeg reda), pa je svaki red mogao uzeti samo svoj kraj (OUT). Sada rez na granici pripada objema redovima: OUT
+klipa ranijeg reda i IN klipa ovoga, pa desni klik uzima blizi od IN-a i OUT-a svog reda (`qnc-segment-panel` `program.rs`,
+i trim playhead na pocetku reda). Vrijedi za S-Story i Story. Nije mijenjano (zakljucano pravilo 20. 10.): zakljucani
+pocetni i zavrsni marker price se ne uzimaju, pa IN prvog i OUT zadnjeg klipa misem se ne uzimaju. Testovi, conformance.
+Uzivo nije provjereno.
