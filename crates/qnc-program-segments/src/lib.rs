@@ -185,6 +185,9 @@ pub struct ProgramSegments {
     export_run: qnc_export_launch::ExportRun,
     /// The message of the last finished export and the file it wrote (its link).
     exported: Option<(String, String)>,
+    /// The draft story sent on to the Story (Media Assist Video, user 2026-10-31): how many
+    /// segments came at the end of the Story, or why not.
+    send_draft: Option<std::sync::mpsc::Receiver<Result<usize, String>>>,
     /// The message of an export running or failed (shown red, user 2026-10-24).
     export_alert: Option<String>,
     /// The program's loudness and what it was measured for (placements, waves, rate).
@@ -337,7 +340,7 @@ impl ProgramSegments {
         if !same {
             // B-roll shots whose cover never came (the program stopped between the two
             // writes) go; a minute old, so a cover another process is writing stays.
-            if let Ok(shots) = VirtualShotsWriter::spawn(story.clone()) {
+            if let Ok(shots) = VirtualShotsWriter::spawn(story.main_story()) {
                 let _ = shots.submit(&ShotOperation::ForgetUnconfirmedCoverShots { older_than_seconds: 60 });
                 self.shots = Some(shots);
             }

@@ -919,7 +919,9 @@ impl Script {
                     origin: part.origin,
                 });
             }
-            qnc_program_db::StoryWriter::start(target.clone())?.call(&qnc_program_db::Operation::AppendSegments { project_id, segments })?;
+            // The skeleton goes to Media Assist Video, the draft story (user 2026-10-31): its
+            // parts are refined there and sent on to the Story from there.
+            qnc_program_db::StoryWriter::start(target.draft_story())?.call(&qnc_program_db::Operation::AppendSegments { project_id, segments })?;
             Ok(None)
         })
     }

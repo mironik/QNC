@@ -331,12 +331,10 @@ fn validate_editorial_layout_composition(root: &Path) -> CheckResult {
             ));
         }
     }
-    for group in ["l"] {
-        if editorial["groups"][group]["right_panel"] != "none" {
-            report.error(format!(
-                "editorial.layout.json: group '{group}' must keep the right panel empty (none)"
-            ));
-        }
+    // Media Assist Video is the Story without its lead-in, on the project's draft story
+    // (user 2026-10-31).
+    if editorial["groups"]["l"]["right_panel"] != "draft_segment_panel" {
+        report.error("editorial.layout.json: group 'l' (Video) must use draft_segment_panel".to_string());
     }
     if editorial["groups"]["g"]["right_panel"] != "script_panel" {
         report.error("editorial.layout.json: group 'g' (Audio) must use script_panel".to_string());

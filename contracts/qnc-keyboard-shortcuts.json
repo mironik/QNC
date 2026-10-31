@@ -176,7 +176,10 @@
       "label": "Draft price (FCP7 XML: snimljeni OFF-ovi i izjave)"
     },
     "script_send_story": {
-      "label": "Posalji kostur price u Story (na kraj)"
+      "label": "Posalji kostur price u MA Video (na kraj)"
+    },
+    "story_send_draft": {
+      "label": "Posalji pricu MA Videa u Story (na kraj)"
     },
     "script_open_export": {
       "label": "Otvori izvezeni scenarij"

@@ -231,6 +231,7 @@ impl ProgramSegments {
             }
             SegmentCommand::Marker => self.marker_at_playhead(),
             SegmentCommand::AddSegment(kind) => self.create_from_source(kind),
+            SegmentCommand::SendToStory => self.send_draft_to_story(),
             SegmentCommand::Cover { overwrite } => self.cover_from_source(overwrite),
             SegmentCommand::SelectCover { cover_id, frame } => self.select_cover(cover_id, frame),
             SegmentCommand::TakeCover { cover_id, frame } => {
