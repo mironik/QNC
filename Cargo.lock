@@ -3109,6 +3109,7 @@ dependencies = [
  "qnc-media-assist-audio-desktop-adapter",
  "qnc-media-assist-video-desktop-adapter",
  "qnc-project-desktop-adapter",
+ "qnc-s-story-desktop-adapter",
  "qnc-shell-desktop-api",
  "qnc-story-desktop-adapter",
 ]
@@ -5547,6 +5548,26 @@ dependencies = [
  "qnc-transcript",
  "qnc-transcript-panel",
  "qnc-ui-text",
+]
+
+[[package]]
+name = "qnc-s-story"
+version = "0.1.0"
+dependencies = [
+ "eframe",
+ "qnc-dev-diagnostics",
+ "qnc-editorial-desktop",
+]
+
+[[package]]
+name = "qnc-s-story-desktop-adapter"
+version = "0.1.0"
+dependencies = [
+ "eframe",
+ "qnc-board",
+ "qnc-editorial-desktop",
+ "qnc-shell-desktop-api",
+ "qnc-status-line",
 ]
 
 [[package]]

@@ -324,14 +324,14 @@ fn validate_editorial_layout_composition(root: &Path) -> CheckResult {
             "contracts/ui/editorial.layout.json or ingest.layout.json missing or invalid JSON",
         );
     };
-    for group in ["e", "g", "l", "o"] {
+    for group in ["e", "g", "k", "l", "o"] {
         if !editorial["groups"][group].is_object() {
             report.error(format!(
                 "editorial.layout.json: missing composition for group '{group}'"
             ));
         }
     }
-    for group in ["l"] {
+    for group in ["k", "l"] {
         if editorial["groups"][group]["right_panel"] != "none" {
             report.error(format!(
                 "editorial.layout.json: group '{group}' must keep the right panel empty (none)"
@@ -366,7 +366,7 @@ fn validate_editorial_layout_composition(root: &Path) -> CheckResult {
             ));
         }
     }
-    for group in ["e", "g", "l", "o"] {
+    for group in ["e", "g", "k", "l", "o"] {
         let actions = editorial["groups"][group]["source_dock"]["actions_rtl"].as_array();
         if actions.map_or(true, |actions| actions.is_empty()) {
             report.error(format!(

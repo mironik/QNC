@@ -1,0 +1,12 @@
+{
+  "application_id": "qnc.s-story",
+  "tab_id": "s_story",
+  "label": "S-Story",
+  "enabled": true,
+  "system": true,
+  "removable": false,
+  "priority_group": "k",
+  "host_mode": "embedded_public_api",
+  "desktop_entry": "qnc_s_story",
+  "standalone_executable": "qnc-s-story"
+}

@@ -7237,3 +7237,16 @@ dijela na njegovo mjesto; `qnc-script` (`send_story`, poruka nakon upisa), `qnc-
 (sljedeci koraci): kostur u MA Video (fino podesavanje prije slanja), slanje dijela kostura kao prepisivanje njegovih
 segmenata u prici (pokrivalice iznad njih trazi odluku). Testovi `qnc-script-draft` (novi `skeleton`), `qnc-program-db`
 (novi `a_skeleton_is_appended_in_one_step_...`), `qnc-script`, conformance. Uzivo nije provjereno.
+Izmjena i izvedba 2026-10-31 (korisnik: "i dalje radis gresku zbog koje smo presli na flat montazu... u MA Video to jos nisu
+segmenti u smislu Storyja... to su klipovi, source-story, elementi koji imaju isti status i mogucnosti upravljanja kao source
+klipovi"; "nova forma S-Story, nova grupa K (kostur)"; "S-Story poseban zapis koji je ujedno sigurnosni zapis ako korisnik
+pokvari Story"; "da, otkljucavam shell, kreni s 1 i 2"): (1) Vracen commit 4089fb0 (MA Video kao Story ploca na vlastitoj
+radnoj prici `story-draft.db` sa segmentima): elementi kostura nisu segmenti. MA Video je opet kakav je bio. (2) Nova forma
+S-Story, grupa `k` (kostur): `apps/qnc-s-story` (`qnc-app.json`, samostalni exe `qnc-s-story`), javni desktop adapter
+`crates/qnc-s-story-desktop-adapter`, ugovor aplikacije `contracts/applications/s-story.application.json`, grupa `k` u
+`contracts/ui/editorial.layout.json` (zasad kopija MA Video forme, desni panel prazan), shell (otkljucan) samo Cargo ovisnost
+na adapter i unos u tablicu tvornica (`apps/qnc-app`), root Cargo, conformance zna grupu `k`, katalog aplikacija osvjezen
+(a, b, e, g, k, l, o). Launch bar pokazuje S-Story kad ga template projekta izabere. Nije izvedeno (koraci 3-5): vlastiti
+zapis S-Storyja (elementi kao izvorni klipovi: klip, IN/OUT, A1/A2, J/L, razmak ili rez, porijeklo), kostur na jednom ravnom
+timelineu (kocka SubSegmenta), Send to S-Story iz MA Audija i Send to Story iz S-Storyja. Testovi, `--check-contracts`,
+conformance, release build.

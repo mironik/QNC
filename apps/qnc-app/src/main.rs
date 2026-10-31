@@ -61,8 +61,10 @@ fn embedded_app_factories() -> HashMap<String, EmbeddedAppFactory> {
     let media_assist_audio_ai = qnc_media_assist_audio_ai_desktop_adapter::factory();
     let media_assist_audio = qnc_media_assist_audio_desktop_adapter::factory();
     let media_assist_video = qnc_media_assist_video_desktop_adapter::factory();
+    let s_story = qnc_s_story_desktop_adapter::factory();
     let story = qnc_story_desktop_adapter::factory();
     HashMap::from([
+        (s_story.desktop_entry.to_string(), s_story),
         (project.desktop_entry.to_string(), project),
         (ingest.desktop_entry.to_string(), ingest),
         (
