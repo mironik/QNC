@@ -7259,3 +7259,9 @@ prethodnom i porijeklom `script:<blok>:<dio>`; `Append` dodaje na kraj u jednom 
 `Read` daje redom. `qnc-script` `send_story` pise elemente tamo (zvuk kao do sada: dio scenarija ili zvuk zadrzan za klip,
 A2 OFF-a iskljucen); ovisnost o `qnc-program-db` uklonjena. Nije izvedeno: prikaz i uredivanje kostura u S-Storyju, Send to
 Story iz S-Storyja. Testovi `qnc-skeleton-db` (2), `qnc-script`, `qnc-ui-text`, conformance.
+Izmjena 2026-10-31 (korisnik: "S-Story ide poslije MA Videa, stavi ga K kako i jest"): MA Video je prioritetna grupa `j`
+(`apps/qnc-media-assist-video/qnc-app.json`; kljuc forme u ugovoru rasporeda ostaje `l`), pa je redoslijed a, b, e, g, j
+(MA Video), k (S-Story), o (Story); katalog aplikacija osvjezen. Projekt cuva slijed aplikacija iz vremena kad je napravljen,
+pa novi redoslijed dobiva kad mu se template ponovno izabere u Projectu. Provjereno citanjem aktivnog projekta (primjer
+`qnc-skeleton-db/examples/read.rs`, samo citanje): Send to S-Story je upisao 5 elemenata (OFF1, tri izjave, OFF2); S-Story
+ih jos ne prikazuje.
