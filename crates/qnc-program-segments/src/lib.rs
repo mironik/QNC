@@ -173,6 +173,8 @@ pub struct ProgramSegments {
     waker: qnc_prerender_launch::PrerenderWaker,
     /// The stored waves of the clips the program plays (v5 program waveform).
     waves: qnc_program_waveform::ProgramWaves,
+    /// The reader of the clips' waves and filmstrips, kept for another S-Story version.
+    artifacts: Option<std::sync::Arc<dyn qnc_program_waveform::TimelineArtifactRead>>,
     /// The stored filmstrips of the clips the program shows (Wrap row pictures).
     filmstrips: qnc_program_filmstrip::ProgramFilmstrips,
     /// The preview normalises the program's A1 and A2 (user 2026-10-24); on when the
@@ -325,7 +327,8 @@ impl ProgramSegments {
         waves: Option<std::sync::Arc<dyn qnc_program_waveform::TimelineArtifactRead>>,
         prerender: Option<qnc_content_store::ContentTarget>,
     ) {
-        let same = self.target.as_ref().map(ProjectDbTarget::uri) == Some(story.uri());
+        // Another S-Story version is another story (user 2026-10-31).
+        let same = self.target.as_ref().map(|target| (target.uri(), target.draft_version())) == Some((story.uri(), story.draft_version()));
         if !same {
             // Another project starts afresh; normalising stays as the user has it (on at start).
             let normalize = self.normalize;
@@ -335,6 +338,7 @@ impl ProgramSegments {
                 format!("story-normalize {} (project opened)", if normalize { "on" } else { "off" }),
             );
             self.filmstrips.set_reader(waves.clone());
+            self.artifacts = waves.clone();
             self.waves.set_reader(waves);
         }
         if !same {
@@ -353,6 +357,14 @@ impl ProgramSegments {
         self.prerender = prerender;
         self.waker.wake(self.prerender.as_ref());
         self.reload();
+    }
+
+    /// Shows S-Story version `version` (user 2026-10-31: every version is a copy of the Story of
+    /// its own): the same project, its story the version's. Nothing on a form of the Story.
+    pub fn switch_story(&mut self, version: u32) {
+        let Some(target) = self.target.clone().filter(ProjectDbTarget::is_draft) else { return };
+        let project_id = self.project_id.clone();
+        self.configure(target.draft_story(version), &project_id, self.artifacts.clone(), self.prerender.clone());
     }
 
     pub fn view(&self) -> &SegmentsView {

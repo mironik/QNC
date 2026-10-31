@@ -22,15 +22,21 @@ pub struct ProjectDb {
     draft: Option<PathBuf>,
 }
 
-/// The file of the draft story beside the project database (S-Story).
-pub const DRAFT_FILE: &str = "story-draft.db";
+/// The files of the S-Story versions beside the project database: `story-draft-<n>.db`, one per
+/// version (user 2026-10-31: every version of the S-Story is a copy of the Story of its own).
+pub const DRAFT_PREFIX: &str = "story-draft-";
+
+/// The file of version `version` of the S-Story.
+pub fn draft_file(version: u32) -> String {
+    format!("{DRAFT_PREFIX}{version}.db")
+}
 /// The name the project database is attached under on a draft connection.
 pub const PROJECT_SCHEMA: &str = "project";
 
 /// Whether `conn` is a connection of the draft story (the project database attached).
 pub fn is_draft(conn: &Connection) -> bool {
     // The main file is the draft's (a pragma read is refused by the table modules' authorizer).
-    conn.path().and_then(|path| Path::new(path).file_name()).is_some_and(|name| name == DRAFT_FILE)
+    conn.path().and_then(|path| Path::new(path).file_name()).and_then(|name| name.to_str()).is_some_and(|name| name.starts_with(DRAFT_PREFIX))
 }
 
 impl std::fmt::Debug for ProjectDb {
@@ -81,8 +87,8 @@ impl ProjectDb {
     /// database, created empty when missing; the project database is attached read through, so
     /// the catalog, the settings and the leases are the project's. Unqualified names find the
     /// draft's tables first, so a module writes only there.
-    pub fn with_draft(mut self) -> Result<Self> {
-        let file = self.file.with_file_name(DRAFT_FILE);
+    pub fn with_draft(mut self, version: u32) -> Result<Self> {
+        let file = self.file.with_file_name(draft_file(version));
         if !file.is_file() {
             Connection::open_with_flags(&file, OpenFlags::SQLITE_OPEN_READ_WRITE | OpenFlags::SQLITE_OPEN_CREATE)
                 .map_err(|e| e.to_string())?;

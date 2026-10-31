@@ -6,19 +6,17 @@
   "schema_version": "0.1.0",
   "qnc_uri": "qnc://local/db/project_db",
   "tables": [
-    "skeleton_versions",
-    "skeleton_elements"
+    "skeleton_versions"
   ],
   "public_read_views": [
-    "public_skeleton_versions",
-    "public_skeleton_elements"
+    "public_skeleton_versions"
   ],
   "write_owner": "qnc.module.skeleton-db",
   "public_read_policy": "public_read_views",
   "rules": {
-    "versions": "Every send from the script of Media Assist Audio is a new version, numbered 1, 2, ...; a number is never given again. Each version has its own elements in order.",
-    "elements": "Each element is a SubClip, a source clip (ton: a statement, picture and sound of its clip; off: the voice record of an OFF) with its own IN/OUT, A1/A2, A1 J/L and the pause or cut before it, in order. Elements are not story segments.",
-    "record": "Its own record, apart from the script (MA Audio sends to it) and the Story (it sends to the Story): the safe copy a broken Story is sent again from, all of it or a part."
+    "versions": "Every send from the script of Media Assist Audio is a new version, numbered 1, 2, ...; a number is never given again. This table holds only the list of versions.",
+    "stories": "Each version is a story of its own, a copy of the Story with no lead-in and lead-out, in story-draft-<n>.db beside project.db, written through the same story module (qnc.module.program-db). Its segments are SubClips until they are sent to the Story.",
+    "record": "Apart from the script (MA Audio sends to it) and the Story (it sends to the Story): the safe copy a broken Story is sent again from."
   },
   "migration_policy": "owner_application_only",
   "created_at": "2026-10-31T00:00:00Z",

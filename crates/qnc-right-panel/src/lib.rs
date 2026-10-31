@@ -12,7 +12,7 @@ use qnc_editorial_layout::RightPanelTab;
 
 pub const MODULE_ID: &str = "qnc.module.right-panel";
 /// The kinds of right panels are the side pieces' (`qnc-side-pieces`): their pieces are made per kind.
-pub use qnc_side_pieces::{DRAFT_SEGMENT_PANEL, SCRIPT_PANEL, SEGMENT_PANEL, SKELETON_PANEL, TRANSCRIPT_PANEL, VIDEO_AI_PANEL};
+pub use qnc_side_pieces::{DRAFT_SEGMENT_PANEL, SCRIPT_PANEL, SEGMENT_PANEL, TRANSCRIPT_PANEL, VIDEO_AI_PANEL};
 
 /// What the right panels show.
 pub struct Shown<'a> {
@@ -23,8 +23,6 @@ pub struct Shown<'a> {
     pub shots: &'a qnc_clip_shots::ShotsView,
     /// The script of the story (Media Assist Audio).
     pub script: &'a qnc_script::ScriptView,
-    /// The versions of the S-Story.
-    pub versions: &'a qnc_skeleton_versions::VersionsView,
     /// The shown clip's source timecode.
     pub timecode: Option<&'a qnc_source_timecode::SourceTimecode>,
 }
@@ -56,8 +54,6 @@ pub fn show(ui: &mut egui::Ui, kind: &str, theme: &qnc_desktop_theme::Theme, sho
         TRANSCRIPT_PANEL => (qnc_transcript_panel::show(ui, shown.transcript, theme, shown.timecode), false),
         VIDEO_AI_PANEL => (qnc_shot_panel::show(ui, shown.shots, theme, shown.timecode, shown.cover_lengths), false),
         SCRIPT_PANEL => (qnc_script_panel::show(ui, shown.script, shown.transcript, theme), false),
-        // The open S-Story version: the same Wrap rows, its elements as SubClips.
-        SKELETON_PANEL => (qnc_segment_panel::show(ui, &shown.versions.segments, theme, shown.cover_lengths), true),
         _ => (None, false),
     }
 }

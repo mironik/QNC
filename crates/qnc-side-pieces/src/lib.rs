@@ -20,16 +20,14 @@ pub const MODULE_ID: &str = "qnc.module.side-pieces";
 
 /// The kinds of right panels (a group's layout contract names them).
 pub const SEGMENT_PANEL: &str = "segment_panel";
-/// The segment panel of the draft story (S-Story, user 2026-10-31: "like the Story,
-/// without the lead-in"): the same panel, its story the project's draft.
+/// The segment panel of the S-Story (user 2026-10-31: "like the Story, without the lead-in"):
+/// the same panel, its story the open version (a copy of the Story of its own).
 pub const DRAFT_SEGMENT_PANEL: &str = "draft_segment_panel";
 pub const TRANSCRIPT_PANEL: &str = "transcript_panel";
 /// The Video AI panel: the shots of the clip on the preview.
 pub const VIDEO_AI_PANEL: &str = "video_ai_panel";
 /// The script of the story (Media Assist Audio, user 2026-10-28).
 pub const SCRIPT_PANEL: &str = "script_panel";
-/// The S-Story (user 2026-10-31): the open version of its story as Wrap rows of SubClips.
-pub const SKELETON_PANEL: &str = "skeleton_panel";
 
 /// What the right panel pieces show; empty for a piece the form does not have.
 #[derive(Debug, Clone, Default, PartialEq)]
@@ -48,7 +46,7 @@ pub struct SidePieces {
     script: Option<Script>,
     versions: Option<SkeletonVersions>,
     views: SideViews,
-    /// The form's segment panel shows the draft story.
+    /// The form's segment panel shows a version of the S-Story.
     draft_story: bool,
 }
 
@@ -62,21 +60,24 @@ impl SidePieces {
             transcript: (has(TRANSCRIPT_PANEL) || has(SCRIPT_PANEL)).then(Transcript::new),
             shots: has(VIDEO_AI_PANEL).then(ClipShots::default),
             script: has(SCRIPT_PANEL).then(Script::new),
-            versions: has(SKELETON_PANEL).then(SkeletonVersions::new),
+            versions: has(DRAFT_SEGMENT_PANEL).then(SkeletonVersions::new),
             views: SideViews::default(),
-            // Under the S-Story too the segment pieces read the draft story, never the Story.
-            draft_story: has(DRAFT_SEGMENT_PANEL) || has(SKELETON_PANEL),
+            draft_story: has(DRAFT_SEGMENT_PANEL),
         }
     }
 
     /// The story of the form's segment panel in the project database `target`: the Story, or
-    /// the draft story when the form's panel is the draft's.
+    /// the open S-Story version when the form's panel is the S-Story's.
     pub fn story_of(&self, target: qnc_db_broker::ProjectDbTarget) -> qnc_db_broker::ProjectDbTarget {
-        if self.draft_story { target.draft_story() } else { target }
+        match self.draft_story() {
+            Some(version) => target.draft_story(version),
+            None => target,
+        }
     }
 
-    pub fn draft_story(&self) -> bool {
-        self.draft_story
+    /// The S-Story version the form shows; `None` for a form of the Story or none.
+    pub fn draft_story(&self) -> Option<u32> {
+        self.draft_story.then(|| self.versions.as_ref().map_or(1, SkeletonVersions::open_number))
     }
 
     pub fn views(&self) -> &SideViews {
@@ -103,7 +104,7 @@ impl SidePieces {
             play_pieces(script, preview);
         }
         if let Some(versions) = &mut self.versions {
-            if versions.poll(preview, clips) {
+            if versions.poll(preview) {
                 self.views.versions = Arc::new(versions.view().clone());
             }
         }
@@ -146,17 +147,9 @@ impl SidePieces {
         None
     }
 
-    /// Whether the form's rows are the S-Story's versions, not the Story's segments.
-    pub fn has_versions(&self) -> bool {
-        self.versions.is_some()
-    }
-
-    /// An action on the rows of the S-Story's open version; `None` without the S-Story.
-    pub fn act_on_rows(&mut self, event: &qnc_action_event::ActionEvent, preview: &mut SourcePreview) -> Option<bool> {
-        let versions = self.versions.as_mut()?;
-        let done = versions.act_on_rows(event, preview);
-        self.views.versions = Arc::new(versions.view().clone());
-        Some(done)
+    /// The S-Story version newly opened (its number), once: the story machinery turns to it.
+    pub fn take_version_switch(&mut self) -> Option<u32> {
+        self.versions.as_mut().and_then(SkeletonVersions::take_switch)
     }
 
     /// A clip and IN/OUT a chosen statement, usable part or script block opens (once).
@@ -194,8 +187,10 @@ mod tests {
         assert!(ai.transcript.is_some() && ai.shots.is_some() && ai.script.is_none());
         let audio = SidePieces::for_panels([SCRIPT_PANEL]);
         assert!(audio.transcript.is_some() && audio.shots.is_none() && audio.script.is_some() && audio.versions.is_none());
-        let s_story = SidePieces::for_panels([SKELETON_PANEL]);
-        assert!(s_story.versions.is_some() && s_story.script.is_none() && s_story.draft_story());
+        assert_eq!(audio.draft_story(), None);
+        let s_story = SidePieces::for_panels([DRAFT_SEGMENT_PANEL]);
+        assert!(s_story.versions.is_some() && s_story.script.is_none());
+        assert_eq!(s_story.draft_story(), Some(1), "version 1 until the list of versions is read");
     }
 }
 

@@ -19,7 +19,6 @@ qnc-key-list = { workspace = true }
 qnc-segments-keys = { workspace = true }
 qnc-sync-session = { workspace = true }
 qnc-program-segments = { workspace = true }
-qnc-segment-panel = { workspace = true }
 qnc-source-preview = { workspace = true }
 qnc-source-mark-focus = { workspace = true }
 qnc-keyframe-nav = { workspace = true }

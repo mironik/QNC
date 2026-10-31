@@ -121,13 +121,13 @@ fn a_shorter_lead_out_takes_the_markers_past_the_new_end_with_it() {
 }
 
 #[test]
-fn the_draft_story_of_media_assist_video_is_its_own_and_has_no_leads() {
+fn every_s_story_version_is_a_story_of_its_own_with_no_leads() {
     let dir = tempfile::tempdir().unwrap();
     let path = dir.path().join("project.db");
     drop(imported_store(&path));
     set_leads(&path, 2.0, 2.0);
     let main = qnc_db_broker::ProjectDbTarget::from_owner_binding(&path, "qnc://local/db/project_db/p1").unwrap();
-    let draft = main.draft_story();
+    let draft = main.draft_story(1);
     let segment = |kind: &str, range: (u64, u64)| Operation::CreateSegment {
         project_id: "p1".into(),
         kind: kind.into(),
@@ -154,5 +154,7 @@ fn the_draft_story_of_media_assist_video_is_its_own_and_has_no_leads() {
     let main_rows = StoryReader::open(&main).unwrap().list_segments().unwrap();
     assert_eq!(main_rows.iter().filter(|row| !row.lead.is_empty()).count(), 2);
     assert_eq!(StoryReader::open(&draft).unwrap().list_segments().unwrap().len(), 1);
-    assert!(path.with_file_name(qnc_db_broker::DRAFT_FILE).is_file());
+    assert!(path.with_file_name(qnc_db_broker::draft_file(1)).is_file());
+    // Another version is another story: version 1 is not in it.
+    assert!(StoryReader::open(&main.draft_story(2)).unwrap().list_segments().unwrap().is_empty());
 }

@@ -141,7 +141,7 @@
     "story.pool.subsegment_empty": "No SubSegments yet: put parts together with SubSegment.",
     "script.subsegment_card": "{mark} · {clip} ({n} parts)",
     "script.voice_card": "{mark} · T{take} ({n} takes)",
-    "skeleton.version_card": "Version {n} · {count} elements",
+    "skeleton.version_card": "Version {n}",
     "script.draft_empty": "The draft has nothing in it yet: record an OFF or add a statement.",
     "script.draft": "Draft XML",
     "script.draft_hint": "The story as recorded so far, for an editing program: recorded OFFs (the take used) and statements in reading order, a pause where an OFF is not recorded yet.",

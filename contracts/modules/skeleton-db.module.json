@@ -40,6 +40,6 @@
     "qnc.module.scanner",
     "qnc.module.broadcast-player-core"
   ],
-  "adapter_policy": "The S-Story skeleton (user 2026-10-31) as a table module of the project database intermediary (qnc-db-broker): skeleton_elements and the view public_skeleton_elements. Each element is a source clip in order (statement ton or voice over off) with its IN/OUT, A1/A2 (camera channel, level, off), J/L of A1, the pause or cut before it and its origin in the script. It is its own record, apart from the script and the Story, and the safe copy a broken Story is sent again from. It owns only its table and is written only through the intermediary.",
+  "adapter_policy": "The list of S-Story versions (user 2026-10-31) as a table module of the project database intermediary (qnc-db-broker): skeleton_versions and the view public_skeleton_versions, numbered 1, 2, ... Each version is its own story in story-draft-<n>.db, written by the story module; this module owns only the list and is written only through the intermediary.",
   "specification": "AGENTS.md"
 }

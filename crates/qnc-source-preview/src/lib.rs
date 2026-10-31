@@ -100,9 +100,9 @@ pub struct PreviewContext {
     /// The project database (the source timeline keeps each clip's A1/A2 sound there),
     /// resolved with the context, off the form thread.
     project_target: Option<qnc_db_broker::ProjectDbTarget>,
-    /// The story program this preview plays is the project's draft story (Media Assist
-    /// Video, user 2026-10-31), not the Story.
-    draft_story: bool,
+    /// The story program this preview plays is an S-Story version (user 2026-10-31: a copy of
+    /// the Story of its own), not the Story.
+    draft_story: Option<u32>,
 }
 
 impl PreviewContext {
@@ -125,7 +125,7 @@ impl PreviewContext {
             notice: None,
             activity_target,
             project_target,
-            draft_story: false,
+            draft_story: None,
         }
     }
 
@@ -164,13 +164,13 @@ impl PreviewContext {
             notice,
             activity_target,
             project_target,
-            draft_story: false,
+            draft_story: None,
         }
     }
 
-    /// The story program this preview plays: the draft story when `draft`.
-    pub fn with_draft_story(mut self, draft: bool) -> Self {
-        self.draft_story = draft;
+    /// The story program this preview plays: S-Story version `version`, else the Story.
+    pub fn with_draft_story(mut self, version: Option<u32>) -> Self {
+        self.draft_story = version;
         self
     }
 
@@ -411,6 +411,18 @@ impl SourcePreview {
             (false, false, false) => qnc_playback_activity::PlaybackLevel::Idle,
         };
         self.activity.update_level(self.activity_target.as_ref(), level);
+    }
+
+    /// The story program plays S-Story version `version` from now on; a program of another
+    /// version that is shown is cut (user 2026-10-31: every version is a story of its own).
+    pub fn set_draft_story(&mut self, version: Option<u32>) {
+        let Some(context) = &mut self.context else { return };
+        if context.draft_story != version {
+            context.draft_story = version;
+            if self.program {
+                self.close();
+            }
+        }
     }
 
     /// Cuts the current session and clears everything shown.
@@ -903,7 +915,10 @@ impl SourcePreview {
         };
         self.open_program(first_frame, move |reader, workspace_db_uri| {
             let target = qnc_db_broker::ProjectDbTarget::for_project(&context.reader, &context.settings)?;
-            let target = if context.draft_story { target.draft_story() } else { target };
+            let target = match context.draft_story {
+                Some(version) => target.draft_story(version),
+                None => target,
+            };
             loader(target)(reader, workspace_db_uri)
         })
     }

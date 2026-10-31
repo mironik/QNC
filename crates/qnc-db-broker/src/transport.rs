@@ -35,7 +35,7 @@ pub struct ProjectDbTarget {
     /// The draft story of the project (user 2026-10-31: S-Story is a story of its
     /// own, beside the Story): the same table modules on a companion file of the project
     /// database, which it reads through.
-    draft: bool,
+    draft: Option<u32>,
 }
 
 #[derive(Clone)]
@@ -77,7 +77,7 @@ impl ProjectDbTarget {
                 token: owner.token.ok_or("Nedostaje DB credential.")?,
             },
         };
-        Ok(Self { uri, binding, draft: false })
+        Ok(Self { uri, binding, draft: None })
     }
 
     /// The owner supplies the private file binding; the public identity stays `uri`.
@@ -86,7 +86,7 @@ impl ProjectDbTarget {
         Ok(Self {
             uri: uri.into(),
             binding: Binding::Local(file.to_path_buf()),
-            draft: false,
+            draft: None,
         })
     }
 
@@ -98,7 +98,7 @@ impl ProjectDbTarget {
         Ok(Self {
             uri: uri.into(),
             binding: Binding::Remote { resolver, token },
-            draft: false,
+            draft: None,
         })
     }
 
@@ -109,16 +109,21 @@ impl ProjectDbTarget {
     /// The draft story of the same project (S-Story): its own story tables in a
     /// companion file beside the project database, reading the project database (catalog,
     /// settings, leases) through it. The Story is never written there.
-    pub fn draft_story(&self) -> Self {
-        Self { draft: true, ..self.clone() }
+    pub fn draft_story(&self, version: u32) -> Self {
+        Self { draft: Some(version), ..self.clone() }
     }
 
     /// The Story of the same project (from a draft target).
     pub fn main_story(&self) -> Self {
-        Self { draft: false, ..self.clone() }
+        Self { draft: None, ..self.clone() }
     }
 
     pub fn is_draft(&self) -> bool {
+        self.draft.is_some()
+    }
+
+    /// The S-Story version this target is the story of; `None` for the Story.
+    pub fn draft_version(&self) -> Option<u32> {
         self.draft
     }
 
@@ -130,9 +135,12 @@ impl ProjectDbTarget {
         let endpoint = match &self.binding {
             Binding::Local(file) => {
                 let db = ProjectDb::open(file, &self.uri, access, factories.clone())?;
-                Endpoint::Local(if self.draft { db.with_draft()? } else { db })
+                Endpoint::Local(match self.draft {
+                    Some(version) => db.with_draft(version)?,
+                    None => db,
+                })
             }
-            Binding::Remote { .. } if self.draft => {
+            Binding::Remote { .. } if self.draft.is_some() => {
                 return Err(qnc_ui_text::text("db.draft_story_local_only").into())
             }
             Binding::Remote { resolver, token } => Endpoint::Remote(

@@ -7331,3 +7331,20 @@ B-roll, u docku samo Add SubClip; conformance: k mora imati skeleton_panel. Nije
 timelinea (korak 5), uredivanje (gore/dolje, brisanje, pauza/rez), Send to Story (korak 6); dugmad trake panela (Undo,
 Export...) na redovima S-Storyja ne rade nista. Testovi `qnc-skeleton-versions` (2), `qnc-side-pieces`, `qnc-panel-focus`
 (zlatna tablica tipki), conformance, release build. Uzivo nije provjereno.
+Izmjena 2026-10-31 (korisnik: "opet nepotrebno pises los kod... kopija Storyja koja ima sve u kompletu treba biti
+polaziste"; "1-da" (svaka verzija je svoja kopija Storyja); "All je uvijek prvi.. Stories iza njega"): zamjenjuje korak 4
+iznad (redovi elemenata kao zaseban prikaz). Svaka verzija S-Storyja je prica za sebe, kopija Storyja bez lead-ina i
+lead-outa, u `story-draft-<n>.db` uz `project.db` (`qnc-db-broker` `draft_file(n)`, `DRAFT_PREFIX`,
+`ProjectDbTarget::draft_story(n)`, `draft_version()`); pise je isti modul price (`qnc-program-db`), pa S-Story ima sve sto
+ima Story (Wrap redovi, V/Home, markeri, slotovi, pokrivalice, play kroz OFF-ove, zoom, Undo). `qnc-skeleton-db` drzi samo
+popis verzija (`skeleton_versions`, broj 1, 2, ..., ne ponavlja se; razvojna tablica elemenata se brise). MA Audio "Send to
+S-Story" (`qnc-script`) pravi novu verziju i u njezinu pricu dodaje kostur kao segmente (`AppendSegments`). Pool S-Storyja:
+tabovi All, Stories, SubClip, B-roll, Segment; kartice "Version n" (`qnc-skeleton-versions`), klik otvara verziju: Wrap
+izlazi, panel Segmenti cita pricu te verzije (`qnc-program-segments` `switch_story`), preview je svira
+(`qnc-source-preview` `set_draft_story`); bez izbora otvara se najnovija. Desni panel grupe k je `draft_segment_panel`
+(panel Segmenti); `skeleton_panel` i redovi elemenata uklonjeni (`qnc-right-panel`, `qnc-panel-focus` route). "Send to
+Story" salje segmente otvorene verzije na kraj Storyja. Ugovori `skeleton.database.json`, `skeleton-db`,
+`skeleton-versions`. Stara jedna radna prica `story-draft.db` vise se ne cita. Testovi `qnc-db-broker`, `qnc-skeleton-db`,
+`qnc-skeleton-versions`, `qnc-side-pieces`, `qnc-panel-focus` (zlatna tablica tipki), `qnc-program-db`,
+`qnc-program-segments`, `qnc-script`, `qnc-source-preview`, `qnc-editorial-application`, conformance. Debug cache obrisan
+(`cargo clean --profile dev`, 34,8 GiB; disk je imao 1,8 GB slobodno). Uzivo nije provjereno.

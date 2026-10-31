@@ -100,8 +100,8 @@ impl PanelFocus {
         self.side.story_of(target)
     }
 
-    /// Whether the form's segment panel shows the draft story.
-    pub fn draft_story(&self) -> bool {
+    /// The S-Story version the form's segment panel shows; `None` for the Story.
+    pub fn draft_story(&self) -> Option<u32> {
         self.side.draft_story()
     }
 
@@ -140,6 +140,12 @@ impl PanelFocus {
         &mut self,
         (preview, wrap, segments, timeline, clips): (&mut SourcePreview, &mut WrapSession, &mut ProgramSegments, &mut TimelineProjection, &mut [qnc_clip_row::ClipRow]),
     ) -> FocusView {
+        // Another S-Story version opened (user 2026-10-31): the Story machinery turns to its story.
+        if let Some(version) = self.side.take_version_switch() {
+            wrap.leave();
+            segments.switch_story(version);
+            preview.set_draft_story(Some(version));
+        }
         // What the segment panel took is its own: left by a click, Tab or Enter, it is dropped.
         let last = std::mem::replace(&mut self.last_panel, self.panel);
         if last == Panel::Segments && self.panel != Panel::Segments {

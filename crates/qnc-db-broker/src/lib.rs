@@ -12,7 +12,7 @@ mod database;
 mod owned;
 mod transport;
 
-pub use database::{is_draft, ProjectDb, DRAFT_FILE, PROJECT_SCHEMA};
+pub use database::{draft_file, is_draft, ProjectDb, DRAFT_PREFIX, PROJECT_SCHEMA};
 pub use owned::{owned_tables, write_only_own_tables, OwnedTables};
 pub use qnc_json_transport::{Access, Credentials};
 pub use qnc_write_lease::{begin_write, WriteLease, WriteTx};

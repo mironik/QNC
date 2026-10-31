@@ -15,7 +15,7 @@
   "state_policy": "session_local",
   "database_write_policy": "no_db_writes",
   "runtime_crate": "qnc-skeleton-versions",
-  "input": "The project database of the preview; the S-Story versions and their elements as qnc-skeleton-db reads them, read again every 2 s outside the UI thread; the clips of the pool for posters and lengths.",
-  "output": "Cards of the pool's Stories tab (Version n with its number of elements, length and the poster of its first clip) and the version open (skeleton_open_version with the version id). It writes nothing.",
+  "input": "The project database of the preview; the list of S-Story versions as qnc-skeleton-db reads it, read again every 2 s outside the UI thread.",
+  "output": "Cards of the pool's Stories tab (Version n) and the version open (skeleton_open_version with its number); a switch of the open version is taken once by the panel focus, which opens that version's story. It writes nothing.",
   "specification": "User 2026-10-31: several S-Story versions from the same elements of MA Audio; a Stories tab in the S-Story pool (AGENTS.md)."
 }

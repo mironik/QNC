@@ -92,7 +92,7 @@ impl FocusView {
     /// the action a click sends with the card's id.
     pub fn tab_cards<'a>(&self, tab: qnc_pool_tabs::LibraryTab, clips: &'a [qnc_clip_row::ClipRow]) -> (Vec<qnc_clip_row::TabCard<'a>>, &'static str) {
         match tab {
-            qnc_pool_tabs::LibraryTab::Stories => (self.versions.cards(clips), qnc_skeleton_versions::OPEN),
+            qnc_pool_tabs::LibraryTab::Stories => (self.versions.cards(), qnc_skeleton_versions::OPEN),
             tab => self.script.tab_cards(tab == qnc_pool_tabs::LibraryTab::Voice, clips),
         }
     }
