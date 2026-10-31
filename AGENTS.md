@@ -7291,3 +7291,8 @@ Segmenti, Wrap redovi jedan ispod drugoga, markeri, slotovi, pokrivalice); zapis
 te price; S-Story "Send to Story" salje svoje segmente na kraj Storyja. Grupa l (MA Video) je opet prazna. Conformance: k mora
 imati `draft_segment_panel`, l `none`. Testovi `qnc-program-db`, `qnc-program-segments`, `qnc-script`, `qnc-side-pieces`,
 `qnc-db-broker`, `qnc-panel-focus`, conformance. Uzivo nije provjereno. Nije izvedeno: slanje dijela price kao prepisivanje.
+Nalaz i popravak poruke 2026-10-31 (korisnik: S-Story "nije spojen broadcast player"; monitor: "Program source has no
+transport binding"): kopija Storyja radi; prica S-Storyja cita OFF iz mape projekta i izjave Mironik 3452/3429 s kartice
+`volume-a8155186` (FX6 CFexpress), a ta kartica nije bila spojena (na D: je bio drugi disk, serijski 29C991CF). Player tada
+nema vezu za izvor i cijela prica se ne otvara. `qnc-player-launcher`: poruka sada imenuje izvor koji nije spojen. Provjereno
+citanjem baze (privremeni primjer, uklonjen). Kod kopije Storyja nije mijenjan.

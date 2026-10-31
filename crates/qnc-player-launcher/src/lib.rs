@@ -194,7 +194,7 @@ fn program_bindings(
                 .iter()
                 .find(|binding| binding.source_uri() == source_uri)
                 .map(SourceTransportBinding::media_binding)
-                .ok_or_else(|| "Program source has no transport binding.".to_string())
+                .ok_or_else(|| format!("The source {source_uri} is not connected (no transport binding)."))
         })
         .collect()
 }
@@ -208,7 +208,7 @@ fn binding_for(
     Ok(sources
         .iter()
         .find(|binding| binding.source_uri() == reference.source_uri())
-        .ok_or("Player source has no transport binding.")?
+        .ok_or_else(|| format!("The source {} is not connected (no transport binding).", reference.source_uri()))?
         .media_binding())
 }
 
