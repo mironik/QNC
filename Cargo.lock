@@ -4880,6 +4880,7 @@ dependencies = [
  "qnc-script",
  "qnc-segments-keys",
  "qnc-side-pieces",
+ "qnc-skeleton",
  "qnc-source-mark-focus",
  "qnc-source-panel",
  "qnc-source-preview",
@@ -5544,6 +5545,8 @@ dependencies = [
  "qnc-segment-panel",
  "qnc-shot-panel",
  "qnc-side-pieces",
+ "qnc-skeleton",
+ "qnc-skeleton-panel",
  "qnc-source-timecode",
  "qnc-transcript",
  "qnc-transcript-panel",
@@ -5610,6 +5613,7 @@ dependencies = [
  "qnc-source-preview",
  "qnc-source-timecode",
  "qnc-status-line",
+ "qnc-subsegment-edit",
  "qnc-timeline",
  "qnc-transcript",
  "qnc-trim-stills",
@@ -5881,10 +5885,24 @@ dependencies = [
  "qnc-clip-row",
  "qnc-clip-shots",
  "qnc-script",
+ "qnc-skeleton",
  "qnc-source-preview",
  "qnc-source-timecode",
  "qnc-timeline",
  "qnc-transcript",
+]
+
+[[package]]
+name = "qnc-skeleton"
+version = "0.1.0"
+dependencies = [
+ "qnc-clip-row",
+ "qnc-script-db",
+ "qnc-skeleton-db",
+ "qnc-source-preview",
+ "qnc-source-timecode",
+ "qnc-subsegment-edit",
+ "qnc-ui-text",
 ]
 
 [[package]]
@@ -5898,6 +5916,19 @@ dependencies = [
  "serde",
  "serde_json",
  "tempfile",
+]
+
+[[package]]
+name = "qnc-skeleton-panel"
+version = "0.1.0"
+dependencies = [
+ "eframe",
+ "qnc-action-event",
+ "qnc-desktop-theme",
+ "qnc-skeleton",
+ "qnc-skeleton-db",
+ "qnc-ui-kit",
+ "qnc-ui-text",
 ]
 
 [[package]]
@@ -6186,6 +6217,24 @@ dependencies = [
  "qnc-editorial-desktop",
  "qnc-shell-desktop-api",
  "qnc-status-line",
+]
+
+[[package]]
+name = "qnc-subsegment-edit"
+version = "0.1.0"
+dependencies = [
+ "qnc-program-filmstrip",
+ "qnc-program-input",
+ "qnc-program-view",
+ "qnc-program-waveform",
+ "qnc-script-db",
+ "qnc-script-draft",
+ "qnc-source-preview",
+ "qnc-source-timecode",
+ "qnc-timeline",
+ "qnc-trim-stills",
+ "qnc-ui-text",
+ "qnc-wheel-jog",
 ]
 
 [[package]]

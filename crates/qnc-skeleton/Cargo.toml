@@ -1,0 +1,14 @@
+[package]
+name = "qnc-skeleton"
+version = "0.1.0"
+edition = "2021"
+description = "QNC public piece: the S-Story skeleton of a project (user 2026-10-31) - its elements read from the project database as source clips on one flat timeline, edited with qnc-subsegment-edit and written back through qnc-skeleton-db; it knows no form"
+
+[dependencies]
+qnc-clip-row = { workspace = true }
+qnc-script-db = { workspace = true }
+qnc-skeleton-db = { workspace = true }
+qnc-source-preview = { workspace = true }
+qnc-source-timecode = { workspace = true }
+qnc-subsegment-edit = { workspace = true }
+qnc-ui-text = { workspace = true }

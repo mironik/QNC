@@ -10,6 +10,7 @@ use std::sync::Arc;
 use qnc_clip_row::ClipRow;
 use qnc_clip_shots::{ClipShots, ShotsView};
 use qnc_script::{Script, ScriptView};
+use qnc_skeleton::{Skeleton, SkeletonView};
 use qnc_source_preview::SourcePreview;
 use qnc_source_timecode::SourceTimecode;
 use qnc_timeline::TimelineProjection;
@@ -24,6 +25,8 @@ pub const TRANSCRIPT_PANEL: &str = "transcript_panel";
 pub const VIDEO_AI_PANEL: &str = "video_ai_panel";
 /// The script of the story (Media Assist Audio, user 2026-10-28).
 pub const SCRIPT_PANEL: &str = "script_panel";
+/// The S-Story skeleton (user 2026-10-31): its elements as source clips on one flat timeline.
+pub const SKELETON_PANEL: &str = "skeleton_panel";
 
 /// What the right panel pieces show; empty for a piece the form does not have.
 #[derive(Debug, Clone, Default, PartialEq)]
@@ -31,6 +34,7 @@ pub struct SideViews {
     pub transcript: Arc<TranscriptView>,
     pub shots: Arc<ShotsView>,
     pub script: Arc<ScriptView>,
+    pub skeleton: Arc<SkeletonView>,
 }
 
 /// The pieces of the panels a form has.
@@ -39,6 +43,7 @@ pub struct SidePieces {
     transcript: Option<Transcript>,
     shots: Option<ClipShots>,
     script: Option<Script>,
+    skeleton: Option<Skeleton>,
     views: SideViews,
 }
 
@@ -52,6 +57,7 @@ impl SidePieces {
             transcript: (has(TRANSCRIPT_PANEL) || has(SCRIPT_PANEL)).then(Transcript::new),
             shots: has(VIDEO_AI_PANEL).then(ClipShots::default),
             script: has(SCRIPT_PANEL).then(Script::new),
+            skeleton: has(SKELETON_PANEL).then(Skeleton::new),
             views: SideViews::default(),
         }
     }
@@ -77,7 +83,13 @@ impl SidePieces {
             if script.poll(preview, timeline, clips) {
                 self.views.script = Arc::new(script.view().clone());
             }
-            play_pieces(script, preview);
+            play_pieces(script.take_pieces_request(), preview);
+        }
+        if let Some(skeleton) = &mut self.skeleton {
+            if skeleton.poll(preview, clips) {
+                self.views.skeleton = Arc::new(skeleton.view().clone());
+            }
+            play_pieces(skeleton.take_pieces_request(), preview);
         }
     }
 
@@ -92,9 +104,16 @@ impl SidePieces {
             let empty = TranscriptView::default();
             let transcript = self.transcript.as_ref().map_or(&empty, Transcript::view);
             if let Some(done) = script.act(action_id, target, (preview, timeline, timecode, transcript)) {
-                play_pieces(script, preview);
+                play_pieces(script.take_pieces_request(), preview);
                 // What the action changed is seen at once (the next poll compares from here).
                 self.views.script = Arc::new(script.view().clone());
+                return Some(done);
+            }
+        }
+        if let Some(skeleton) = &mut self.skeleton {
+            if let Some(done) = skeleton.act(action_id, target, preview) {
+                play_pieces(skeleton.take_pieces_request(), preview);
+                self.views.skeleton = Arc::new(skeleton.view().clone());
                 return Some(done);
             }
         }
@@ -126,7 +145,7 @@ impl SidePieces {
 
     /// Whether a read or write of a piece runs (the form repaints soon).
     pub fn busy(&self) -> bool {
-        self.transcript.as_ref().is_some_and(Transcript::busy) || self.script.as_ref().is_some_and(Script::busy)
+        self.transcript.as_ref().is_some_and(Transcript::busy) || self.script.as_ref().is_some_and(Script::busy) || self.skeleton.as_ref().is_some_and(Skeleton::busy)
     }
 
     /// Whether a transcription of this process runs in the background.
@@ -150,10 +169,10 @@ mod tests {
     }
 }
 
-/// The parts of the SubSegment the script opened, to the one player (user 2026-10-29: its
-/// program plays in the same Broadcast Player as the story).
-fn play_pieces(script: &mut Script, preview: &mut SourcePreview) {
-    if let Some((pieces, frame)) = script.take_pieces_request() {
+/// The parts the script's SubSegment or the S-Story skeleton opened, to the one player (user
+/// 2026-10-29: their program plays in the same Broadcast Player as the story).
+fn play_pieces(request: Option<(Vec<qnc_source_preview::PieceInput>, u64)>, preview: &mut SourcePreview) {
+    if let Some((pieces, frame)) = request {
         preview.show_pieces(&pieces, frame);
     }
 }

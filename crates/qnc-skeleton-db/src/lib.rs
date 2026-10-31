@@ -88,11 +88,18 @@ pub enum Operation {
     Append { elements: Vec<NewElement> },
     /// The elements of the skeleton in order.
     Read,
+    /// An element's IN/OUT, A1 and the pause and join before it change (edited as a source
+    /// clip on the S-Story timeline).
+    Update { element_id: i64, in_frame: u64, out_frame: u64, a1: Lane, gap_before: u64, cut: bool },
+    /// An element changes places with the one before (`earlier`) or after it.
+    Move { element_id: i64, earlier: bool },
+    /// An element leaves the skeleton.
+    Remove { element_id: i64 },
 }
 
 impl Operation {
     pub fn is_write(&self) -> bool {
-        matches!(self, Self::Append { .. })
+        !matches!(self, Self::Read)
     }
 }
 
@@ -101,6 +108,7 @@ impl Operation {
 pub enum Data {
     Elements(Vec<Element>),
     Appended(usize),
+    Changed,
 }
 
 /// Joins the skeleton table to a project database.
@@ -126,7 +134,20 @@ pub fn read(target: &ProjectDbTarget) -> Result<Vec<Element>> {
     let answer = client.execute(MODULE_ID, encode(&Operation::Read)?)?;
     match serde_json::from_value(answer).map_err(|e| e.to_string())? {
         Data::Elements(elements) => Ok(elements),
-        Data::Appended(_) => Err(reply()),
+        _ => Err(reply()),
+    }
+}
+
+/// A change of one element (`Update`, `Move` or `Remove`) through the project's serial writer.
+pub fn change(target: &ProjectDbTarget, operation: Operation) -> Result<()> {
+    if !matches!(operation, Operation::Update { .. } | Operation::Move { .. } | Operation::Remove { .. }) {
+        return Err(reply());
+    }
+    let writer = ProjectDbWriter::start(target.clone(), vec![SkeletonModule::factory()])?;
+    let answer = writer.call(MODULE_ID, encode(&operation)?)?;
+    match serde_json::from_value(answer).map_err(|e| e.to_string())? {
+        Data::Changed => Ok(()),
+        _ => Err(reply()),
     }
 }
 
@@ -137,7 +158,7 @@ pub fn append(target: &ProjectDbTarget, elements: Vec<NewElement>) -> Result<usi
     let answer = writer.call(MODULE_ID, encode(&Operation::Append { elements })?)?;
     match serde_json::from_value(answer).map_err(|e| e.to_string())? {
         Data::Appended(count) => Ok(count),
-        Data::Elements(_) => Err(reply()),
+        _ => Err(reply()),
     }
 }
 

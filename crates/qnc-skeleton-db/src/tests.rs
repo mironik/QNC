@@ -44,6 +44,24 @@ fn elements_come_at_the_end_in_order_and_are_read_back() {
 }
 
 #[test]
+fn an_element_is_changed_moved_and_removed() {
+    let (_dir, target) = project();
+    append(&target, vec![element(ElementKind::Off, "voice-a", 0, 120), element(ElementKind::Ton, "clip-b", 50, 300), element(ElementKind::Ton, "clip-c", 0, 75)]).unwrap();
+    let ids: Vec<i64> = read(&target).unwrap().iter().map(|element| element.element_id).collect();
+    let a1 = Lane { channel: 2, level_db: -3, off: false };
+    change(&target, Operation::Update { element_id: ids[1], in_frame: 60, out_frame: 280, a1, gap_before: 5, cut: true }).unwrap();
+    let changed = &read(&target).unwrap()[1];
+    assert_eq!((changed.in_frame, changed.out_frame, changed.a1, changed.gap_before, changed.cut), (60, 280, a1, 5, true));
+    change(&target, Operation::Move { element_id: ids[2], earlier: true }).unwrap();
+    change(&target, Operation::Move { element_id: ids[0], earlier: true }).unwrap();
+    let order: Vec<_> = read(&target).unwrap().iter().map(|element| element.clip_id.clone()).collect();
+    assert_eq!(order, ["voice-a", "clip-c", "clip-b"], "the first stays first");
+    change(&target, Operation::Remove { element_id: ids[0] }).unwrap();
+    assert_eq!(read(&target).unwrap().len(), 2);
+    assert!(change(&target, Operation::Read).is_err());
+}
+
+#[test]
 fn a_bad_element_writes_nothing() {
     let (_dir, target) = project();
     let mut bad = element(ElementKind::Ton, "clip-b", 50, 50);

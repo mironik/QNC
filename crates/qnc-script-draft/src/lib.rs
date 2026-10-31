@@ -27,8 +27,14 @@ pub fn block_pieces(block: &Block) -> Vec<Piece> {
 
 /// The parts as the player's program takes them.
 pub fn piece_inputs(block: &Block) -> Vec<PieceInput> {
-    block_pieces(block)
-        .into_iter()
+    inputs_of(&block_pieces(block))
+}
+
+/// Parts as the player's program takes them (a SubSegment's, or the S-Story skeleton's).
+pub fn inputs_of(pieces: &[Piece]) -> Vec<PieceInput> {
+    pieces
+        .iter()
+        .cloned()
         .enumerate()
         .map(|(index, piece)| PieceInput {
             clip_id: piece.clip_id,

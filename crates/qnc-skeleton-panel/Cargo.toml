@@ -1,0 +1,14 @@
+[package]
+name = "qnc-skeleton-panel"
+version = "0.1.0"
+edition = "2021"
+description = "QNC public panel: the S-Story skeleton listed (each element a source clip with its length) with Open; a click opens the skeleton on its flat timeline at that element; it holds no state and knows no form"
+
+[dependencies]
+eframe = { workspace = true }
+qnc-action-event = { workspace = true }
+qnc-desktop-theme = { workspace = true }
+qnc-skeleton = { workspace = true }
+qnc-skeleton-db = { workspace = true }
+qnc-ui-kit = { workspace = true }
+qnc-ui-text = { workspace = true }

@@ -7265,3 +7265,17 @@ Izmjena 2026-10-31 (korisnik: "S-Story ide poslije MA Videa, stavi ga K kako i j
 pa novi redoslijed dobiva kad mu se template ponovno izabere u Projectu. Provjereno citanjem aktivnog projekta (primjer
 `qnc-skeleton-db/examples/read.rs`, samo citanje): Send to S-Story je upisao 5 elemenata (OFF1, tri izjave, OFF2); S-Story
 ih jos ne prikazuje.
+Izvedeno 2026-10-31 (korisnik: "da, kreni"; "sve to vec postoji"): S-Story prikazuje i uredjuje kostur na jednom ravnom
+timelineu. Uredjivanje dijelova SubSegmenta premjesteno je (ne prepisano) iz `qnc-script` u novu javnu kocku
+`crates/qnc-subsegment-edit` (+ ugovor): rubovi dijela (Ctrl+I/O, desni klik, povlacenje, strelice, kotacic) sa zoomom
+reza, A1 dijela, pauza i spoj prije dijela, premjestanje i brisanje; svaku izmjenu vraca kao `PieceWrite`, a pise je
+vlasnik (scenarij u `qnc-script-db`, kostur u `qnc-skeleton-db`). `qnc-script` je koristi; `qnc-script-draft::inputs_of`.
+`qnc-skeleton-db`: operacije `Update`, `Move`, `Remove` (`change`). Nova kocka `crates/qnc-skeleton` (+ ugovor): elementi
+kostura citani iz baze projekta izvan niti sucelja, kao izvorni klipovi jedan iza drugoga, otvoreni u istoj kocki
+uredjivanja; svaka izmjena odmah se upise u kostur (scenarij ni Story se ne mijenjaju). Novi panel
+`crates/qnc-skeleton-panel` (+ ugovor): popis elemenata s duljinom i Open; klik na element otvara kostur na njegovom
+pocetku. Desni panel grupe k je `skeleton_panel` (`qnc-side-pieces` `SKELETON_PANEL`, `qnc-right-panel`,
+`qnc-panel-focus` `FocusView.skeleton`); timeline kostura stoji na mjestu source timelinea istim panelom kao SubSegment
+(`qnc-subsegment-panel`), svira ga isti Broadcast Player. Conformance: grupa k mora imati skeleton_panel. Testovi
+`qnc-subsegment-edit` (7), `qnc-skeleton`, `qnc-skeleton-db` (3), `qnc-script`, conformance. Uzivo nije provjereno. Nije
+izvedeno: Send to Story iz S-Storyja (cijeli kostur ili dio kao rewrite; pokrivalice iznad dijela cekaju odluku).

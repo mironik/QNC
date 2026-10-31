@@ -35,7 +35,56 @@ impl Store {
             Operation::Read if !self.schema_ready => Ok(Data::Elements(Vec::new())),
             Operation::Read => self.read(),
             Operation::Append { elements } => self.append(elements),
+            Operation::Update { element_id, in_frame, out_frame, a1, gap_before, cut } => self.update(*element_id, (*in_frame, *out_frame), *a1, (*gap_before, *cut)),
+            Operation::Move { element_id, earlier } => self.relocate(*element_id, *earlier),
+            Operation::Remove { element_id } => self.remove(*element_id),
         }
+    }
+
+    fn update(&mut self, element_id: i64, (in_frame, out_frame): (u64, u64), a1: Lane, (gap, cut): (u64, bool)) -> Result<Data> {
+        if out_frame <= in_frame || !(MIN_LEVEL_DB..=MAX_LEVEL_DB).contains(&a1.level_db) || a1.channel > 63 {
+            return Err(qnc_ui_text::text("db.skeleton_invalid").into());
+        }
+        let tx = qnc_db_broker::begin_write(&mut self.conn).map_err(err)?;
+        let changed = tx
+            .execute(
+                "UPDATE skeleton_elements SET in_frame = ?2, out_frame = ?3, a1_channel = ?4, a1_level_db = ?5, a1_off = ?6,
+                   gap_before = ?7, cut = ?8 WHERE element_id = ?1",
+                params![element_id, in_frame as i64, out_frame as i64, a1.channel, a1.level_db, a1.off, gap as i64, cut],
+            )
+            .map_err(err)?;
+        if changed != 1 {
+            return Err(qnc_ui_text::text("db.skeleton_invalid").into());
+        }
+        tx.commit().map_err(err)?;
+        Ok(Data::Changed)
+    }
+
+    /// Swaps the place of an element with its neighbour; at the end nothing moves.
+    fn relocate(&mut self, element_id: i64, earlier: bool) -> Result<Data> {
+        let tx = qnc_db_broker::begin_write(&mut self.conn).map_err(err)?;
+        let at: i64 = tx.query_row("SELECT sort_index FROM skeleton_elements WHERE element_id = ?1", params![element_id], |row| row.get(0)).map_err(err)?;
+        let neighbour = if earlier {
+            "SELECT element_id, sort_index FROM skeleton_elements WHERE sort_index < ?1 ORDER BY sort_index DESC LIMIT 1"
+        } else {
+            "SELECT element_id, sort_index FROM skeleton_elements WHERE sort_index > ?1 ORDER BY sort_index LIMIT 1"
+        };
+        let found: Option<(i64, i64)> = tx.query_row(neighbour, params![at], |row| Ok((row.get(0)?, row.get(1)?))).ok();
+        if let Some((other, other_at)) = found {
+            // Through a free place: the sort index is unique.
+            tx.execute("UPDATE skeleton_elements SET sort_index = -1 WHERE element_id = ?1", params![element_id]).map_err(err)?;
+            tx.execute("UPDATE skeleton_elements SET sort_index = ?2 WHERE element_id = ?1", params![other, at]).map_err(err)?;
+            tx.execute("UPDATE skeleton_elements SET sort_index = ?2 WHERE element_id = ?1", params![element_id, other_at]).map_err(err)?;
+        }
+        tx.commit().map_err(err)?;
+        Ok(Data::Changed)
+    }
+
+    fn remove(&mut self, element_id: i64) -> Result<Data> {
+        let tx = qnc_db_broker::begin_write(&mut self.conn).map_err(err)?;
+        tx.execute("DELETE FROM skeleton_elements WHERE element_id = ?1", params![element_id]).map_err(err)?;
+        tx.commit().map_err(err)?;
+        Ok(Data::Changed)
     }
 
     fn append(&mut self, elements: &[NewElement]) -> Result<Data> {

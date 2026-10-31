@@ -331,12 +331,15 @@ fn validate_editorial_layout_composition(root: &Path) -> CheckResult {
             ));
         }
     }
-    for group in ["k", "l"] {
+    for group in ["l"] {
         if editorial["groups"][group]["right_panel"] != "none" {
             report.error(format!(
                 "editorial.layout.json: group '{group}' must keep the right panel empty (none)"
             ));
         }
+    }
+    if editorial["groups"]["k"]["right_panel"] != "skeleton_panel" {
+        report.error("editorial.layout.json: group 'k' (S-Story) must use skeleton_panel".to_string());
     }
     if editorial["groups"]["g"]["right_panel"] != "script_panel" {
         report.error("editorial.layout.json: group 'g' (Audio) must use script_panel".to_string());
