@@ -39,10 +39,7 @@ struct Neighbour {
 /// markers by its difference, so they stay on their pictures.
 pub(crate) fn sync_leads(conn: &Connection) -> Result<()> {
     let real = real_parts(conn)?;
-    // The draft story of Media Assist Video has no lead-in or lead-out (user 2026-10-31:
-    // "like the Story, without the lead-in"), so its first OFF is edited as any segment.
-    let draft = qnc_db_broker::is_draft(conn);
-    let (Some(first), Some(last)) = (real.first().filter(|_| !draft), real.last()) else {
+    let (Some(first), Some(last)) = (real.first(), real.last()) else {
         conn.execute("DELETE FROM story_items WHERE role = 'segment' AND lead != ''", []).map_err(err)?;
         return Ok(());
     };

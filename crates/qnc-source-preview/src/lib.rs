@@ -100,9 +100,6 @@ pub struct PreviewContext {
     /// The project database (the source timeline keeps each clip's A1/A2 sound there),
     /// resolved with the context, off the form thread.
     project_target: Option<qnc_db_broker::ProjectDbTarget>,
-    /// The story program this preview plays is the project's draft story (Media Assist
-    /// Video, user 2026-10-31), not the Story.
-    draft_story: bool,
 }
 
 impl PreviewContext {
@@ -125,7 +122,6 @@ impl PreviewContext {
             notice: None,
             activity_target,
             project_target,
-            draft_story: false,
         }
     }
 
@@ -164,14 +160,7 @@ impl PreviewContext {
             notice,
             activity_target,
             project_target,
-            draft_story: false,
         }
-    }
-
-    /// The story program this preview plays: the draft story when `draft`.
-    pub fn with_draft_story(mut self, draft: bool) -> Self {
-        self.draft_story = draft;
-        self
     }
 
     pub fn project_id(&self) -> &str {
@@ -903,7 +892,6 @@ impl SourcePreview {
         };
         self.open_program(first_frame, move |reader, workspace_db_uri| {
             let target = qnc_db_broker::ProjectDbTarget::for_project(&context.reader, &context.settings)?;
-            let target = if context.draft_story { target.draft_story() } else { target };
             loader(target)(reader, workspace_db_uri)
         })
     }

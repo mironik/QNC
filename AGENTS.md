@@ -7237,24 +7237,3 @@ dijela na njegovo mjesto; `qnc-script` (`send_story`, poruka nakon upisa), `qnc-
 (sljedeci koraci): kostur u MA Video (fino podesavanje prije slanja), slanje dijela kostura kao prepisivanje njegovih
 segmenata u prici (pokrivalice iznad njih trazi odluku). Testovi `qnc-script-draft` (novi `skeleton`), `qnc-program-db`
 (novi `a_skeleton_is_appended_in_one_step_...`), `qnc-script`, conformance. Uzivo nije provjereno.
-Izmjena 2026-10-31 (korisnik: "neznam zasto ponovo gradis ono sto vec postoji"; "sve te elemente imas, samo ih trebas
-primjeniti u MA video"; "MA Video kao Story, ali bez lead-in"; "da, kreni" na vlastitu pricu MA Videa u bazi): zaseban
-panel kostura (4c48f6c) je vracen. MA Video (grupa l) je Story ploca: isti panel Segmenti (Wrap redovi, zoom, J/L, A1/A2,
-markeri, pokrivalice, Sync/B-roll), tabovi All/SubClip/B-roll/Segment, gumbi Talking Head, Voice over, B-roll, Sync/B-roll,
-Add SubClip i "Send to Story". Razlika je samo prica na kojoj radi: vlastita radna prica MA Videa, bez lead-ina i
-lead-outa. Izvedba (umjesto stupca oznake price u svakoj tablici, kako je bilo opisano): radna prica je datoteka
-`story-draft.db` uz `project.db` iste mape projekta, s istim tablicama price (`qnc-program-db`); posrednik je otvara samu
-(shema i nadogradnje rade samo na njoj), a zatim prikljuci `project.db` kao shemu `project`, pa katalog klipova, postavke
-i najam citaju iz baze projekta. `qnc-db-broker` (`ProjectDbTarget::draft_story`, `main_story`, `is_draft`, `DRAFT_FILE`,
-`with_draft`; autorizator dopusta ATTACH; radna prica samo za lokalnu bazu, inace `db.draft_story_local_only`),
-`qnc-content-read` (`has_view` vidi i prikljucenu bazu), `qnc-program-db` (`sync_leads`: radna prica nema leadove).
-Koju pricu forma uzima kaze ugovor rasporeda: desni panel `draft_segment_panel` (`qnc-side-pieces` `story_of`,
-`qnc-panel-focus`, `qnc-right-panel`, `qnc-source-preview` `with_draft_story`; conformance: grupa l ga mora imati); B-roll
-kadrovi pokrivalica uvijek idu u bazu projekta (`main_story`). MA Audio "Send to MA Video" (`script_send_story`) dodaje
-kostur na kraj radne price MA Videa. MA Video "Send to Story" (`story_send_draft`, bez tipke; ukljucen kad radna prica ima
-segmente) dodaje aktivne segmente radne price redom na kraj Storyja u jednom koraku (`AppendSegments`, jedan Undo), svaki s
-klipom, IN/OUT, A1 i A2 i porijeklom `draft:<segment>` (`qnc-program-commands` `SendToStory`, `qnc-program-segments`
-`send_draft_to_story`, upis u pozadinskoj niti). Nije izvedeno: pokrivalice i markeri radne price se ne salju u Story;
-slanje dijela kao prepisivanje u prici. Testovi `qnc-program-db` (54, novi
-`the_draft_story_of_media_assist_video_is_its_own_and_has_no_leads`), `qnc-program-segments`, `qnc-panel-focus`, zlatna
-tablica tipki, `qnc-db-broker`, `qnc-content-read`, conformance. Uzivo nije provjereno.

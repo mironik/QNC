@@ -248,36 +248,17 @@
     "l": {
       "role": "media_assist_video",
       "pool_head": {
-        "show_segment_tab": true,
+        "show_segment_tab": false,
         "show_cover_tab": true,
         "show_export_hires": false,
-        "show_quick_cover": true,
-        "tabs_left": [
-          {
-            "label": "@pool.tab.all",
-            "action_id": "editorial_tab_all"
-          },
-          {
-            "label": "@pool.tab.subclip",
-            "action_id": "editorial_tab_virtual"
-          },
-          {
-            "label": "@pool.tab.broll",
-            "action_id": "editorial_tab_broll"
-          },
-          {
-            "label": "@pool.tab.segment",
-            "action_id": "editorial_tab_segment"
-          }
-        ]
+        "show_quick_cover": false
       },
-      "right_panel": "draft_segment_panel",
+      "right_panel": "none",
       "tab_order": [
         "pool_tabs",
         "pool",
         "source_timeline",
-        "source_buttons",
-        "segments"
+        "source_buttons"
       ],
       "source_dock": {
         "show": true,
@@ -285,26 +266,9 @@
         "show_story_actions": true,
         "show_ingest_actions": false,
         "actions_rtl": [
-          {
-            "label": "@story.send_draft",
-            "action_id": "story_send_draft"
-          },
-          {
-            "label": "@story.sync_broll",
-            "action_id": "cover_mode_sync"
-          },
-          {
-            "label": "@pool.tab.broll",
-            "action_id": "cover_mode_covers"
-          },
-          {
-            "label": "@story.voice_over",
-            "action_id": "add_off_segment"
-          },
-          {
-            "label": "@story.talking_head",
-            "action_id": "add_ton_segment"
-          },
+          "@story.broll",
+          "@story.voice_over",
+          "@story.talking_head",
           {
             "label": "@story.add_subclip",
             "action_id": "save_virtual_shot"
@@ -312,7 +276,7 @@
         ]
       },
       "media_card": {
-        "selection_check": false,
+        "selection_check": true,
         "status_dots": "pipeline"
       }
     },

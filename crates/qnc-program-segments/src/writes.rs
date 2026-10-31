@@ -1,42 +1,6 @@
 use super::*;
 
 impl ProgramSegments {
-    /// Media Assist Video sends its story on to the Story (user 2026-10-31): its segments in
-    /// order come at the end of the Story in one step (one Undo there takes them back), each
-    /// with its clip, range and A1/A2, the draft segment it came from as its origin.
-    pub(crate) fn send_draft_to_story(&mut self) {
-        let Some(target) = self.target.clone().filter(ProjectDbTarget::is_draft) else { return };
-        let segments: Vec<qnc_program_db::AppendSegment> = self
-            .stored
-            .iter()
-            .filter(|segment| segment.active && segment.lead.is_empty())
-            .map(|segment| qnc_program_db::AppendSegment {
-                kind: segment.kind.clone(),
-                clip_id: segment.clip_id.clone(),
-                in_frame: segment.in_frame,
-                out_frame: segment.out_frame,
-                a1: (segment.a1_source_channel, segment.a1_level_db, segment.a1_off),
-                a2: (segment.a2_source_channel, segment.a2_level_db, segment.a2_off),
-                origin: format!("draft:{}", segment.segment_id),
-            })
-            .collect();
-        if segments.is_empty() {
-            return self.refresh_view(qnc_ui_text::text("story.msg.draft_empty").into());
-        }
-        let (send, receive) = std::sync::mpsc::channel();
-        let (project_id, count) = (self.project_id.clone(), segments.len());
-        let started = std::thread::Builder::new().name("qnc-story-send-draft".into()).spawn(move || {
-            let written = StoryWriter::start(target.main_story())
-                .and_then(|writer| writer.call(&Operation::AppendSegments { project_id, segments }))
-                .map(|_| count);
-            let _ = send.send(written);
-        });
-        if started.is_ok() {
-            self.send_draft = Some(receive);
-            self.refresh_view(qnc_ui_text::text("story.msg.sending_draft").into());
-        }
-    }
-
     pub(crate) fn write(&mut self, operation: Operation) {
         self.write_keyed(operation);
     }
@@ -77,8 +41,7 @@ impl ProgramSegments {
             return self.refresh_view(qnc_ui_text::text("story.msg.db_unavailable").into());
         };
         if self.shots.is_none() {
-            // B-roll shots are the project's, also for a cover of the draft story.
-            match VirtualShotsWriter::spawn(target.main_story()) { // never waits on the form thread
+            match VirtualShotsWriter::spawn(target) { // never waits on the form thread
                 Ok(shots) => self.shots = Some(shots),
                 Err(error) => return self.refresh_view(error),
             }
@@ -125,15 +88,6 @@ impl ProgramSegments {
             }
         });
         if let Some(message) = exported {
-            self.refresh_view(message);
-            return true;
-        }
-        if let Some(sent) = self.send_draft.as_ref().and_then(|receive| receive.try_recv().ok()) {
-            self.send_draft = None;
-            let message = match sent {
-                Ok(count) => qnc_ui_text::fill("story.msg.sent_draft", &[("n", &count.to_string())]).to_string(),
-                Err(error) => error,
-            };
             self.refresh_view(message);
             return true;
         }

@@ -349,9 +349,7 @@ impl SegmentsView {
             Some(SegmentCommand::Redo) => self.redo_depth > 0,
             Some(SegmentCommand::UndoSelected { .. }) => self.has_selected_object,
             // Covers need segments (user 2026-10-10).
-            Some(SegmentCommand::CoverMode { .. } | SegmentCommand::ToggleSync | SegmentCommand::SendToStory) => {
-                !self.rows.is_empty()
-            }
+            Some(SegmentCommand::CoverMode { .. } | SegmentCommand::ToggleSync) => !self.rows.is_empty(),
             _ => true,
         }
     }

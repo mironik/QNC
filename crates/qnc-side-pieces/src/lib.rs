@@ -19,9 +19,6 @@ pub const MODULE_ID: &str = "qnc.module.side-pieces";
 
 /// The kinds of right panels (a group's layout contract names them).
 pub const SEGMENT_PANEL: &str = "segment_panel";
-/// The segment panel of the draft story (Media Assist Video, user 2026-10-31: "like the Story,
-/// without the lead-in"): the same panel, its story the project's draft.
-pub const DRAFT_SEGMENT_PANEL: &str = "draft_segment_panel";
 pub const TRANSCRIPT_PANEL: &str = "transcript_panel";
 /// The Video AI panel: the shots of the clip on the preview.
 pub const VIDEO_AI_PANEL: &str = "video_ai_panel";
@@ -43,8 +40,6 @@ pub struct SidePieces {
     shots: Option<ClipShots>,
     script: Option<Script>,
     views: SideViews,
-    /// The form's segment panel shows the draft story.
-    draft_story: bool,
 }
 
 impl SidePieces {
@@ -58,18 +53,7 @@ impl SidePieces {
             shots: has(VIDEO_AI_PANEL).then(ClipShots::default),
             script: has(SCRIPT_PANEL).then(Script::new),
             views: SideViews::default(),
-            draft_story: has(DRAFT_SEGMENT_PANEL),
         }
-    }
-
-    /// The story of the form's segment panel in the project database `target`: the Story, or
-    /// the draft story when the form's panel is the draft's.
-    pub fn story_of(&self, target: qnc_db_broker::ProjectDbTarget) -> qnc_db_broker::ProjectDbTarget {
-        if self.draft_story { target.draft_story() } else { target }
-    }
-
-    pub fn draft_story(&self) -> bool {
-        self.draft_story
     }
 
     pub fn views(&self) -> &SideViews {

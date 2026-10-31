@@ -32,10 +32,6 @@ pub const IDLE_RELEASE: std::time::Duration = std::time::Duration::from_secs(2);
 pub struct ProjectDbTarget {
     uri: String,
     binding: Binding,
-    /// The draft story of the project (user 2026-10-31: Media Assist Video is a story of its
-    /// own, beside the Story): the same table modules on a companion file of the project
-    /// database, which it reads through.
-    draft: bool,
 }
 
 #[derive(Clone)]
@@ -77,7 +73,7 @@ impl ProjectDbTarget {
                 token: owner.token.ok_or("Nedostaje DB credential.")?,
             },
         };
-        Ok(Self { uri, binding, draft: false })
+        Ok(Self { uri, binding })
     }
 
     /// The owner supplies the private file binding; the public identity stays `uri`.
@@ -86,7 +82,6 @@ impl ProjectDbTarget {
         Ok(Self {
             uri: uri.into(),
             binding: Binding::Local(file.to_path_buf()),
-            draft: false,
         })
     }
 
@@ -98,28 +93,11 @@ impl ProjectDbTarget {
         Ok(Self {
             uri: uri.into(),
             binding: Binding::Remote { resolver, token },
-            draft: false,
         })
     }
 
     pub fn uri(&self) -> &str {
         &self.uri
-    }
-
-    /// The draft story of the same project (Media Assist Video): its own story tables in a
-    /// companion file beside the project database, reading the project database (catalog,
-    /// settings, leases) through it. The Story is never written there.
-    pub fn draft_story(&self) -> Self {
-        Self { draft: true, ..self.clone() }
-    }
-
-    /// The Story of the same project (from a draft target).
-    pub fn main_story(&self) -> Self {
-        Self { draft: false, ..self.clone() }
-    }
-
-    pub fn is_draft(&self) -> bool {
-        self.draft
     }
 
     pub fn open(
@@ -129,11 +107,7 @@ impl ProjectDbTarget {
     ) -> Result<ProjectDbClient> {
         let endpoint = match &self.binding {
             Binding::Local(file) => {
-                let db = ProjectDb::open(file, &self.uri, access, factories.clone())?;
-                Endpoint::Local(if self.draft { db.with_draft()? } else { db })
-            }
-            Binding::Remote { .. } if self.draft => {
-                return Err(qnc_ui_text::text("db.draft_story_local_only").into())
+                Endpoint::Local(ProjectDb::open(file, &self.uri, access, factories.clone())?)
             }
             Binding::Remote { resolver, token } => Endpoint::Remote(
                 JsonClient::connect(resolver, &self.uri, ENDPOINT, token, MAX_BYTES)
