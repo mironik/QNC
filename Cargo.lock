@@ -5599,7 +5599,6 @@ dependencies = [
  "qnc-export-launch",
  "qnc-image-assets",
  "qnc-newsroom-sheet-db",
- "qnc-program-db",
  "qnc-program-filmstrip",
  "qnc-program-view",
  "qnc-program-waveform",
@@ -5608,6 +5607,7 @@ dependencies = [
  "qnc-script-export",
  "qnc-script-files",
  "qnc-script-profile",
+ "qnc-skeleton-db",
  "qnc-source-preview",
  "qnc-source-timecode",
  "qnc-status-line",
@@ -5887,6 +5887,18 @@ dependencies = [
  "qnc-source-timecode",
  "qnc-timeline",
  "qnc-transcript",
+]
+
+[[package]]
+name = "qnc-skeleton-db"
+version = "0.1.0"
+dependencies = [
+ "qnc-db-broker",
+ "qnc-ui-text",
+ "rusqlite",
+ "serde",
+ "serde_json",
+ "tempfile",
 ]
 
 [[package]]

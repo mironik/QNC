@@ -7296,3 +7296,15 @@ transport binding"): kopija Storyja radi; prica S-Storyja cita OFF iz mape proje
 `volume-a8155186` (FX6 CFexpress), a ta kartica nije bila spojena (na D: je bio drugi disk, serijski 29C991CF). Player tada
 nema vezu za izvor i cijela prica se ne otvara. `qnc-player-launcher`: poruka sada imenuje izvor koji nije spojen. Provjereno
 citanjem baze (privremeni primjer, uklonjen). Kod kopije Storyja nije mijenjan.
+Izvedeno 2026-10-31 (korisnik: "ovi klipovi u s-story nisu segmenti, oni su jos uvijek subklipovi... status segmenata dobit
+ce tek kad ih posaljemo u Story"; "od istih elemenata u MA Audio moze se sloziti vise s-storija... tab u kojemu ce biti
+verzije price"; "automatski verzija 1, 2..., uvijek nova verzija, kreni"): koraci 1 i 2 plana. (1) Zapis verzija S-Storyja:
+vracen `crates/qnc-skeleton-db` (+ ugovori modula i baze) s verzijama: tablice `skeleton_versions` (broj 1, 2, ..., broj se
+ne ponavlja) i `skeleton_elements` (stavka pripada verziji, redoslijed unutar verzije), pogledi `public_skeleton_versions`,
+`public_skeleton_elements`; operacije `AppendVersion` (nova verzija u jednom koraku, prazna se ne pravi), `ReadVersions`,
+`Read { version_id }`, `Update`, `Move` (unutar verzije), `Remove`; stavka je SubClip (klip, IN/OUT, A1/A2, J/L, pauza ili
+rez, porijeklo), ne segment price; razvojna tablica bez verzija se brise. Conformance: na popisu javnih DB vlasnika. (2) MA
+Audio "Send to S-Story" (`qnc-script`) svaki put pravi novu verziju; scenarij i Story se ne mijenjaju. Testovi
+`qnc-skeleton-db` (3), `qnc-script`, conformance. Nije izvedeno (koraci 3-6): tab Stories u poolu S-Storyja, redovi verzije
+u desnom panelu, otvaranje stavke uvecane na mjestu source timelinea, Send to Story; S-Story zasad i dalje pokazuje
+kopiju Storyja (`story-draft.db`), koja se uklanja u koraku 4.
