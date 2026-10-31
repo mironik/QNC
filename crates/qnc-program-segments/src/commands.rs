@@ -182,6 +182,7 @@ impl ProgramSegments {
             }
             SegmentCommand::DeleteSelected => self.delete_selected(),
             SegmentCommand::SelectMarker(marker_id) => self.select_marker(&marker_id),
+            SegmentCommand::TakeMarker(marker_id) if self.take_clip_edge(&marker_id) => {}
             SegmentCommand::TakeMarker(marker_id) => {
                 self.select_marker(&marker_id);
                 self.edit_marker();

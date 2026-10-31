@@ -423,6 +423,21 @@ impl SegmentsView {
 
     /// The segment of the user a program frame belongs to: a frame of the lead-in belongs to
     /// the first segment, of the lead-out to the last one (they are glued to them).
+    /// The edge of a clip a locked story marker stands for (user 2026-10-31: every element has
+    /// its IN and OUT): in a story with no lead-in or lead-out (the S-Story) the start marker is
+    /// the first segment's IN (`true`) and the end marker the last one's OUT (`false`). With a
+    /// lead there it stays the locked edge of the story.
+    pub fn clip_edge_of(&self, pin: &MarkerPin) -> Option<(&SegmentRow, bool)> {
+        if !pin.locked {
+            return None;
+        }
+        if pin.frame == 0 {
+            self.rows.first().filter(|row| !row.lead && row.start_frame == 0).map(|row| (row, true))
+        } else {
+            self.rows.last().filter(|row| !row.lead && row.end_frame == pin.frame).map(|row| (row, false))
+        }
+    }
+
     pub fn user_segment_at(&self, program_frame: u64) -> Option<&SegmentRow> {
         self.wrap_rows()
             .into_iter()

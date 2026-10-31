@@ -109,7 +109,8 @@ pub(crate) fn paint_program(
             id: &pin.marker_id,
             frame: local(pin.frame),
             taken: pin.taken,
-            locked: pin.locked,
+            // A locked story edge that is a clip's IN or OUT (no lead there) is taken like any cut.
+            locked: pin.locked && segments.clip_edge_of(pin).is_none(),
             part: match pin.taken_part {
                 qnc_program_view::TakenPart::Whole => qnc_timeline::TimelineMarkerPart::Whole,
                 qnc_program_view::TakenPart::Picture => qnc_timeline::TimelineMarkerPart::Picture,

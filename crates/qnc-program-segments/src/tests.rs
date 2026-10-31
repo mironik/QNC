@@ -589,6 +589,24 @@ fn a_taken_slot_shows_the_four_edit_pictures_and_a_taken_marker_two() {
     assert!(segments.view().edit_stills.is_empty());
 }
 
+/// User 2026-10-31: every element has its IN and OUT. With no lead-in or lead-out (the S-Story)
+/// the locked start and end markers are the first element's IN and the last one's OUT: the
+/// mouse takes them (the panel does not lock them) and the take is that segment's edge.
+#[test]
+fn with_no_leads_the_story_start_and_end_are_the_first_in_and_the_last_out() {
+    let mut segments = component();
+    let (first, last) = (segments.view().rows.first().unwrap().clone(), segments.view().rows.last().unwrap().clone());
+    let pin = |id: &str| segments.view().markers.iter().find(|pin| pin.marker_id == id).unwrap().clone();
+    assert_eq!(segments.view().clip_edge_of(&pin("S")).map(|(row, start)| (row.segment_id.clone(), start)), Some((first.segment_id.clone(), true)));
+    assert_eq!(segments.view().clip_edge_of(&pin("E")).map(|(row, start)| (row.segment_id.clone(), start)), Some((last.segment_id.clone(), false)));
+    assert_eq!(segments.view().clip_edge_of(&pin("m1")), None, "an open marker is a cut, not an edge");
+    segments.apply(SegmentCommand::TakeMarker("S".into()));
+    assert_eq!(segments.view().editing.as_deref(), Some(first.segment_id.as_str()), "the first IN");
+    segments.apply_action("clear_focus");
+    segments.apply(SegmentCommand::TakeMarker("E".into()));
+    assert_eq!(segments.view().editing.as_deref(), Some(last.segment_id.as_str()), "the last OUT");
+}
+
 #[test]
 fn a_taken_segment_edge_shows_its_pictures_on_the_source_timeline() {
     let mut segments = component();

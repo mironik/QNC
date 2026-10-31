@@ -7356,3 +7356,10 @@ klipa ranijeg reda i IN klipa ovoga, pa desni klik uzima blizi od IN-a i OUT-a s
 i trim playhead na pocetku reda). Vrijedi za S-Story i Story. Nije mijenjano (zakljucano pravilo 20. 10.): zakljucani
 pocetni i zavrsni marker price se ne uzimaju, pa IN prvog i OUT zadnjeg klipa misem se ne uzimaju. Testovi, conformance.
 Uzivo nije provjereno.
+Dopuna 2026-10-31 (korisnik: "da, i prvi IN i zadnji OUT u S-Storyju... svi elementi imaju svoj in i out"): u prici bez
+lead-ina i lead-outa (S-Story) zakljucani pocetni i zavrsni marker price su IN prvog i OUT zadnjeg elementa. Panel ih ne
+zakljucava za mis, a desni klik (i Ctrl+M) na njih uzima rub tog segmenta kao Ctrl+Shift+I/O (klip se otvara na source
+timelineu s uzetim IN-om ili OUT-om, strelice i kotacic pomicu, Enter zapisuje `TrimSegment`, Esc odustaje).
+`qnc-program-view` `clip_edge_of` (zakljucani marker bez leada na tom kraju), `qnc-segment-panel` (`locked` samo kad nije
+rub klipa), `qnc-program-segments` (`take_clip_edge`, `take_edge_of`). U Storyju (s leadovima) zakljucano pravilo od 20. 10.
+ostaje. Test `with_no_leads_the_story_start_and_end_are_the_first_in_and_the_last_out`, conformance. Uzivo nije provjereno.
