@@ -331,15 +331,13 @@ fn validate_editorial_layout_composition(root: &Path) -> CheckResult {
             ));
         }
     }
-    for group in ["l"] {
-        if editorial["groups"][group]["right_panel"] != "none" {
-            report.error(format!(
-                "editorial.layout.json: group '{group}' must keep the right panel empty (none)"
-            ));
-        }
+    if editorial["groups"]["l"]["right_panel"] != "none" {
+        report.error("editorial.layout.json: group 'l' must keep the right panel empty (none)".to_string());
     }
-    if editorial["groups"]["k"]["right_panel"] != "skeleton_panel" {
-        report.error("editorial.layout.json: group 'k' (S-Story) must use skeleton_panel".to_string());
+    // S-Story is a copy of the Story without its lead-in and lead-out, on the project's draft
+    // story (user 2026-10-31).
+    if editorial["groups"]["k"]["right_panel"] != "draft_segment_panel" {
+        report.error("editorial.layout.json: group 'k' (S-Story) must use draft_segment_panel".to_string());
     }
     if editorial["groups"]["g"]["right_panel"] != "script_panel" {
         report.error("editorial.layout.json: group 'g' (Audio) must use script_panel".to_string());
@@ -1914,7 +1912,6 @@ fn is_public_db_owner_path(relative: &str) -> bool {
         "crates/qnc-artifact-db/",
         "crates/qnc-prerender-db/",
         "crates/qnc-clip-sound/",
-        "crates/qnc-skeleton-db/",
         "crates/qnc-transcript-db/",
         "crates/qnc-newsroom-sheet-db/",
         "crates/qnc-script-db/",

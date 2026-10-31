@@ -7279,3 +7279,15 @@ pocetku. Desni panel grupe k je `skeleton_panel` (`qnc-side-pieces` `SKELETON_PA
 (`qnc-subsegment-panel`), svira ga isti Broadcast Player. Conformance: grupa k mora imati skeleton_panel. Testovi
 `qnc-subsegment-edit` (7), `qnc-skeleton`, `qnc-skeleton-db` (3), `qnc-script`, conformance. Uzivo nije provjereno. Nije
 izvedeno: Send to Story iz S-Storyja (cijeli kostur ili dio kao rewrite; pokrivalice iznad dijela cekaju odluku).
+Izmjena 2026-10-31 (korisnik: "opet nisi razumio... slaganje klipova je u desnom panelu, na isti nacin kao i u storiju, jedan
+ispod drugoga"; "napravi kopiju storija u s-story"; "sve sto ima stori... prakticno dupliciraj stori"): S-Story (grupa k) je
+kopija Storyja na vlastitom zapisu, bez lead-ina i lead-outa. Vraceni su 423fbf7, 4329174 (osim reda grupa: MA Video ostaje
+`j`) i 67b2295: kostur kao ravni timeline na mjestu source timelinea, `qnc-skeleton`, `qnc-skeleton-panel`,
+`qnc-skeleton-db`, `qnc-subsegment-edit` (uredjivanje SubSegmenta je opet u `qnc-script`). Ponovno primijenjen 4089fb0, ali za
+grupu k umjesto l: raspored grupe k je raspored Storyja (tabovi All, SubClip, B-roll, Segment; Talking Head, Voice over,
+B-roll | Sync/B-roll, Add SubClip, Export HI-res) uz dugme "Send to Story", desni panel `draft_segment_panel` (isti panel
+Segmenti, Wrap redovi jedan ispod drugoga, markeri, slotovi, pokrivalice); zapis je prica u `story-draft.db` uz `project.db`
+(posrednik baze, `ProjectDbTarget::draft_story`), bez lead-ina i lead-outa. MA Audio "Send to S-Story" dodaje kostur na kraj
+te price; S-Story "Send to Story" salje svoje segmente na kraj Storyja. Grupa l (MA Video) je opet prazna. Conformance: k mora
+imati `draft_segment_panel`, l `none`. Testovi `qnc-program-db`, `qnc-program-segments`, `qnc-script`, `qnc-side-pieces`,
+`qnc-db-broker`, `qnc-panel-focus`, conformance. Uzivo nije provjereno. Nije izvedeno: slanje dijela price kao prepisivanje.

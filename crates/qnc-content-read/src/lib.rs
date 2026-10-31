@@ -399,12 +399,13 @@ pub fn media_uris_on(
 }
 
 fn has_view(conn: &Connection, name: &str) -> Result<bool, String> {
-    conn.query_row(
-        "SELECT EXISTS(SELECT 1 FROM sqlite_master WHERE name = ?1)",
-        [name],
-        |row| row.get(0),
-    )
-    .map_err(|error| error.to_string())
+    // In every schema of the connection: a draft story reads the catalog of the project
+    // database attached to it (S-Story, user 2026-10-31). A name the connection
+    // cannot find does not prepare.
+    if !name.chars().all(|c| c.is_ascii_alphanumeric() || c == '_') {
+        return Err(format!("invalid view name {name}"));
+    }
+    Ok(conn.prepare(&format!("SELECT 1 FROM {name} LIMIT 0")).is_ok())
 }
 
 #[cfg(test)]

@@ -178,6 +178,9 @@
     "script_send_story": {
       "label": "Posalji kostur price u S-Story (na kraj)"
     },
+    "story_send_draft": {
+      "label": "Posalji pricu S-Storyja u Story (na kraj)"
+    },
     "script_open_export": {
       "label": "Otvori izvezeni scenarij"
     },

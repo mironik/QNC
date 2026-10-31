@@ -21,5 +21,3 @@ qnc-shot-panel = { workspace = true }
 qnc-side-pieces = { workspace = true }
 qnc-script = { workspace = true }
 qnc-script-panel = { workspace = true }
-qnc-skeleton = { workspace = true }
-qnc-skeleton-panel = { workspace = true }

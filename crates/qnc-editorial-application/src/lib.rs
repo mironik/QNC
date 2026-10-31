@@ -301,7 +301,7 @@ impl EditorialApplication {
             (Some(_), Ok(_)) => {
                 self.content_target = match loaded.targets {
                     Ok(targets) => {
-                        self.segments.configure(targets.1.clone(), &project_id, loaded.artifacts, Some(targets.0.clone()));
+                        self.segments.configure(self.focus.story_of(targets.1.clone()), &project_id, loaded.artifacts, Some(targets.0.clone()));
                         Some(targets)
                     }
                     Err(error) => {
@@ -310,7 +310,7 @@ impl EditorialApplication {
                     }
                 };
                 if let Some(context) = loaded.preview {
-                    self.preview.configure(context);
+                    self.preview.configure(context.with_draft_story(self.focus.draft_story()));
                 }
             }
             (_, Err(error)) => self.view.preview.message = error.clone(),

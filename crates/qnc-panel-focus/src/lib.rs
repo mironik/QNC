@@ -28,8 +28,10 @@ pub use panel::*;
 
 /// Actions of the segment panel that also run from the other panels: they use
 /// the source the user marked (v5 dispatches them whatever the focus).
-const SOURCE_TO_PROGRAM: [&str; 7] = [
+const SOURCE_TO_PROGRAM: [&str; 8] = [
     "add_ton_segment",
+    // S-Story sends its story on to the Story (user 2026-10-31).
+    "story_send_draft",
     "add_off_segment",
     "quick_overwrite_cover",
     "overwrite_cover",
@@ -90,6 +92,17 @@ impl PanelFocus {
     pub fn with_layout(layout: FocusLayout) -> Self {
         let panel = layout.order.first().copied().unwrap_or_default();
         Self { panel, walk: walk_of(&layout), side: qnc_side_pieces::SidePieces::for_panels(layout.right_panels.iter().map(String::as_str)), ..Self::default() }
+    }
+
+    /// The story the form's segment panel shows in project database `target` (the draft story
+    /// of S-Story, else the Story).
+    pub fn story_of(&self, target: qnc_db_broker::ProjectDbTarget) -> qnc_db_broker::ProjectDbTarget {
+        self.side.story_of(target)
+    }
+
+    /// Whether the form's segment panel shows the draft story.
+    pub fn draft_story(&self) -> bool {
+        self.side.draft_story()
     }
 
     /// The action a key on the pool tabs or a dock button stood for, once.
@@ -169,7 +182,7 @@ impl PanelFocus {
             }
         }
         let side = self.side.views().clone();
-        FocusView { panel: self.panel, button, pool_step: self.walk.last_step(), transcript: side.transcript, shots: side.shots, script: side.script, skeleton: side.skeleton }
+        FocusView { panel: self.panel, button, pool_step: self.walk.last_step(), transcript: side.transcript, shots: side.shots, script: side.script }
     }
 
     /// Whether a key picture search runs (the caller repaints soon).

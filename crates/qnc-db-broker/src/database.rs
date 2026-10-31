@@ -18,6 +18,19 @@ pub struct ProjectDb {
     access: Access,
     factories: Vec<Arc<dyn TableModuleFactory>>,
     modules: BTreeMap<&'static str, Box<dyn TableModule>>,
+    /// The draft story file the modules write instead, the project database attached.
+    draft: Option<PathBuf>,
+}
+
+/// The file of the draft story beside the project database (S-Story).
+pub const DRAFT_FILE: &str = "story-draft.db";
+/// The name the project database is attached under on a draft connection.
+pub const PROJECT_SCHEMA: &str = "project";
+
+/// Whether `conn` is a connection of the draft story (the project database attached).
+pub fn is_draft(conn: &Connection) -> bool {
+    // The main file is the draft's (a pragma read is refused by the table modules' authorizer).
+    conn.path().and_then(|path| Path::new(path).file_name()).is_some_and(|name| name == DRAFT_FILE)
 }
 
 impl std::fmt::Debug for ProjectDb {
@@ -59,7 +72,23 @@ impl ProjectDb {
             access,
             factories,
             modules: BTreeMap::new(),
+            draft: None,
         })
+    }
+
+    /// The draft story of this project (user 2026-10-31: S-Story, a story of its
+    /// own beside the Story): the modules' tables in a companion file beside the project
+    /// database, created empty when missing; the project database is attached read through, so
+    /// the catalog, the settings and the leases are the project's. Unqualified names find the
+    /// draft's tables first, so a module writes only there.
+    pub fn with_draft(mut self) -> Result<Self> {
+        let file = self.file.with_file_name(DRAFT_FILE);
+        if !file.is_file() {
+            Connection::open_with_flags(&file, OpenFlags::SQLITE_OPEN_READ_WRITE | OpenFlags::SQLITE_OPEN_CREATE)
+                .map_err(|e| e.to_string())?;
+        }
+        self.draft = Some(file);
+        Ok(self)
     }
 
     pub fn uri(&self) -> &str {
@@ -82,7 +111,21 @@ impl ProjectDb {
             return Err(qnc_ui_text::text("db.access_read_only").into());
         }
         if !self.modules.contains_key(factory.id()) {
-            let module = factory.attach(connect(&self.file, self.access)?, self.access)?;
+            let module = match &self.draft {
+                Some(draft) => {
+                    // The module makes its tables on the draft alone, then the project database
+                    // is attached: no schema step of the module ever reaches the Story.
+                    let module = factory.attach(connect(draft, self.access)?, self.access)?;
+                    let conn = module.connection();
+                    conn.execute("ATTACH DATABASE ?1 AS project", [self.file.to_string_lossy()])
+                        .map_err(|e| e.to_string())?;
+                    if self.access == Access::ReadWrite {
+                        keep_wal_file(conn, c"project");
+                    }
+                    module
+                }
+                None => factory.attach(connect(&self.file, self.access)?, self.access)?,
+            };
             self.modules.insert(factory.id(), module);
         }
         let module = self
@@ -148,7 +191,7 @@ fn connect(file: &Path, access: Access) -> Result<Connection> {
         }
         conn.pragma_update(None, "synchronous", "FULL")
             .map_err(|e| e.to_string())?;
-        keep_wal_file(&conn);
+        keep_wal_file(&conn, c"main");
     }
     Ok(conn)
 }
@@ -158,13 +201,13 @@ fn connect(file: &Path, access: Access) -> Result<Connection> {
 /// the last writing connection was refused and retried for ~3 s while it held the
 /// database; every reader and writer waited (live 2026-10-12: a Sync play and a clip
 /// waited 1.5-3 s). Closing now takes ~1 ms; the file is reused, never removed.
-fn keep_wal_file(conn: &Connection) {
+fn keep_wal_file(conn: &Connection, schema: &std::ffi::CStr) {
     let mut on: std::os::raw::c_int = 1;
     // SAFETY: a file control of this open connection's main database; it only sets a flag.
     unsafe {
         rusqlite::ffi::sqlite3_file_control(
             conn.handle(),
-            c"main".as_ptr(),
+            schema.as_ptr(),
             rusqlite::ffi::SQLITE_FCNTL_PERSIST_WAL,
             (&mut on as *mut std::os::raw::c_int).cast(),
         );

@@ -73,6 +73,9 @@ pub fn write_only_own_tables(conn: &Connection, access: Access, owned: &'static 
             | A::Savepoint { .. }
             | A::Function { .. }
             | A::Recursive => R::Allow,
+            // The intermediary attaches the project database to a draft story's connection
+            // (`ProjectDb::with_draft`), after the module made its tables.
+            A::Attach { .. } | A::Unknown { code: rusqlite::ffi::SQLITE_ATTACH, .. } => R::Allow,
             _ => R::Deny,
         }
     }));

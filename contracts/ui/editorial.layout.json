@@ -248,17 +248,36 @@
     "k": {
       "role": "s_story",
       "pool_head": {
-        "show_segment_tab": false,
+        "show_segment_tab": true,
         "show_cover_tab": true,
-        "show_export_hires": false,
-        "show_quick_cover": false
+        "show_export_hires": true,
+        "show_quick_cover": true,
+        "tabs_left": [
+          {
+            "label": "@pool.tab.all",
+            "action_id": "editorial_tab_all"
+          },
+          {
+            "label": "@pool.tab.subclip",
+            "action_id": "editorial_tab_virtual"
+          },
+          {
+            "label": "@pool.tab.broll",
+            "action_id": "editorial_tab_broll"
+          },
+          {
+            "label": "@pool.tab.segment",
+            "action_id": "editorial_tab_segment"
+          }
+        ]
       },
-      "right_panel": "skeleton_panel",
+      "right_panel": "draft_segment_panel",
       "tab_order": [
         "pool_tabs",
         "pool",
         "source_timeline",
-        "source_buttons"
+        "source_buttons",
+        "segments"
       ],
       "source_dock": {
         "show": true,
@@ -266,9 +285,26 @@
         "show_story_actions": true,
         "show_ingest_actions": false,
         "actions_rtl": [
-          "@story.broll",
-          "@story.voice_over",
-          "@story.talking_head",
+          {
+            "label": "@story.send_draft",
+            "action_id": "story_send_draft"
+          },
+          {
+            "label": "@story.sync_broll",
+            "action_id": "cover_mode_sync"
+          },
+          {
+            "label": "@pool.tab.broll",
+            "action_id": "cover_mode_covers"
+          },
+          {
+            "label": "@story.voice_over",
+            "action_id": "add_off_segment"
+          },
+          {
+            "label": "@story.talking_head",
+            "action_id": "add_ton_segment"
+          },
           {
             "label": "@story.add_subclip",
             "action_id": "save_virtual_shot"
@@ -276,7 +312,7 @@
         ]
       },
       "media_card": {
-        "selection_check": true,
+        "selection_check": false,
         "status_dots": "pipeline"
       }
     },

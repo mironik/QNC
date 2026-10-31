@@ -103,6 +103,8 @@ pub enum SegmentCommand {
     Marker,
     /// Talking Head (Ton) or Voice over (Off) from the marked source.
     AddSegment(SegmentKind),
+    /// S-Story: its story sent on to the end of the Story (user 2026-10-31).
+    SendToStory,
     /// Cover slot / B (empty selected slot) or Overwrite / Shift+B from the marked source.
     Cover {
         overwrite: bool,
@@ -251,6 +253,7 @@ impl SegmentCommand {
             "step_prev_part" => Self::Step { up: true },
             "step_next_part" => Self::Step { up: false },
             "add_ton_segment" => Self::AddSegment(SegmentKind::Ton),
+            "story_send_draft" => Self::SendToStory,
             "add_off_segment" => Self::AddSegment(SegmentKind::Off),
             "quick_overwrite_cover" => Self::Cover { overwrite: false },
             "overwrite_cover" => Self::Cover { overwrite: true },

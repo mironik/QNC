@@ -119,3 +119,40 @@ fn a_shorter_lead_out_takes_the_markers_past_the_new_end_with_it() {
     marker(&mut store, 50).unwrap();
     assert_eq!(markers(&mut store), vec![50]);
 }
+
+#[test]
+fn the_draft_story_of_media_assist_video_is_its_own_and_has_no_leads() {
+    let dir = tempfile::tempdir().unwrap();
+    let path = dir.path().join("project.db");
+    drop(imported_store(&path));
+    set_leads(&path, 2.0, 2.0);
+    let main = qnc_db_broker::ProjectDbTarget::from_owner_binding(&path, "qnc://local/db/project_db/p1").unwrap();
+    let draft = main.draft_story();
+    let segment = |kind: &str, range: (u64, u64)| Operation::CreateSegment {
+        project_id: "p1".into(),
+        kind: kind.into(),
+        clip_id: "c1".into(),
+        in_frame: range.0,
+        out_frame: range.1,
+        fps_num: 50,
+        fps_den: 1,
+        a1_source_channel: 0,
+        a1_level_db: 0,
+        a1_off: false,
+        a2_source_channel: 1,
+        a2_level_db: 0,
+        a2_off: false,
+    };
+    StoryWriter::start(draft.clone()).unwrap().call(&segment("offovi", (300, 400))).unwrap();
+    let draft_rows = StoryReader::open(&draft).unwrap().list_segments().unwrap();
+    // The draft's first OFF is its first segment: no lead-in before it, none after.
+    let shown: Vec<_> = draft_rows.iter().map(|row| (row.lead.as_str(), row.kind.as_str(), row.in_frame)).collect();
+    assert_eq!(shown, vec![("", "offovi", 300)]);
+    // The Story did not get it, and gets its own leads when it is written.
+    assert!(StoryReader::open(&main).unwrap().list_segments().unwrap().is_empty());
+    StoryWriter::start(main.clone()).unwrap().call(&segment("tonovi", (300, 400))).unwrap();
+    let main_rows = StoryReader::open(&main).unwrap().list_segments().unwrap();
+    assert_eq!(main_rows.iter().filter(|row| !row.lead.is_empty()).count(), 2);
+    assert_eq!(StoryReader::open(&draft).unwrap().list_segments().unwrap().len(), 1);
+    assert!(path.with_file_name(qnc_db_broker::DRAFT_FILE).is_file());
+}

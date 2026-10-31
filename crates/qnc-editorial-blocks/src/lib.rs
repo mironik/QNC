@@ -33,7 +33,7 @@ pub fn render_desktop(
         "clip-cards" => framed(pool(ui, contracts, theme, view), ui, rect, &[Panel::Pool]),
         // The group's right panel by its layout contract (Segmenti for Story, the transcript for Audio AI).
         "right-panel" => {
-            let (answer, segments) = qnc_right_panel::show_tabbed(ui, &contracts.composition().right_panel, &contracts.composition().right_panel_tabs, theme, &qnc_right_panel::Shown { segments: &view.segments, cover_lengths: &contracts.editorial.cover_lengths, transcript: &view.focus.transcript, shots: &view.focus.shots, script: &view.focus.script, skeleton: &view.focus.skeleton, timecode: view.source_timeline.timecode.as_ref() });
+            let (answer, segments) = qnc_right_panel::show_tabbed(ui, &contracts.composition().right_panel, &contracts.composition().right_panel_tabs, theme, &qnc_right_panel::Shown { segments: &view.segments, cover_lengths: &contracts.editorial.cover_lengths, transcript: &view.focus.transcript, shots: &view.focus.shots, script: &view.focus.script, timecode: view.source_timeline.timecode.as_ref() });
             framed(answer.map(EditorialIntent::Action), ui, rect, if segments { &[Panel::Segments] } else { &[] })
         }
         "source-dock" => framed(source_dock(ui, contracts, theme, view), ui, rect, if view.segments.zoom.is_some() { &[Panel::Segments, Panel::SourceButtons] } else { &[Panel::SourceTimeline, Panel::SourceButtons] }),
@@ -67,7 +67,7 @@ fn source_dock(ui: &mut Ui, contracts: &EditorialContracts, theme: &Theme, view:
         });
     };
     // The enlarged slot under the header in place of the timeline: the buttons stay (user 2026-10-22).
-    let mut zoom = qnc_subsegment_panel::or_body(qnc_segment_panel::zoom_body(&view.segments, qnc_theme_styles::timeline(theme), &contracts.editorial.cover_lengths), view.focus.script.subsegment.as_ref().or(view.focus.skeleton.subsegment.as_ref()), qnc_theme_styles::timeline(theme));
+    let mut zoom = qnc_subsegment_panel::or_body(qnc_segment_panel::zoom_body(&view.segments, qnc_theme_styles::timeline(theme), &contracts.editorial.cover_lengths), view.focus.script.subsegment.as_ref(), qnc_theme_styles::timeline(theme));
     let (dock, instead) = ((theme, contracts.editorial.source_dock.header_timeline_gap), zoom.as_mut().map(|zoom| zoom as &mut qnc_source_timeline::Instead));
     let (intent, zoomed) = qnc_source_timeline::show_with(ui, rect, dock, label, header, (&view.preview.timeline, &view.preview.assets), &view.source_timeline, instead);
     // A click on A1/A2 and the wheel are the source timeline's own catalog actions.

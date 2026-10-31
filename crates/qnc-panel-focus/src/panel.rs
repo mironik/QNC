@@ -83,8 +83,6 @@ pub struct FocusView {
     pub shots: std::sync::Arc<qnc_clip_shots::ShotsView>,
     /// The script of the story (Media Assist Audio).
     pub script: std::sync::Arc<qnc_script::ScriptView>,
-    /// The S-Story skeleton.
-    pub skeleton: std::sync::Arc<qnc_skeleton::SkeletonView>,
 }
 
 impl FocusView {
