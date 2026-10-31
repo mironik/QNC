@@ -124,6 +124,8 @@ impl ProgramSegments {
         view.trim_frames = self.edit_moves().into_iter().map(|(_, new)| new).collect();
         view.trim_frames.extend(self.cut_sound_trim_frames());
         view.a1_splits = self.picture_splits();
+        // The S-Story: every element's own IN and OUT instead of markers and cuts (user 2026-10-31).
+        self.element_view(&mut view);
         qnc_program_view::mark_clip_edges(&mut view.edit_stills, |id| self.clip_frames.get(id).copied());
         self.lane_view(&mut view);
         view.zoom = self.zoom_window(&view);

@@ -7363,3 +7363,17 @@ timelineu s uzetim IN-om ili OUT-om, strelice i kotacic pomicu, Enter zapisuje `
 `qnc-program-view` `clip_edge_of` (zakljucani marker bez leada na tom kraju), `qnc-segment-panel` (`locked` samo kad nije
 rub klipa), `qnc-program-segments` (`take_clip_edge`, `take_edge_of`). U Storyju (s leadovima) zakljucano pravilo od 20. 10.
 ostaje. Test `with_no_leads_the_story_start_and_end_are_the_first_in_and_the_last_out`, conformance. Uzivo nije provjereno.
+Izmjena 2026-10-31 (korisnik: "ovo nije story"; "da, tako je, kreni"; "dvoklik na jedan od elemenata s-stori wrapa treba u
+source timeline otvoriti 15% prethodnog i narednog klipa a u sredini odabrani klip, kao kod pokrivalica; odabrani klip se
+ponasa kao Slot"): zamjenjuje prethodni zapis (zakljucani pocetak i kraj price kao rub klipa; taj kod je uklonjen). U
+S-Storyju svaki element je SubClip sa svojim IN-om i OUT-om, bez pravila Storyja (rez dvaju klipova, roll, zakljucani
+markeri, slotovi). Wrap redak elementa crta samo njegov IN i OUT (pripadaju elementu po id-u, ne po slici); desni klik uzima
+blizi, strelice i kotacic ga pomicu za sliku klipa, povlacenje misem takoder, trim playhead i zoom reza pokazuju nacrt (slika
+prije i nova prva, nova zadnja i slika poslije), Enter zapisuje `TrimSegment` (elementi iza se pomicu za razliku), Esc
+odustaje; dok je jedan rub uzet, drugi se odbija. Prvi IN i zadnji OUT uzimaju se kao i ostali. Dvoklik na element otvara ga
+na mjestu source timelinea: element u sredini (70 %), po 15 % prethodnog i sljedeceg; u zoomu se uzimaju samo IN i OUT
+srednjeg elementa. Nove stvari: `qnc-program-view` (`element_pins`, `element_edge`, `ELEMENT_IN`/`ELEMENT_OUT`,
+`SegmentsView.element_edges`, `zoom_element`), `qnc-program-segments` (`element_trim.rs`, `Take::ElementEdge`, zoom
+elementa), `qnc-segment-panel` (rubovi elementa umjesto markera), rjecnik. Story nije mijenjan, osim rezova na granici redova
+iz prethodnog popravka (rez pripada objema redovima). Test `every_s_story_element_has_its_own_in_and_out`, conformance.
+Uzivo nije provjereno.

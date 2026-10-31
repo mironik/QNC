@@ -56,29 +56,6 @@ impl ProgramSegments {
             .user_segment_at(playhead)
             .or_else(|| self.view.rows.iter().find(|row| !row.lead && self.selected.as_ref() == Some(&row.segment_id)))
             .cloned();
-        self.take_edge_of(row, start)
-    }
-
-    /// A right click on the locked start or end marker of a story with no lead there (the
-    /// S-Story, user 2026-10-31): it is the first element's IN or the last one's OUT, taken as
-    /// that segment's edge (as Ctrl+Shift+I/O). `false` when the marker is not such an edge.
-    pub(crate) fn take_clip_edge(&mut self, marker_id: &str) -> bool {
-        let Some((row, start)) = self
-            .view
-            .markers
-            .iter()
-            .find(|pin| pin.marker_id == marker_id)
-            .and_then(|pin| self.view.clip_edge_of(pin))
-            .map(|(row, start)| (row.clone(), start))
-        else {
-            return false;
-        };
-        self.take_edge_of(Some(row), start);
-        true
-    }
-
-    fn take_edge_of(&mut self, row: Option<qnc_program_view::SegmentRow>, start: bool) -> bool {
-        let playhead = self.playhead.unwrap_or(0);
         let Some(row) = row else {
             self.refresh_view(qnc_ui_text::text("story.msg.no_segment_to_trim").into());
             return false;

@@ -17,6 +17,7 @@ mod zoom;
 mod edit;
 mod nav;
 mod slot_move;
+mod element_trim;
 mod slot_trim;
 mod cut_part;
 pub use cut_part::{CutPart, CutSound, SoundEdge};
@@ -253,6 +254,8 @@ pub struct ProgramSegments {
     slot_move: Option<slot_move::SlotMove>,
     /// The slot edge taken with Ctrl+I/O on the segment panel (`slot_trim.rs`).
     slot_trim: Option<slot_trim::SlotTrim>,
+    /// The IN or OUT of an S-Story element taken on its Wrap row (`element_trim.rs`).
+    element_trim: Option<element_trim::ElementTrim>,
     /// What of the taken marker's cut moves (`cut_part.rs`).
     cut_part: cut_part::CutPart,
     /// A cover taken with Ctrl+click; Delete removes it.

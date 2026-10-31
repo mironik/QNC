@@ -589,24 +589,6 @@ fn a_taken_slot_shows_the_four_edit_pictures_and_a_taken_marker_two() {
     assert!(segments.view().edit_stills.is_empty());
 }
 
-/// User 2026-10-31: every element has its IN and OUT. With no lead-in or lead-out (the S-Story)
-/// the locked start and end markers are the first element's IN and the last one's OUT: the
-/// mouse takes them (the panel does not lock them) and the take is that segment's edge.
-#[test]
-fn with_no_leads_the_story_start_and_end_are_the_first_in_and_the_last_out() {
-    let mut segments = component();
-    let (first, last) = (segments.view().rows.first().unwrap().clone(), segments.view().rows.last().unwrap().clone());
-    let pin = |id: &str| segments.view().markers.iter().find(|pin| pin.marker_id == id).unwrap().clone();
-    assert_eq!(segments.view().clip_edge_of(&pin("S")).map(|(row, start)| (row.segment_id.clone(), start)), Some((first.segment_id.clone(), true)));
-    assert_eq!(segments.view().clip_edge_of(&pin("E")).map(|(row, start)| (row.segment_id.clone(), start)), Some((last.segment_id.clone(), false)));
-    assert_eq!(segments.view().clip_edge_of(&pin("m1")), None, "an open marker is a cut, not an edge");
-    segments.apply(SegmentCommand::TakeMarker("S".into()));
-    assert_eq!(segments.view().editing.as_deref(), Some(first.segment_id.as_str()), "the first IN");
-    segments.apply_action("clear_focus");
-    segments.apply(SegmentCommand::TakeMarker("E".into()));
-    assert_eq!(segments.view().editing.as_deref(), Some(last.segment_id.as_str()), "the last OUT");
-}
-
 #[test]
 fn a_taken_segment_edge_shows_its_pictures_on_the_source_timeline() {
     let mut segments = component();
@@ -1229,4 +1211,47 @@ fn backspace_undoes_what_is_picked_and_otherwise_in_time() {
     segments.selected_marker = Some("m2".into());
     segments.apply(SegmentCommand::Cue(30));
     assert_eq!(segments.selected_marker, None, "a click lets go of the picked marker");
+}
+
+/// User 2026-10-31 ("this is not the Story"): in the S-Story every element is a SubClip with its
+/// own IN and OUT. Its Wrap row offers them in the place of the markers and the cuts; a right
+/// click takes one, the arrows move it a picture of its clip and the trim playhead follows; the
+/// first IN and the last OUT are taken as any other; a double click enlarges the element with
+/// 15 % of its neighbours.
+#[test]
+fn every_s_story_element_has_its_own_in_and_out() {
+    let mut segments = component();
+    let file = std::env::temp_dir().join("qnc-s-story-edges.db");
+    segments.target = Some(ProjectDbTarget::from_owner_binding(&file, "qnc://local/db/project_db/p1").unwrap().draft_story(1));
+    segments.refresh_view(String::new());
+    let view = segments.view().clone();
+    assert!(view.markers.is_empty() && view.joins.is_empty(), "no markers and no cuts between two clips");
+    let first = view.rows.first().unwrap().clone();
+    let last = view.rows.last().unwrap().clone();
+    let ids: Vec<_> = view.element_edges.iter().map(|pin| (pin.marker_id.clone(), pin.frame)).collect();
+    assert_eq!(ids.len(), view.rows.len() * 2, "an IN and an OUT for every element");
+    assert!(ids.contains(&(format!("in:{}", first.segment_id), 0)), "the first IN is not locked");
+    assert!(ids.contains(&(format!("out:{}", last.segment_id), view.total_frames)), "nor the last OUT");
+
+    assert!(segments.apply(SegmentCommand::TakeMarker(format!("out:{}", first.segment_id))));
+    assert!(segments.apply_action("step_forward_frame"), "the arrow moves the OUT a picture");
+    let taken = segments.view().element_edges.iter().find(|pin| pin.taken).unwrap().clone();
+    assert_eq!((taken.marker_id.as_str(), taken.frame), (format!("out:{}", first.segment_id).as_str(), first.end_frame + 1));
+    assert_eq!(segments.view().trim_frames, vec![first.end_frame + 1]);
+    segments.apply(SegmentCommand::TakeMarker(format!("in:{}", last.segment_id)));
+    let still = segments.view().element_edges.iter().find(|pin| pin.taken).map(|pin| pin.marker_id.clone());
+    assert_eq!(still, Some(format!("out:{}", first.segment_id)), "another edge is refused while one is taken");
+    assert!(segments.apply_action("clear_focus"));
+    assert!(segments.view().element_edges.iter().all(|pin| !pin.taken), "Escape drops it");
+
+    segments.apply(SegmentCommand::TakeMarker(format!("in:{}", first.segment_id)));
+    segments.apply_action("step_back_frame");
+    assert!(segments.view().element_edges.iter().any(|pin| pin.taken), "the first IN is taken");
+    segments.apply_action("clear_focus");
+
+    segments.zoom(None, Some(first.start_frame + 1));
+    let length = first.end_frame - first.start_frame;
+    let side = (length as f64 * 0.15 / 0.7).round() as u64;
+    assert_eq!(segments.view().zoom, Some((0, first.end_frame + side)), "the element in the middle, 15 % after it");
+    assert_eq!(segments.view().zoom_element.as_deref(), Some(first.segment_id.as_str()));
 }

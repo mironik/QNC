@@ -12,7 +12,8 @@ pub use edit_stills::{edit_stills, mark_clip_edges, program_picture, trim_stills
 
 pub use markers::{
     check_move, first_empty_slot, neighbour_marker, neighbour_segment, neighbour_slot,
-    join_at, join_pins, join_segment, program_frame, resolve, slot_at, slots, source_at, MarkerPin, Slot, TakenPart, JOIN_PREFIX,
+    element_edge, element_pins, join_at, join_pins, join_segment, program_frame, resolve, slot_at, slots, source_at, MarkerPin, Slot,
+    TakenPart, ELEMENT_IN, ELEMENT_OUT, JOIN_PREFIX,
 };
 pub use qnc_program_commands::{SegmentCommand, SegmentKind};
 
@@ -189,6 +190,13 @@ pub struct SegmentsView {
     /// The cuts between two clips on A1 where no M marker stands (user 2026-10-29: every cut
     /// is a marker); they have no slot and only their A1 sound is edited.
     pub joins: Vec<MarkerPin>,
+    /// The S-Story (user 2026-10-31: "this is not the Story"; every element is a SubClip with its
+    /// own IN and OUT): the IN (`ELEMENT_IN` + segment id) and OUT (`ELEMENT_OUT` + id) of every
+    /// element, in the place of the M markers and the cuts between two clips. Empty in the Story.
+    pub element_edges: Vec<MarkerPin>,
+    /// The element a zoom of the S-Story enlarges (its window has 15 % of the elements before
+    /// and after): only its own IN and OUT are taken there.
+    pub zoom_element: Option<String>,
     pub slots: Vec<Slot>,
     /// Covers by program frame.
     pub covers: Vec<CoverSpan>,
@@ -423,21 +431,6 @@ impl SegmentsView {
 
     /// The segment of the user a program frame belongs to: a frame of the lead-in belongs to
     /// the first segment, of the lead-out to the last one (they are glued to them).
-    /// The edge of a clip a locked story marker stands for (user 2026-10-31: every element has
-    /// its IN and OUT): in a story with no lead-in or lead-out (the S-Story) the start marker is
-    /// the first segment's IN (`true`) and the end marker the last one's OUT (`false`). With a
-    /// lead there it stays the locked edge of the story.
-    pub fn clip_edge_of(&self, pin: &MarkerPin) -> Option<(&SegmentRow, bool)> {
-        if !pin.locked {
-            return None;
-        }
-        if pin.frame == 0 {
-            self.rows.first().filter(|row| !row.lead && row.start_frame == 0).map(|row| (row, true))
-        } else {
-            self.rows.last().filter(|row| !row.lead && row.end_frame == pin.frame).map(|row| (row, false))
-        }
-    }
-
     pub fn user_segment_at(&self, program_frame: u64) -> Option<&SegmentRow> {
         self.wrap_rows()
             .into_iter()

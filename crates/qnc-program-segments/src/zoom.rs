@@ -34,6 +34,8 @@ impl ProgramSegments {
             })
         });
         let covered = slot.as_ref().filter(|id| self.view.slots.iter().any(|slot| &slot.slot_id == *id && slot.has_cover));
+        // The S-Story has no slots to enlarge: the element there is (user 2026-10-31).
+        let covered = covered.filter(|_| !self.is_s_story());
         let wanted = match (covered, self.view.user_segment_at(frame)) {
             (Some(id), _) => Some(ZoomOn::Slot(id.clone())),
             (None, Some(row)) => Some(ZoomOn::Segment(row.segment_id.clone())),
@@ -64,6 +66,12 @@ impl ProgramSegments {
             ZoomOn::Slot(id) => {
                 let slot = view.slots.iter().find(|slot| &slot.slot_id == id)?;
                 Some(window(slot.start_frame, slot.end_frame, view.total_frames))
+            }
+            // An S-Story element is enlarged as a slot is (user 2026-10-31): 15 % of the
+            // elements before and after it on each side, the element in the middle.
+            ZoomOn::Segment(id) if self.is_s_story() => {
+                let row = view.rows.iter().find(|row| &row.segment_id == id)?;
+                Some(window(row.start_frame, row.end_frame, view.total_frames))
             }
             ZoomOn::Segment(id) => view.wrap_rows().into_iter().find(|(_, row)| &row.segment_id == id).map(|(window, _)| window),
             ZoomOn::Program => (view.total_frames > 0).then_some((0, view.total_frames)),
