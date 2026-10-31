@@ -7250,3 +7250,12 @@ na adapter i unos u tablicu tvornica (`apps/qnc-app`), root Cargo, conformance z
 zapis S-Storyja (elementi kao izvorni klipovi: klip, IN/OUT, A1/A2, J/L, razmak ili rez, porijeklo), kostur na jednom ravnom
 timelineu (kocka SubSegmenta), Send to S-Story iz MA Audija i Send to Story iz S-Storyja. Testovi, `--check-contracts`,
 conformance, release build.
+Popravak 2026-10-31 (korisnik: "krivo saljes, treba slati u S-Story, a ti si poslao u Story"): gumb panela scenarija (MA Audio)
+je "Send to S-Story" (`script_send_story`) i vise ne dira Story. Nova javna kocka `crates/qnc-skeleton-db` (+ ugovori modula
+`skeleton-db.module.json` i baze `skeleton.database.json`; modul tablica posrednika, tablica `skeleton_elements` i pogled
+`public_skeleton_elements`; conformance: na popisu javnih DB vlasnika): zapis S-Storyja odvojen od scenarija i Storyja. Element
+je izvorni klip (`ton` izjava ili `off` zapis glasa) s IN/OUT, A1/A2 (kanal, razina, off), J/L A1, razmakom ili rezom prema
+prethodnom i porijeklom `script:<blok>:<dio>`; `Append` dodaje na kraj u jednom koraku (neispravan element ne upisuje nista),
+`Read` daje redom. `qnc-script` `send_story` pise elemente tamo (zvuk kao do sada: dio scenarija ili zvuk zadrzan za klip,
+A2 OFF-a iskljucen); ovisnost o `qnc-program-db` uklonjena. Nije izvedeno: prikaz i uredivanje kostura u S-Storyju, Send to
+Story iz S-Storyja. Testovi `qnc-skeleton-db` (2), `qnc-script`, `qnc-ui-text`, conformance.

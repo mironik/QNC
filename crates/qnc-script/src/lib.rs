@@ -884,7 +884,6 @@ impl Script {
                 return true;
             }
         };
-        let project_id = locator.settings().project_id.clone();
         self.message_after_write = Some(qnc_ui_text::fill("script.sent_story", &[("n", &parts.len().to_string())]));
         self.view.message = qnc_ui_text::text("script.sending_story").into();
         self.write(preview, move |target| {
@@ -894,7 +893,9 @@ impl Script {
                 let record = qnc_voice_take::describe_record(locator.settings(), &voice.name, &voice.clip_uri, &takes, &first_tc)?;
                 qnc_voice_catalog::publish_record(locator.reader(), locator.settings(), &voice.name, record)?;
             }
-            let mut segments = Vec::with_capacity(parts.len());
+            // The skeleton goes to S-Story, its own record (user 2026-10-31): each part a source
+            // clip; neither the script nor the Story changes.
+            let mut elements = Vec::with_capacity(parts.len());
             for part in parts {
                 let kept = qnc_clip_sound::read(target, &part.clip_id)?;
                 let lane = |lane: Option<&qnc_clip_sound::LaneSound>, channel: u16| lane.map_or((channel, 0, false), |lane| (lane.channel, lane.level_db, lane.off));
@@ -903,23 +904,22 @@ impl Script {
                     Some((channel, level, off)) => (channel.unwrap_or(kept_a1.0), level, off),
                     None => kept_a1,
                 };
-                // An Off's A2 is its own voice, off (the story hears an Off's A2 only where a
-                // Ton goes into it); a Ton keeps the A2 kept for its clip, else channel 2.
-                let a2 = match part.kind {
-                    "offovi" => (a1.0, 0, true),
-                    _ => lane(kept.as_ref().map(|sound| &sound.a2), 1),
-                };
-                segments.push(qnc_program_db::AppendSegment {
-                    kind: part.kind.into(),
+                // An OFF's A2 is its own voice, off; a statement keeps the A2 kept for its clip,
+                // else channel 2.
+                let off = part.kind == "offovi";
+                let a2 = if off { (a1.0, 0, true) } else { lane(kept.as_ref().map(|sound| &sound.a2), 1) };
+                let as_lane = |(channel, level_db, off): (u16, i8, bool)| qnc_skeleton_db::Lane { channel, level_db, off };
+                elements.push(qnc_skeleton_db::NewElement {
+                    kind: if off { qnc_skeleton_db::ElementKind::Off } else { qnc_skeleton_db::ElementKind::Ton },
                     clip_id: part.clip_id,
                     in_frame: part.from_frame,
                     out_frame: part.to_frame,
-                    a1,
-                    a2,
+                    a1: as_lane(a1),
+                    a2: as_lane(a2),
                     origin: part.origin,
                 });
             }
-            qnc_program_db::StoryWriter::start(target.clone())?.call(&qnc_program_db::Operation::AppendSegments { project_id, segments })?;
+            qnc_skeleton_db::append(target, elements)?;
             Ok(None)
         })
     }
