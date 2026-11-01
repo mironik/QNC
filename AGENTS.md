@@ -7457,7 +7457,7 @@ Vraceno 2026-11-01 (korisnik: "i dalje to nije ispravna verzija, pogledaj commit
 bez pomaka unutra (`qnc-timeline`). Usporedba s tim commitom: preostale razlike u kockama Storyja ukljucuju se samo u
 S-Storyju (`is_s_story`, `clips_are_slots`, `is_draft`, `draft_story`). Uzivo nije provjereno.
 Popravak 2026-11-01 (korisnik: "touchpad pomice playholder kad s dva prsta idem lijevo-desno i gore-dolje, a ne bi trebalo"):
-karta touchpada `contracts/input/touchpad.json`: pomak s dva prsta vodoravno i okomito je `none` (prije `jog`, 18. 10.), na
-svim timelineima. Pinch ostaje `level`; dodir s dva prsta ostaje desni klik (Ctrl+). `qnc-touchpad` uzima pokret samo kad
-njegova uloga nesto radi, pa pomak s dva prsta ide panelu (popis Wrap redova se lista kao inace). Kotacic misa (cijeli zarezi)
-nije mijenjan. Test `a_two_finger_swipe_does_not_move_the_playhead_and_is_left_to_the_panel`, conformance. Uzivo nije provjereno.
+karta touchpada `contracts/input/touchpad.json`: pomak s dva prsta okomito je `none` (prije `jog`, 18. 10.), vodoravno ostaje
+`jog` kao u pushanoj verziji (korisnik: "treba pomicati, ali samo lijevo-desno"), na svim timelineima. Pinch ostaje `level`; dodir s dva prsta ostaje desni klik (Ctrl+). `qnc-touchpad` uzima pokret samo kad
+njegova uloga nesto radi, pa pomak gore-dolje ide panelu (popis Wrap redova se lista kao inace). Kotacic misa (cijeli zarezi)
+nije mijenjan. Test `only_a_two_finger_swipe_across_moves_the_playhead_along_is_left_to_the_panel`, conformance. Uzivo nije provjereno.

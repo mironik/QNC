@@ -153,12 +153,14 @@ mod tests {
     }
 
     #[test]
-    fn a_two_finger_swipe_does_not_move_the_playhead_and_is_left_to_the_panel() {
+    fn only_a_two_finger_swipe_across_moves_the_playhead_along_is_left_to_the_panel() {
         let mut steps = Steps::default();
-        let swipe = [fine(0.0, 2.4, false), fine(-2.4, 0.0, false)];
-        add(&map(), &swipe, &mut steps);
-        assert!(all(&mut steps).is_empty(), "user 2026-11-01: a swipe is no step");
-        assert!(!swipe.iter().any(|event| touchpad_event(&map(), event)), "the panel's list scrolls");
+        let along = fine(0.0, 2.4, false);
+        add(&map(), &[along.clone()], &mut steps);
+        assert!(all(&mut steps).is_empty(), "user 2026-11-01: up/down is no step");
+        assert!(!touchpad_event(&map(), &along), "the panel's list scrolls");
+        add(&map(), &[fine(-2.4, 0.0, false)], &mut steps);
+        assert_eq!(all(&mut steps).len(), 2, "left/right moves the playhead");
         assert!(touchpad_event(&map(), &fine(0.0, 0.5, true)), "a pinch still sets the level");
     }
 
