@@ -7395,3 +7395,12 @@ prazni ni zadnji slot nego se pomakne sve iza (`SlotTrim.ripple`), dvoklik povec
 pokrivalice; samo slika granice u zoomu je J ili L slike klipa (`SetJoinPicture`), A1 granice postojeci J/L spoja.
 Story nije mijenjan. Nije izvedeno: A2 granice u zoomu (`SetCutSoundEdges`) jos ne pise klipove u S-Storyju. Testovi `in_an_s_story_every_clip_is_a_slot_and_the_slot_edits_write_the_clip`,
 `in_an_s_story_the_slot_tools_make_the_clip_and_the_story_longer_or_shorter`. Uzivo nije provjereno.
+Dopuna 2026-11-01 (korisnik: "desni klik ne ide na IN markere, samo na OUT"; "na prvom klipu na IN treba dodati IN, a
+na zadnjem OUT, kako smo dodali na segmentima"): u S-Storyju desni klik na rez uzima rub klipa na kliknutoj strani reza
+kao Ctrl+I/O (IN klipa iza reza, OUT klipa prije), i IN prvog i OUT zadnjeg klipa (pocetak i kraj price nisu
+zakljucani za desni klik u S-Storyju). Story ostaje: desni klik uzima marker cijeli. `qnc-timeline` `events.rs`
+(desni klik na marker nosi kliknutu sliku), `qnc-program-commands` `TakeMarkerAt`, `qnc-program-segments`
+(`clip_edge_at`, `refresh.rs`). Zlatna tablica misa: 1 redak promijenjen (vrijednost slike). Testovi, conformance.
+Nalaz iz loga: monitor bljeska jer D: (serijski 29C9-91CF) javlja "Permission denied" za `XDROOT\Clip\Mironik 3584.MXF`
+(ffmpeg "Invalid argument", "could not find header partition pack key"), a slike reza ponavljaju dekodiranje svakih
+~100 ms. Uzivo nije provjereno.

@@ -70,6 +70,9 @@ pub enum SegmentCommand {
     SelectMarker(String),
     /// A right click on an M marker: it is taken as with Ctrl+M (user 2026-10-17).
     TakeMarker(String),
+    /// The same right click with the frame clicked: in the S-Story the clip's IN or OUT on the
+    /// side of the cut it was clicked on (user 2026-11-01).
+    TakeMarkerAt { marker_id: String, frame: u64 },
     /// A right click in a slot: it is taken as with Ctrl+S.
     TakeSlot(String),
     /// A right click on A1 (0) or A2 of a Wrap row: the sound of what lies at the program
@@ -200,7 +203,8 @@ impl SegmentCommand {
         let (target, value) = (event.target.clone(), event.unsigned());
         Some(match (event.action_id.as_str(), target, value) {
             ("timeline_cue_frame", _, Some(frame)) => Self::Cue(frame),
-            ("select_marker", Some(id), _) => Self::TakeMarker(id),
+            ("select_marker", Some(marker_id), Some(frame)) => Self::TakeMarkerAt { marker_id, frame },
+            ("select_marker", Some(id), None) => Self::TakeMarker(id),
             ("select_current_marker_slot", Some(id), _) => Self::TakeSlot(id),
             ("add_marker_continue", _, Some(frame)) => Self::AddMarkerAt(frame),
             ("timeline_take_cover", Some(cover_id), Some(frame)) => Self::TakeCover { cover_id, frame },

@@ -12,6 +12,11 @@ impl ProgramSegments {
         (view.undo_depth, view.redo_depth) = self.history;
         view.has_selected_object = self.selected_object().is_some();
         view.markers = resolve(&view, &self.stored_markers, self.selected_marker.as_deref());
+        if self.is_s_story() {
+            // The first IN and the last OUT are taken by a right click as every edge (user
+            // 2026-11-01); the store still keeps the story's start and end where they are.
+            view.markers.iter_mut().for_each(|pin| pin.locked = false);
+        }
         // The cuts between two clips on A1 where no M marker stands (user 2026-10-29).
         view.joins = qnc_program_view::join_pins(&view, &view.markers);
         view.alert = self.alert.clone();

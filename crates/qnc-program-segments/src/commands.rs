@@ -182,6 +182,21 @@ impl ProgramSegments {
             }
             SegmentCommand::DeleteSelected => self.delete_selected(),
             SegmentCommand::SelectMarker(marker_id) => self.select_marker(&marker_id),
+            // A right click on a cut of the S-Story takes the edge of the clip on its side, as
+            // Ctrl+I/O (user 2026-11-01); elsewhere the marker whole, as Ctrl+M.
+            SegmentCommand::TakeMarkerAt { marker_id, frame } => match self.clip_edge_at(&marker_id, frame) {
+                Some((slot_id, start)) => {
+                    if self.refused(crate::confirm::Take::SlotEdge(slot_id.clone(), start)) {
+                        return true;
+                    }
+                    self.selected_slot = Some(slot_id);
+                    self.take_slot_edge(start);
+                }
+                None => {
+                    self.select_marker(&marker_id);
+                    self.edit_marker();
+                }
+            },
             SegmentCommand::TakeMarker(marker_id) => {
                 self.select_marker(&marker_id);
                 self.edit_marker();

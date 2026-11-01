@@ -97,6 +97,10 @@ impl ProgramSegments {
         let playhead = self.playhead.unwrap_or(0);
         match command {
             Command::TakeMarker(id) => Some(Take::Marker(id.clone())),
+            Command::TakeMarkerAt { marker_id, frame } => match self.clip_edge_at(marker_id, *frame) {
+                Some((slot_id, start)) => Some(Take::SlotEdge(slot_id, start)),
+                None => Some(Take::Marker(marker_id.clone())),
+            },
             Command::TakeSlot(id) => Some(Take::Slot(id.clone())),
             Command::TakeCover { cover_id, .. } => Some(Take::Cover(cover_id.clone())),
             Command::SelectSlotAtPlayhead => qnc_program_view::slot_at(&self.view.slots, playhead).map(|slot| Take::Slot(slot.slot_id.clone())),

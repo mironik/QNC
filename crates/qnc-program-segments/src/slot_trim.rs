@@ -193,3 +193,18 @@ impl ProgramSegments {
         true
     }
 }
+
+impl ProgramSegments {
+    /// A right click on a cut of the S-Story (user 2026-11-01): every clip has its own IN and OUT,
+    /// so the click takes the edge of the clip on its side of the cut, the IN of the clip after
+    /// it or the OUT of the clip before; the first IN and the last OUT too. `None` in the Story.
+    pub(crate) fn clip_edge_at(&self, marker_id: &str, frame: u64) -> Option<(String, bool)> {
+        if !self.is_s_story() {
+            return None;
+        }
+        let cut = self.view.markers.iter().find(|pin| pin.marker_id == marker_id)?.frame;
+        let after = self.view.slots.iter().find(|slot| slot.start_frame == cut).map(|slot| (slot.slot_id.clone(), true));
+        let before = self.view.slots.iter().find(|slot| slot.end_frame == cut).map(|slot| (slot.slot_id.clone(), false));
+        if frame >= cut { after.or(before) } else { before.or(after) }
+    }
+}
