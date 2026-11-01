@@ -127,7 +127,13 @@ impl ProgramSegments {
             None => qnc_program_view::edit_stills(&view, &slots(&self.stored_slots, None), &self.edit_moves()),
         };
         view.source_edit_stills = self.source_stills();
-        view.trim_frames = self.edit_moves().into_iter().map(|(_, new)| new).collect();
+        view.trim_frames = match &self.slot_trim {
+            // The IN of an S-Story clip taken: its line is the IN only; the end moving with the
+            // shorter or longer clip is no second playhead (user 2026-11-01: "the playhead goes
+            // to the OUT").
+            Some(trim) if trim.ripple && trim.start => vec![trim.slot_start],
+            _ => self.edit_moves().into_iter().map(|(_, new)| new).collect(),
+        };
         view.trim_frames.extend(self.cut_sound_trim_frames());
         view.a1_splits = self.picture_splits();
         qnc_program_view::mark_clip_edges(&mut view.edit_stills, |id| self.clip_frames.get(id).copied());

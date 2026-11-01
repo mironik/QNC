@@ -7410,3 +7410,9 @@ Lijevi klik na Wrap retku stavlja playhead na IN kliknutog klipa (lijeva polovic
 polovica); desni klik (Ctrl+) po istom pravilu uzima IN ili OUT tog klipa. Story ostaje: lijevi klik je playhead na
 kliknutu sliku. `qnc-program-segments` (`clip_half`, `clip_half_frame`, `clip_edge_at`, grana `Cue`). Test
 `in_an_s_story_the_slot_tools_make_the_clip_and_the_story_longer_or_shorter` prosiren. Uzivo nije provjereno.
+Popravak 2026-11-01 (korisnik: "klik na lijevi dio prvog offa playhead postavlja na OUT umjesto na IN"; "na prvi klip
+postaviti marker na pocetku i na kraju zadnjeg klipa kao na Story wrap"): log: klik na lijevu polovicu dao je IN, ali dok je
+IN klipa uzet bijela trim crta crtala se i na kraju klipa (kraj se mice s kracim ili duljim klipom), pa je izgledalo kao
+playhead na OUT-u. Sada uzeti IN u S-Storyju ima samo jednu trim crtu, na IN-u (`qnc-program-segments` `refresh.rs`, test).
+Marker na samom pocetku ili kraju reda (prvi IN, zadnji OUT) crta se 1,5 px unutar reda, pa se vidi (`qnc-timeline`
+`paint_markers`; vrijedi i za Story). Testovi, conformance. Uzivo nije provjereno.

@@ -539,6 +539,11 @@ fn in_an_s_story_the_slot_tools_make_the_clip_and_the_story_longer_or_shorter() 
         segments.apply(SegmentCommand::TakeMarkerAt { marker_id, frame: clicked });
         let slot_id = segments.view().slots[slot].slot_id.clone();
         assert_eq!(segments.slot_trim.as_ref().map(|trim| (trim.slot_id.clone(), trim.start)), Some((slot_id, start)), "the cut at {cut} clicked at {clicked}");
+        if start {
+            // The IN taken: one trim line, on the IN, none on the OUT (user 2026-11-01).
+            let slot_start = segments.view().slots[slot].start_frame;
+            assert_eq!(segments.view().trim_frames, vec![slot_start], "the cut at {cut} clicked at {clicked}");
+        }
         segments.apply_action("clear_focus");
     }
     // A left click on the left half of a clip puts the playhead on its IN, on the right half
