@@ -7404,3 +7404,9 @@ zakljucani za desni klik u S-Storyju). Story ostaje: desni klik uzima marker cij
 Nalaz iz loga: monitor bljeska jer D: (serijski 29C9-91CF) javlja "Permission denied" za `XDROOT\Clip\Mironik 3584.MXF`
 (ffmpeg "Invalid argument", "could not find header partition pack key"), a slike reza ponavljaju dekodiranje svakih
 ~100 ms. Uzivo nije provjereno.
+Ispravak 2026-11-01 (korisnik: "pomjesao si markere... klik lijevog misa na lijevoj polovici klipa - playhead na IN tog
+klipa, na desnoj polovici - playhead na OUT tog klipa"): u S-Storyju odlucuje kliknuta polovica klipa, ne najblizi rez.
+Lijevi klik na Wrap retku stavlja playhead na IN kliknutog klipa (lijeva polovica) ili na njegov OUT, zadnju sliku (desna
+polovica); desni klik (Ctrl+) po istom pravilu uzima IN ili OUT tog klipa. Story ostaje: lijevi klik je playhead na
+kliknutu sliku. `qnc-program-segments` (`clip_half`, `clip_half_frame`, `clip_edge_at`, grana `Cue`). Test
+`in_an_s_story_the_slot_tools_make_the_clip_and_the_story_longer_or_shorter` prosiren. Uzivo nije provjereno.

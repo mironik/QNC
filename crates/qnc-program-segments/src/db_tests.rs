@@ -541,4 +541,10 @@ fn in_an_s_story_the_slot_tools_make_the_clip_and_the_story_longer_or_shorter() 
         assert_eq!(segments.slot_trim.as_ref().map(|trim| (trim.slot_id.clone(), trim.start)), Some((slot_id, start)), "the cut at {cut} clicked at {clicked}");
         segments.apply_action("clear_focus");
     }
+    // A left click on the left half of a clip puts the playhead on its IN, on the right half
+    // on its OUT (its last picture) (user 2026-11-01).
+    for (clicked, playhead) in [(60, 50), (90, 102), (3, 0), (140, 151)] {
+        segments.apply(SegmentCommand::Cue(clicked));
+        assert_eq!(segments.playhead, Some(playhead), "clicked at {clicked}");
+    }
 }

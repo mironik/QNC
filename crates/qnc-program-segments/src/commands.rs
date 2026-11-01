@@ -229,6 +229,7 @@ impl ProgramSegments {
             }
             SegmentCommand::ProgramStart => self.cue_program(0),
             SegmentCommand::Cue(frame) => {
+                let frame = self.clip_half_frame(frame);
                 // A click that only places the playhead lets go of a slot it leaves, so
                 // Ctrl+I/O take the slot under the playhead.
                 let inside = self.view.slots.iter().any(|slot| {

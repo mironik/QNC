@@ -202,9 +202,35 @@ impl ProgramSegments {
         if !self.is_s_story() {
             return None;
         }
+        // User 2026-11-01: the clicked half of a clip decides, not the nearest cut: the
+        // left half is that clip's IN, the right half its OUT.
+        if let Some((slot, start)) = self.clip_half(frame) {
+            return Some((slot.slot_id.clone(), start));
+        }
         let cut = self.view.markers.iter().find(|pin| pin.marker_id == marker_id)?.frame;
         let after = self.view.slots.iter().find(|slot| slot.start_frame == cut).map(|slot| (slot.slot_id.clone(), true));
         let before = self.view.slots.iter().find(|slot| slot.end_frame == cut).map(|slot| (slot.slot_id.clone(), false));
         if frame >= cut { after.or(before) } else { before.or(after) }
+    }
+
+    /// In the S-Story the clip (slot) under a frame and which half of it the frame is in:
+    /// true for the left half (its IN), false for the right half (its OUT).
+    pub(crate) fn clip_half(&self, frame: u64) -> Option<(&qnc_program_view::Slot, bool)> {
+        if !self.is_s_story() {
+            return None;
+        }
+        let slot = self.view.slots.iter().find(|slot| (slot.start_frame..slot.end_frame).contains(&frame))?;
+        let middle = slot.start_frame + (slot.end_frame - slot.start_frame) / 2;
+        Some((slot, frame < middle))
+    }
+
+    /// A left click in the S-Story: the playhead goes to the IN of the clicked clip on its
+    /// left half, to its OUT (last picture) on its right half (user 2026-11-01).
+    pub(crate) fn clip_half_frame(&self, frame: u64) -> u64 {
+        match self.clip_half(frame) {
+            Some((slot, true)) => slot.start_frame,
+            Some((slot, false)) => slot.end_frame.saturating_sub(1),
+            None => frame,
+        }
     }
 }
