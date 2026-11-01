@@ -7436,3 +7436,10 @@ Popravak 2026-11-01 (korisnik: "gdje su dugmici, u originalu su bili na sredini"
 klipa ili price, pa je rez na OUT-u stajao na desnom rubu, a dugmad Undo | Save | Cancel (centrirana na rezu) s njim.
 Sada zoom ima sekundu sa svake strane i na kraju (iza kraja je prazno), a dugmad su uvijek u sredini zooma, izmedju
 dviju slika (`qnc-program-view` `zoom_window`, `qnc-trim-overlay`). Vrijedi za sve zoomove. Uzivo nije provjereno.
+Popravak 2026-11-01 (korisnik: "pokvario si Story, usporedi sa zadnjom pushanom verzijom"): log: u Storyju desni klik na
+pocetku Wrap reda uzimao je rez sa susjednim klipom (granica reda) i strelice su ga rollale. Uzrok je izmjena od 31. 10.
+(fce5aa88: rez na granici reda pripada objema redovima), napravljena za S-Story, a vrijedila je i za Story. Usporedba s
+pushanom verzijom (origin/libav-decoder 6674ea2c): ostale izmjene za S-Story u Storyju ne rade (`is_s_story`,
+`clips_are_slots`). Sada Story opet crta i uzima rez na granici samo na kraju ranijeg reda (v5 `local_marker_frame`), a
+S-Story na oba reda (`qnc-segment-panel` `program.rs`). Ostaju i u Storyju: marker na samom rubu reda crta se malo unutra,
+zoom ima sekundu sa svake strane i na kraju, dugmad zooma u sredini. Testovi, conformance. Uzivo nije provjereno.

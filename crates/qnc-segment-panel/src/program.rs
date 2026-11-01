@@ -100,11 +100,11 @@ pub(crate) fn paint_program(
         .markers
         .iter()
         .chain(&segments.joins)
-        // A cut on a segment border belongs to both rows (user 2026-10-31): it is the OUT of the
-        // clip of the earlier row and the IN of the clip of this one, so a right click on either
-        // row takes the nearer of its own IN and OUT (v5 `local_marker_frame` drew it only at the
-        // end of the earlier row, so every row could take only its end).
-        .filter(|pin| (start..=end).contains(&pin.frame))
+        // v5 `local_marker_frame`: a marker on a segment border is drawn at the end of the
+        // earlier row; only the first row shows frame 0. In the S-Story a border cut belongs to
+        // both rows (user 2026-10-31: every clip has its IN and OUT); the Story stays as v5
+        // (user 2026-11-01: "you broke the Story").
+        .filter(|pin| (start..=end).contains(&pin.frame) && (segments.clips_are_slots || pin.frame != start || start == 0))
         .map(|pin| TimelineMarkerPin {
             id: &pin.marker_id,
             frame: local(pin.frame),
@@ -133,7 +133,7 @@ pub(crate) fn paint_program(
     let trim_labels: Vec<(u64, String)> = segments
         .trim_frames
         .iter()
-        .filter(|frame| (start..=end).contains(*frame))
+        .filter(|frame| (start..=end).contains(*frame) && (segments.clips_are_slots || **frame != start || start == 0))
         .map(|frame| (local(*frame), segments.timecode(*frame)))
         .collect();
     let trim_playheads: Vec<(u64, &str)> = trim_labels.iter().map(|(frame, label)| (*frame, label.as_str())).collect();
