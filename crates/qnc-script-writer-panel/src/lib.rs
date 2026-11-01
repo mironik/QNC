@@ -49,7 +49,7 @@ pub fn show(ui: &mut Ui, view: &ScriptView, theme: &qnc_desktop_theme::Theme) ->
     let open_spec = open.as_deref().and_then(|code| view.profile.as_ref()?.kind(code));
 
     // The header: title, lengths and the document buttons.
-    let header_height = theme.chrome_row_height * 2.0 + 8.0;
+    let header_height = theme.chrome_row_height * 2.0 + theme.font_ui + 30.0;
     let header = Rect::from_min_size(inner.min, Vec2::new(inner.width(), header_height));
     let mut top = ui.new_child(UiBuilder::new().max_rect(header).layout(Layout::top_down(Align::Min)));
     if let Some(event) = paint_header(&mut top, view, theme, style) {
@@ -70,7 +70,10 @@ pub fn show(ui: &mut Ui, view: &ScriptView, theme: &qnc_desktop_theme::Theme) ->
         let used = kind.role == Role::Anchor && view.blocks.iter().any(|row| row.block.kind == kind.id);
         let on = open.as_deref() == Some(kind.id.as_str());
         let enabled = !used && view.recording.is_none();
-        if qnc_ui_kit::chrome_button(&mut buttons, &kind.short, enabled, on, style).on_hover_text(&kind.label).clicked() {
+        // Every button as wide as the others, so the group is centred as measured.
+        let cell = Vec2::new(STORY_BUTTON, theme.chrome_control_height);
+        let pressed = buttons.allocate_ui_with_layout(cell, Layout::centered_and_justified(egui::Direction::LeftToRight), |ui| qnc_ui_kit::chrome_button(ui, &kind.short, enabled, on, style).on_hover_text(&kind.label).clicked()).inner;
+        if pressed {
             if kind.role == Role::Clip {
                 qnc_media_overlay::set_open(ui.ctx(), true);
             }
@@ -147,14 +150,33 @@ fn paint_header(ui: &mut Ui, view: &ScriptView, theme: &qnc_desktop_theme::Theme
             });
         });
     });
+    // The lengths in the middle, large: approved, the length so far, and what is left or how much
+    // it is over (user 2026-11-01: the information that matters).
+    let total = view.total_seconds();
+    let target = view.target_seconds;
+    let left = target.map(|target| target - total);
+    let big = theme.font_ui + 9.0;
+    let dash = || "-".to_string();
+    let mut pieces = vec![
+        (qnc_ui_text::fill("writer.approved", &[("t", &target.map_or_else(dash, seconds_label))]), theme.text),
+        (qnc_ui_text::fill("writer.length", &[("t", &seconds_label(total))]), theme.text),
+    ];
+    pieces.push(match left {
+        Some(left) if left < 0.0 => (qnc_ui_text::fill("writer.over", &[("t", &seconds_label(-left))]), theme.danger),
+        Some(left) => (qnc_ui_text::fill("writer.left", &[("t", &seconds_label(left))]), theme.focus),
+        None => (qnc_ui_text::fill("writer.left", &[("t", &dash())]), theme.text_muted),
+    });
+    let mut job = egui::text::LayoutJob::default();
+    for (index, (text, color)) in pieces.iter().enumerate() {
+        if index > 0 {
+            job.append("     ·     ", 0.0, egui::TextFormat { font_id: egui::FontId::proportional(big), color: theme.text_muted, ..Default::default() });
+        }
+        job.append(text, 0.0, egui::TextFormat { font_id: egui::FontId::proportional(big), color: *color, ..Default::default() });
+    }
+    ui.vertical_centered(|ui| {
+        ui.label(job);
+    });
     ui.horizontal(|ui| {
-        let total = view.total_seconds();
-        let target = view.target_seconds;
-        let left = target.map(|target| target - total);
-        let shown = |seconds: Option<f64>| seconds.map_or_else(|| "-".to_string(), |seconds| if seconds < 0.0 { format!("-{}", seconds_label(-seconds)) } else { seconds_label(seconds) });
-        let lengths = qnc_ui_text::fill("writer.lengths", &[("target", &shown(target)), ("total", &seconds_label(total)), ("left", &shown(left))]);
-        let over = left.is_some_and(|left| left < 0.0);
-        ui.label(RichText::new(lengths).color(if over { theme.danger } else { theme.text }).size(theme.font_ui + 1.0));
         if view.anchor_seconds > 0.0 {
             ui.label(muted(&qnc_ui_text::fill("writer.anchor", &[("anchor", &seconds_label(view.anchor_seconds))])));
         }

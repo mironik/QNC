@@ -7608,3 +7608,9 @@ conformance (g mora imati `script_writer_panel` i `media_overlay`), C10 `qnc-edi
 (grupa h) nije mijenjan. Nije izvedeno: dokument za urednika i lektora kao zaseban obrazac (zasad postojeci export
 scenarija), tipke za grupu price. Testovi `qnc-script-writer-panel`, `qnc-side-pieces`, `qnc-editorial-layout`,
 `qnc-media-overlay`, `qnc-script`, `qnc-ui-text`, conformance. Uzivo nije provjereno.
+Popravak 2026-11-01 (korisnik, sa snimkom: "donja dugmad i gornje informacije ODOBRENO - TRAJANJE - PREKORACENJE trebaju
+centrirani na sredini; to treba biti izdvojeni uocljivi tekst jer je bitna informacija"): dugmad grupe price bila su
+uza od izracunate sirine pa grupa nije bila u sredini; sada je svako dugme jednako siroko (132 px) i grupa je tocno
+centrirana. Trajanja su zaseban red na sredini vrha, veca slova: "Odobreno · Trajanje · Preostalo" (preostalo u boji
+fokusa), a kad je prilog dulji od odobrenog "Prekoracenje" crveno (rjecnik `writer.approved`, `writer.length`,
+`writer.left`, `writer.over` umjesto `writer.lengths`). `qnc-script-writer-panel`. Uzivo nije provjereno.
