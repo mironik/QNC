@@ -7558,3 +7558,9 @@ je "Slozena izjava", tab "Slozene izjave", Dodaj SubClip je "Dodaj izjavu". (4) 
 `2026_11_01_78fa621b...` ima ponovno dan profil `general_tv` (hrvatski nazivi), primjer
 `qnc-script-db/examples/use_profile.rs` (isto sto "Use for project" u uredivacu profila). Testovi dotaknutih kocki,
 conformance. Uzivo nije provjereno.
+Izmjena 2026-11-01 (korisnik: "sagledao sam siru sliku MA Audio... preimenuj grupu G u H"): MA Audio je prioritetna
+grupa `h` (`apps/qnc-media-assist-audio/qnc-app.json`); kljuc forme u ugovoru rasporeda ostaje `g`, kao sto je MA Video
+grupa `j` s kljucem `l`. Redoslijed: a, b, e, h (MA Audio), j (MA Video), k (S-Story), o (Story); grupa g je slobodna.
+Katalog aplikacija osvjezen (`qnc-app-catalog refresh apps target\release data\application-catalog.json`). Projekt cuva
+slijed aplikacija iz vremena kad je napravljen; novi dobiva kad mu se template ponovno izabere u Projectu. Conformance,
+`--check-contracts`.
