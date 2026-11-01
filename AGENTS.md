@@ -7456,3 +7456,8 @@ Vraceno 2026-11-01 (korisnik: "i dalje to nije ispravna verzija, pogledaj commit
 (`qnc-program-view` `zoom_window`), dugmad zooma centrirana na rezu (`qnc-trim-overlay` iz tog commita), marker na rubu reda
 bez pomaka unutra (`qnc-timeline`). Usporedba s tim commitom: preostale razlike u kockama Storyja ukljucuju se samo u
 S-Storyju (`is_s_story`, `clips_are_slots`, `is_draft`, `draft_story`). Uzivo nije provjereno.
+Popravak 2026-11-01 (korisnik: "touchpad pomice playholder kad s dva prsta idem lijevo-desno i gore-dolje, a ne bi trebalo"):
+karta touchpada `contracts/input/touchpad.json`: pomak s dva prsta vodoravno i okomito je `none` (prije `jog`, 18. 10.), na
+svim timelineima. Pinch ostaje `level`; dodir s dva prsta ostaje desni klik (Ctrl+). `qnc-touchpad` uzima pokret samo kad
+njegova uloga nesto radi, pa pomak s dva prsta ide panelu (popis Wrap redova se lista kao inace). Kotacic misa (cijeli zarezi)
+nije mijenjan. Test `a_two_finger_swipe_does_not_move_the_playhead_and_is_left_to_the_panel`, conformance. Uzivo nije provjereno.

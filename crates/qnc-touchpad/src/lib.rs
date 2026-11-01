@@ -76,11 +76,20 @@ fn add(map: &TouchpadMap, events: &[egui::Event], steps: &mut Steps) {
     }
 }
 
-/// Whether an event is the touchpad's.
-fn touchpad_event(event: &egui::Event) -> bool {
+/// Whether an event is the touchpad's and its role does something. A gesture whose role is
+/// `none` is left to the panel (user 2026-11-01: a two-finger swipe does not move the
+/// playhead; the list under it scrolls as it would).
+fn touchpad_event(map: &TouchpadMap, event: &egui::Event) -> bool {
+    let acts = |role: Role| role != Role::None;
     match event {
-        egui::Event::MouseWheel { unit, delta, .. } => !qnc_wheel_jog::is_notch(*unit, *delta),
-        egui::Event::Zoom(_) => true,
+        egui::Event::MouseWheel { unit, delta, modifiers } if !qnc_wheel_jog::is_notch(*unit, *delta) => {
+            if modifiers.ctrl || modifiers.command {
+                acts(map.pinch)
+            } else {
+                (delta.x != 0.0 && acts(map.swipe_horizontal)) || (delta.y != 0.0 && acts(map.swipe_vertical))
+            }
+        }
+        egui::Event::Zoom(_) => acts(map.pinch),
         _ => false,
     }
 }
@@ -96,7 +105,7 @@ pub fn take(ui: &Ui, rect: Rect, key: egui::Id) -> Option<Wheel> {
     if over {
         let events = ctx.input(|input| input.events.clone());
         add(&map, &events, &mut steps);
-        if events.iter().any(touchpad_event) {
+        if events.iter().any(|event| touchpad_event(&map, event)) {
             ctx.input_mut(|input| {
                 input.smooth_scroll_delta = egui::Vec2::ZERO;
                 input.raw_scroll_delta = egui::Vec2::ZERO;
@@ -128,15 +137,29 @@ mod tests {
         std::iter::from_fn(|| steps.next()).collect()
     }
 
+    fn jog_map() -> TouchpadMap {
+        TouchpadMap { swipe_horizontal: Role::Jog, swipe_vertical: Role::Jog, ..map() }
+    }
+
     #[test]
     fn a_windows_swipe_adds_up_fractions_of_a_notch_to_steps() {
         let mut steps = Steps::default();
-        add(&map(), &[fine(0.0, 0.4, false), fine(0.0, 0.4, false)], &mut steps);
+        add(&jog_map(), &[fine(0.0, 0.4, false), fine(0.0, 0.4, false)], &mut steps);
         assert!(all(&mut steps).is_empty(), "less than a notch: no step yet");
-        add(&map(), &[fine(0.0, 0.4, false)], &mut steps);
+        add(&jog_map(), &[fine(0.0, 0.4, false)], &mut steps);
         assert_eq!(all(&mut steps), vec![Wheel { up: true, ctrl: false }]);
-        add(&map(), &[fine(-2.5, 0.0, false)], &mut steps);
+        add(&jog_map(), &[fine(-2.5, 0.0, false)], &mut steps);
         assert_eq!(all(&mut steps).len(), 2, "across, back: two steps");
+    }
+
+    #[test]
+    fn a_two_finger_swipe_does_not_move_the_playhead_and_is_left_to_the_panel() {
+        let mut steps = Steps::default();
+        let swipe = [fine(0.0, 2.4, false), fine(-2.4, 0.0, false)];
+        add(&map(), &swipe, &mut steps);
+        assert!(all(&mut steps).is_empty(), "user 2026-11-01: a swipe is no step");
+        assert!(!swipe.iter().any(|event| touchpad_event(&map(), event)), "the panel's list scrolls");
+        assert!(touchpad_event(&map(), &fine(0.0, 0.5, true)), "a pinch still sets the level");
     }
 
     #[test]
