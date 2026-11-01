@@ -225,7 +225,8 @@
       },
       "right_panel": "script_writer_panel",
       "media_overlay": {
-        "title": "@ma_script.media_title"
+        "title": "@ma_script.media_title",
+        "panel": "transcript_panel"
       },
       "tab_order": [
         "pool_tabs",

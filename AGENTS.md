@@ -7614,3 +7614,14 @@ uza od izracunate sirine pa grupa nije bila u sredini; sada je svako dugme jedna
 centrirana. Trajanja su zaseban red na sredini vrha, veca slova: "Odobreno · Trajanje · Preostalo" (preostalo u boji
 fokusa), a kad je prilog dulji od odobrenog "Prekoracenje" crveno (rjecnik `writer.approved`, `writer.length`,
 `writer.left`, `writer.over` umjesto `writer.lengths`). `qnc-script-writer-panel`. Uzivo nije provjereno.
+Izmjena 2026-11-01 (korisnik, prozor medija MA Scripta: "mijenja se samo izgled ne i funkcionalnost koju je nasljedio od
+MA Audio"; "monitor gore, ispod media pool, ispod prikaz transcripta, ispod source timeline"): prozor medija je jedan
+stupac: monitor (trecina visine), red s tabovima poola i transportom, media pool (cetvrtina visine), panel prijepisa
+(ostatak) i source timeline na dnu. Panel u prozoru daje ugovor rasporeda (`media_overlay.panel`: `transcript_panel`),
+isti panel prijepisa kao u AI Media Assistu. `qnc-editorial-layout` (`MediaOverlay.panel`, `media_overlay_layout`,
+`panel_at`: vrsta panela i tabovi na mjestu ploce), `qnc-editorial-blocks` (desni panel i panel prozora kroz istu granu,
+C10 isti 92). Conformance prolazi; test `ma_script_has_the_script_over_the_whole_form_and_the_media_in_its_overlay`
+prosiren, ali nije pokrenut: na racunalu nema MSVC linkera (`C:\Program Files\Microsoft Visual Studio\2022` je prazan),
+pa se nista ne moze prevesti. Debug cache obrisan uz dozvolu korisnika (`cargo clean --profile dev`, 12,3 GiB; disk je
+bio pun). Uzivo nije provjereno. Nije
+izvedeno: "Dodaj u pricu" u prozoru (redak ostaje ispod prozora).

@@ -142,13 +142,28 @@ impl EditorialContracts {
         if shown { layout.split_place_below("clip-cards", POOL_ACTIONS, height) } else { layout }
     }
 
-    /// The layout in the media overlay of a group that has one (form G): the monitor with the
-    /// transport under it on the left, the pool tabs and clip cards on the right, the source
-    /// timeline along the bottom; the pool action bar as on the board. None for other groups.
+    /// The layout in the media overlay of a group that has one (form G, user 2026-11-01): one
+    /// column, the monitor on top, under it the row of the pool tabs and the transport, the
+    /// clip cards, the overlay's panel (the transcript) and the source timeline at the bottom;
+    /// the pool action bar as on the board. None for other groups.
     pub fn media_overlay_layout(&self, tab_selected: impl Fn(&str) -> bool) -> Option<qnc_board::Layout> {
-        self.composition().media_overlay.as_ref()?;
-        let names = qnc_board::BoardNames { monitor: "preview", head: "transport", body: "", right: "clip-cards", dock: "source-dock" };
-        let layout = self.board_sizes().standard_layout(&names).split_place_above("clip-cards", "pool-head", self.shell.theme_metrics.chrome_row_height);
+        use qnc_board::{Axis, Layout, Node, Part, Size};
+        let overlay = self.composition().media_overlay.as_ref()?;
+        let block = |name: &str| Some(Node::Block { name: name.to_string() });
+        let share = |ratio| Size::Share { ratio, min: 120.0, rest_min: 120.0 };
+        let px = |px| Size::Px { px, max_share: None };
+        let pool = if overlay.panel.is_some() { share(OVERLAY_POOL_SHARE) } else { Size::Rest };
+        let mut parts = vec![
+            Part { size: share(OVERLAY_MONITOR_SHARE), face: Some("left".into()), node: block("preview") },
+            Part { size: px(self.shell.theme_metrics.chrome_row_height), face: None, node: block("pool-head") },
+            Part { size: pool, face: None, node: block("clip-cards") },
+        ];
+        if let Some(panel) = &overlay.panel {
+            parts.push(Part { size: Size::Rest, face: Some("right".into()), node: block(panel) });
+        }
+        parts.push(Part { size: px(self.dock_height()), face: None, node: block("source-dock") });
+        let layout = Layout { face: Some("bg".into()), root: Node::Split { axis: Axis::Vertical, parts } };
+        let layout = self.media_layout(layout);
         let bar = &self.composition().pool_actions;
         let shown = !bar.actions.is_empty() && bar.tabs.iter().any(|tab| tab_selected(tab));
         let height = qnc_action_bar_panel::height(self.shell.theme_metrics.chrome_control_height, self.editorial.board.block_pad);
@@ -158,6 +173,17 @@ impl EditorialContracts {
     /// The row under the monitor in two places: the pool tabs and the transport panel.
     fn media_layout(&self, layout: qnc_board::Layout) -> qnc_board::Layout {
         layout.split_place("pool-head", "transport", self.editorial.pool_head.transport_width)
+    }
+
+    /// The panel kind and its tabs at place `block`: the group's right panel, or the media
+    /// overlay's panel in its own place; none for any other place.
+    pub fn panel_at(&self, block: &str) -> Option<(&str, &[RightPanelTab])> {
+        let composition = self.composition();
+        if block == "right-panel" {
+            return Some((composition.right_panel.as_str(), composition.right_panel_tabs.as_slice()));
+        }
+        let overlay = composition.media_overlay.as_ref()?.panel.as_deref()?;
+        (overlay == block).then_some((overlay, &[][..]))
     }
 
     /// The window title of the media overlay of this group, if it has one.
@@ -332,11 +358,18 @@ pub struct GroupComposition {
 
 /// The place of the pool action bar on the board.
 pub const POOL_ACTIONS: &str = "pool-actions";
+/// The shares of the media overlay's height for the monitor and, with a panel under it, the pool.
+const OVERLAY_MONITOR_SHARE: f32 = 0.32;
+const OVERLAY_POOL_SHARE: f32 = 0.24;
 
 /// The title of the media overlay's window (the panel of the group opens it).
 #[derive(Debug, Clone, Deserialize)]
 pub struct MediaOverlay {
     pub title: String,
+    /// The panel kind shown between the pool and the source timeline (MA Script: the
+    /// transcript, user 2026-11-01); none: the pool reaches the source timeline.
+    #[serde(default)]
+    pub panel: Option<String>,
 }
 
 /// The buttons under the clip cards and the pool tabs they are shown on.
@@ -435,7 +468,10 @@ mod tests {
         assert_eq!(script.composition().right_panel, "script_writer_panel");
         assert_eq!(blocks(&script.board_layout(|_| false)), ["right-panel"]);
         let overlay = script.media_overlay_layout(|_| false).expect("the media overlay");
-        assert_eq!(blocks(&overlay), ["preview", "transport", "pool-head", "clip-cards", "source-dock"]);
+        assert_eq!(blocks(&overlay), ["preview", "pool-head", "transport", "clip-cards", "transcript_panel", "source-dock"]);
+        assert_eq!(script.panel_at("transcript_panel").map(|(kind, _)| kind), Some("transcript_panel"));
+        assert_eq!(script.panel_at("right-panel").map(|(kind, _)| kind), Some("script_writer_panel"));
+        assert!(script.panel_at("clip-cards").is_none());
         let audio = EditorialContracts::load("h").expect("MA Audio, group h");
         assert!(audio.media_overlay_layout(|_| false).is_none(), "MA Audio keeps the media on its board");
         assert!(blocks(&audio.board_layout(|_| false)).contains(&"clip-cards".to_string()));
