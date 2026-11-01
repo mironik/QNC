@@ -7485,3 +7485,12 @@ dijelovi tonova koji nastaju selekcijom teksta transcripta... primjereniji bi bi
 talking head"): u AI Media Assistu (grupa e) tab poola za dijelove spremljene iz prijepisa zove se Talking Head (rjecnik
 `pool.tab.talking_head`, `contracts/ui/editorial.layout.json`); radnja i sadrzaj taba isti (`editorial_tab_virtual`).
 Ostale forme zadrzavaju SubClip. Testovi `qnc-ui-text`, `qnc-editorial-layout`, conformance. Uzivo nije provjereno.
+Izmjena 2026-11-01 (korisnik: "pojmovi u TV kucama: SOT za izjavu, VO za off, NAT ili AMB za atmosferu... da bi se drzali
+pro pojmova trebali bi ih i koristiti"; odluka "VO, i napravi odmah i hrvatski rjecnik"): engleski rjecnik koristi SOT (prije
+Ton / Talking Head), VO (prije Off / Voice over / OFF) i NAT; vrsta segmenta na Wrap retku i u tabu Segment ide kroz rjecnik
+(`qnc-program-commands` `SegmentKind::label`, sifre `story.kind.sot`, `story.kind.vo`), tab AI Media Assista je SOT
+(`pool.tab.sot`), pripremljeni profil scenarija `general_tv` ima oznaku i cue VO. Vrijednosti u bazi (`tonovi`/`offovi`),
+sifre radnji i tipke nisu mijenjane; profil vec spremljen u projektu zadrzava OFF. Hrvatski rjecnik `contracts/text/hr/`
+(cetiri dijela, sve sifre engleskog; Izjava, Off, Atmosfera, Pokrivalice); `qnc-ui-text` slaze rjecnik iz dijelova (sifra
+dvaput je greska). Jezik je postavka racunala: `data/ui-language.json` `{"language": "hr"}`, bez nje engleski. Testovi
+`qnc-ui-text` (svaka sifra u svakom rjecniku), `qnc-script` (oznake VO), conformance. Uzivo nije provjereno.

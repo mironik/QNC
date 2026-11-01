@@ -6,3 +6,4 @@ description = "QNC public piece: the commands of a story program (Ton/Off segmen
 
 [dependencies]
 qnc-action-event = { workspace = true }
+qnc-ui-text = { workspace = true }

@@ -27,10 +27,11 @@ impl SegmentKind {
         }
     }
 
+    /// The newsroom word of the kind (user 2026-11-01: SOT and VO, in the chosen language).
     pub fn label(self) -> &'static str {
         match self {
-            Self::Ton => "Ton",
-            Self::Off => "Off",
+            Self::Ton => qnc_ui_text::text("story.kind.sot"),
+            Self::Off => qnc_ui_text::text("story.kind.vo"),
         }
     }
 

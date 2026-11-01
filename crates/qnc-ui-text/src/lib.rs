@@ -18,8 +18,20 @@ pub const VERSION: &str = env!("CARGO_PKG_VERSION");
 /// The language every other dictionary follows.
 pub const BASE_LANGUAGE: &str = "en";
 
-/// The dictionaries QNC is built with: language code and its file.
-pub const DICTIONARIES: &[(&str, &str)] = &[("en", include_str!("../../../contracts/text/en.json"))];
+/// The dictionaries QNC is built with: language code and its files (a dictionary may be in
+/// parts; a code in two parts of one language is an error).
+pub const DICTIONARIES: &[(&str, &[&str])] = &[
+    ("en", &[include_str!("../../../contracts/text/en.json")]),
+    (
+        "hr",
+        &[
+            include_str!("../../../contracts/text/hr/1.json"),
+            include_str!("../../../contracts/text/hr/2.json"),
+            include_str!("../../../contracts/text/hr/3.json"),
+            include_str!("../../../contracts/text/hr/4.json"),
+        ],
+    ),
+];
 
 /// The texts of one language.
 #[derive(Debug, Clone)]
@@ -31,15 +43,23 @@ pub struct Texts {
 impl Texts {
     /// The dictionary of `language`.
     pub fn for_language(language: &str) -> Result<Self, String> {
-        let (_, json) = DICTIONARIES
+        let (_, parts) = DICTIONARIES
             .iter()
             .find(|(code, _)| *code == language)
             .ok_or_else(|| format!("QNC nema rjecnik za jezik '{language}'."))?;
-        let file: Dictionary = serde_json::from_str(json).map_err(|error| format!("rjecnik '{language}': {error}"))?;
-        if file.language != language {
-            return Err(format!("rjecnik '{language}' je oznacen kao '{}'", file.language));
+        let mut texts = BTreeMap::new();
+        for json in parts.iter() {
+            let file: Dictionary = serde_json::from_str(json).map_err(|error| format!("rjecnik '{language}': {error}"))?;
+            if file.language != language {
+                return Err(format!("rjecnik '{language}' je oznacen kao '{}'", file.language));
+            }
+            for (code, text) in file.texts {
+                if texts.insert(code.clone(), text).is_some() {
+                    return Err(format!("rjecnik '{language}' ima '{code}' dvaput"));
+                }
+            }
         }
-        Ok(Self { language: file.language, texts: file.texts })
+        Ok(Self { language: language.to_string(), texts })
     }
 
     /// The language this computer chose (`ui-language.json` beside its other settings), else the base one.

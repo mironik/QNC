@@ -5181,6 +5181,7 @@ name = "qnc-program-commands"
 version = "0.1.0"
 dependencies = [
  "qnc-action-event",
+ "qnc-ui-text",
 ]
 
 [[package]]

@@ -35,7 +35,7 @@ fn marks_are_the_numbered_cues_of_the_profile_and_lengths_its_rules() {
     let blocks = [Block::written("intro", "Najava."), Block::written("off", "Uvod u prilog."), sot("Rekao je."), recorded, Block::written("nat", "")];
     let rows = rows(&blocks, Some(&profile), 2.5);
     let marks: Vec<&str> = rows.iter().map(|row| row.mark.as_str()).collect();
-    assert_eq!(marks, [profile.kind("intro").unwrap().short.as_str(), "OFF 1", "SOT 1", "OFF 2", "NAT"]);
+    assert_eq!(marks, [profile.kind("intro").unwrap().short.as_str(), "VO 1", "SOT 1", "VO 2", "NAT"]);
     assert_eq!(rows.iter().map(|row| row.seconds).collect::<Vec<_>>(), [0.4, 1.2, 5.0, 7.0, 0.0]);
     assert!(rows[1].recorded && !rows[0].recorded && rows[2].is_clip());
 }
@@ -45,7 +45,7 @@ fn the_script_as_text_has_every_block_in_reading_order_with_its_mark() {
     let profile = general_tv();
     let blocks = [Block::written("off", "Uvod u prilog."), sot("Rekao je.")];
     let view = ScriptView { blocks: rows(&blocks, Some(&profile), 2.5), profile: Some(profile), ..ScriptView::default() };
-    assert_eq!(view.text(), "OFF 1 (0:01)\nUvod u prilog.\n\nSOT 1 Mironik 2002 10:00:02:00 - 10:00:06:49 (5:00)\nRekao je.");
+    assert_eq!(view.text(), "VO 1 (0:01)\nUvod u prilog.\n\nSOT 1 Mironik 2002 10:00:02:00 - 10:00:06:49 (5:00)\nRekao je.");
     assert_eq!(view.text_kinds().iter().map(|k| k.id.as_str()).collect::<Vec<_>>(), ["intro", "off", "outro"]);
     assert_eq!(view.clip_kinds().iter().map(|k| k.id.as_str()).collect::<Vec<_>>(), ["sot", "standup", "nat"]);
 }
