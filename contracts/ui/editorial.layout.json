@@ -210,7 +210,7 @@
             "action_id": "editorial_tab_all"
           },
           {
-            "label": "@pool.tab.subclip",
+            "label": "@pool.tab.sot",
             "action_id": "editorial_tab_virtual"
           },
           {

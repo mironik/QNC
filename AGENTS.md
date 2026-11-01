@@ -7543,3 +7543,6 @@ Izvedeno 2026-11-01 (korisnik: "obrisi visak istih izjava"): `qnc-virtual-shots`
 `_shot_001` ostaje. Usput: testni programi uvijek koriste osnovni jezik (`qnc-ui-text` `host`,
 `qnc-dev-diagnostics::unit_test` javan), jer su testovi koji traze engleski tekst padali kad je racunalo izabralo hrvatski.
 Testovi `qnc-virtual-shots`, `qnc-ui-text`, `qnc-dev-diagnostics`, conformance.
+Izmjena 2026-11-01 (korisnik, MA Audio: "trenutna oznaka SubClip nije opravdana... to su Izjave"): u MA Audiju (grupa g) tab
+poola `editorial_tab_virtual` je SOT / Izjave (`pool.tab.sot`, kao u AI Media Assistu); hrvatski naziv taba je sada
+mnozina "Izjave" u obje forme. Story, S-Story i MA Video zadrzavaju SubClip. Samo raspored i rjecnik.
