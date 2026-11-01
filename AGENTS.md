@@ -7508,3 +7508,8 @@ su ostali engleski (Izvoz, Pokrij slot, Prepisi, Pozicija, AI zvuk / AI slika, U
 Snimi, Zaustavi, Radni naziv, Pretek, Poveznica, Uvoz medija, Izvor reprodukcije, H.264 protok, Gotova postavka). Ostaju
 nazivi formata i kodeka, IN/OUT, SubClip, Template, AI, NORM, Auto/On i nazivi aplikacija. Samo `contracts/text/hr/`.
 Test `qnc-ui-text`. Uzivo nije provjereno.
+Izmjena 2026-11-01 (korisnik: "u AI Media Assist prvo dugme iznad source timeline treba biti Dodaj izjavu... ta izjava se
+prikazuje u tabu Izjava u media poolu"): u grupi e prvo dugme zaglavlja source timelinea zove se Add statement / Dodaj
+izjavu (`story.add_statement`, `contracts/ui/editorial.layout.json`); radnja ista (`save_virtual_shot`), a spremljeno ide u
+tab SOT / Izjava (`editorial_tab_virtual`). Ostale forme zadrzavaju Add SubClip. Testovi `qnc-ui-text`,
+`qnc-editorial-layout`, conformance. Uzivo nije provjereno.

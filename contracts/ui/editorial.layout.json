@@ -175,7 +175,7 @@
           "@story.voice_over",
           "@story.talking_head",
           {
-            "label": "@story.add_subclip",
+            "label": "@story.add_statement",
             "action_id": "save_virtual_shot"
           }
         ]

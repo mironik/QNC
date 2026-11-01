@@ -136,6 +136,7 @@
     "story.voice_over": "Off",
     "story.talking_head": "Izjava",
     "story.add_subclip": "Dodaj SubClip",
+    "story.add_statement": "Dodaj izjavu",
     "story.sync_broll": "Sync/Pokrivalice",
     "story.pool.empty": "Još nema klipova: najprije ih uvezite u Ingestu.",
     "story.pool.broll_empty": "Još nema pokrivalica: dodajte pokrivalicu u slot.",
