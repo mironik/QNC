@@ -7443,3 +7443,11 @@ pushanom verzijom (origin/libav-decoder 6674ea2c): ostale izmjene za S-Story u S
 `clips_are_slots`). Sada Story opet crta i uzima rez na granici samo na kraju ranijeg reda (v5 `local_marker_frame`), a
 S-Story na oba reda (`qnc-segment-panel` `program.rs`). Ostaju i u Storyju: marker na samom rubu reda crta se malo unutra,
 zoom ima sekundu sa svake strane i na kraju, dugmad zooma u sredini. Testovi, conformance. Uzivo nije provjereno.
+Audit 2026-11-01 (korisnik: "vrati Story iz pushane verzije"; odabrao "prvo audit"): log (tab storyboard, Story): desni
+klik na slici 4 i 210 uzima isti rez dvaju klipova (join) na kraju prvog Wrap reda, jer desni klik po zakljucanom pravilu
+od 20. 10. uzima najblizi marker bez obzira na udaljenost; to je isto i u pushanoj verziji. Usporedba koda Storyja s pushanom
+(6674ea2c): sve izmjene S-Storyja ukljucuju se samo uz pricu verzije (`is_s_story`, `clips_are_slots`, `draft_story`);
+u Storyju su razlike: izmjene od 30. 10. (jedna tablica `story_items`, A2 Tona u Off i njegovo crtanje), te danas marker na
+rubu reda malo unutra, zoom sekunda sa svake strane na kraju i dugmad zooma u sredini. Popravljeno: b1dbb306 je izbacio i
+pravilo od 30. 10. da se rez cije L ide u sljedeci red crta i na pocetku tog reda; vraceno (`qnc-segment-panel`
+`program.rs`). Nista nije vraceno na pushanu verziju. Uzivo nije provjereno.

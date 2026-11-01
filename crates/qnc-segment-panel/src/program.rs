@@ -104,7 +104,12 @@ pub(crate) fn paint_program(
         // earlier row; only the first row shows frame 0. In the S-Story a border cut belongs to
         // both rows (user 2026-10-31: every clip has its IN and OUT); the Story stays as v5
         // (user 2026-11-01: "you broke the Story").
-        .filter(|pin| (start..=end).contains(&pin.frame) && (segments.clips_are_slots || pin.frame != start || start == 0))
+        // A border cut whose sound goes on into this row (an L, user 2026-10-30: the A2 of a Ton
+        // into the Off after it) is drawn at its start too, so its sound's side shows where it is.
+        .filter(|pin| {
+            let reaches_in = [pin.sound_tail, pin.a1_tail].into_iter().flatten().any(|side| start < side && side <= end);
+            (start..=end).contains(&pin.frame) && (segments.clips_are_slots || pin.frame != start || start == 0 || reaches_in)
+        })
         .map(|pin| TimelineMarkerPin {
             id: &pin.marker_id,
             frame: local(pin.frame),
