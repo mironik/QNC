@@ -394,7 +394,7 @@ impl EditorialApplication {
         };
         self.store_short_stills(Some((&saved.shot_id, &saved.clip_id, saved.marks)));
         self.reload_shorts();
-        self.view.library_tab = LibraryTab::Virtual;
+        if self.view.library_tab != LibraryTab::Transcript { self.view.library_tab = LibraryTab::Virtual } // from the transcript more statements follow (user 2026-11-01)
         self.view.message = qnc_ui_text::fill("story.msg.subclip_saved", &[("shot", &saved.shot_id)]);
         self.view.chosen_shot_id = Some(saved.shot_id);
     }

@@ -7513,3 +7513,7 @@ prikazuje u tabu Izjava u media poolu"): u grupi e prvo dugme zaglavlja source t
 izjavu (`story.add_statement`, `contracts/ui/editorial.layout.json`); radnja ista (`save_virtual_shot`), a spremljeno ide u
 tab SOT / Izjava (`editorial_tab_virtual`). Ostale forme zadrzavaju Add SubClip. Testovi `qnc-ui-text`,
 `qnc-editorial-layout`, conformance. Uzivo nije provjereno.
+Dopuna 2026-11-01 (korisnik: "ne prebacuje na tab Izjava, nego ostaje na tabu Prijepis... zato sto korisnik vjerojatno
+treba kreirati jos izjava"; log: izjava spremljena u 19:38:18, pool je presao na Izjava, korisnik se kliknom vratio na
+Prijepis): izjava spremljena dok je otvoren tab Prijepis ostavlja pool na Prijepisu; s ostalih tabova pool i dalje prelazi
+na SubClip / Izjava (`qnc-editorial-application` `short_saved`, isti broj redaka).
