@@ -142,8 +142,9 @@ fn paint_script(ui: &mut egui::Ui, view: &ScriptView, transcript: &TranscriptVie
 }
 
 /// One block: its mark, length and buttons on top, its text below; a click chooses it (a text
-/// block's text goes into the editor), a clip block can open its clip.
-fn paint_block(ui: &mut egui::Ui, row: &qnc_script::BlockRow, view: &ScriptView, theme: &qnc_desktop_theme::Theme, style: qnc_ui_kit::ChromeButtonStyle) -> Option<ActionEvent> {
+/// block's text goes into the editor), a clip block can open its clip. Public: every panel of
+/// the script draws its blocks with it (MA Audio's and MA Script's).
+pub fn paint_block(ui: &mut egui::Ui, row: &qnc_script::BlockRow, view: &ScriptView, theme: &qnc_desktop_theme::Theme, style: qnc_ui_kit::ChromeButtonStyle) -> Option<ActionEvent> {
     let mut asked = None;
     let block = &row.block;
     let id = block.id.to_string();

@@ -8,4 +8,3 @@ description = "QNC public panel: the media pool, the monitor and the source time
 eframe = { workspace = true }
 qnc-board = { workspace = true }
 qnc-desktop-theme = { workspace = true }
-qnc-ui-kit = { workspace = true }

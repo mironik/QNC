@@ -1,0 +1,19 @@
+[package]
+name = "qnc-script-writer-panel"
+version = "0.1.0"
+edition = "2021"
+description = "QNC public passive panel: writing the story (user 2026-11-01, MA Script) - its working title and lengths on top with the document buttons, the blocks in reading order, and in the lower third a floating group of story buttons with the editor of the pressed kind above it; it paints only and gives catalog actions"
+
+[dependencies]
+eframe = { workspace = true }
+qnc-action-event = { workspace = true }
+qnc-desktop-theme = { workspace = true }
+qnc-media-overlay = { workspace = true }
+qnc-script = { workspace = true }
+qnc-script-panel = { workspace = true }
+qnc-text-source-editor = { workspace = true }
+qnc-ui-kit = { workspace = true }
+qnc-ui-text = { workspace = true }
+
+[dev-dependencies]
+serde_json = { workspace = true }

@@ -31,7 +31,7 @@
   "state_policy": "session_local",
   "database_write_policy": "no_db_writes",
   "runtime_crate": "qnc-media-overlay",
-  "input": "The place of the bar, the form's theme and pad, the label of the open button and the title of the window; the form draws its board layout of the window in the window body.",
+  "input": "The form's theme and the title of the window; a panel opens it (set_open), and the form draws its board layout of the window in the window body.",
   "output": "The answer of the layout drawn in the window; whether the window is open is kept only in egui memory of this process.",
   "specification": "User 2026-11-01, form G: the script panel over the whole form, the media pool, the Broadcast Player monitor and the source timeline in an overlay window."
 }

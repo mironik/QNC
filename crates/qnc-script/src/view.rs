@@ -97,6 +97,8 @@ pub struct ScriptView {
     pub anchor_seconds: f64,
     /// The target length of the story (the story sheet's first length field).
     pub target_seconds: Option<f64>,
+    /// The story's working title (the story sheet's slug).
+    pub title: Option<String>,
     /// The first words of the story and its last words (the director's cue that it ends).
     pub in_cue: String,
     pub out_cue: String,

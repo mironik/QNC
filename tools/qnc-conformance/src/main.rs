@@ -343,8 +343,8 @@ fn validate_editorial_layout_composition(root: &Path) -> CheckResult {
         report.error("editorial.layout.json: group 'h' (Audio) must use script_panel".to_string());
     }
     // MA Script (user 2026-11-01): the script over the whole form, the media in a window over it.
-    if editorial["groups"]["g"]["right_panel"] != "script_panel" || !editorial["groups"]["g"]["media_overlay"].is_object() {
-        report.error("editorial.layout.json: group 'g' (MA Script) must use script_panel with a media_overlay".to_string());
+    if editorial["groups"]["g"]["right_panel"] != "script_writer_panel" || !editorial["groups"]["g"]["media_overlay"].is_object() {
+        report.error("editorial.layout.json: group 'g' (MA Script) must use script_writer_panel with a media_overlay".to_string());
     }
     if editorial["groups"]["e"]["right_panel"] != "transcript_panel" {
         report.error("editorial.layout.json: group 'e' (Audio AI) must use transcript_panel".to_string());

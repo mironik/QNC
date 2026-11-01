@@ -223,9 +223,8 @@
           }
         ]
       },
-      "right_panel": "script_panel",
+      "right_panel": "script_writer_panel",
       "media_overlay": {
-        "label": "@ma_script.media",
         "title": "@ma_script.media_title"
       },
       "tab_order": [

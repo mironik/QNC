@@ -4688,7 +4688,6 @@ dependencies = [
  "eframe",
  "qnc-board",
  "qnc-desktop-theme",
- "qnc-ui-kit",
 ]
 
 [[package]]
@@ -5600,6 +5599,7 @@ dependencies = [
  "qnc-program-view",
  "qnc-script",
  "qnc-script-panel",
+ "qnc-script-writer-panel",
  "qnc-segment-panel",
  "qnc-shot-panel",
  "qnc-side-pieces",
@@ -5764,6 +5764,22 @@ dependencies = [
  "qnc-newsroom-sheet",
  "qnc-script-profile",
  "qnc-ui-text",
+]
+
+[[package]]
+name = "qnc-script-writer-panel"
+version = "0.1.0"
+dependencies = [
+ "eframe",
+ "qnc-action-event",
+ "qnc-desktop-theme",
+ "qnc-media-overlay",
+ "qnc-script",
+ "qnc-script-panel",
+ "qnc-text-source-editor",
+ "qnc-ui-kit",
+ "qnc-ui-text",
+ "serde_json",
 ]
 
 [[package]]

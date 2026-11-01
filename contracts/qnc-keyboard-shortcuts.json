@@ -142,6 +142,9 @@
     "script_editor_clear": {
       "label": "Isprazni editor scenarija"
     },
+    "script_save_text": {
+      "label": "Spremi tekst editora u scenarij (zamijeni izabrani blok ili dodaj blok vrste)"
+    },
     "script_subsegment": {
       "label": "SubSegment: IN-OUT klipa kao sljedeci dio izabranog bloka izjave, ili novi blok"
     },

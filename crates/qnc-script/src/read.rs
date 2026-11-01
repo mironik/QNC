@@ -11,6 +11,8 @@ pub(crate) struct Script {
     pub blocks: Vec<Block>,
     pub profile: Option<ScriptProfile>,
     pub target: Option<f64>,
+    /// The story's working title (the sheet's slug).
+    pub title: Option<String>,
     /// Every voice record, and whether its clip and the take used are in the project folder.
     pub voices: Vec<(Voice, bool)>,
 }
@@ -36,6 +38,8 @@ pub(crate) fn read_script(target: &ProjectDbTarget, locator: Option<&StillLocato
         }
     };
     let sheet = qnc_newsroom_sheet_db::read(target).ok();
+    // The story's working title is the sheet's slug (user 2026-11-01, MA Script header).
+    let title = sheet.as_ref().and_then(|sheet| sheet.values.get("slug")?.as_str().map(str::trim).filter(|title| !title.is_empty()).map(str::to_string));
     let length = sheet.and_then(|sheet| {
         let field = sheet.sheet.get("fields")?.as_array()?.iter().find(|field| field.get("kind").and_then(serde_json::Value::as_str) == Some("duration"))?;
         let code = field.get("id")?.as_str()?;
@@ -49,5 +53,5 @@ pub(crate) fn read_script(target: &ProjectDbTarget, locator: Option<&StillLocato
             (voice, present)
         })
         .collect();
-    Ok(Script { blocks, profile, target: length, voices })
+    Ok(Script { blocks, profile, target: length, title, voices })
 }

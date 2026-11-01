@@ -47,6 +47,10 @@ pub const ADD_TEXT: &str = "script_add_text";
 pub const REPLACE_TEXT: &str = "script_replace_text";
 /// The editor is emptied (and no longer holds a block's text).
 pub const CLEAR_EDITOR: &str = "script_editor_clear";
+/// The editor's text is saved (user 2026-11-01, MA Script): back into the text block it was
+/// taken from, otherwise as a block of the text kind named (target: the kind's code); once it
+/// is in the script the editor is empty and holds no block.
+pub const SAVE_TEXT: &str = "script_save_text";
 /// The shown clip's IN/OUT goes into the script as a block of a clip kind (target: its code).
 pub const ADD_CLIP: &str = "script_add_clip";
 /// A statement of the transcript goes into the script (target: its id).
@@ -167,6 +171,8 @@ pub struct Script {
     voice_after_write: Option<(String, u16)>,
     /// What the panel says once the write in progress is done.
     message_after_write: Option<String>,
+    /// The editor is emptied once the write in progress is done (a saved text).
+    clear_after_write: bool,
 }
 
 /// The A1 of part `index` taken (Ctrl+1) as drafted: camera channel, level, off.
@@ -189,7 +195,7 @@ struct Trim {
 
 impl Default for Script {
     fn default() -> Self {
-        Self { view: ScriptView::default(), blocks: Vec::new(), project: None, reading: None, read_at: None, writing: None, source_request: None, names: HashMap::new(), words_per_second: Ok(0.0), take: None, taking: None, exporting: None, draft: Default::default(), open_subsegment: None, pieces_request: None, trim: None, waves: qnc_program_waveform::ProgramWaves::new(), filmstrips: qnc_program_filmstrip::ProgramFilmstrips::new(), waves_project: None, trim_stills: qnc_trim_stills::TrimStills::new(), zoom_follow: Default::default(), sound: None, voices: Vec::new(), voice_request: None, voice_after_write: None, message_after_write: None }
+        Self { view: ScriptView::default(), blocks: Vec::new(), project: None, reading: None, read_at: None, writing: None, source_request: None, names: HashMap::new(), words_per_second: Ok(0.0), take: None, taking: None, exporting: None, draft: Default::default(), open_subsegment: None, pieces_request: None, trim: None, waves: qnc_program_waveform::ProgramWaves::new(), filmstrips: qnc_program_filmstrip::ProgramFilmstrips::new(), waves_project: None, trim_stills: qnc_trim_stills::TrimStills::new(), zoom_follow: Default::default(), sound: None, voices: Vec::new(), voice_request: None, voice_after_write: None, message_after_write: None, clear_after_write: false }
     }
 }
 
@@ -497,6 +503,18 @@ impl Script {
                 };
                 self.write(preview, move |target| qnc_script_db::add_at(target, place, Block::written(kind.id, text)).map(Some))
             }
+            SAVE_TEXT => match self.view.editing {
+                Some(block) => {
+                    let text = self.view.editor.trim().to_string();
+                    if text.is_empty() {
+                        self.view.message = qnc_ui_text::text("script.write_first").into();
+                        return Some(true);
+                    }
+                    self.clear_after_write = true;
+                    self.write(preview, move |target| qnc_script_db::set_text(target, block, text).map(|_| None))
+                }
+                None => return self.act(ADD_TEXT, target, (preview, timeline, timecode, transcript)),
+            },
             REPLACE_TEXT => {
                 let (Some(block), text) = (self.view.editing, self.view.editor.trim().to_string()) else {
                     self.view.message = qnc_ui_text::text("script.choose_text").into();
@@ -1041,6 +1059,11 @@ impl Script {
                     Ok(added) => {
                         self.voice_request = heard;
                         self.view.message = said.unwrap_or_default();
+                        // A saved text leaves the editor empty (MA Script).
+                        if std::mem::take(&mut self.clear_after_write) {
+                            self.view.editor.clear();
+                            self.view.editing = None;
+                        }
                         if let Some(id) = added {
                             self.view.selected = Some(id);
                             // The editor's text is in the script now.
@@ -1058,10 +1081,11 @@ impl Script {
         if let Some(reading) = &self.reading {
             if let Ok(result) = reading.try_recv() {
                 match result {
-                    Ok(read::Script { blocks, profile, target, voices }) => {
+                    Ok(read::Script { blocks, profile, target, title, voices }) => {
                         self.blocks = blocks;
                         self.view.profile = profile;
                         self.view.target_seconds = target;
+                        self.view.title = title;
                         self.voices = voices;
                     }
                     Err(error) => self.view.message = error,

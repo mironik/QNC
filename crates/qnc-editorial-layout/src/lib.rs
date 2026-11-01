@@ -132,9 +132,9 @@ impl EditorialContracts {
     pub fn board_layout(&self, tab_selected: impl Fn(&str) -> bool) -> qnc_board::Layout {
         let height = qnc_action_bar_panel::height(self.shell.theme_metrics.chrome_control_height, self.editorial.board.block_pad);
         // A group with the media overlay (form G, user 2026-11-01): its right panel is the whole
-        // form under the bar that opens the overlay.
+        // form; the panel opens the overlay.
         if self.composition().media_overlay.is_some() {
-            return qnc_board::Layout::block("right-panel").with_face("right").split_place_above("right-panel", MEDIA_OVERLAY_BAR, height);
+            return qnc_board::Layout::block("right-panel").with_face("right");
         }
         let layout = self.media_layout(self.board_sizes().standard_layout(&self.board_names()));
         let bar = &self.composition().pool_actions;
@@ -160,7 +160,7 @@ impl EditorialContracts {
         layout.split_place("pool-head", "transport", self.editorial.pool_head.transport_width)
     }
 
-    /// The label and the window title of the media overlay of this group, if it has one.
+    /// The window title of the media overlay of this group, if it has one.
     pub fn media_overlay(&self) -> Option<&MediaOverlay> {
         self.composition().media_overlay.as_ref()
     }
@@ -333,13 +333,9 @@ pub struct GroupComposition {
 /// The place of the pool action bar on the board.
 pub const POOL_ACTIONS: &str = "pool-actions";
 
-/// The place of the bar that opens the media overlay (form G).
-pub const MEDIA_OVERLAY_BAR: &str = "media-overlay";
-
-/// The button that opens the media overlay and the title of its window.
+/// The title of the media overlay's window (the panel of the group opens it).
 #[derive(Debug, Clone, Deserialize)]
 pub struct MediaOverlay {
-    pub label: String,
     pub title: String,
 }
 
@@ -436,8 +432,8 @@ mod tests {
             qnc_board::solve(layout, rect).blocks.into_iter().map(|(name, _)| name).collect::<Vec<_>>()
         };
         let script = EditorialContracts::load("g").expect("the group g layout");
-        assert_eq!(script.composition().right_panel, "script_panel");
-        assert_eq!(blocks(&script.board_layout(|_| false)), [MEDIA_OVERLAY_BAR, "right-panel"]);
+        assert_eq!(script.composition().right_panel, "script_writer_panel");
+        assert_eq!(blocks(&script.board_layout(|_| false)), ["right-panel"]);
         let overlay = script.media_overlay_layout(|_| false).expect("the media overlay");
         assert_eq!(blocks(&overlay), ["preview", "transport", "pool-head", "clip-cards", "source-dock"]);
         let audio = EditorialContracts::load("h").expect("MA Audio, group h");

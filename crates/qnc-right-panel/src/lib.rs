@@ -12,7 +12,7 @@ use qnc_editorial_layout::RightPanelTab;
 
 pub const MODULE_ID: &str = "qnc.module.right-panel";
 /// The kinds of right panels are the side pieces' (`qnc-side-pieces`): their pieces are made per kind.
-pub use qnc_side_pieces::{DRAFT_SEGMENT_PANEL, SCRIPT_PANEL, SEGMENT_PANEL, TRANSCRIPT_PANEL, VIDEO_AI_PANEL};
+pub use qnc_side_pieces::{DRAFT_SEGMENT_PANEL, SCRIPT_PANEL, SCRIPT_WRITER_PANEL, SEGMENT_PANEL, TRANSCRIPT_PANEL, VIDEO_AI_PANEL};
 
 /// What the right panels show.
 pub struct Shown<'a> {
@@ -54,6 +54,7 @@ pub fn show(ui: &mut egui::Ui, kind: &str, theme: &qnc_desktop_theme::Theme, sho
         TRANSCRIPT_PANEL => (qnc_transcript_panel::show(ui, shown.transcript, theme, shown.timecode), false),
         VIDEO_AI_PANEL => (qnc_shot_panel::show(ui, shown.shots, theme, shown.timecode, shown.cover_lengths), false),
         SCRIPT_PANEL => (qnc_script_panel::show(ui, shown.script, shown.transcript, theme), false),
+        SCRIPT_WRITER_PANEL => (qnc_script_writer_panel::show(ui, shown.script, theme), false),
         _ => (None, false),
     }
 }

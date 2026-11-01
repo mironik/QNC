@@ -5,7 +5,7 @@
 use eframe::egui::{self, Align, Layout, Rect, Ui};
 
 use qnc_editorial_application::{EditorialIntent, EditorialView, LibraryTab};
-use qnc_editorial_layout::{theme::Theme, EditorialContracts, MEDIA_OVERLAY_BAR};
+use qnc_editorial_layout::{theme::Theme, EditorialContracts};
 use qnc_media_card::{CardGridAction, CardMetrics, StatusDotsMode, Ticks};
 use qnc_panel_focus::{paint_focus, Panel};
 use qnc_timeline::TimelineIntent;
@@ -34,7 +34,6 @@ pub fn render_desktop(
             framed(answer.map(EditorialIntent::Action), ui, rect, if segments { &[Panel::Segments] } else { &[] })
         }
         "source-dock" => framed(source_dock(ui, contracts, theme, view), ui, rect, if view.segments.zoom.is_some() { &[Panel::Segments, Panel::SourceButtons] } else { &[Panel::SourceTimeline, Panel::SourceButtons] }),
-        MEDIA_OVERLAY_BAR => qnc_media_overlay::bar(ui, rect, theme, contracts.editorial.board.block_pad, contracts.media_overlay().map(|overlay| overlay.label.as_str())),
         place => qnc_action_bar_panel::show(ui, rect, theme, contracts.editorial.board.block_pad, contracts.action_bar(place), |id| view.action_enabled(id)).map(EditorialIntent::action),
     });
     let answer = qnc_board::show_in_frame(ui, frame, &board, |name| faces.named(name), &mut place);

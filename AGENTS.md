@@ -7585,3 +7585,26 @@ izabere u Projectu. Nije izvedeno: dokument za potvrdu (urednik, lektor), drukci
 (zasad samo gumb). Testovi `qnc-board`, `qnc-media-overlay`, `qnc-editorial-layout` (novi
 `ma_script_has_the_script_over_the_whole_form_and_the_media_in_its_overlay`), `qnc-app`, conformance, `--check-contracts`,
 release build. Uzivo nije provjereno.
+Izmjena 2026-11-01 (korisnik, MA Script: "dvije grupe dugmadi, jedna za kreiranje price, druga za kreiranje i upravljanje
+dokumentima"; prva grupa "centrirana, plivajuca, u donjoj trecini ekrana"; "na samom vrhu naziv priloga (Radni naziv iz
+baze), ukupno odobreno trajanje, trajanje tekuceg dijela i koliko je preostalo"; "na startu nema edit panela, pojavi se
+iznad grupe dugmica kad korisnik klikne"; "najava se zasivi kad je pohranjena"; "za svaki naredni off povecava se broj";
+"IZJAVA otvara overlay prozor"; "bolji naziv za atmosferu bi mogao biti NETON"): desni panel grupe g je
+`script_writer_panel`, nova javna kocka-panel `crates/qnc-script-writer-panel` (+ ugovor
+`contracts/modules/script-writer-panel.module.json`) preko cijele forme; traka s gumbom "Media pool i player" uklonjena
+(`qnc-media-overlay` vise nema `bar`, prozor otvara panel kroz `set_open`; `MediaOverlay` ima samo naslov). Vrh: radni
+naziv (polje `slug` obrasca priloga, `qnc-script` `ScriptView.title`), "Odobreno / Napisano / Preostalo" (preostalo
+crveno kad je preko), voditelj zasebno, desno dokumenti: Na pregled (`script_export`: tekst, A/V HTML i MOS za
+pregled), Kopiraj, Nacrt XML, Posalji u S-Story. Sredina: blokovi price istim crtanjem kao panel scenarija
+(`qnc-script-panel::paint_block` je javan). Donja trecina: plutajuca centrirana grupa, jedno dugme po vrsti profila
+scenarija projekta, redom profila (opca TV: NAJAVA, OFF, IZJAVA, STAND-UP, NETON, ODJAVA); vrsta voditelja (najava,
+odjava) siva kad je vec u prici. Tekstualna vrsta otvara editor iznad grupe (naslov sljedeci broj, npr. "OFF 3"; klik na
+tekstualni blok otvara ga za uredivanje), Spremi (`script_save_text`, nova radnja kataloga bez tipke u `qnc-script`:
+zamijeni blok iz kojeg je tekst uzet ili dodaj blok vrste, nakon upisa editor je prazan) i Odustani. Vrsta klipa otvara
+prozor medija i iznad grupe redak "Dodaj u pricu" za IN-OUT oznacen na source timelineu (`script_add_clip`). Koja je
+vrsta otvorena je izbor prikaza ovog procesa (egui memorija). Hrvatski: ATMOSFERA je NETON (`sp.s.nat`, `sp.k.nat`,
+`sp.f.nat`, `sp.sp.nat`). `qnc-side-pieces` `SCRIPT_WRITER_PANEL` (scenarij i transkript), `qnc-right-panel`,
+conformance (g mora imati `script_writer_panel` i `media_overlay`), C10 `qnc-editorial-blocks` 93 -> 92. MA Audio
+(grupa h) nije mijenjan. Nije izvedeno: dokument za urednika i lektora kao zaseban obrazac (zasad postojeci export
+scenarija), tipke za grupu price. Testovi `qnc-script-writer-panel`, `qnc-side-pieces`, `qnc-editorial-layout`,
+`qnc-media-overlay`, `qnc-script`, `qnc-ui-text`, conformance. Uzivo nije provjereno.

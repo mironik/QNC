@@ -28,6 +28,8 @@ pub const TRANSCRIPT_PANEL: &str = "transcript_panel";
 pub const VIDEO_AI_PANEL: &str = "video_ai_panel";
 /// The script of the story (Media Assist Audio, user 2026-10-28).
 pub const SCRIPT_PANEL: &str = "script_panel";
+/// Writing the story over the whole form (MA Script, user 2026-11-01): the same script.
+pub const SCRIPT_WRITER_PANEL: &str = "script_writer_panel";
 
 /// What the right panel pieces show; empty for a piece the form does not have.
 #[derive(Debug, Clone, Default, PartialEq)]
@@ -57,9 +59,9 @@ impl SidePieces {
         let kinds: Vec<&str> = kinds.into_iter().collect();
         let has = |kind: &str| kinds.contains(&kind);
         Self {
-            transcript: (has(TRANSCRIPT_PANEL) || has(SCRIPT_PANEL)).then(Transcript::new),
+            transcript: (has(TRANSCRIPT_PANEL) || has(SCRIPT_PANEL) || has(SCRIPT_WRITER_PANEL)).then(Transcript::new),
             shots: has(VIDEO_AI_PANEL).then(ClipShots::default),
-            script: has(SCRIPT_PANEL).then(Script::new),
+            script: (has(SCRIPT_PANEL) || has(SCRIPT_WRITER_PANEL)).then(Script::new),
             versions: has(DRAFT_SEGMENT_PANEL).then(SkeletonVersions::new),
             views: SideViews::default(),
             draft_story: has(DRAFT_SEGMENT_PANEL),
@@ -188,6 +190,8 @@ mod tests {
         let audio = SidePieces::for_panels([SCRIPT_PANEL]);
         assert!(audio.transcript.is_some() && audio.shots.is_none() && audio.script.is_some() && audio.versions.is_none());
         assert_eq!(audio.draft_story(), None);
+        let script = SidePieces::for_panels([SCRIPT_WRITER_PANEL]);
+        assert!(script.transcript.is_some() && script.script.is_some() && script.versions.is_none());
         let s_story = SidePieces::for_panels([DRAFT_SEGMENT_PANEL]);
         assert!(s_story.versions.is_some() && s_story.script.is_none());
         assert_eq!(s_story.draft_story(), Some(1), "version 1 until the list of versions is read");
