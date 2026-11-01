@@ -141,7 +141,7 @@
             "action_id": "editorial_tab_transcript"
           },
           {
-            "label": "@pool.tab.subclip",
+            "label": "@pool.tab.talking_head",
             "action_id": "editorial_tab_virtual"
           }
         ]

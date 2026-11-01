@@ -7480,3 +7480,8 @@ grupa e `pool_actions` (tabovi na kojima se vidi, dugmad); `qnc-editorial-layout
 `board_layout(tab_selected)`, `action_bar`). Forma ploce isti broj redaka (C10 93): mjesto koje nema svoj panel ide traci.
 Traka nije u krugu Tab tipke (dugmad source docka su). Test
 `ai_media_assist_has_transcribe_under_its_pool_on_the_all_tab_only`, conformance. Uzivo nije provjereno.
+Izmjena 2026-11-01 (korisnik: "na ovoj formi tab SubClip ne bi koristio kao mjesto gdje ce se prikazivati odabrani
+dijelovi tonova koji nastaju selekcijom teksta transcripta... primjereniji bi bio Talking Head, jer ce to biti polaziste za
+talking head"): u AI Media Assistu (grupa e) tab poola za dijelove spremljene iz prijepisa zove se Talking Head (rjecnik
+`pool.tab.talking_head`, `contracts/ui/editorial.layout.json`); radnja i sadrzaj taba isti (`editorial_tab_virtual`).
+Ostale forme zadrzavaju SubClip. Testovi `qnc-ui-text`, `qnc-editorial-layout`, conformance. Uzivo nije provjereno.
