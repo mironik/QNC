@@ -528,6 +528,11 @@
         ]
       },
       {
+        "title": "@project.interface",
+        "block": "ui_language",
+        "label": "@project.interface_language"
+      },
+      {
         "title": "@project.keyboard",
         "block": "keyboard_preset",
         "label": "@project.key_preset"

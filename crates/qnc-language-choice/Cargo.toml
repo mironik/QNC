@@ -1,0 +1,11 @@
+[package]
+name = "qnc-language-choice"
+version = "0.1.0"
+edition = "2021"
+description = "QNC public block: the choice of this computer's interface language, in a settings panel"
+
+[dependencies]
+eframe = { workspace = true }
+qnc-dev-diagnostics = { workspace = true }
+qnc-settings-form = { workspace = true }
+qnc-ui-text = { workspace = true }

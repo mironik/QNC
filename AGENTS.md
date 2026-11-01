@@ -7494,3 +7494,12 @@ sifre radnji i tipke nisu mijenjane; profil vec spremljen u projektu zadrzava OF
 (cetiri dijela, sve sifre engleskog; Izjava, Off, Atmosfera, Pokrivalice); `qnc-ui-text` slaze rjecnik iz dijelova (sifra
 dvaput je greska). Jezik je postavka racunala: `data/ui-language.json` `{"language": "hr"}`, bez nje engleski. Testovi
 `qnc-ui-text` (svaka sifra u svakom rjecniku), `qnc-script` (oznake VO), conformance. Uzivo nije provjereno.
+Otkljucano i izvedeno 2026-11-01 (korisnik: "u projektu treba biti opcija izbora jezika sucelja"; odluke: postavka racunala s
+biracem u Projectu, primjena nakon ponovnog pokretanja; Project otkljucan samo za to): Project Advanced ima odjeljak
+Interface / Sucelje s izborom "Interface language (this computer)" (`contracts/ui/project.layout.json` blok `ui_language`,
+rjecnik). Nova javna kocka `crates/qnc-language-choice` (+ ugovor `contracts/modules/language-choice.module.json`): jezici za
+koje QNC ima rjecnik, izabrani jezik racunala i napomena dok to nije jezik u kojem QNC radi; pise samo postavku racunala
+`data/ui-language.json`, nikad projekt ni bazu. `qnc-ui-text`: `languages`, `chosen_language`, `choose_language` (jezik bez
+rjecnika se odbija). Forma Projecta isti broj redaka (C10 1142): odjeljak koji nije njezin ide kocki. Test
+`the_chosen_language_is_kept_for_this_computer_and_only_one_qnc_knows`, conformance. Uzivo nije provjereno. Project je
+ponovno zamrznut.

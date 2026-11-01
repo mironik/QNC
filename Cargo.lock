@@ -4484,6 +4484,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "qnc-language-choice"
+version = "0.1.0"
+dependencies = [
+ "eframe",
+ "qnc-dev-diagnostics",
+ "qnc-settings-form",
+ "qnc-ui-text",
+]
+
+[[package]]
 name = "qnc-level-bar"
 version = "0.1.0"
 dependencies = [
@@ -5380,6 +5390,7 @@ dependencies = [
  "qnc-dir-browser",
  "qnc-export-preset",
  "qnc-keyboard-shortcut",
+ "qnc-language-choice",
  "qnc-location-field",
  "qnc-newsroom-sheet",
  "qnc-project-application",

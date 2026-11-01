@@ -114,7 +114,7 @@ fn section_body(
             changed |= qnc_export_preset::apply_preset(draft.draft_settings, &selected);
         }
         Some("applications") => applications(ui, advanced, shell, draft, application_action),
-        _ => {}
+        other => qnc_language_choice::section(ui, other, one, &section.label, style),
     }
     changed |= qnc_settings_form::field_grid(ui, width, draft.draft_settings, &section.fields, &advanced.options, style);
     if let Some(then) = section.then.as_ref().filter(|then| then.when.holds(draft.draft_settings)) {

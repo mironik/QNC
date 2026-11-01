@@ -1,0 +1,36 @@
+{
+  "module_id": "qnc.module.language-choice",
+  "module_name": "Interface language choice",
+  "module_version": "0.1.0",
+  "module_kind": "ui_widget",
+  "capabilities": [
+    "ui.setting.interface_language"
+  ],
+  "input_contract_version": "0.1.0",
+  "output_contract_version": "0.1.0",
+  "supported_os": [
+    "windows",
+    "linux",
+    "macos"
+  ],
+  "supported_cpu": [
+    "x86_64",
+    "aarch64"
+  ],
+  "transport_protocol_version": "0.1.0",
+  "forbidden_calls": [
+    "application.start",
+    "business.db.write",
+    "database.read",
+    "workflow.run",
+    "media.process",
+    "player.command"
+  ],
+  "forbidden_dependencies": [],
+  "state_policy": "stateless",
+  "database_write_policy": "no_db_writes",
+  "runtime_crate": "qnc-language-choice",
+  "input": "The settings panel's section named ui_language, its label and grid style; the languages QNC has dictionaries for (qnc-ui-text).",
+  "output": "This computer's interface language kept beside its other settings (data/ui-language.json through qnc-ui-text); a note while it is not the language QNC runs in. It applies when QNC starts again.",
+  "specification": "User 2026-11-01: the choice of the interface language is in Project; it is a setting of this computer (2026-10-14), not of a project."
+}
