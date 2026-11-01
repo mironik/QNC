@@ -36,6 +36,11 @@ pub fn show(ui: &mut egui::Ui, view: &TranscriptView, theme: &qnc_desktop_theme:
     }
     let mut asked = None;
     let at = |frame: u64| timecode.map_or_else(|| frame.to_string(), |tc| tc.label(frame));
+    let ends = marked_ends(view);
+    // New IN/OUT (a statement opened, a cut made): its text is brought into view once.
+    let seen = egui::Id::new("qnc-transcript-panel-marks");
+    let bring = ui.ctx().memory_mut(|memory| memory.data.get_temp::<Option<(u64, u64)>>(seen)) != Some(view.marks);
+    ui.ctx().memory_mut(|memory| memory.data.insert_temp(seen, view.marks));
     egui::ScrollArea::vertical().auto_shrink([false, false]).show(&mut ui, |ui| {
         // Lines and silences in the order of their frames.
         let mut silences = view.silences.iter().peekable();
@@ -43,7 +48,11 @@ pub fn show(ui: &mut egui::Ui, view: &TranscriptView, theme: &qnc_desktop_theme:
             while let Some((from, to)) = silences.next_if(|(from, _)| *from < line.from) {
                 paint_silence(ui, &at(*from), &at(*to), theme);
             }
-            if let Some(word) = paint_line(ui, line, view, theme) {
+            let (word, rect) = paint_line(ui, line, view, ends, theme);
+            if bring && ends.is_some_and(|(first, _)| line_words(line).iter().any(|w| (w.1, w.2) == first)) {
+                ui.scroll_to_rect(rect, Some(egui::Align::Center));
+            }
+            if let Some(word) = word {
                 asked = Some(word);
             }
             ui.add_space(4.0);
@@ -138,20 +147,24 @@ fn clock(seconds: f64) -> String {
 /// One line as one text wrapped at the panel's width (user 2026-10-26: "sentences go out of the
 /// panel, they should wrap"), the word said at the playhead lit; returns the first frame of a
 /// clicked word.
-fn paint_line(ui: &mut egui::Ui, line: &Line, view: &TranscriptView, theme: &qnc_desktop_theme::Theme) -> Option<(u64, u64, bool)> {
+fn paint_line(ui: &mut egui::Ui, line: &Line, view: &TranscriptView, ends: Option<((u64, u64), (u64, u64))>, theme: &qnc_desktop_theme::Theme) -> (Option<(u64, u64, bool)>, egui::Rect) {
     let running = view.running.is_some_and(|(from, to)| line.from >= from && line.to <= to);
     let base = if running { theme.text_muted } else { theme.text };
     let font = egui::FontId::proportional(theme.font_ui);
-    let words: Vec<(&str, u64, u64)> = if line.words.is_empty() {
-        vec![(line.text.as_str(), line.from, line.to)]
-    } else {
-        line.words.iter().map(|w| (w.text.as_str(), w.from, w.to.max(w.from + 1))).collect()
-    };
+    let words = line_words(line);
     let mut job = egui::text::LayoutJob::default();
     let mut spans = Vec::with_capacity(words.len());
+    // The IN and OUT of the text are red brackets, the words between them lit (user 2026-11-01:
+    // a statement clicked shows where its text starts and ends).
+    let bracket = |job: &mut egui::text::LayoutJob, mark: &str| {
+        job.append(mark, 0.0, egui::TextFormat::simple(egui::FontId::proportional(theme.font_ui + 2.0), theme.danger));
+    };
     for (at, (text, from, to)) in words.iter().enumerate() {
         if at > 0 {
             job.append(" ", 0.0, egui::TextFormat::simple(font.clone(), base));
+        }
+        if ends.is_some_and(|(first, _)| first == (*from, *to)) {
+            bracket(&mut job, "[ ");
         }
         let lit = said(view, *from, *to);
         let marked = view.marks.is_some_and(|(a, b)| (a..b).contains(&((from + to) / 2)));
@@ -166,6 +179,9 @@ fn paint_line(ui: &mut egui::Ui, line: &Line, view: &TranscriptView, theme: &qnc
         let start = job.text.chars().count();
         job.append(text, 0.0, format);
         spans.push((start, start + text.chars().count(), (*from, *to)));
+        if ends.is_some_and(|(_, last)| last == (*from, *to)) {
+            bracket(&mut job, " ]");
+        }
     }
     job.wrap.max_width = ui.available_width().max(1.0);
     let galley = ui.fonts(|fonts| fonts.layout_job(job));
@@ -180,9 +196,48 @@ fn paint_line(ui: &mut egui::Ui, line: &Line, view: &TranscriptView, theme: &qnc
     let double = response.double_clicked();
     let clicked = if response.clicked() || double { response.interact_pointer_pos().and_then(word_at).map(|(from, to)| (from, to, double)) } else { None };
     ui.painter().galley(rect.min, galley, base);
-    clicked
+    (clicked, rect)
+}
+
+/// The words of a line with their frames (a line without words is one word).
+fn line_words(line: &Line) -> Vec<(&str, u64, u64)> {
+    if line.words.is_empty() {
+        vec![(line.text.as_str(), line.from, line.to)]
+    } else {
+        line.words.iter().map(|w| (w.text.as_str(), w.from, w.to.max(w.from + 1))).collect()
+    }
+}
+
+/// The first and the last word between IN and OUT, by the middle of the word.
+fn marked_ends(view: &TranscriptView) -> Option<((u64, u64), (u64, u64))> {
+    let (a, b) = view.marks?;
+    let mut inside = view.lines.iter().flat_map(line_words).map(|(_, from, to)| (from, to)).filter(|(from, to)| (a..b).contains(&((from + to) / 2)));
+    let first = inside.next()?;
+    Some((first, inside.last().unwrap_or(first)))
 }
 
 fn said(view: &TranscriptView, from: u64, to: u64) -> bool {
     view.playhead.is_some_and(|playhead| (from..to).contains(&playhead))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use qnc_transcript::Word;
+
+    #[test]
+    fn the_in_and_out_words_are_the_first_and_last_between_the_marks_across_lines() {
+        let line = |words: &[(u64, u64)]| Line {
+            from: words[0].0,
+            to: words[words.len() - 1].1,
+            text: String::new(),
+            words: words.iter().map(|&(from, to)| Word { from, to, text: "w".into() }).collect(),
+        };
+        let mut view = TranscriptView { lines: std::sync::Arc::new(vec![line(&[(0, 10), (10, 20)]), line(&[(30, 40), (40, 50)])]), ..TranscriptView::default() };
+        assert_eq!(marked_ends(&view), None, "no IN/OUT, no brackets");
+        view.marks = Some((12, 46));
+        assert_eq!(marked_ends(&view), Some(((10, 20), (40, 50))));
+        view.marks = Some((31, 39));
+        assert_eq!(marked_ends(&view), Some(((30, 40), (30, 40))), "one word is both");
+    }
 }

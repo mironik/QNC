@@ -7517,3 +7517,9 @@ Dopuna 2026-11-01 (korisnik: "ne prebacuje na tab Izjava, nego ostaje na tabu Pr
 treba kreirati jos izjava"; log: izjava spremljena u 19:38:18, pool je presao na Izjava, korisnik se kliknom vratio na
 Prijepis): izjava spremljena dok je otvoren tab Prijepis ostavlja pool na Prijepisu; s ostalih tabova pool i dalje prelazi
 na SubClip / Izjava (`qnc-editorial-application` `short_saved`, isti broj redaka).
+Dopuna 2026-11-01 (korisnik: "kada korisnik klikne na izjavu tekstualni prikaz treba oznaciti IN tekst i OUT tekst"): u
+panelu prijepisa prva rijec izmedu IN i OUT prikazanog klipa dobiva crvenu zagradu "[" ispred, zadnja "]" iza (rijeci
+izmedu i dalje podloga i podcrtano), a kad se IN/OUT promijeni (klik na izjavu, rez), tekst izjave se jednom dovede na
+sredinu vidljivog dijela panela. Vrijedi i za IN/OUT postavljen I/O i rezom. `qnc-transcript-panel` (`marked_ends`,
+`line_words`). Test `the_in_and_out_words_are_the_first_and_last_between_the_marks_across_lines`, conformance. Uzivo nije
+provjereno.
