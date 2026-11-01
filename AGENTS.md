@@ -7564,3 +7564,24 @@ grupa `j` s kljucem `l`. Redoslijed: a, b, e, h (MA Audio), j (MA Video), k (S-S
 Katalog aplikacija osvjezen (`qnc-app-catalog refresh apps target\release data\application-catalog.json`). Projekt cuva
 slijed aplikacija iz vremena kad je napravljen; novi dobiva kad mu se template ponovno izabere u Projectu. Conformance,
 `--check-contracts`.
+Izvedeno 2026-11-01 (korisnik: "kreiraj novu formu G... namjena ista kao MA Audio, ali dizajn orijentiran na pisanje priloga
+i kreiranje dokumenta koji se salje na potvrdu Uredniku i Lektoru... osnova je desni panel iz MA Audio, prikazuje se preko
+cijele forme; Media pool, Broadcast Player i source timeline idu u overlay prozor"): nova forma MA Script, prioritetna grupa
+`g`: `apps/qnc-ma-script` (`qnc-app.json`, samostalni exe `qnc-ma-script`), javni desktop adapter
+`crates/qnc-ma-script-desktop-adapter`, ugovor aplikacije `contracts/applications/ma-script.application.json`, shell samo
+Cargo ovisnost na adapter i unos u tablicu tvornica (`apps/qnc-app`), root Cargo, katalog aplikacija osvjezen (a, b, e, g,
+h, j, k, o). Kljuc forme MA Audio u ugovoru rasporeda je sada `h` (kao njegova grupa; `apps/qnc-media-assist-audio`,
+adapter, conformance), a kljuc `g` je MA Script. Raspored grupe g (`contracts/ui/editorial.layout.json`): isti dijelovi kao
+MA Audio (tabovi poola, gumbi source timelinea, `script_panel`) i `media_overlay` (natpis gumba i naslov prozora, rjecnik
+`ma_script.media`, `ma_script.media_title`). Ploca grupe g je desni panel preko cijele forme ispod trake s gumbom "Media
+pool i player"; gumb otvara prozor preko forme (92 % zaslona) s monitorom i transportom lijevo, tabovima poola i
+karticama desno i source timelineom na dnu, istim kockama kao na ploci MA Audija; X ili isti gumb ga zatvara. Nova javna
+kocka `crates/qnc-media-overlay` (+ ugovor `contracts/modules/media-overlay.module.json`): traka s gumbom i prozor;
+otvorenost je izbor prikaza ovog procesa (egui memorija), nigdje se ne pise. `qnc-board`: `Layout::block`, `with_face`,
+`split_place_above`. `qnc-editorial-layout`: `GroupComposition.media_overlay`, `MEDIA_OVERLAY_BAR`,
+`media_overlay_layout`. `qnc-editorial-blocks` crta ista mjesta na ploci i u prozoru (C10 isti, 93). Conformance: grupa g
+mora imati `script_panel` i `media_overlay`, MA Audio (h) `script_panel`. Projekt dobiva MA Script kad ga template
+izabere u Projectu. Nije izvedeno: dokument za potvrdu (urednik, lektor), drukciji izgled scenarija; prozor nema tipku
+(zasad samo gumb). Testovi `qnc-board`, `qnc-media-overlay`, `qnc-editorial-layout` (novi
+`ma_script_has_the_script_over_the_whole_form_and_the_media_in_its_overlay`), `qnc-app`, conformance, `--check-contracts`,
+release build. Uzivo nije provjereno.

@@ -5,7 +5,7 @@
 use eframe::egui::{self, Align, Layout, Rect, Ui};
 
 use qnc_editorial_application::{EditorialIntent, EditorialView, LibraryTab};
-use qnc_editorial_layout::{theme::Theme, EditorialContracts};
+use qnc_editorial_layout::{theme::Theme, EditorialContracts, MEDIA_OVERLAY_BAR};
 use qnc_media_card::{CardGridAction, CardMetrics, StatusDotsMode, Ticks};
 use qnc_panel_focus::{paint_focus, Panel};
 use qnc_timeline::TimelineIntent;
@@ -22,11 +22,8 @@ pub fn render_desktop(
     view: &EditorialView,
 ) -> Option<EditorialIntent> {
     let (faces, board) = (theme.board_faces(), contracts.board_layout(|id| view.tab_selected(id)));
-    let framed = |intent, ui: &Ui, rect, panels: &[Panel]| {
-        paint_focus(ui, rect, panels.contains(&view.focus.panel), theme.focus);
-        intent
-    };
-    qnc_board::show_in_frame(ui, frame, &board, |name| faces.named(name), |ui, block, rect| qnc_dev_diagnostics::timed_block(block, || match block {
+    let framed = |intent, ui: &Ui, rect, panels: &[Panel]| { paint_focus(ui, rect, panels.contains(&view.focus.panel), theme.focus); intent };
+    let mut place = |ui: &mut Ui, block: &str, rect: Rect| qnc_dev_diagnostics::timed_block(block, || match block {
         "preview" => preview(ui, rect, contracts, theme, view),
         "pool-head" => framed(pool_tabs(ui, rect, contracts, theme, view), ui, rect, &[Panel::PoolTabs]),
         "transport" => qnc_transport_panel::show(ui, rect, theme, contracts.tab_gap()).map(|action| EditorialIntent::action(&action)),
@@ -37,8 +34,11 @@ pub fn render_desktop(
             framed(answer.map(EditorialIntent::Action), ui, rect, if segments { &[Panel::Segments] } else { &[] })
         }
         "source-dock" => framed(source_dock(ui, contracts, theme, view), ui, rect, if view.segments.zoom.is_some() { &[Panel::Segments, Panel::SourceButtons] } else { &[Panel::SourceTimeline, Panel::SourceButtons] }),
+        MEDIA_OVERLAY_BAR => qnc_media_overlay::bar(ui, rect, theme, contracts.editorial.board.block_pad, contracts.media_overlay().map(|overlay| overlay.label.as_str())),
         place => qnc_action_bar_panel::show(ui, rect, theme, contracts.editorial.board.block_pad, contracts.action_bar(place), |id| view.action_enabled(id)).map(EditorialIntent::action),
-    }))
+    });
+    let answer = qnc_board::show_in_frame(ui, frame, &board, |name| faces.named(name), &mut place);
+    answer.or(qnc_media_overlay::show_board(ui.ctx(), theme, contracts.media_overlay().map(|overlay| overlay.title.as_str()), contracts.media_overlay_layout(|id| view.tab_selected(id)), |name| faces.named(name), place))
 }
 
 fn preview(ui: &mut Ui, rect: Rect, contracts: &EditorialContracts, theme: &Theme, view: &EditorialView) -> Option<EditorialIntent> {

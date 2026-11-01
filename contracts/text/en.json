@@ -475,6 +475,8 @@
     "transcript.empty": "No transcript of this clip yet: tick clips in the pool (or set this clip's IN/OUT, none for the whole clip) and press Transcribe.",
     "transcript.no_clip": "Choose a clip in the media pool.",
     "ma.transcribe": "Transcribe",
+    "ma_script.media": "Media pool and player",
+    "ma_script.media_title": "Media pool, player and source timeline",
     "ai.tab_audio": "Audio AI",
     "ai.tab_video": "Video AI",
     "ma.transcribe_fast": "Fast",

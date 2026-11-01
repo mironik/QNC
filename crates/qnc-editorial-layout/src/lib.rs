@@ -130,11 +130,39 @@ impl EditorialContracts {
     /// Under the clip cards the group's pool action bar (`pool-actions`) while one of its
     /// tabs is open (`tab_selected` tells the open tab).
     pub fn board_layout(&self, tab_selected: impl Fn(&str) -> bool) -> qnc_board::Layout {
-        let layout = self.board_sizes().standard_layout(&self.board_names()).split_place("pool-head", "transport", self.editorial.pool_head.transport_width);
+        let height = qnc_action_bar_panel::height(self.shell.theme_metrics.chrome_control_height, self.editorial.board.block_pad);
+        // A group with the media overlay (form G, user 2026-11-01): its right panel is the whole
+        // form under the bar that opens the overlay.
+        if self.composition().media_overlay.is_some() {
+            return qnc_board::Layout::block("right-panel").with_face("right").split_place_above("right-panel", MEDIA_OVERLAY_BAR, height);
+        }
+        let layout = self.media_layout(self.board_sizes().standard_layout(&self.board_names()));
+        let bar = &self.composition().pool_actions;
+        let shown = !bar.actions.is_empty() && bar.tabs.iter().any(|tab| tab_selected(tab));
+        if shown { layout.split_place_below("clip-cards", POOL_ACTIONS, height) } else { layout }
+    }
+
+    /// The layout in the media overlay of a group that has one (form G): the monitor with the
+    /// transport under it on the left, the pool tabs and clip cards on the right, the source
+    /// timeline along the bottom; the pool action bar as on the board. None for other groups.
+    pub fn media_overlay_layout(&self, tab_selected: impl Fn(&str) -> bool) -> Option<qnc_board::Layout> {
+        self.composition().media_overlay.as_ref()?;
+        let names = qnc_board::BoardNames { monitor: "preview", head: "transport", body: "", right: "clip-cards", dock: "source-dock" };
+        let layout = self.board_sizes().standard_layout(&names).split_place_above("clip-cards", "pool-head", self.shell.theme_metrics.chrome_row_height);
         let bar = &self.composition().pool_actions;
         let shown = !bar.actions.is_empty() && bar.tabs.iter().any(|tab| tab_selected(tab));
         let height = qnc_action_bar_panel::height(self.shell.theme_metrics.chrome_control_height, self.editorial.board.block_pad);
-        if shown { layout.split_place_below("clip-cards", POOL_ACTIONS, height) } else { layout }
+        Some(if shown { layout.split_place_below("clip-cards", POOL_ACTIONS, height) } else { layout })
+    }
+
+    /// The row under the monitor in two places: the pool tabs and the transport panel.
+    fn media_layout(&self, layout: qnc_board::Layout) -> qnc_board::Layout {
+        layout.split_place("pool-head", "transport", self.editorial.pool_head.transport_width)
+    }
+
+    /// The label and the window title of the media overlay of this group, if it has one.
+    pub fn media_overlay(&self) -> Option<&MediaOverlay> {
+        self.composition().media_overlay.as_ref()
     }
 
     /// The buttons of the action bar placed at `place` (none for any other place).
@@ -296,10 +324,24 @@ pub struct GroupComposition {
     /// The action bar under the clip cards (AI Media Assist: Transcribe, user 2026-11-01).
     #[serde(default)]
     pub pool_actions: PoolActions,
+    /// The media pool, the monitor and the source timeline in a window over the form (form G,
+    /// user 2026-11-01); none: they are places of the board.
+    #[serde(default)]
+    pub media_overlay: Option<MediaOverlay>,
 }
 
 /// The place of the pool action bar on the board.
 pub const POOL_ACTIONS: &str = "pool-actions";
+
+/// The place of the bar that opens the media overlay (form G).
+pub const MEDIA_OVERLAY_BAR: &str = "media-overlay";
+
+/// The button that opens the media overlay and the title of its window.
+#[derive(Debug, Clone, Deserialize)]
+pub struct MediaOverlay {
+    pub label: String,
+    pub title: String,
+}
 
 /// The buttons under the clip cards and the pool tabs they are shown on.
 #[derive(Debug, Clone, Default, Deserialize)]
@@ -385,5 +427,21 @@ mod tests {
         assert_eq!(contracts.composition().pool_actions.tabs, ["editorial_tab_all"]);
         let story = EditorialContracts::load("o").expect("the story layout");
         assert_eq!(story.action_bar(POOL_ACTIONS).count(), 0, "Story has no pool bar");
+    }
+
+    #[test]
+    fn ma_script_has_the_script_over_the_whole_form_and_the_media_in_its_overlay() {
+        let blocks = |layout: &qnc_board::Layout| {
+            let rect = eframe::egui::Rect::from_min_size(eframe::egui::Pos2::ZERO, eframe::egui::vec2(1600.0, 900.0));
+            qnc_board::solve(layout, rect).blocks.into_iter().map(|(name, _)| name).collect::<Vec<_>>()
+        };
+        let script = EditorialContracts::load("g").expect("the group g layout");
+        assert_eq!(script.composition().right_panel, "script_panel");
+        assert_eq!(blocks(&script.board_layout(|_| false)), [MEDIA_OVERLAY_BAR, "right-panel"]);
+        let overlay = script.media_overlay_layout(|_| false).expect("the media overlay");
+        assert_eq!(blocks(&overlay), ["preview", "transport", "pool-head", "clip-cards", "source-dock"]);
+        let audio = EditorialContracts::load("h").expect("MA Audio, group h");
+        assert!(audio.media_overlay_layout(|_| false).is_none(), "MA Audio keeps the media on its board");
+        assert!(blocks(&audio.board_layout(|_| false)).contains(&"clip-cards".to_string()));
     }
 }

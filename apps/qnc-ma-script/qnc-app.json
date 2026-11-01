@@ -1,0 +1,12 @@
+{
+  "application_id": "qnc.ma-script",
+  "tab_id": "ma_script",
+  "label": "MA Script",
+  "enabled": true,
+  "system": true,
+  "removable": false,
+  "priority_group": "g",
+  "host_mode": "embedded_public_api",
+  "desktop_entry": "qnc_ma_script",
+  "standalone_executable": "qnc-ma-script"
+}

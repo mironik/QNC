@@ -1,0 +1,11 @@
+[package]
+name = "qnc-media-overlay"
+version = "0.1.0"
+edition = "2021"
+description = "QNC public panel: the media pool, the monitor and the source timeline in a window over a form, and the bar that opens it (form G)"
+
+[dependencies]
+eframe = { workspace = true }
+qnc-board = { workspace = true }
+qnc-desktop-theme = { workspace = true }
+qnc-ui-kit = { workspace = true }

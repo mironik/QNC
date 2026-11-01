@@ -324,7 +324,7 @@ fn validate_editorial_layout_composition(root: &Path) -> CheckResult {
             "contracts/ui/editorial.layout.json or ingest.layout.json missing or invalid JSON",
         );
     };
-    for group in ["e", "g", "k", "l", "o"] {
+    for group in ["e", "g", "h", "k", "l", "o"] {
         if !editorial["groups"][group].is_object() {
             report.error(format!(
                 "editorial.layout.json: missing composition for group '{group}'"
@@ -339,8 +339,12 @@ fn validate_editorial_layout_composition(root: &Path) -> CheckResult {
     if editorial["groups"]["k"]["right_panel"] != "draft_segment_panel" {
         report.error("editorial.layout.json: group 'k' (S-Story) must use draft_segment_panel (the Story on its open version)".to_string());
     }
-    if editorial["groups"]["g"]["right_panel"] != "script_panel" {
-        report.error("editorial.layout.json: group 'g' (Audio) must use script_panel".to_string());
+    if editorial["groups"]["h"]["right_panel"] != "script_panel" {
+        report.error("editorial.layout.json: group 'h' (Audio) must use script_panel".to_string());
+    }
+    // MA Script (user 2026-11-01): the script over the whole form, the media in a window over it.
+    if editorial["groups"]["g"]["right_panel"] != "script_panel" || !editorial["groups"]["g"]["media_overlay"].is_object() {
+        report.error("editorial.layout.json: group 'g' (MA Script) must use script_panel with a media_overlay".to_string());
     }
     if editorial["groups"]["e"]["right_panel"] != "transcript_panel" {
         report.error("editorial.layout.json: group 'e' (Audio AI) must use transcript_panel".to_string());
@@ -367,7 +371,7 @@ fn validate_editorial_layout_composition(root: &Path) -> CheckResult {
             ));
         }
     }
-    for group in ["e", "g", "k", "l", "o"] {
+    for group in ["e", "g", "h", "k", "l", "o"] {
         let actions = editorial["groups"][group]["source_dock"]["actions_rtl"].as_array();
         if actions.map_or(true, |actions| actions.is_empty()) {
             report.error(format!(

@@ -20,6 +20,7 @@ qnc-story-desktop-adapter = { workspace = true }
 qnc-media-assist-video-desktop-adapter = { workspace = true }
 qnc-s-story-desktop-adapter = { workspace = true }
 qnc-media-assist-audio-desktop-adapter = { workspace = true }
+qnc-ma-script-desktop-adapter = { workspace = true }
 qnc-project-desktop-adapter = { workspace = true }
 qnc-shell-desktop-api = { workspace = true }
 

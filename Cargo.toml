@@ -13,6 +13,7 @@ members = [
     "apps/qnc-media-assist-video",
     "apps/qnc-s-story",
     "apps/qnc-media-assist-audio",
+    "apps/qnc-ma-script",
     "apps/qnc-project",
     "crates/qnc-contracts",
     "crates/qnc-camera-patterns",
@@ -85,6 +86,7 @@ members = [
     "crates/qnc-media-assist-video-desktop-adapter",
     "crates/qnc-s-story-desktop-adapter",
     "crates/qnc-media-assist-audio-desktop-adapter",
+    "crates/qnc-ma-script-desktop-adapter",
     "crates/qnc-ingest-store",
     "crates/qnc-keyboard-shortcut",
     "crates/qnc-json-transport",
@@ -178,6 +180,7 @@ members = [
     "crates/qnc-monitor-panel",
     "crates/qnc-transport-panel",
     "crates/qnc-action-bar-panel",
+    "crates/qnc-media-overlay",
     "crates/qnc-language-choice",
     "crates/qnc-dir-browser-panel",
     "crates/qnc-location-field",
@@ -374,6 +377,7 @@ qnc-story-desktop-adapter = { path = "crates/qnc-story-desktop-adapter" }
 qnc-media-assist-video-desktop-adapter = { path = "crates/qnc-media-assist-video-desktop-adapter" }
 qnc-s-story-desktop-adapter = { path = "crates/qnc-s-story-desktop-adapter" }
 qnc-media-assist-audio-desktop-adapter = { path = "crates/qnc-media-assist-audio-desktop-adapter" }
+qnc-ma-script-desktop-adapter = { path = "crates/qnc-ma-script-desktop-adapter" }
 qnc-ingest-store = { path = "crates/qnc-ingest-store" }
 qnc-keyboard-shortcut = { path = "crates/qnc-keyboard-shortcut" }
 qnc-json-transport = { path = "crates/qnc-json-transport" }
@@ -459,6 +463,7 @@ qnc-export-launch = { path = "crates/qnc-export-launch" }
 qnc-monitor-panel = { path = "crates/qnc-monitor-panel" }
 qnc-transport-panel = { path = "crates/qnc-transport-panel" }
 qnc-action-bar-panel = { path = "crates/qnc-action-bar-panel" }
+qnc-media-overlay = { path = "crates/qnc-media-overlay" }
 qnc-language-choice = { path = "crates/qnc-language-choice" }
 qnc-dir-browser-panel = { path = "crates/qnc-dir-browser-panel" }
 qnc-location-field = { path = "crates/qnc-location-field" }

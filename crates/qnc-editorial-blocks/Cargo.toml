@@ -13,6 +13,7 @@ qnc-dev-diagnostics = { workspace = true }
 qnc-editorial-application = { workspace = true }
 qnc-editorial-layout = { workspace = true }
 qnc-media-card = { workspace = true }
+qnc-media-overlay = { workspace = true }
 qnc-media-pool-panel = { workspace = true }
 qnc-monitor-panel = { workspace = true }
 qnc-panel-focus = { workspace = true }

@@ -1,0 +1,12 @@
+[package]
+name = "qnc-ma-script-desktop-adapter"
+version = "0.1.0"
+edition = "2021"
+description = "QNC MA Script public desktop adapter"
+
+[dependencies]
+qnc-status-line = { workspace = true }
+qnc-board = { workspace = true }
+eframe = { workspace = true }
+qnc-editorial-desktop = { workspace = true }
+qnc-shell-desktop-api = { workspace = true }

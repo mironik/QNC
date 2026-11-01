@@ -3115,6 +3115,7 @@ dependencies = [
  "qnc-desktop",
  "qnc-dev-diagnostics",
  "qnc-ingest-desktop-adapter",
+ "qnc-ma-script-desktop-adapter",
  "qnc-media-assist-audio-ai-desktop-adapter",
  "qnc-media-assist-audio-desktop-adapter",
  "qnc-media-assist-video-desktop-adapter",
@@ -3697,6 +3698,7 @@ dependencies = [
  "qnc-editorial-application",
  "qnc-editorial-layout",
  "qnc-media-card",
+ "qnc-media-overlay",
  "qnc-media-pool-panel",
  "qnc-monitor-panel",
  "qnc-panel-focus",
@@ -4545,6 +4547,26 @@ dependencies = [
 ]
 
 [[package]]
+name = "qnc-ma-script"
+version = "0.1.0"
+dependencies = [
+ "eframe",
+ "qnc-dev-diagnostics",
+ "qnc-editorial-desktop",
+]
+
+[[package]]
+name = "qnc-ma-script-desktop-adapter"
+version = "0.1.0"
+dependencies = [
+ "eframe",
+ "qnc-board",
+ "qnc-editorial-desktop",
+ "qnc-shell-desktop-api",
+ "qnc-status-line",
+]
+
+[[package]]
 name = "qnc-media-assist-audio"
 version = "0.1.0"
 dependencies = [
@@ -4657,6 +4679,16 @@ version = "0.1.0"
 dependencies = [
  "qnc-decoder-catalog",
  "qnc-ui-text",
+]
+
+[[package]]
+name = "qnc-media-overlay"
+version = "0.1.0"
+dependencies = [
+ "eframe",
+ "qnc-board",
+ "qnc-desktop-theme",
+ "qnc-ui-kit",
 ]
 
 [[package]]

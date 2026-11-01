@@ -159,3 +159,13 @@ fn a_place_split_in_two_gives_each_panel_its_own_place() {
     assert_eq!(head.right(), transport.left());
     assert_eq!(sizes().standard_layout(&NAMES).split_place("nowhere", "transport", 200.0), sizes().standard_layout(&NAMES));
 }
+
+#[test]
+fn a_bar_above_one_block_takes_its_height_on_top_of_the_whole_board() {
+    let rect = Rect::from_min_size(egui::pos2(0.0, 0.0), Vec2::new(1000.0, 700.0));
+    let s = solve(&Layout::block("panel").with_face("right").split_place_above("panel", "bar", 40.0), rect);
+    let (bar, panel) = (s.block("bar").unwrap(), s.block("panel").unwrap());
+    assert_eq!((bar.top(), bar.height(), bar.width()), (0.0, 40.0, 1000.0));
+    assert_eq!((panel.top(), panel.bottom(), panel.width()), (40.0, 700.0, 1000.0));
+    assert_eq!(face(&s, "right"), rect);
+}

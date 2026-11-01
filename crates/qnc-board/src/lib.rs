@@ -207,6 +207,27 @@ impl BoardSizes {
 }
 
 impl Layout {
+    /// A layout of one block in the whole board.
+    pub fn block(name: &str) -> Self {
+        Layout { face: None, root: Node::Block { name: name.to_string() } }
+    }
+
+    /// The same layout with the board painted in face `face`.
+    pub fn with_face(mut self, face: &str) -> Self {
+        self.face = Some(face.to_string());
+        self
+    }
+
+    /// The place of block `name` split in two: `above` takes `height` pixels on top, `name`
+    /// keeps the rest under it (a bar over a panel). Nothing changes when there is no such
+    /// place or `height` is not positive.
+    pub fn split_place_above(mut self, name: &str, above: &str, height: f32) -> Self {
+        if height > 0.0 {
+            split_node_first(&mut self.root, name, above, height);
+        }
+        self
+    }
+
     /// The place of block `name` split in two: `name` keeps the rest on the left, `right`
     /// takes `width` pixels on the right (two panels side by side, each placed by name).
     /// Nothing changes when there is no such place or `width` is not positive.
@@ -245,6 +266,29 @@ fn split_node(node: &mut Node, name: &str, right: &str, width: f32, axis: Axis) 
             for part in parts.iter_mut() {
                 if let Some(node) = part.node.as_mut() {
                     split_node(node, name, right, width, axis);
+                }
+            }
+        }
+    }
+}
+
+fn split_node_first(node: &mut Node, name: &str, above: &str, height: f32) {
+    match node {
+        Node::Block { name: block } if block == name => {
+            let block = |name: &str| Some(Node::Block { name: name.to_string() });
+            *node = Node::Split {
+                axis: Axis::Vertical,
+                parts: vec![
+                    Part { size: Size::Px { px: height, max_share: None }, face: None, node: block(above) },
+                    Part { size: Size::Rest, face: None, node: block(name) },
+                ],
+            };
+        }
+        Node::Block { .. } => {}
+        Node::Split { parts, .. } => {
+            for part in parts.iter_mut() {
+                if let Some(node) = part.node.as_mut() {
+                    split_node_first(node, name, above, height);
                 }
             }
         }

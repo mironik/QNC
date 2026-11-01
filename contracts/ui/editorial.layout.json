@@ -198,6 +198,66 @@
       }
     },
     "g": {
+      "role": "ma_script",
+      "pool_head": {
+        "show_segment_tab": false,
+        "show_cover_tab": true,
+        "show_export_hires": false,
+        "show_quick_cover": false,
+        "tabs_left": [
+          {
+            "label": "@pool.tab.all",
+            "action_id": "editorial_tab_all"
+          },
+          {
+            "label": "@pool.tab.sot",
+            "action_id": "editorial_tab_virtual"
+          },
+          {
+            "label": "@pool.tab.subsegment",
+            "action_id": "editorial_tab_subsegment"
+          },
+          {
+            "label": "@pool.tab.voice",
+            "action_id": "editorial_tab_voice"
+          }
+        ]
+      },
+      "right_panel": "script_panel",
+      "media_overlay": {
+        "label": "@ma_script.media",
+        "title": "@ma_script.media_title"
+      },
+      "tab_order": [
+        "pool_tabs",
+        "pool",
+        "source_timeline",
+        "source_buttons"
+      ],
+      "source_dock": {
+        "show": true,
+        "show_header": true,
+        "show_story_actions": true,
+        "show_ingest_actions": false,
+        "actions_rtl": [
+          "@story.broll",
+          "@story.voice_over",
+          {
+            "label": "@script.subsegment",
+            "action_id": "script_subsegment"
+          },
+          {
+            "label": "@story.add_statement",
+            "action_id": "save_virtual_shot"
+          }
+        ]
+      },
+      "media_card": {
+        "selection_check": true,
+        "status_dots": "pipeline"
+      }
+    },
+    "h": {
       "role": "media_assist_audio",
       "pool_head": {
         "show_segment_tab": false,

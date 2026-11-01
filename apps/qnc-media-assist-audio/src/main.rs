@@ -1,4 +1,4 @@
-const GROUP: &str = "g";
+const GROUP: &str = "h";
 
 fn main() -> eframe::Result<()> {
     qnc_dev_diagnostics::log_panics("qnc-media-assist-audio");

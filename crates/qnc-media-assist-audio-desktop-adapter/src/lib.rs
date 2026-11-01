@@ -3,7 +3,7 @@ use std::path::PathBuf;
 use eframe::egui;
 use qnc_shell_desktop_api::{EmbeddedAppFactory, ShellDesktopApp};
 
-const GROUP: &str = "g";
+const GROUP: &str = "h";
 
 pub fn factory() -> EmbeddedAppFactory {
     EmbeddedAppFactory {

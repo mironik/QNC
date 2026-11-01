@@ -174,6 +174,8 @@
     "transcript.empty": "Ovaj klip još nema prijepis: označi klipove u media poolu (ili postavi IN/OUT ovog klipa, bez njih cijeli klip) i pritisni Prijepis.",
     "transcript.no_clip": "Odaberi klip u media poolu.",
     "ma.transcribe": "Prijepis",
+    "ma_script.media": "Media pool i player",
+    "ma_script.media_title": "Media pool, player i source timeline",
     "ai.tab_audio": "AI zvuk",
     "ai.tab_video": "AI slika",
     "ma.transcribe_fast": "Brzo",
