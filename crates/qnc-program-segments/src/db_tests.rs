@@ -533,8 +533,11 @@ fn in_an_s_story_the_slot_tools_make_the_clip_and_the_story_longer_or_shorter() 
     segments.apply(SegmentCommand::SelectSlot { slot_id: middle, frame: 60 });
     settle(&mut segments);
     assert!(segments.take_slot_edge_at_playhead(true));
+    let zoom_cut = |segments: &ProgramSegments| segments.view().zoom_sound.as_ref().map(|zoom| zoom.cut);
+    let before = zoom_cut(&segments).expect("the zoom of the clip's own sound");
     segments.apply_action("step_forward_frame");
     segments.apply_action("step_forward_frame");
+    assert_eq!(zoom_cut(&segments), Some(before + 2), "the clip's sound runs under the cut as the IN moves");
     assert_eq!(segments.view().trim_frames, vec![52]);
     assert_eq!(marker_frames(&segments), vec![0, 52, 103, 152]);
     segments.apply_action("clear_focus");

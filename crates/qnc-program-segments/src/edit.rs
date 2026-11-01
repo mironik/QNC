@@ -162,6 +162,9 @@ impl ProgramSegments {
             };
             return Some(qnc_program_view::ZoomSound { from, to, cut, lanes: [vec![lane(&self.source.lanes[0])], vec![lane(&self.source.lanes[1])]], playhead, ..Default::default() });
         }
+        if let Some(zoom) = self.clip_edge_zoom(view) {
+            return Some(zoom);
+        }
         let cut = cut_of(&view.edit_stills)?;
         let (num, den) = view.timebase?;
         let half = second((u64::from(num), u64::from(den)));
@@ -179,6 +182,34 @@ impl ProgramSegments {
         let near = |placements: Vec<qnc_program_waveform::Placement>| placements.into_iter().filter(|at| at.program_start < reach && from < at.program_end).collect();
         let taken_cut = self.marker_edit.as_ref().map(|(id, _)| id.clone());
         Some(qnc_program_view::ZoomSound { from, to, cut, lanes: [near(segments), near(covers)], cut_sound, picture_taken: taken_cut.is_some() && matches!(self.cut_part, crate::CutPart::Picture), taken_cut, playhead, ..Default::default() })
+    }
+
+    /// The zoom of a taken S-Story clip edge is the zoom of an IN or OUT on the source timeline
+    /// (user 2026-11-01: "use the original pieces, the sound does not move"): the clip's own
+    /// sound around the drafted edge, on the clip's axis, so the sound runs under the cut as
+    /// the arrows and the wheel move it. `None` outside the S-Story.
+    fn clip_edge_zoom(&self, view: &qnc_program_view::SegmentsView) -> Option<qnc_program_view::ZoomSound> {
+        let trim = self.slot_trim.as_ref().filter(|trim| trim.ripple)?;
+        let (segments, _) = view.wave_placements();
+        let at = segments.into_iter().find(|at| at.program_start == trim.slot_start && at.program_end == trim.slot_end)?;
+        let program = (at.program_end - at.program_start).max(1) as i64;
+        let source = at.source_out.saturating_sub(at.source_in) as i64;
+        // A later IN is a shorter clip (`frames` below 0); a later OUT a longer one.
+        let shift = if trim.start { -trim.frames } else { trim.frames } * source / program;
+        let cut = if trim.start { at.source_in } else { at.source_out }.saturating_add_signed(shift);
+        let duration = self.clip_frames.get(&at.clip_id).copied().unwrap_or(at.source_out).max(cut);
+        let (num, den) = view.timebase?;
+        let half = ((f64::from(num) / f64::from(den.max(1))) * source as f64 / program as f64).round().max(1.0) as u64;
+        let playhead = self.zoom_follow.playhead(cut, None);
+        let (from, to) = qnc_program_view::zoom_window(cut, cut, half, duration, playhead);
+        let whole = qnc_program_waveform::Placement {
+            program_start: 0,
+            program_end: duration.max(to),
+            source_in: 0,
+            source_out: duration.max(to),
+            ..at
+        };
+        Some(qnc_program_view::ZoomSound { from, to, cut, lanes: [vec![whole], Vec::new()], playhead, ..Default::default() })
     }
 
     /// Whether a segment edge taken from the segment panel waits for Enter or Escape.

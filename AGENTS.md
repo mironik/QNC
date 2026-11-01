@@ -7427,3 +7427,8 @@ IN rub samog klipa, pa se mora micati kao IN na source timelineu. Sada uzeti IN 
 strelice i kotacic salju (rez i trim crta, `SlotTrim::drafted_in`); OUT kao i prije; ostali rezovi stoje; Enter upisuje.
 Story nije mijenjan. Test u `in_an_s_story_the_slot_tools_make_the_clip_and_the_story_longer_or_shorter`. Uzivo nije
 provjereno.
+Popravak 2026-11-01 (korisnik: "zoom kocka nije original, ne pomice se audio trak, koristi originalne kocke"; play opet radi
+nakon ponovno utaknute kartice): zoom uzetog ruba klipa u S-Storyju pokazivao je spremljenu pricu oko nepomicnog reza, pa
+zvuk nije isao. Sada je to zoom IN/OUT-a source timelinea (isti `ZoomSound` na osi klipa): zvuk samog klipa na kanalu i
+razini njegova A1, prozor oko nacrtanog ruba, pa zvuk tece ispod reza dok ga strelice i kotacic pomicu
+(`qnc-program-segments` `clip_edge_zoom`, test). Story nije mijenjan. Uzivo nije provjereno.
