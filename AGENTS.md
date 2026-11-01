@@ -7503,3 +7503,8 @@ koje QNC ima rjecnik, izabrani jezik racunala i napomena dok to nije jezik u koj
 rjecnika se odbija). Forma Projecta isti broj redaka (C10 1142): odjeljak koji nije njezin ide kocki. Test
 `the_chosen_language_is_kept_for_this_computer_and_only_one_qnc_knows`, conformance. Uzivo nije provjereno. Project je
 ponovno zamrznut.
+Dopuna 2026-11-01 (korisnik: "prevedi i preostale natpise na hrvatski"): u hrvatskom rjecniku prevedeno je 24 natpisa koji
+su ostali engleski (Izvoz, Pokrij slot, Prepisi, Pozicija, AI zvuk / AI slika, Umetak, Prve/Zadnje rijeci, REZ, ISKLJ.,
+Snimi, Zaustavi, Radni naziv, Pretek, Poveznica, Uvoz medija, Izvor reprodukcije, H.264 protok, Gotova postavka). Ostaju
+nazivi formata i kodeka, IN/OUT, SubClip, Template, AI, NORM, Auto/On i nazivi aplikacija. Samo `contracts/text/hr/`.
+Test `qnc-ui-text`. Uzivo nije provjereno.
