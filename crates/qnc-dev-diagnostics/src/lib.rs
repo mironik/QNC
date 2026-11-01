@@ -554,7 +554,7 @@ pub fn wave_diagnostics_enabled() -> bool {
 /// A cargo test binary (it lives in `target/<profile>/deps`) run without an explicit
 /// `QNC_ROOT`: it never writes into the real diagnostics of the repository (audit
 /// 2026-10-20: route tests filled the real player log with thousands of key lines).
-fn unit_test() -> bool {
+pub fn unit_test() -> bool {
     static TEST: std::sync::OnceLock<bool> = std::sync::OnceLock::new();
     *TEST.get_or_init(|| {
         env::var_os("QNC_ROOT").is_none()

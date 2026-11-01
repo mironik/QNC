@@ -60,6 +60,10 @@ impl Store {
                 out_frame,
             } => self.create_cover_shot(project_id, clip_id, clip_name, (*in_frame, *out_frame)),
             Operation::ForgetCoverShot { shot_id } => self.forget_cover_shot(shot_id),
+            Operation::ForgetShort { shot_id } => {
+                self.conn.execute("DELETE FROM virtual_shots WHERE shot_id = ?1 AND class = 'short'", [shot_id]).map_err(err)?;
+                Ok(Data::Changed)
+            }
             Operation::ConfirmCoverShot { shot_id } => self.confirm_cover_shot(shot_id),
             Operation::ForgetUnconfirmedCoverShots { older_than_seconds } => {
                 self.forget_unconfirmed_cover_shots(*older_than_seconds)

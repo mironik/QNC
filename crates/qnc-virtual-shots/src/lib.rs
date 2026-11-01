@@ -89,6 +89,11 @@ pub enum Operation {
         in_frame: u64,
         out_frame: u64,
     },
+    /// A SubClip (statement) removed (user 2026-11-01: the same statement saved four times).
+    /// Only a short; a B-roll shot of a cover is not removed here. Its still files stay.
+    ForgetShort {
+        shot_id: String,
+    },
     ListShorts,
     /// The B-roll virtual shots (covers), oldest first.
     ListBroll,
@@ -262,6 +267,14 @@ pub fn save_short_now(
 /// New IN/OUT of a SubClip (fine tuned on the source timeline), written and waited for.
 pub fn trim_short_now(target: &ProjectDbTarget, shot_id: &str, in_frame: u64, out_frame: u64) -> Result<()> {
     match VirtualShotsWriter::start(target.clone())?.call(&Operation::TrimShort { shot_id: shot_id.into(), in_frame, out_frame })? {
+        Data::Changed => Ok(()),
+        _ => Err(wrong()),
+    }
+}
+
+/// Removes the SubClip `shot_id` (a short only).
+pub fn forget_short_now(target: &ProjectDbTarget, shot_id: &str) -> Result<()> {
+    match VirtualShotsWriter::start(target.clone())?.call(&Operation::ForgetShort { shot_id: shot_id.into() })? {
         Data::Changed => Ok(()),
         _ => Err(wrong()),
     }

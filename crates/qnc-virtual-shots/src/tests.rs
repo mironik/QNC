@@ -58,6 +58,10 @@ fn a_short_is_saved_through_the_intermediary_and_listed_oldest_first() {
     assert_eq!(shorts[0].name, "Mironik 001");
     assert_eq!(shorts[0].still_status, "pending");
     assert!(!shorts[0].b_roll);
+    // A statement saved twice: the extra one is forgotten, the first stays (user 2026-11-01).
+    forget_short_now(&target, "clip-a_shot_002").unwrap();
+    let left: Vec<_> = list_shorts(&target).unwrap().into_iter().map(|short| short.shot_id).collect();
+    assert_eq!(left, ["clip-a_shot_001"]);
 }
 
 #[test]

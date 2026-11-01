@@ -106,7 +106,10 @@ impl Texts {
 /// process); a missing setting is the base language.
 pub fn host() -> Result<&'static Texts, String> {
     static HOST: OnceLock<Result<Texts, String>> = OnceLock::new();
-    HOST.get_or_init(|| Texts::for_host(qnc_dev_diagnostics::locate_qnc_root().as_deref()))
+    // A test binary speaks the base language whatever this computer chose (2026-11-01: tests
+    // that look for an English message failed once the computer chose Croatian).
+    let root = || (!qnc_dev_diagnostics::unit_test()).then(qnc_dev_diagnostics::locate_qnc_root).flatten();
+    HOST.get_or_init(|| Texts::for_host(root().as_deref()))
         .as_ref()
         .map_err(Clone::clone)
 }

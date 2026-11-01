@@ -7536,3 +7536,10 @@ Odustani (`statement_cancel`, zadano). `qnc-short-save` (`start` prima spremljen
 `qnc-source-timeline` (`SourceTimelineView.question`, `with_question`, prozor crta `show_with` i vraca odabranu radnju),
 `qnc-editorial-application` (isti broj redaka), katalog radnji (bez tipki), rjecnik. Test
 `the_same_statement_is_asked_about_and_cancel_writes_nothing`, conformance. Uzivo nije provjereno.
+Izvedeno 2026-11-01 (korisnik: "obrisi visak istih izjava"): `qnc-virtual-shots` operacija `ForgetShort` /
+`forget_short_now` (brise samo red klase `short`, B-roll kadar nikad; datoteke slika ostaju) i primjer
+`examples/forget_shorts.rs` (aktivni projekt, kroz pisca modula). U aktivnom projektu
+`2026_11_01_78fa621b...` obrisane su izjave `clip-ec4623fe-..._shot_002`, `_003`, `_004` (Mironik 3585, 1663-2187);
+`_shot_001` ostaje. Usput: testni programi uvijek koriste osnovni jezik (`qnc-ui-text` `host`,
+`qnc-dev-diagnostics::unit_test` javan), jer su testovi koji traze engleski tekst padali kad je racunalo izabralo hrvatski.
+Testovi `qnc-virtual-shots`, `qnc-ui-text`, `qnc-dev-diagnostics`, conformance.
