@@ -7432,3 +7432,7 @@ nakon ponovno utaknute kartice): zoom uzetog ruba klipa u S-Storyju pokazivao je
 zvuk nije isao. Sada je to zoom IN/OUT-a source timelinea (isti `ZoomSound` na osi klipa): zvuk samog klipa na kanalu i
 razini njegova A1, prozor oko nacrtanog ruba, pa zvuk tece ispod reza dok ga strelice i kotacic pomicu
 (`qnc-program-segments` `clip_edge_zoom`, test). Story nije mijenjan. Uzivo nije provjereno.
+Popravak 2026-11-01 (korisnik: "gdje su dugmici, u originalu su bili na sredini"): prozor zooma bio je odrezan na kraju
+klipa ili price, pa je rez na OUT-u stajao na desnom rubu, a dugmad Undo | Save | Cancel (centrirana na rezu) s njim.
+Sada zoom ima sekundu sa svake strane i na kraju (iza kraja je prazno), a dugmad su uvijek u sredini zooma, izmedju
+dviju slika (`qnc-program-view` `zoom_window`, `qnc-trim-overlay`). Vrijedi za sve zoomove. Uzivo nije provjereno.
