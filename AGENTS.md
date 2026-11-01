@@ -7461,3 +7461,12 @@ karta touchpada `contracts/input/touchpad.json`: pomak s dva prsta okomito je `n
 `jog` kao u pushanoj verziji (korisnik: "treba pomicati, ali samo lijevo-desno"), na svim timelineima. Pinch ostaje `level`; dodir s dva prsta ostaje desni klik (Ctrl+). `qnc-touchpad` uzima pokret samo kad
 njegova uloga nesto radi, pa pomak gore-dolje ide panelu (popis Wrap redova se lista kao inace). Kotacic misa (cijeli zarezi)
 nije mijenjan. Test `only_a_two_finger_swipe_across_moves_the_playhead_along_is_left_to_the_panel`, conformance. Uzivo nije provjereno.
+Popravak 2026-11-01 (korisnik: "u obrascu novi projekt ne vidi se gdje je prompt za tekst"; "svaki enter treba prebacivati
+fokus na novi red, tab i shift+tab kao do sada"): (1) Kursor se crtao (log: egui trazi crtanje za treptanje), ali bojom
+svijetlog izgleda egui-ja (tamnoplava) koju tema nije mijenjala, pa se na tamnom polju nije vidio. Sada je boje teksta teme,
+u svim formama (`qnc-desktop` stil, `qnc-desktop-theme::apply_settings_look`). (2) Enter u obrascu (`form_next_field`) nikad
+nije stigao: katalog tipki odbija svaku tipku dok polje drzi tipkovnicu. Nova funkcija kocke tipkovnice
+`qnc-keyboard-shortcut::pressed_while_typing` pita za tipku obrasca kao da polje ne drzi tipkovnicu; ploca Projecta je
+koristi (C10 isti). Enter iz imena projekta ide na prvo polje za upis, iz polja na sljedece; polja izbora se preskacu, zadnje
+polje nema sljedece. Tab i Shift+Tab nisu mijenjani. Zvuk pri tipkanju nije nadjen u kodu. Test
+`enter_in_a_typed_field_is_the_next_field_of_the_form`, conformance. Uzivo nije provjereno.

@@ -502,6 +502,17 @@ pub fn egui_shortcut_events(ctx: &egui::Context) -> Vec<ShortcutEvent> {
     })
 }
 
+/// Whether a key of `action_id` was pressed while a text field holds the keyboard. The
+/// catalog keeps every key from a focused field; a form's own field keys (the next field)
+/// are asked for here, as if no field held it.
+pub fn pressed_while_typing(ctx: &egui::Context, catalog: &ShortcutCatalog, scope: &str, action_id: &str) -> bool {
+    ctx.wants_keyboard_input()
+        && egui_shortcut_events(ctx).into_iter().any(|event| {
+            let free = ShortcutEvent { text_input_reserved: false, ..event };
+            catalog.action_ids_for_event(scope, &free).contains(&action_id)
+        })
+}
+
 pub fn consume_egui_action_presses(
     ctx: &egui::Context,
     catalog: &ShortcutCatalog,
@@ -672,6 +683,35 @@ mod tests {
         assert!(catalog
             .action_ids_for_event("ingest", &ShortcutEvent::code("KeyO"))
             .contains(&"mark_out"));
+    }
+
+    #[test]
+    fn enter_in_a_typed_field_is_the_next_field_of_the_form() {
+        let catalog = catalog();
+        let ctx = egui::Context::default();
+        let field = egui::Id::new("field");
+        let mut text = String::new();
+        let frame = |events: Vec<egui::Event>, text: &mut String| {
+            let input = egui::RawInput { events, ..Default::default() };
+            let mut pressed = false;
+            let _ = ctx.run(input, |ctx| {
+                pressed = pressed_while_typing(ctx, &catalog, "project", "form_next_field");
+                egui::CentralPanel::default().show(ctx, |ui| ui.add(egui::TextEdit::singleline(text).id(field)));
+            });
+            pressed
+        };
+        frame(Vec::new(), &mut text);
+        ctx.memory_mut(|memory| memory.request_focus(field));
+        frame(Vec::new(), &mut text);
+        let enter = egui::Event::Key {
+            key: egui::Key::Enter,
+            physical_key: None,
+            pressed: true,
+            repeat: false,
+            modifiers: egui::Modifiers::NONE,
+        };
+        assert!(frame(vec![enter], &mut text), "Enter in a typed field moves on");
+        assert!(!frame(Vec::new(), &mut text), "no key, no move");
     }
 
     #[test]

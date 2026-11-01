@@ -40,7 +40,7 @@ pub fn show(
     // While a field is typed in its keys move between fields; while a dialog, picker or
     // browser is open no Project key works.
     let typing = ctx.wants_keyboard_input();
-    let next_field = typing && actions.contains(&"form_next_field");
+    let next_field = qnc_keyboard_shortcut::pressed_while_typing(ctx, &contracts.shortcuts, "project", "form_next_field");
     let open = !typing && !session.keys_held() && actions.contains(&"project_open_selected");
     let intents = open.then_some(ProjectIntent::OpenSelectedProject).into_iter().collect();
     let mut blocks = Blocks { contracts, session, intents };

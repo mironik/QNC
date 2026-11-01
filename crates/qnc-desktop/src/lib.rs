@@ -515,6 +515,8 @@ pub fn apply_visuals(ctx: &egui::Context, shell: &ShellLayoutContract) {
     style.visuals.selection.bg_fill = theme.accent.linear_multiply(0.35);
     style.visuals.selection.stroke = egui::Stroke::new(1.0, theme.focus);
     style.visuals.hyperlink_color = theme.accent;
+    // The text cursor in the text colour: egui's light look draws it dark blue, unseen on a dark field.
+    style.visuals.text_cursor.stroke = egui::Stroke::new(2.0, theme.text);
     ctx.set_style(style);
 }
 

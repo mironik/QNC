@@ -155,6 +155,8 @@ pub fn apply_settings_look(ctx: &egui::Context, theme: &Theme) {
     visuals.selection.bg_fill = theme.accent.linear_multiply(0.35);
     visuals.selection.stroke = Stroke::new(1.0, theme.accent);
     visuals.hyperlink_color = theme.accent;
+    // The text cursor in the text colour: egui's light look draws it dark blue, unseen on a dark field.
+    visuals.text_cursor.stroke = Stroke::new(2.0, theme.text);
     ctx.set_style(style);
 }
 
