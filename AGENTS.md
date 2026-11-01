@@ -7528,3 +7528,11 @@ koji krene prije korisnikova OUT-a stane na OUT-u (pauza i playhead na slici OUT
 svira dalje, a prica i SubSegment (program) se ne diraju. Vrijedi na source timelineu svake forme. `qnc-source-panel`
 `stop_on_out`, `qnc-source-timeline` `sync` prima prikazani timeline (Story i Ingest isti broj redaka). Testovi dotaknutih
 kocki, conformance. Uzivo nije provjereno; test same pauze treba pravi player.
+Dopuna 2026-11-01 (korisnik: "za istu izjavu otvori overlay upozorenje s pitanjem vec kreirana, overwrite - cancel"; log:
+ista izjava 1663-2187 spremljena cetiri puta): Dodaj izjavu (`save_virtual_shot`) za isti klip i isti IN/OUT kao vec
+spremljena izjava (ne B-roll) nista ne pise, nego u sredini ekrana otvara info prozor (`qnc-choice-box`) "Izjava je vec
+kreirana" s Prepisi (`statement_overwrite`: ista izjava se ponovno sprema i njezine slike rade iznova, nikad druga) i
+Odustani (`statement_cancel`, zadano). `qnc-short-save` (`start` prima spremljene izjave, `question`, `answer`),
+`qnc-source-timeline` (`SourceTimelineView.question`, `with_question`, prozor crta `show_with` i vraca odabranu radnju),
+`qnc-editorial-application` (isti broj redaka), katalog radnji (bez tipki), rjecnik. Test
+`the_same_statement_is_asked_about_and_cancel_writes_nothing`, conformance. Uzivo nije provjereno.

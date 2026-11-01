@@ -5829,10 +5829,12 @@ dependencies = [
 name = "qnc-short-save"
 version = "0.1.0"
 dependencies = [
+ "qnc-choice-box",
  "qnc-clip-row",
  "qnc-db-broker",
  "qnc-dev-diagnostics",
  "qnc-ui-text",
+ "qnc-virtual-short-cards",
  "qnc-virtual-shots",
 ]
 
@@ -6158,6 +6160,7 @@ version = "0.1.0"
 dependencies = [
  "eframe",
  "qnc-action-event",
+ "qnc-choice-box",
  "qnc-clip-sound",
  "qnc-desktop-theme",
  "qnc-dev-diagnostics",

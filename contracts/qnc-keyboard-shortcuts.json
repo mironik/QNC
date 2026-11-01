@@ -112,6 +112,12 @@
     "transcript_cue_word": {
       "label": "Playhead na rijec transkripta"
     },
+    "statement_overwrite": {
+      "label": "Ista izjava vec postoji: prepisi je"
+    },
+    "statement_cancel": {
+      "label": "Ista izjava vec postoji: odustani"
+    },
     "transcript_open_clip": {
       "label": "Otvori transkribirani klip (iz popisa transkripta)"
     },

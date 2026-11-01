@@ -64,6 +64,17 @@ pub struct SourceTimelineView {
     pub levels: [Option<f32>; 2],
     /// NORM's state on that bar; `None` where the form has no story to normalise.
     pub normalize: Option<bool>,
+    /// A question about what the source timeline's marks would save (the same statement
+    /// already there, user 2026-11-01), shown over everything until answered.
+    pub question: Option<qnc_choice_box::Choice>,
+}
+
+impl SourceTimelineView {
+    /// This view with `question` shown over everything.
+    pub fn with_question(mut self, question: Option<qnc_choice_box::Choice>) -> Self {
+        self.question = question;
+        self
+    }
 }
 
 /// The state of the source timeline of one form.
@@ -444,6 +455,7 @@ impl SourceTimeline {
             message: self.message.clone(),
             levels: self.view.levels,
             normalize: self.view.normalize,
+            question: None,
         };
     }
 }
@@ -504,7 +516,8 @@ pub fn show_with(
     let intent = qnc_source_dock::show_timeline_dock_with(ui, rect, style, title, header, timeline, drawn.as_mut().map(|draw| draw as &mut dyn FnMut(&mut Ui)));
     drop(drawn);
     let norm = normalize.then(|| qnc_action_event::ActionEvent::key(qnc_level_bar::NORMALIZE));
-    (intent, answer.or(norm))
+    let asked = view.question.as_ref().and_then(|choice| qnc_choice_box::show(ui.ctx(), theme, choice)).map(qnc_action_event::ActionEvent::key);
+    (intent, asked.or(answer).or(norm))
 }
 
 /// One action button of the header, as a form lists them (label, catalog action).

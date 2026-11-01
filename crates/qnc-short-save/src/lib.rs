@@ -27,6 +27,22 @@ pub struct ShortSave {
     fine_tuning: Option<(String, String)>,
     /// The cut last written for a SubClip (its row is read again after the write).
     written: Option<(String, (u64, u64))>,
+    /// The same statement is already there: Overwrite or Cancel is asked (user 2026-11-01).
+    asked: Option<Asked>,
+}
+
+/// The catalog actions of the question "the same statement is already there".
+pub const OVERWRITE: &str = "statement_overwrite";
+pub const CANCEL: &str = "statement_cancel";
+
+/// A save asked about: the statement already there with the same clip and IN/OUT.
+#[derive(Debug, Clone)]
+struct Asked {
+    shot_id: String,
+    clip_id: String,
+    name: String,
+    marks: (u64, u64),
+    target: ProjectDbTarget,
 }
 
 /// A SubClip open on the source timeline: its id, clip and saved IN/OUT.
@@ -82,7 +98,16 @@ impl ShortSave {
         marks: Option<(u64, u64)>,
         target: Option<&ProjectDbTarget>,
         project_id: Option<&str>,
+        saved: &[qnc_virtual_short_cards::VirtualShortCard],
     ) -> Result<(), String> {
+        // The same clip and IN/OUT saved already: asked, not saved twice (user 2026-11-01).
+        let same = saved.iter().find(|card| !card.b_roll && Some(card.clip_id.as_str()) == chosen && Some((card.in_frame, card.out_frame)) == marks);
+        if let (Some(card), Some(target)) = (same, target) {
+            log(&format!("short-save asks: {} is the same statement", card.shot_id));
+            let asked = Asked { shot_id: card.shot_id.clone(), clip_id: card.clip_id.clone(), name: card.name.clone(), marks: (card.in_frame, card.out_frame), target: target.clone() };
+            self.asked = Some(asked);
+            return Ok(());
+        }
         // Why a SubClip was not saved goes to the log too (live 2026-10-28: none was saved and
         // the log did not say why).
         let started = self.check_and_write(chosen, clips, marks, target, project_id);
@@ -122,6 +147,45 @@ impl ShortSave {
         Ok(())
     }
 
+    /// The question while the same statement is already there: an overlay with Overwrite and
+    /// Cancel (user 2026-11-01).
+    pub fn question(&self) -> Option<qnc_choice_box::Choice> {
+        let asked = self.asked.as_ref()?;
+        let option = |action_id: &str, code: &'static str, strong| qnc_choice_box::ChoiceOption { action_id: action_id.into(), label: text(code), strong };
+        Some(qnc_choice_box::Choice {
+            title: text("statement.exists_title"),
+            message: text("statement.exists"),
+            items: vec![asked.name.clone()],
+            solution: text("statement.exists_solution"),
+            options: vec![option(OVERWRITE, "statement.overwrite", false), option(CANCEL, "common.cancel", true)],
+        })
+    }
+
+    /// The answer to the question; `false`: `action_id` is not one of its answers. Overwrite
+    /// writes the statement already there again (its IN/OUT and stills made anew), never a
+    /// second one; Cancel leaves it.
+    pub fn answer(&mut self, action_id: &str) -> bool {
+        if action_id != OVERWRITE && action_id != CANCEL {
+            return false;
+        }
+        let Some(asked) = self.asked.take() else { return true };
+        if action_id == CANCEL || self.pending.is_some() {
+            return true;
+        }
+        log(&format!("short-save overwrites {}", asked.shot_id));
+        let (sender, receiver) = mpsc::channel();
+        let started = std::thread::Builder::new().name("qnc-short-overwrite".into()).spawn(move || {
+            let (in_frame, out_frame) = asked.marks;
+            let written = qnc_virtual_shots::trim_short_now(&asked.target, &asked.shot_id, in_frame, out_frame)
+                .map(|_| Saved { shot_id: asked.shot_id, clip_id: asked.clip_id, marks: asked.marks });
+            let _ = sender.send(written);
+        });
+        if started.is_ok() {
+            self.pending = Some(receiver);
+        }
+        true
+    }
+
     /// The outcome of the save, once.
     pub fn poll(&mut self) -> Option<Result<Saved, String>> {
         let outcome = match self.pending.as_ref()?.try_recv() {
@@ -159,11 +223,38 @@ mod tests {
     #[test]
     fn nothing_is_written_without_a_clip_marks_and_a_database() {
         let mut save = ShortSave::new();
-        assert_eq!(save.start(None, &[], Some((0, 5)), None, Some("p")), Err(text("story.msg.pick_clip")));
+        assert_eq!(save.start(None, &[], Some((0, 5)), None, Some("p"), &[]), Err(text("story.msg.pick_clip")));
         // A row read before the import does not refuse: the database decides when it writes.
-        assert_eq!(save.start(Some("c"), &[clip(false)], Some((0, 5)), None, Some("p")), Err(text("story.msg.db_not_writable")));
-        assert_eq!(save.start(Some("c"), &[clip(true)], None, None, Some("p")), Err(text("story.msg.marks_not_confirmed")));
-        assert_eq!(save.start(Some("c"), &[clip(true)], Some((0, 5)), None, Some("p")), Err(text("story.msg.db_not_writable")));
+        assert_eq!(save.start(Some("c"), &[clip(false)], Some((0, 5)), None, Some("p"), &[]), Err(text("story.msg.db_not_writable")));
+        assert_eq!(save.start(Some("c"), &[clip(true)], None, None, Some("p"), &[]), Err(text("story.msg.marks_not_confirmed")));
+        assert_eq!(save.start(Some("c"), &[clip(true)], Some((0, 5)), None, Some("p"), &[]), Err(text("story.msg.db_not_writable")));
         assert!(save.poll().is_none(), "no write was started");
+    }
+
+    #[test]
+    fn the_same_statement_is_asked_about_and_cancel_writes_nothing() {
+        let card = |b_roll: bool| qnc_virtual_short_cards::VirtualShortCard {
+            shot_id: if b_roll { "c_broll_001" } else { "c_shot_001" }.into(),
+            clip_id: "c".into(),
+            name: "C".into(),
+            in_frame: 0,
+            out_frame: 5,
+            duration_label: String::new(),
+            import_status: "imported".into(),
+            imported_media_uri: String::new(),
+            poster_uri: None,
+            poster_image: None,
+            b_roll,
+        };
+        let target = ProjectDbTarget::from_owner_binding(std::path::Path::new("nowhere.db"), "qnc://local/db/project_db/p1").unwrap();
+        let mut save = ShortSave::new();
+        assert!(save.start(Some("c"), &[clip(true)], Some((0, 5)), Some(&target), Some("p"), &[card(true), card(false)]).is_ok());
+        let question = save.question().expect("the same statement (not the B-roll shot) is asked about");
+        assert_eq!(save.asked.as_ref().map(|a| a.shot_id.as_str()), Some("c_shot_001"));
+        assert_eq!(question.options.iter().map(|o| o.action_id.as_str()).collect::<Vec<_>>(), [OVERWRITE, CANCEL]);
+        assert!(save.pending.is_none(), "nothing is written while asking");
+        assert!(!save.answer("play_pause"), "not an answer");
+        assert!(save.answer(CANCEL));
+        assert!(save.question().is_none() && save.pending.is_none(), "Cancel writes nothing");
     }
 }

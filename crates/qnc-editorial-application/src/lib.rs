@@ -221,7 +221,7 @@ impl EditorialApplication {
         let timebase = self.preview.player_view().source_timebase();
         let timeline = self.view.preview.timeline;
         let source = self.focus.source_timeline_mut(); // the one source timeline: lanes, channels, timecode
-        self.view.source_timeline = qnc_dev_diagnostics::timed_block("poll-source-sync", || source.sync(self.view.preview.clip_id.as_deref(), self.content_target.as_ref().map(|targets| &targets.0), &mut self.preview, &timeline).clone());
+        self.view.source_timeline = qnc_dev_diagnostics::timed_block("poll-source-sync", || source.sync(self.view.preview.clip_id.as_deref(), self.content_target.as_ref().map(|targets| &targets.0), &mut self.preview, &timeline).clone()).with_question(self.short_save.question());
         self.segments.set_source(SourcePick::new(
             self.view.chosen_clip_id(),
             self.view.current_clip_label(),
@@ -377,12 +377,12 @@ impl EditorialApplication {
             action_ids::SAVE_VIRTUAL_SHOT => {
                 let target = self.content_target.as_ref().map(|targets| &targets.1);
                 let marks = self.view.preview.timeline.visible_source_marks();
-                if let Err(message) = self.short_save.start(self.view.chosen_clip_id(), &self.view.clips, marks, target, self.shown_project.as_deref()) {
+                if let Err(message) = self.short_save.start(self.view.chosen_clip_id(), &self.view.clips, marks, target, self.shown_project.as_deref(), &self.view.shorts) {
                     self.view.message = message;
                 }
                 true
             }
-            _ => false,
+            other => self.short_save.answer(other), // Overwrite or Cancel of the same statement (user 2026-11-01)
         }
     }
 
