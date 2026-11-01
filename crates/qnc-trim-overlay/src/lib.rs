@@ -106,8 +106,12 @@ pub fn show(ctx: &egui::Context, segments: &SegmentsView) -> Option<ActionEvent>
                     turned = Some(clicked);
                 }
             }
+            // The buttons stand over the playhead: the cut's line through the sound, else the
+            // marker between the pictures (user 2026-10-30).
+            let mut centre = gap_at;
             if let Some(sound) = sound {
                 let area = Rect::from_min_size(egui::pos2(top.x, top.y + picture.y + LABEL_HEIGHT + BUTTONS_HEIGHT + LANES_GAP), Vec2::new(row_width, 2.0 * LANE_HEIGHT + GAP / 2.0 + WORDS_HEIGHT));
+                centre = Some(cut_line_x(area, sound));
                 let (word, side) = paint_sound(ui, area, sound, gap_at, top.y, &visuals);
                 // A double clicked word on a source timeline's zoom is a cut, as on the transcript.
                 if let Some((from, to)) = word.filter(|_| source) {
@@ -118,9 +122,7 @@ pub fn show(ctx: &egui::Context, segments: &SegmentsView) -> Option<ActionEvent>
                 }
             }
             let row = Rect::from_min_size(egui::pos2(top.x, top.y + picture.y + LABEL_HEIGHT), Vec2::new(row_width, BUTTONS_HEIGHT));
-            // Always in the middle of the zoom, between the two pictures (user 2026-11-01: "in the
-            // original they were in the middle"); the cut is in the middle too, a second each side.
-            if let Some(pressed) = paint_buttons(ui, row, row.center().x) {
+            if let Some(pressed) = paint_buttons(ui, row, centre.unwrap_or(row.center().x)) {
                 turned = Some(pressed);
             }
         });

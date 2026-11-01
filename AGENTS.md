@@ -7451,3 +7451,8 @@ u Storyju su razlike: izmjene od 30. 10. (jedna tablica `story_items`, A2 Tona u
 rubu reda malo unutra, zoom sekunda sa svake strane na kraju i dugmad zooma u sredini. Popravljeno: b1dbb306 je izbacio i
 pravilo od 30. 10. da se rez cije L ide u sljedeci red crta i na pocetku tog reda; vraceno (`qnc-segment-panel`
 `program.rs`). Nista nije vraceno na pushanu verziju. Uzivo nije provjereno.
+Vraceno 2026-11-01 (korisnik: "i dalje to nije ispravna verzija, pogledaj commit od jucer ujutro"): Story je vracen na
+`39ce3c06` (31. 10. 12:30; Story kod isti kao u 51be166d od 00:10): zoom prozor odrezan na kraju klipa i price kao prije
+(`qnc-program-view` `zoom_window`), dugmad zooma centrirana na rezu (`qnc-trim-overlay` iz tog commita), marker na rubu reda
+bez pomaka unutra (`qnc-timeline`). Usporedba s tim commitom: preostale razlike u kockama Storyja ukljucuju se samo u
+S-Storyju (`is_s_story`, `clips_are_slots`, `is_draft`, `draft_story`). Uzivo nije provjereno.

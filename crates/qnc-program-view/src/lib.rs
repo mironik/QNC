@@ -152,11 +152,9 @@ pub fn zoom_reach(from: u64, to: u64, playhead: Option<u64>) -> u64 {
 /// The window of the trim zoom on its axis: a second (`half` frames) on each side of the
 /// cut, or of the playhead while the player plays, so the wave moves with the play
 /// (user 2026-10-30); never past `total`.
-pub fn zoom_window(earliest: u64, latest: u64, half: u64, _total: u64, playhead: Option<u64>) -> (u64, u64) {
+pub fn zoom_window(earliest: u64, latest: u64, half: u64, total: u64, playhead: Option<u64>) -> (u64, u64) {
     let (earliest, latest) = playhead.map_or((earliest, latest), |frame| (frame, frame));
-    // A second on each side also at the end of a clip or the story (user 2026-11-01: the cut
-    // and the buttons over it stay in the middle); past the end the zoom is empty.
-    (earliest.saturating_sub(half), latest + half)
+    (earliest.saturating_sub(half), (latest + half).min(total.max(latest + 1)))
 }
 
 /// The sides of the taken cut's A2 sound in the zoom: where the sound after starts (its J) and

@@ -2272,9 +2272,7 @@ fn paint_markers(
         if marker.join && !marker.taken && !marker.split(0) && !marker.sound_split() {
             continue;
         }
-        // A marker on the very start or end of the row (the first IN, the last OUT) is drawn
-        // just inside it, so it is seen (user 2026-11-01).
-        let x = x_for_frame(track, range_start, duration, marker.frame).clamp(track.left() + 1.5, track.right() - 1.5);
+        let x = x_for_frame(track, range_start, duration, marker.frame);
         let (width, color) = if hovered == Some(marker.id) { (2.0, input.theme.marker_hover) } else { (1.0, input.theme.focus) };
         // With audio bands a marker belongs to the covers: its line runs over the video and
         // A2, never over A1, and it has no "M" over A1's wave (user 2026-10-15).
