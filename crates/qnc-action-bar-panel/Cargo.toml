@@ -1,0 +1,11 @@
+[package]
+name = "qnc-action-bar-panel"
+version = "0.1.0"
+edition = "2021"
+description = "QNC public panel: a row of action buttons a layout places under a panel (as Cancel | Select under the Ingest browser)"
+
+[dependencies]
+eframe = { workspace = true }
+qnc-desktop-theme = { workspace = true }
+qnc-theme-styles = { workspace = true }
+qnc-ui-kit = { workspace = true }

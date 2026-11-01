@@ -127,8 +127,20 @@ impl EditorialContracts {
 
     /// The board of this group: the standard layout with the row under the monitor in two
     /// places, the pool tabs (`pool-head`) and the transport panel (`transport`).
-    pub fn board_layout(&self) -> qnc_board::Layout {
-        self.board_sizes().standard_layout(&self.board_names()).split_place("pool-head", "transport", self.editorial.pool_head.transport_width)
+    /// Under the clip cards the group's pool action bar (`pool-actions`) while one of its
+    /// tabs is open (`tab_selected` tells the open tab).
+    pub fn board_layout(&self, tab_selected: impl Fn(&str) -> bool) -> qnc_board::Layout {
+        let layout = self.board_sizes().standard_layout(&self.board_names()).split_place("pool-head", "transport", self.editorial.pool_head.transport_width);
+        let bar = &self.composition().pool_actions;
+        let shown = !bar.actions.is_empty() && bar.tabs.iter().any(|tab| tab_selected(tab));
+        let height = qnc_action_bar_panel::height(self.shell.theme_metrics.chrome_control_height, self.editorial.board.block_pad);
+        if shown { layout.split_place_below("clip-cards", POOL_ACTIONS, height) } else { layout }
+    }
+
+    /// The buttons of the action bar placed at `place` (none for any other place).
+    pub fn action_bar(&self, place: &str) -> impl Iterator<Item = qnc_action_bar_panel::BarAction<'_>> {
+        let actions = if place == POOL_ACTIONS { self.composition().pool_actions.actions.as_slice() } else { &[] };
+        actions.iter().filter_map(|action| Some(qnc_action_bar_panel::BarAction { label: action.label(), action_id: action.action_id()? }))
     }
 
     /// The sizes of Media Assist and Story on the one desktop board: the monitor keeps
@@ -281,6 +293,19 @@ pub struct GroupComposition {
     pub pool_head: GroupPoolHead,
     pub source_dock: GroupSourceDock,
     pub media_card: GroupMediaCard,
+    /// The action bar under the clip cards (AI Media Assist: Transcribe, user 2026-11-01).
+    #[serde(default)]
+    pub pool_actions: PoolActions,
+}
+
+/// The place of the pool action bar on the board.
+pub const POOL_ACTIONS: &str = "pool-actions";
+
+/// The buttons under the clip cards and the pool tabs they are shown on.
+#[derive(Debug, Clone, Default, Deserialize)]
+pub struct PoolActions {
+    pub tabs: Vec<String>,
+    pub actions: Vec<TransportCommand>,
 }
 
 /// One tab of the right panel: its label, its catalog action and the panel kind it shows.
@@ -343,4 +368,22 @@ pub struct GroupMediaCard {
     #[serde(default)]
     pub ticks_several: bool,
     pub status_dots: String,
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn ai_media_assist_has_transcribe_under_its_pool_on_the_all_tab_only() {
+        let contracts = EditorialContracts::load("e").expect("the group e layout");
+        let bar: Vec<_> = contracts.action_bar(POOL_ACTIONS).map(|action| action.action_id).collect();
+        assert_eq!(bar, ["transcribe_marks"]);
+        assert_eq!(contracts.action_bar("source-dock").count(), 0, "no bar in any other place");
+        let dock = &contracts.composition().source_dock.actions_rtl;
+        assert!(dock.iter().all(|action| action.action_id() != Some("transcribe_marks")), "Transcribe moved off the dock");
+        assert_eq!(contracts.composition().pool_actions.tabs, ["editorial_tab_all"]);
+        let story = EditorialContracts::load("o").expect("the story layout");
+        assert_eq!(story.action_bar(POOL_ACTIONS).count(), 0, "Story has no pool bar");
+    }
 }

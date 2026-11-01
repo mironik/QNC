@@ -3067,6 +3067,16 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "d55d956fa96f5ec02be2e13af0e20391a5aa83d6a074e3ad368959d0fab299ea"
 
 [[package]]
+name = "qnc-action-bar-panel"
+version = "0.1.0"
+dependencies = [
+ "eframe",
+ "qnc-desktop-theme",
+ "qnc-theme-styles",
+ "qnc-ui-kit",
+]
+
+[[package]]
 name = "qnc-action-event"
 version = "0.1.0"
 
@@ -3679,6 +3689,7 @@ name = "qnc-editorial-blocks"
 version = "0.1.0"
 dependencies = [
  "eframe",
+ "qnc-action-bar-panel",
  "qnc-action-event",
  "qnc-board",
  "qnc-clip-row",
@@ -3726,6 +3737,7 @@ name = "qnc-editorial-layout"
 version = "0.1.0"
 dependencies = [
  "eframe",
+ "qnc-action-bar-panel",
  "qnc-board",
  "qnc-contracts",
  "qnc-desktop-theme",

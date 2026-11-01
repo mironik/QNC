@@ -21,7 +21,7 @@ pub fn render_desktop(
     theme: &Theme,
     view: &EditorialView,
 ) -> Option<EditorialIntent> {
-    let (faces, board) = (theme.board_faces(), contracts.board_layout());
+    let (faces, board) = (theme.board_faces(), contracts.board_layout(|id| view.tab_selected(id)));
     let framed = |intent, ui: &Ui, rect, panels: &[Panel]| {
         paint_focus(ui, rect, panels.contains(&view.focus.panel), theme.focus);
         intent
@@ -37,7 +37,7 @@ pub fn render_desktop(
             framed(answer.map(EditorialIntent::Action), ui, rect, if segments { &[Panel::Segments] } else { &[] })
         }
         "source-dock" => framed(source_dock(ui, contracts, theme, view), ui, rect, if view.segments.zoom.is_some() { &[Panel::Segments, Panel::SourceButtons] } else { &[Panel::SourceTimeline, Panel::SourceButtons] }),
-        _ => None,
+        place => qnc_action_bar_panel::show(ui, rect, theme, contracts.editorial.board.block_pad, contracts.action_bar(place), |id| view.action_enabled(id)).map(EditorialIntent::action),
     }))
 }
 

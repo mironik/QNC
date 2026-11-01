@@ -1,0 +1,37 @@
+{
+  "module_id": "qnc.module.action-bar-panel",
+  "module_name": "Action bar panel",
+  "module_version": "0.1.0",
+  "module_kind": "ui_widget",
+  "capabilities": [
+    "ui.panel.action_bar"
+  ],
+  "input_contract_version": "0.1.0",
+  "output_contract_version": "0.1.0",
+  "supported_os": [
+    "windows",
+    "linux",
+    "macos"
+  ],
+  "supported_cpu": [
+    "x86_64",
+    "aarch64"
+  ],
+  "transport_protocol_version": "0.1.0",
+  "forbidden_calls": [
+    "application.start",
+    "business.db.write",
+    "database.read",
+    "workflow.run",
+    "media.process",
+    "filesystem.write",
+    "player.command"
+  ],
+  "forbidden_dependencies": [],
+  "state_policy": "stateless",
+  "database_write_policy": "no_db_writes",
+  "runtime_crate": "qnc-action-bar-panel",
+  "input": "The place the board gives it, the form's theme and pad, the buttons of that place from the layout contract (label and catalog action) and which actions can be pressed now.",
+  "output": "The clicked button's catalog action; the first button is drawn strong, the others plain, from the right of the bar.",
+  "specification": "User 2026-11-01: the Transcribe button of AI Media Assist under its media pool, as Cancel | Select under the Ingest browser; shown on the All tab only."
+}

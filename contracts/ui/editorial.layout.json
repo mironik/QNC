@@ -177,10 +177,6 @@
           {
             "label": "@story.add_subclip",
             "action_id": "save_virtual_shot"
-          },
-          {
-            "label": "@ma.transcribe",
-            "action_id": "transcribe_marks"
           }
         ]
       },
@@ -188,6 +184,17 @@
         "selection_check": true,
         "ticks_several": true,
         "status_dots": "pipeline"
+      },
+      "pool_actions": {
+        "tabs": [
+          "editorial_tab_all"
+        ],
+        "actions": [
+          {
+            "label": "@ma.transcribe",
+            "action_id": "transcribe_marks"
+          }
+        ]
       }
     },
     "g": {

@@ -7470,3 +7470,13 @@ nije stigao: katalog tipki odbija svaku tipku dok polje drzi tipkovnicu. Nova fu
 koristi (C10 isti). Enter iz imena projekta ide na prvo polje za upis, iz polja na sljedece; polja izbora se preskacu, zadnje
 polje nema sljedece. Tab i Shift+Tab nisu mijenjani. Zvuk pri tipkanju nije nadjen u kodu. Test
 `enter_in_a_typed_field_is_the_next_field_of_the_form`, conformance. Uzivo nije provjereno.
+Izmjena 2026-11-01 (korisnik: "u AI Media Assist dugme Transcript prebaciti u sucelje Media Poola po uzoru na Ingest";
+"ostaje prikaz Media Poola, ali se ispod dodaje dugme"; "to vrijedi na ALL tabu, kada se otvori tab Transcript toga nema"):
+Transcribe (`transcribe_marks`) vise nije u zaglavlju source timelinea grupe e nego u traci ispod Media poola, kao
+Cancel | Select ispod preglednika u Ingestu, i samo dok je otvoren tab All; na ostalim tabovima pool zauzima cijelu visinu.
+Nova javna kocka-panel `crates/qnc-action-bar-panel` (+ ugovor `contracts/modules/action-bar-panel.module.json`): traka
+dugmadi koje raspored daje mjestu, zdesna, prvo jako. `qnc-board` `split_place_below`; `contracts/ui/editorial.layout.json`
+grupa e `pool_actions` (tabovi na kojima se vidi, dugmad); `qnc-editorial-layout` (`PoolActions`, `POOL_ACTIONS`,
+`board_layout(tab_selected)`, `action_bar`). Forma ploce isti broj redaka (C10 93): mjesto koje nema svoj panel ide traci.
+Traka nije u krugu Tab tipke (dugmad source docka su). Test
+`ai_media_assist_has_transcribe_under_its_pool_on_the_all_tab_only`, conformance. Uzivo nije provjereno.
