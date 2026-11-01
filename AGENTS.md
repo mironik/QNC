@@ -7421,3 +7421,9 @@ pokrivalica"): nacrt ruba klipa u S-Storyju pomicao je sve rezove iza uzetog rub
 se rezovi crtali usred tudih klipova. Sada se u nacrtu mice samo uzeti rub: OUT klipa; uzeti IN stoji (klip klizi ispod
 njega). Ostali klipovi i njihovi rezovi ostaju gdje jesu, kao kod slota pokrivalice; Enter i dalje upisuje pricu dulju ili
 kracu (`qnc-program-segments` `SlotTrim::moved`, test prilagoden). Uzivo nije provjereno.
+Popravak 2026-11-01 (korisnik: "IN je zarobljen, ne moze se pomicati"; "napravi usporedbu story - s-story"): usporedba:
+u Storyju uzeti pocetak slota stoji na mjestu jer pokrivalica klizi ispod njega (slot pokriva isti dio price); u S-Storyju je
+IN rub samog klipa, pa se mora micati kao IN na source timelineu. Sada uzeti IN klipa u S-Storyju u nacrtu ide gdje ga
+strelice i kotacic salju (rez i trim crta, `SlotTrim::drafted_in`); OUT kao i prije; ostali rezovi stoje; Enter upisuje.
+Story nije mijenjan. Test u `in_an_s_story_the_slot_tools_make_the_clip_and_the_story_longer_or_shorter`. Uzivo nije
+provjereno.

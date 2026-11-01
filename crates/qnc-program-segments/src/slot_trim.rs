@@ -33,13 +33,24 @@ pub(crate) struct SlotTrim {
 impl SlotTrim {
     /// Where a marker frame of the program is drawn: from the slot's end on (the locked
     /// end of the story excepted) it moves with the trim.
+    /// Where a taken IN is drafted: a later IN is a shorter slot (`frames` below 0).
+    pub(crate) fn drafted_in(&self) -> u64 {
+        self.slot_start.saturating_add_signed(-self.frames)
+    }
+
     pub(crate) fn moved(&self, frame: u64, total: u64) -> u64 {
         if self.ripple {
             // In the S-Story only the edge being edited moves in the draft: the OUT of the
             // clip; its IN stays where it is (the clip slides under it). The other clips and
             // their cuts stay drawn where they are, as with a slot of a cover (user 2026-11-01:
             // "the red lines move in all the clips"); Enter writes the story longer or shorter.
-            return if !self.start && frame == self.slot_end { frame.saturating_add_signed(self.frames) } else { frame };
+            // The taken IN is drawn where it goes too, like the IN on the source timeline
+            // (user 2026-11-01: "the IN is stuck, it cannot move").
+            return match self.start {
+                false if frame == self.slot_end => frame.saturating_add_signed(self.frames),
+                true if frame == self.slot_start => self.drafted_in(),
+                _ => frame,
+            };
         }
         let reach = self.empty.map_or(total.saturating_sub(1), |(start, _)| start);
         if frame >= self.slot_end && frame <= reach && frame < total {

@@ -131,7 +131,7 @@ impl ProgramSegments {
             // The IN of an S-Story clip taken: its line is the IN only; the end moving with the
             // shorter or longer clip is no second playhead (user 2026-11-01: "the playhead goes
             // to the OUT").
-            Some(trim) if trim.ripple && trim.start => vec![trim.slot_start],
+            Some(trim) if trim.ripple && trim.start => vec![trim.drafted_in()],
             _ => self.edit_moves().into_iter().map(|(_, new)| new).collect(),
         };
         view.trim_frames.extend(self.cut_sound_trim_frames());

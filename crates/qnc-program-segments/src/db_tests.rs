@@ -527,6 +527,17 @@ fn in_an_s_story_the_slot_tools_make_the_clip_and_the_story_longer_or_shorter() 
     segments.apply_action("activate_focused_item");
     settle(&mut segments);
     assert_eq!(spans(&segments), vec![(0, 50), (50, 103), (103, 152)], "shorter: the story is shorter");
+    // The taken IN moves with the arrows: its cut and its trim line go where it goes, the
+    // other cuts stay (user 2026-11-01: "the IN is stuck").
+    let middle = segments.view().slots[1].slot_id.clone();
+    segments.apply(SegmentCommand::SelectSlot { slot_id: middle, frame: 60 });
+    settle(&mut segments);
+    assert!(segments.take_slot_edge_at_playhead(true));
+    segments.apply_action("step_forward_frame");
+    segments.apply_action("step_forward_frame");
+    assert_eq!(segments.view().trim_frames, vec![52]);
+    assert_eq!(marker_frames(&segments), vec![0, 52, 103, 152]);
+    segments.apply_action("clear_focus");
     // A double click enlarges the clip's slot, as a cover's.
     segments.apply(SegmentCommand::Zoom { slot: None, frame: Some(70) });
     assert_eq!(segments.view().zoom, Some((39, 114)), "53 frames: 11 on each side");
