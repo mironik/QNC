@@ -7523,3 +7523,8 @@ izmedu i dalje podloga i podcrtano), a kad se IN/OUT promijeni (klik na izjavu, 
 sredinu vidljivog dijela panela. Vrijedi i za IN/OUT postavljen I/O i rezom. `qnc-transcript-panel` (`marked_ends`,
 `line_words`). Test `the_in_and_out_words_are_the_first_and_last_between_the_marks_across_lines`, conformance. Uzivo nije
 provjereno.
+Dopuna 2026-11-01 (korisnik: "da, neka play izjave stane na OUT-u"; log: izjava 556-816 svirala je do 980): play klipa
+koji krene prije korisnikova OUT-a stane na OUT-u (pauza i playhead na slici OUT-a); play koji krene na ili iza OUT-a
+svira dalje, a prica i SubSegment (program) se ne diraju. Vrijedi na source timelineu svake forme. `qnc-source-panel`
+`stop_on_out`, `qnc-source-timeline` `sync` prima prikazani timeline (Story i Ingest isti broj redaka). Testovi dotaknutih
+kocki, conformance. Uzivo nije provjereno; test same pauze treba pravi player.

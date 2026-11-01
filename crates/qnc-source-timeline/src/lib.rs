@@ -96,7 +96,8 @@ impl SourceTimeline {
     /// Once a frame: the shown clip and the project content its stored record is read
     /// from. Another clip starts on the A1/A2 sound kept for it in the project database,
     /// else on A1 channel 1 and A2 channel 2 (user rules 2026-10-01, 2026-10-24).
-    pub fn sync(&mut self, clip_id: Option<&str>, content: Option<&ContentTarget>, preview: &mut SourcePreview) -> &SourceTimelineView {
+    pub fn sync(&mut self, clip_id: Option<&str>, content: Option<&ContentTarget>, preview: &mut SourcePreview, timeline: &TimelineProjection) -> &SourceTimelineView {
+        self.keys.stop_on_out(preview, timeline);
         if self.clip.as_deref() != clip_id {
             self.clip = clip_id.map(str::to_string);
             self.first_cut = None; // a pair of cuts belongs to its clip
@@ -661,7 +662,7 @@ mod tests {
         source.route("step_next_part", &mut preview, &mut timeline);
         source.route("activate_focused_item", &mut preview, &mut timeline);
         assert_eq!(source.kept(0).channel, 1);
-        source.sync(Some("b"), None, &mut SourcePreview::new());
+        source.sync(Some("b"), None, &mut SourcePreview::new(), &timeline);
         assert_eq!((source.kept(0).channel, source.kept(1).channel), (0, 1), "A1 on channel 1, A2 on channel 2");
     }
 }

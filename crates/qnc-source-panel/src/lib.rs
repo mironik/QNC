@@ -36,11 +36,39 @@ pub const ACTIONS: &[&str] = &[
 #[derive(Debug, Clone, Default)]
 pub struct SourcePanel {
     mark_taken: bool,
+    /// The player played at the last look.
+    was_playing: bool,
+    /// The clip frame of OUT a play started before it stops at.
+    stop_at: Option<u64>,
 }
 
 impl SourcePanel {
     pub fn new() -> Self {
         Self::default()
+    }
+
+    /// Once a frame: a play of the clip started before the user's OUT stops on OUT (user
+    /// 2026-11-01: a statement plays from IN to OUT and stops there). A play started on or
+    /// after OUT plays on; a program (story, SubSegment) is not the clip and is left alone.
+    pub fn stop_on_out(&mut self, preview: &mut SourcePreview, timeline: &TimelineProjection) {
+        let playing = preview.player_view().playing();
+        let frame = preview.clip_frame();
+        if playing && !self.was_playing {
+            let out = timeline.source_out_frame.map(|out| timeline.range_start_frame + out);
+            self.stop_at = out.filter(|out| frame.is_some_and(|frame| frame < *out));
+        }
+        self.was_playing = playing;
+        if !playing {
+            self.stop_at = None;
+            return;
+        }
+        if let (Some(out), Some(frame)) = (self.stop_at, frame) {
+            if frame >= out {
+                self.stop_at = None;
+                preview.pause();
+                preview.cue(out);
+            }
+        }
     }
 
     /// IN or OUT is taken: the arrows move it, Escape gives them back to the playhead.
