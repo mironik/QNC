@@ -17,7 +17,13 @@ pub struct EditorButton<'a> {
     pub action_id: &'a str,
     pub target: &'a str,
     pub enabled: bool,
+    /// The group the button belongs to; buttons of one group stand together and a wider gap
+    /// parts the groups (user 2026-11-01: buttons in logical groups, not scattered).
+    pub group: u8,
 }
+
+/// The gap between two groups of buttons.
+const GROUP_GAP: f32 = 18.0;
 
 /// What the editor shows.
 pub struct Editor<'a> {
@@ -49,7 +55,12 @@ pub fn show(ui: &mut egui::Ui, editor: &Editor<'_>, theme: &qnc_desktop_theme::T
     ui.horizontal(|ui| {
         ui.label(RichText::new(editor.title).color(theme.text_muted).size(theme.font_ui));
         ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+            let mut group = None;
             for button in editor.buttons.iter().rev() {
+                if group.is_some_and(|group| group != button.group) {
+                    ui.add_space(GROUP_GAP);
+                }
+                group = Some(button.group);
                 if qnc_ui_kit::chrome_button(ui, button.label, button.enabled, false, style).clicked() {
                     answer = Some(Answer::Button(button.action_id.to_string(), (!button.target.is_empty()).then(|| button.target.to_string())));
                 }

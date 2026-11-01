@@ -243,7 +243,7 @@
             "action_id": "script_subsegment"
           },
           {
-            "label": "@story.add_subclip",
+            "label": "@story.add_statement",
             "action_id": "save_virtual_shot"
           }
         ]

@@ -9,22 +9,22 @@
         { "kind": "text", "label": "@sp.f.camera", "id": "camera", "path": "camera", "hint": "@sp.h.camera" },
         { "kind": "text", "label": "@sp.f.graphics", "id": "graphics", "path": "graphics", "hint": "@sp.h.graphics" }
       ] },
-    { "id": "off", "label": "@sp.k.vo", "short": "VO", "role": "spoken", "picture": "{mark} (B-ROLL)", "counts": "story", "recorded": true, "cue": "VO {n}", "speaker": "@sp.sp.vo",
+    { "id": "off", "label": "@sp.k.vo", "short": "@sp.s.vo", "role": "spoken", "picture": "{mark} (B-ROLL)", "counts": "story", "recorded": true, "cue": "@sp.c.vo", "speaker": "@sp.sp.vo",
       "fields": [
         { "kind": "text", "label": "@sp.f.broll", "id": "broll", "path": "broll", "hint": "@sp.h.broll" },
         { "kind": "text", "label": "@sp.f.nat", "id": "nat", "path": "nat", "hint": "@sp.h.nat" }
       ] },
-    { "id": "sot", "label": "@sp.k.sot", "short": "SOT", "role": "clip", "picture": "{mark}: {clip} {start} - {end}", "counts": "story", "cues": true, "cue": "SOT {n}", "speaker": "{caption_name} (SOT)",
+    { "id": "sot", "label": "@sp.k.sot", "short": "@sp.s.sot", "role": "clip", "picture": "{mark}: {clip} {start} - {end}", "counts": "story", "cues": true, "cue": "@sp.c.sot", "speaker": "{caption_name} (SOT)",
       "fields": [
         { "kind": "text", "label": "@sp.f.name", "id": "caption_name", "path": "caption_name" },
         { "kind": "text", "label": "@sp.f.role", "id": "caption_role", "path": "caption_role" }
       ] },
-    { "id": "standup", "label": "@sp.k.standup", "short": "STAND-UP", "role": "clip", "picture": "{mark}: {clip} {start} - {end}", "counts": "story", "cues": true, "cue": "STAND-UP", "speaker": "@sp.sp.standup",
+    { "id": "standup", "label": "@sp.k.standup", "short": "@sp.s.standup", "role": "clip", "picture": "{mark}: {clip} {start} - {end}", "counts": "story", "cues": true, "cue": "@sp.s.standup", "speaker": "@sp.sp.standup",
       "fields": [
         { "kind": "text", "label": "@sp.f.shot", "id": "shot", "path": "shot", "hint": "@sp.h.shot" },
         { "kind": "text", "label": "@sp.f.location", "id": "location", "path": "location", "hint": "@sp.h.location" }
       ] },
-    { "id": "nat", "label": "@sp.k.nat", "short": "NAT", "role": "clip", "picture": "{mark}: {clip} {start} - {end}", "counts": "story", "speaker": "@sp.sp.nat",
+    { "id": "nat", "label": "@sp.k.nat", "short": "@sp.s.nat", "role": "clip", "picture": "{mark}: {clip} {start} - {end}", "counts": "story", "speaker": "@sp.sp.nat",
       "fields": [
         { "kind": "text", "label": "@sp.f.direction", "id": "direction", "path": "direction", "hint": "@sp.h.nat" }
       ] },

@@ -7546,3 +7546,15 @@ Testovi `qnc-virtual-shots`, `qnc-ui-text`, `qnc-dev-diagnostics`, conformance.
 Izmjena 2026-11-01 (korisnik, MA Audio: "trenutna oznaka SubClip nije opravdana... to su Izjave"): u MA Audiju (grupa g) tab
 poola `editorial_tab_virtual` je SOT / Izjave (`pool.tab.sot`, kao u AI Media Assistu); hrvatski naziv taba je sada
 mnozina "Izjave" u obje forme. Story, S-Story i MA Video zadrzavaju SubClip. Samo raspored i rjecnik.
+Izmjena 2026-11-01 (korisnik, MA Audio: "slozi dugmad po logickim cjelinama i u hrvatskoj verziji koristi hrvatske
+izraze"): (1) Panel scenarija (`qnc-script-panel`): prvi red je naslov i naziv profila (skracen, nikad ispod gumba) te
+izlaz scenarija zdesna Kopiraj, Izvoz, Nacrt XML, Posalji u S-Story; drugi red "U scenarij iz klipa (IN-OUT):" i po
+gumb za svaku vrstu klipa profila (+ IZJAVA, + STAND-UP, + ATMOSFERA). Editor teksta: najprije gumbi vrsta teksta
+(+ NAJAVA, + OFF, + ODJAVA), razmak, pa ispravljanje (Zamijeni, Ocisti); `qnc-text-source-editor` `EditorButton.group`
+i razmak izmedu skupina. (2) Pripremljeni profili `general_tv`, `tv_package`, `agency_online`: kratki nazivi i cue su
+sifre rjecnika (`sp.s.vo`, `sp.s.sot`, `sp.s.su`, `sp.s.standup`, `sp.s.nat`, `sp.s.lead`, `sp.c.*`): engleski VO, SOT,
+SU, NAT; hrvatski OFF, IZJAVA, STAND-UP, ATMOSFERA, UVOD. `inews_mos` ostaje u izrazima iNEWS-a. (3) MA Audio: SubSegment
+je "Slozena izjava", tab "Slozene izjave", Dodaj SubClip je "Dodaj izjavu". (4) Aktivni projekt
+`2026_11_01_78fa621b...` ima ponovno dan profil `general_tv` (hrvatski nazivi), primjer
+`qnc-script-db/examples/use_profile.rs` (isto sto "Use for project" u uredivacu profila). Testovi dotaknutih kocki,
+conformance. Uzivo nije provjereno.

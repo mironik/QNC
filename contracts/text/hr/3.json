@@ -18,7 +18,7 @@
     "script.no_project": "Najprije otvorite projekt.",
     "script.choose_to_record": "Najprije odaberite blok za snimanje.",
     "script.no_clip_kind": "Profil scenarija ovog projekta nema vrstu klipa.",
-    "script.subsegment": "SubSegment",
+    "script.subsegment": "Složena izjava",
     "script.pieces_length": "{n} dijelova",
     "script.open_subsegment": "Otvori SubSegment",
     "subsegment.trimming": "REZ",

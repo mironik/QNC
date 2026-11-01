@@ -47,33 +47,43 @@ fn paint_script(ui: &mut egui::Ui, view: &ScriptView, transcript: &TranscriptVie
     let mut asked = None;
     let style = qnc_ui_kit::ChromeButtonStyle { text: theme.text, border: theme.border, focus: theme.focus, height: theme.chrome_control_height };
     let muted = |text: &str| RichText::new(text).color(theme.text_muted).size(theme.font_ui);
+    // Buttons in logical groups (user 2026-11-01): the first row is the script and what goes out
+    // of it (copy, export, draft, send to S-Story, in that order), the second what goes into it
+    // from the shown clip's IN-OUT.
+    let out = !view.blocks.is_empty() && !view.exporting;
     ui.horizontal(|ui| {
         ui.label(RichText::new(qnc_ui_text::text("script.title")).color(theme.text).strong());
-        if let Some(profile) = &view.profile {
-            ui.label(muted(&qnc_ui_text::fill("script.profile", &[("name", &profile.name)])));
-        }
         ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-            if qnc_ui_kit::chrome_button(ui, qnc_ui_text::text("script.export"), !view.blocks.is_empty() && !view.exporting, false, style).on_hover_text(qnc_ui_text::text("script.export_hint")).clicked() {
-                asked = Some(ActionEvent::key(EXPORT).at(PANEL));
+            if qnc_ui_kit::chrome_button(ui, qnc_ui_text::text("script.send_story"), out, false, style).on_hover_text(qnc_ui_text::text("script.send_story_hint")).clicked() {
+                asked = Some(ActionEvent::key(SEND_STORY).at(PANEL));
             }
-            if qnc_ui_kit::chrome_button(ui, qnc_ui_text::text("script.draft"), !view.blocks.is_empty() && !view.exporting, false, style).on_hover_text(qnc_ui_text::text("script.draft_hint")).clicked() {
+            if qnc_ui_kit::chrome_button(ui, qnc_ui_text::text("script.draft"), out, false, style).on_hover_text(qnc_ui_text::text("script.draft_hint")).clicked() {
                 asked = Some(ActionEvent::key(DRAFT).at(PANEL));
             }
-            if qnc_ui_kit::chrome_button(ui, qnc_ui_text::text("script.send_story"), !view.blocks.is_empty() && !view.exporting, false, style).on_hover_text(qnc_ui_text::text("script.send_story_hint")).clicked() {
-                asked = Some(ActionEvent::key(SEND_STORY).at(PANEL));
+            if qnc_ui_kit::chrome_button(ui, qnc_ui_text::text("script.export"), out, false, style).on_hover_text(qnc_ui_text::text("script.export_hint")).clicked() {
+                asked = Some(ActionEvent::key(EXPORT).at(PANEL));
             }
             if qnc_ui_kit::chrome_button(ui, qnc_ui_text::text("script.copy"), !view.blocks.is_empty(), false, style).clicked() {
                 ui.ctx().copy_text(view.text());
             }
-            // One button per clip kind: the shown clip's IN-OUT goes in as that kind.
-            for kind in view.clip_kinds().into_iter().rev() {
-                let label = qnc_ui_text::fill("script.add_clip", &[("kind", &kind.short)]);
-                let hint = qnc_ui_text::fill("script.add_clip_hint", &[("kind", &kind.label)]);
-                if qnc_ui_kit::chrome_button(ui, &label, view.marks, false, style).on_hover_text(hint).clicked() {
-                    asked = Some(ActionEvent::key(ADD_CLIP).with_target(kind.id.clone()).at(PANEL));
-                }
+            // The profile's name takes what is left and never runs under the buttons.
+            if let Some(profile) = &view.profile {
+                ui.with_layout(egui::Layout::left_to_right(egui::Align::Center), |ui| {
+                    ui.add(egui::Label::new(muted(&qnc_ui_text::fill("script.profile", &[("name", &profile.name)]))).truncate());
+                });
             }
         });
+    });
+    ui.horizontal(|ui| {
+        ui.label(muted(qnc_ui_text::text("script.from_clip")));
+        // One button per clip kind: the shown clip's IN-OUT goes in as that kind.
+        for kind in view.clip_kinds() {
+            let label = qnc_ui_text::fill("script.add_clip", &[("kind", &kind.short)]);
+            let hint = qnc_ui_text::fill("script.add_clip_hint", &[("kind", &kind.label)]);
+            if qnc_ui_kit::chrome_button(ui, &label, view.marks, false, style).on_hover_text(hint).clicked() {
+                asked = Some(ActionEvent::key(ADD_CLIP).with_target(kind.id.clone()).at(PANEL));
+            }
+        }
     });
     // The length of the script against the target of the story sheet (red when over).
     let total = view.total_seconds();
@@ -302,11 +312,11 @@ fn paint_editor(ui: &mut egui::Ui, view: &ScriptView, theme: &qnc_desktop_theme:
     let written = !view.editor.trim().is_empty();
     let kinds = view.text_kinds();
     let labels: Vec<String> = kinds.iter().map(|kind| qnc_ui_text::fill("script.add_text", &[("kind", &kind.short)])).collect();
-    let mut buttons = vec![
-        EditorButton { label: qnc_ui_text::text("script.clear"), action_id: CLEAR_EDITOR, target: "", enabled: written || view.editing.is_some() },
-        EditorButton { label: qnc_ui_text::text("script.replace"), action_id: REPLACE_TEXT, target: "", enabled: written && view.editing.is_some() },
-    ];
-    buttons.extend(kinds.iter().zip(&labels).map(|(kind, label)| EditorButton { label, action_id: ADD_TEXT, target: &kind.id, enabled: written }));
+    // Two groups (user 2026-11-01): the text goes into the script as a kind, then the text is
+    // corrected (Replace into the block it came from, Clear).
+    let mut buttons: Vec<EditorButton> = kinds.iter().zip(&labels).map(|(kind, label)| EditorButton { label, action_id: ADD_TEXT, target: &kind.id, enabled: written, group: 0 }).collect();
+    buttons.push(EditorButton { label: qnc_ui_text::text("script.replace"), action_id: REPLACE_TEXT, target: "", enabled: written && view.editing.is_some(), group: 1 });
+    buttons.push(EditorButton { label: qnc_ui_text::text("script.clear"), action_id: CLEAR_EDITOR, target: "", enabled: written || view.editing.is_some(), group: 1 });
     let info = qnc_ui_text::fill("script.editor_info", &[("words", &view.editor.split_whitespace().count().to_string()), ("length", &seconds_label(view.editor_seconds))]);
     let title = match view.editing.and_then(|id| view.kind_of(id)) {
         Some(kind) => qnc_ui_text::fill("script.editor_editing", &[("kind", &kind.short)]),
