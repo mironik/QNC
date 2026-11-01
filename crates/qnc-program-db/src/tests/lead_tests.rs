@@ -158,3 +158,58 @@ fn every_s_story_version_is_a_story_of_its_own_with_no_leads() {
     // Another version is another story: version 1 is not in it.
     assert!(StoryReader::open(&main.draft_story(2)).unwrap().list_segments().unwrap().is_empty());
 }
+
+/// User 2026-10-31: in the S-Story every clip is a slot. Its markers are the clips' borders, and
+/// the slot's edits write the clip: a longer slot makes the story longer, a shorter one shorter,
+/// a marker moved whole is a roll of its two clips, a slot moved whole keeps its clip.
+#[test]
+fn in_an_s_story_every_clip_is_a_slot_and_the_slot_edits_write_the_clip() {
+    let dir = tempfile::tempdir().unwrap();
+    let path = dir.path().join("project.db");
+    drop(imported_store(&path));
+    let main = qnc_db_broker::ProjectDbTarget::from_owner_binding(&path, "qnc://local/db/project_db/p1").unwrap();
+    let draft = main.draft_story(1);
+    let writer = StoryWriter::start(draft.clone()).unwrap();
+    for (kind, range) in [("tonovi", (300, 400)), ("offovi", (500, 600)), ("tonovi", (700, 800))] {
+        writer
+            .call(&Operation::CreateSegment {
+                project_id: "p1".into(),
+                kind: kind.into(),
+                clip_id: "c1".into(),
+                in_frame: range.0,
+                out_frame: range.1,
+                fps_num: 50,
+                fps_den: 1,
+                a1_source_channel: 0,
+                a1_level_db: 0,
+                a1_off: false,
+                a2_source_channel: 1,
+                a2_level_db: 0,
+                a2_off: false,
+            })
+            .unwrap();
+    }
+    let read = || StoryReader::open(&draft).unwrap();
+    let ranges = || read().list_segments().unwrap().iter().map(|row| (row.in_frame, row.out_frame)).collect::<Vec<_>>();
+    let slots = || read().list_slots().unwrap().iter().map(|slot| (slot.slot_id.clone(), slot.start_frame, slot.end_frame)).collect::<Vec<_>>();
+    let spans = || slots().iter().map(|(_, start, end)| (*start, *end)).collect::<Vec<_>>();
+    assert_eq!(spans(), vec![(0, 100), (100, 200), (200, 300)], "a slot for every clip");
+    // The first slot's end 10 later: the clip is longer, so is the story.
+    writer.call(&Operation::TrimSlot { slot_id: slots()[0].0.clone(), start: false, frames: 10 }).unwrap();
+    assert_eq!(ranges(), vec![(300, 410), (500, 600), (700, 800)]);
+    assert_eq!(spans(), vec![(0, 110), (110, 210), (210, 310)]);
+    // The last slot's start 5 shorter: the clip starts later, the story is shorter.
+    writer.call(&Operation::TrimSlot { slot_id: slots()[2].0.clone(), start: true, frames: -5 }).unwrap();
+    assert_eq!(ranges(), vec![(300, 410), (500, 600), (705, 800)]);
+    assert_eq!(spans(), vec![(0, 110), (110, 210), (210, 305)]);
+    // The marker between the first two clips 10 later: a roll, the story keeps its length.
+    let marker = read().list_markers().unwrap().into_iter().find(|marker| marker.program_frame == 110).unwrap().marker_id;
+    writer.call(&Operation::MoveMarker { marker_id: marker, program_frame: 120 }).unwrap();
+    assert_eq!(ranges(), vec![(300, 420), (510, 600), (705, 800)]);
+    assert_eq!(spans(), vec![(0, 120), (120, 210), (210, 305)]);
+    // The middle slot 5 later as a whole: it keeps its clip, the one before plays on, the one
+    // after starts later.
+    writer.call(&Operation::MoveSlot { slot_id: slots()[1].0.clone(), start_frame: 125 }).unwrap();
+    assert_eq!(ranges(), vec![(300, 425), (510, 600), (710, 800)]);
+    assert_eq!(spans(), vec![(0, 125), (125, 215), (215, 305)]);
+}

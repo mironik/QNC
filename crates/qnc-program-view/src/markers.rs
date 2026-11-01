@@ -59,29 +59,6 @@ pub struct MarkerPin {
 /// The id of the cut before the clip `segment_id` on A1.
 pub const JOIN_PREFIX: &str = "join:";
 
-/// The ids of an S-Story element's IN and OUT (user 2026-10-31): prefix + segment id.
-pub const ELEMENT_IN: &str = "in:";
-pub const ELEMENT_OUT: &str = "out:";
-
-/// An S-Story element edge's segment and whether it is the IN; `None` for any other pin.
-pub fn element_edge(id: &str) -> Option<(&str, bool)> {
-    id.strip_prefix(ELEMENT_IN).map(|segment| (segment, true)).or_else(|| id.strip_prefix(ELEMENT_OUT).map(|segment| (segment, false)))
-}
-
-/// The IN and OUT pins of every element (no lead rows: the S-Story has none).
-pub fn element_pins(view: &SegmentsView) -> Vec<MarkerPin> {
-    view.rows
-        .iter()
-        .filter(|row| !row.lead)
-        .flat_map(|row| {
-            [(ELEMENT_IN, row.start_frame), (ELEMENT_OUT, row.end_frame)].map(|(prefix, frame)| MarkerPin {
-                marker_id: format!("{prefix}{}", row.segment_id),
-                ..MarkerPin::at(frame)
-            })
-        })
-        .collect()
-}
-
 /// The clip after the cut of a join pin's id; `None` for an M marker.
 pub fn join_segment(marker_id: &str) -> Option<&str> {
     marker_id.strip_prefix(JOIN_PREFIX)

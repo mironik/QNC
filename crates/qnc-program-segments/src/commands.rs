@@ -4,15 +4,12 @@ impl ProgramSegments {
     /// Whether a keyboard catalog action belongs to the program.
     pub fn handles(&self, action_id: &str) -> bool {
         self.command_for(action_id).is_some()
-            || ((self.slot_move.is_some() || self.slot_trim.is_some() || self.element_trim.is_some())
+            || ((self.slot_move.is_some() || self.slot_trim.is_some())
                 && matches!(action_id, "step_back_frame" | "step_forward_frame" | "clear_focus"))
     }
 
     /// Applies a keyboard catalog action of the program; false if it is not one.
     pub fn apply_action(&mut self, action_id: &str) -> bool {
-        if let Some(done) = self.element_key(action_id) {
-            return done; // a taken S-Story element edge
-        }
         if let Some(done) = self.trim_key(action_id) {
             return done; // a taken slot edge (segment panel)
         }
@@ -185,7 +182,6 @@ impl ProgramSegments {
             }
             SegmentCommand::DeleteSelected => self.delete_selected(),
             SegmentCommand::SelectMarker(marker_id) => self.select_marker(&marker_id),
-            SegmentCommand::TakeMarker(marker_id) if qnc_program_view::element_edge(&marker_id).is_some() => return self.take_element_edge(&marker_id),
             SegmentCommand::TakeMarker(marker_id) => {
                 self.select_marker(&marker_id);
                 self.edit_marker();
@@ -289,9 +285,6 @@ impl ProgramSegments {
                 self.marker_at_playhead();
             }
             SegmentCommand::NudgeMarker(frames) => self.nudge_marker(frames),
-            SegmentCommand::DragMarker { marker_id, frame } if qnc_program_view::element_edge(&marker_id).is_some() => {
-                return self.drag_element_edge(&marker_id, frame);
-            }
             SegmentCommand::DragMarker { marker_id, frame } => {
                 // User rule: a marker moves only after Ctrl+M took it.
                 if self.marker_edit.as_ref().map(|(id, _)| id) == Some(&marker_id) {

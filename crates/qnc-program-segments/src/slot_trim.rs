@@ -25,12 +25,18 @@ pub(crate) struct SlotTrim {
     /// The first slot after it without a cover, (start, end): it takes the difference and
     /// the slots after it stay (user 2026-10-13); `None`: the last slot takes it.
     pub(crate) empty: Option<(u64, u64)>,
+    /// The S-Story (user 2026-10-31): the slot is its clip, so the story grows or shrinks with
+    /// it; everything after the slot moves, the end of the story too.
+    pub(crate) ripple: bool,
 }
 
 impl SlotTrim {
     /// Where a marker frame of the program is drawn: from the slot's end on (the locked
     /// end of the story excepted) it moves with the trim.
     pub(crate) fn moved(&self, frame: u64, total: u64) -> u64 {
+        if self.ripple {
+            return if frame >= self.slot_end { frame.saturating_add_signed(self.frames) } else { frame };
+        }
         let reach = self.empty.map_or(total.saturating_sub(1), |(start, _)| start);
         if frame >= self.slot_end && frame <= reach && frame < total {
             frame.saturating_add_signed(self.frames)
@@ -72,7 +78,8 @@ impl ProgramSegments {
             self.refresh_view(qnc_ui_text::text("story.msg.no_slot_under_playhead").into());
             return false;
         };
-        if slot.end_frame >= self.view.total_frames {
+        let ripple = self.is_s_story();
+        if slot.end_frame >= self.view.total_frames && !ripple {
             self.refresh_view(qnc_ui_text::text("story.msg.last_slot_ends_story").into());
             return false;
         }
@@ -89,7 +96,8 @@ impl ProgramSegments {
             .iter()
             .filter(|later| later.start_frame >= slot.end_frame && !later.has_cover)
             .min_by_key(|later| later.start_frame)
-            .map(|later| (later.start_frame, later.end_frame));
+            .map(|later| (later.start_frame, later.end_frame))
+            .filter(|_| !ripple);
         self.slot_trim = Some(SlotTrim {
             slot_id: slot.slot_id,
             start,
@@ -97,6 +105,7 @@ impl ProgramSegments {
             slot_end: slot.end_frame,
             frames: 0,
             empty,
+            ripple,
         });
         // The monitor shows the cut at once: the slot's first or last picture.
         self.cue_program(if start { slot.start_frame } else { slot.end_frame.saturating_sub(1) });
@@ -152,7 +161,7 @@ impl ProgramSegments {
                 self.refresh_view(qnc_ui_text::text("story.msg.empty_slot_one_picture").into());
                 return true;
             }
-            None if last as i64 + frames >= total as i64 => {
+            None if !trim.ripple && last as i64 + frames >= total as i64 => {
                 self.refresh_view(qnc_ui_text::text("story.msg.last_slot_one_picture").into());
                 return true;
             }

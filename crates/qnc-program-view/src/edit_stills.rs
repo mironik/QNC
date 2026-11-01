@@ -113,13 +113,15 @@ pub fn trim_stills(view: &SegmentsView, slots: &[Slot], slot_id: &str, start: bo
     };
     let total = view.total_frames;
     let new_end = slot.end_frame.saturating_add_signed(frames);
-    let moved = |frame: u64| if frame >= slot.end_frame && frame < total { frame.saturating_add_signed(frames) } else { frame };
+    // In the S-Story the story ends with its last clip: the end moves with it.
+    let moved = |frame: u64| if frame >= slot.end_frame && (frame < total || view.clips_are_slots) { frame.saturating_add_signed(frames) } else { frame };
     let mut stills = Vec::new();
     if start {
         if slot.start_frame > 0 {
             stills.push(still(view, slots, &|frame| frame, slot.start_frame, false).labelled(qnc_ui_text::text("story.still.previous_slot_last")));
         }
-        let cover = view.covers.iter().find(|cover| cover.slot_id == slot.slot_id);
+        let clips = clip_covers(view, slots);
+        let cover = view.covers.iter().chain(&clips).find(|cover| cover.slot_id == slot.slot_id);
         let first = match cover {
             Some(cover) => {
                 let length = cover.end_frame.saturating_sub(cover.start_frame).max(1) as i64;
@@ -176,7 +178,7 @@ fn still(view: &SegmentsView, slots: &[Slot], moved: &dyn Fn(u64) -> u64, marker
 
 /// The picture at a program frame of the draft: a cover there, else the segment.
 fn picture_at(view: &SegmentsView, slots: &[Slot], moved: &dyn Fn(u64) -> u64, frame: u64) -> Option<StillPicture> {
-    if let Some(picture) = view.covers.iter().find_map(|cover| cover_picture(cover, slots, moved, frame)) {
+    if let Some(picture) = view.covers.iter().chain(&clip_covers(view, slots)).find_map(|cover| cover_picture(cover, slots, moved, frame)) {
         return Some(picture);
     }
     let (segment, source_frame) = source_at(view, frame)?;
@@ -295,4 +297,33 @@ mod clip_edge_tests {
         assert_eq!(edges, vec![Some(ClipEdge::Start), None, Some(ClipEdge::End), Some(ClipEdge::End)]);
         assert_eq!(stills[3].picture.as_ref().unwrap().source_frame, 99, "past the end: the last frame");
     }
+}
+
+/// In the S-Story (user 2026-10-31: "off = slot, ton = slot") the picture clip of every slot,
+/// as the cover of that slot: it fills the slot and plays its source from IN, so a moved
+/// marker rolls it and a moved end plays it on, as with a cover. An Off has no picture.
+fn clip_covers(view: &SegmentsView, slots: &[Slot]) -> Vec<CoverSpan> {
+    if !view.clips_are_slots {
+        return Vec::new();
+    }
+    view.rows
+        .iter()
+        .filter(|row| row.kind.has_base_video())
+        .filter_map(|row| {
+            let slot = slots.iter().find(|slot| slot.start_frame == row.start_frame)?;
+            Some(CoverSpan {
+                cover_id: row.segment_id.clone(),
+                slot_id: slot.slot_id.clone(),
+                start_frame: row.start_frame,
+                end_frame: row.end_frame,
+                selected: false,
+                clip_id: row.clip_id.clone(),
+                source_in_frame: row.source_in_frame,
+                source_out_frame: row.source_out_frame,
+                a2_source_channel: 0,
+                a2_level_db: 0,
+                a2_off: true,
+            })
+        })
+        .collect()
 }

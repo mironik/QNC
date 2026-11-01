@@ -72,7 +72,7 @@ impl ProgramSegments {
         if let Some(trim) = &self.slot_trim {
             // The draft: the markers from the slot's end on move with the trim.
             let total = view.total_frames;
-            view.markers.iter_mut().filter(|pin| !pin.locked).for_each(|pin| pin.frame = trim.moved(pin.frame, total));
+            view.markers.iter_mut().filter(|pin| !pin.locked || trim.ripple).for_each(|pin| pin.frame = trim.moved(pin.frame, total));
             for drawn in &mut view.slots {
                 (drawn.start_frame, drawn.end_frame) = (trim.moved(drawn.start_frame, total), trim.moved(drawn.end_frame, total));
             }
@@ -116,6 +116,7 @@ impl ProgramSegments {
         view.exported_file = self.exported.as_ref().filter(|(said, _)| *said == view.message).map(|(_, file)| file.clone());
         view.export_alert = self.export_alert.as_deref() == Some(view.message.as_str());
         view.editing = self.editing.clone();
+        view.clips_are_slots = self.is_s_story();
         view.edit_stills = match &self.slot_trim {
             Some(trim) => qnc_program_view::trim_stills(&view, &slots(&self.stored_slots, None), &trim.slot_id, trim.start, trim.frames),
             None => qnc_program_view::edit_stills(&view, &slots(&self.stored_slots, None), &self.edit_moves()),
@@ -124,8 +125,6 @@ impl ProgramSegments {
         view.trim_frames = self.edit_moves().into_iter().map(|(_, new)| new).collect();
         view.trim_frames.extend(self.cut_sound_trim_frames());
         view.a1_splits = self.picture_splits();
-        // The S-Story: every element's own IN and OUT instead of markers and cuts (user 2026-10-31).
-        self.element_view(&mut view);
         qnc_program_view::mark_clip_edges(&mut view.edit_stills, |id| self.clip_frames.get(id).copied());
         self.lane_view(&mut view);
         view.zoom = self.zoom_window(&view);

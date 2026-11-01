@@ -18,6 +18,11 @@ fn configure(segments: &mut ProgramSegments, file: &std::path::Path) {
 const URI: &str = "qnc://local/db/ingest_content/p1";
 
 fn store_with_story(file: &std::path::Path) -> Vec<String> {
+    store_in(file, story_target(file))
+}
+
+/// The same three segments in a story of `target` (the Story or an S-Story version).
+fn store_in(file: &std::path::Path, target: ProjectDbTarget) -> Vec<String> {
     {
         let conn = rusqlite::Connection::open(file).unwrap();
         conn.execute_batch(
@@ -38,7 +43,7 @@ fn store_with_story(file: &std::path::Path) -> Vec<String> {
             [],
         )
         .unwrap();
-    let story = StoryWriter::start(story_target(file)).unwrap();
+    let story = StoryWriter::start(target).unwrap();
     let mut ids = Vec::new();
     for (kind, start) in [("offovi", 0), ("tonovi", 100), ("tonovi", 200)] {
         let StoryData::Created(id) = story
@@ -484,4 +489,45 @@ fn normalising_is_on_at_start_and_opening_a_project_keeps_what_the_user_chose() 
     store_with_story(&other);
     segments.configure(ProjectDbTarget::from_owner_binding(&other, "qnc://local/db/project_db/p2").unwrap(), "p2", None, None);
     assert_eq!(segments.normalization(), None, "off as the user turned it");
+}
+
+/// User 2026-10-31: in an S-Story every clip is a slot and the slot's tools work on it: Ctrl+O
+/// makes the clip longer and the story with it, also on the last clip; Ctrl+I at a clip's start
+/// shortens it and the story; the trim pictures follow the clip as they follow a cover; a double
+/// click enlarges the clip's slot with 15 % of its neighbours.
+#[test]
+fn in_an_s_story_the_slot_tools_make_the_clip_and_the_story_longer_or_shorter() {
+    let dir = tempfile::tempdir().unwrap();
+    let file = dir.path().join("project.db");
+    let draft = story_target(&file).draft_story(1);
+    store_in(&file, draft.clone());
+    let mut segments = ProgramSegments::new();
+    segments.configure(draft, "p1", None, None);
+    settle(&mut segments);
+    let spans = |segments: &ProgramSegments| segments.view().slots.iter().map(|slot| (slot.start_frame, slot.end_frame)).collect::<Vec<_>>();
+    assert_eq!(spans(&segments), vec![(0, 50), (50, 100), (100, 150)], "every clip is a slot");
+    // Ctrl+O on the middle clip (a Ton 100..150 of the clip): 3 pictures longer.
+    segments.set_playhead(Some(60));
+    assert!(segments.take_slot_edge_at_playhead(false));
+    for _ in 0..3 {
+        segments.apply_action("step_forward_frame");
+    }
+    assert_eq!(marker_frames(&segments), vec![0, 50, 103, 153], "the draft: everything after moves, the end too");
+    let last: Vec<_> = segments.view().edit_stills.iter().filter(|still| still.cut).filter_map(|still| still.picture.as_ref().map(|p| p.source_frame)).collect();
+    assert_eq!(last, vec![152], "the clip plays on to its new last picture");
+    segments.apply_action("activate_focused_item");
+    settle(&mut segments);
+    assert_eq!(spans(&segments), vec![(0, 50), (50, 103), (103, 153)], "the clip and the story are longer");
+    // Ctrl+O on the last clip also works: the story ends with it.
+    let last = segments.view().slots[2].slot_id.clone();
+    segments.apply(SegmentCommand::SelectSlot { slot_id: last, frame: 120 });
+    settle(&mut segments);
+    assert!(segments.take_slot_edge_at_playhead(false));
+    segments.apply_action("step_back_frame");
+    segments.apply_action("activate_focused_item");
+    settle(&mut segments);
+    assert_eq!(spans(&segments), vec![(0, 50), (50, 103), (103, 152)], "shorter: the story is shorter");
+    // A double click enlarges the clip's slot, as a cover's.
+    segments.apply(SegmentCommand::Zoom { slot: None, frame: Some(70) });
+    assert_eq!(segments.view().zoom, Some((39, 114)), "53 frames: 11 on each side");
 }

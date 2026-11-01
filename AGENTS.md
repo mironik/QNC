@@ -7377,3 +7377,21 @@ srednjeg elementa. Nove stvari: `qnc-program-view` (`element_pins`, `element_edg
 elementa), `qnc-segment-panel` (rubovi elementa umjesto markera), rjecnik. Story nije mijenjan, osim rezova na granici redova
 iz prethodnog popravka (rez pripada objema redovima). Test `every_s_story_element_has_its_own_in_and_out`, conformance.
 Uzivo nije provjereno.
+Izmjena 2026-11-01 (korisnik: "još uvijek praviš nove kocke... moraš koristiti stare kocke za zoom i zoom u source
+timeline"; "u s-story svaki klip tretiraj kao slot... off=slot, ton=slot"; "funkcije koje imamo sa slotovima treba
+koristiti u kompletu"; "produljenje slota produljuje ukupnu priču, skraćenje skraćuje"): zamjenjuje dva zapisa od
+31. 10. (zakljucani pocetak i kraj kao rub klipa; svaki element svoj IN i OUT). Audit: `element_trim.rs`, pinovi
+elemenata (`element_pins`, `element_edge`, `zoom_element`), filtar `own_element` u panelu i S-Story grana zooma bili
+su djelomicna kopija postojeceg ruba slota i segmenta (bez skoka na kljucnu sliku, bez pravila kraja klipa,
+vlastite slike reza) i uklonjeni su (git revert a0786228 i 616ff280, zapisi u AGENTS.md ostaju kao povijest). Sada
+u S-Storyju (prica verzije `story-draft-<n>.db`) na svakoj granici dvaju klipova stoji M marker, pa je svaki klip
+jedan slot, a postojeci kod slota i markera radi s njim kao s pokrivalicom: `qnc-program-db` `clip_slots.rs`
+(`ensure_clip_borders` u `finalize_story`: markeri su tocno granice klipova; u pricu verzije `MoveMarker` granice je
+roll dvaju klipova (`roll_join`), `TrimSlot` mijenja IN ili OUT klipa u slotu i pricu (`trim_segment`), `MoveSlot`
+zadrzava klip, prethodni svira dalje, sljedeci pocinje kasnije); `qnc-program-view` `SegmentsView.clips_are_slots`
+i `clip_covers`: slike reza (`edit_stills`, `trim_stills`) uzimaju Ton klip slota kao njegovu pokrivalicu, kraj
+price se mice s klipom; `qnc-program-segments`: rub slota u S-Storyju i na zadnjem klipu, razliku ne preuzima
+prazni ni zadnji slot nego se pomakne sve iza (`SlotTrim.ripple`), dvoklik povecava slot klipa (70/15/15) kao slot
+pokrivalice; samo slika granice u zoomu je J ili L slike klipa (`SetJoinPicture`), A1 granice postojeci J/L spoja.
+Story nije mijenjan. Nije izvedeno: A2 granice u zoomu (`SetCutSoundEdges`) jos ne pise klipove u S-Storyju. Testovi `in_an_s_story_every_clip_is_a_slot_and_the_slot_edits_write_the_clip`,
+`in_an_s_story_the_slot_tools_make_the_clip_and_the_story_longer_or_shorter`. Uzivo nije provjereno.

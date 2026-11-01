@@ -32,7 +32,6 @@ impl ProgramSegments {
             || self.commit_marker_edit()
             || self.commit_slot_move()
             || self.commit_slot_trim()
-            || self.commit_element_trim()
     }
 
     /// Ctrl+I (`start`) or Ctrl+O on the segment panel: that edge of the slot under the
@@ -72,10 +71,6 @@ impl ProgramSegments {
         if let Some(slot) = &self.slot_move {
             return Some(Take::Slot(slot.slot_id.clone()));
         }
-        if let Some(trim) = &self.element_trim {
-            let prefix = if trim.start { qnc_program_view::ELEMENT_IN } else { qnc_program_view::ELEMENT_OUT };
-            return Some(Take::ElementEdge(format!("{prefix}{}", trim.segment_id)));
-        }
         if let Some(trim) = &self.slot_trim {
             return Some(Take::SlotEdge(trim.slot_id.clone(), trim.start));
         }
@@ -101,7 +96,6 @@ impl ProgramSegments {
         use crate::SegmentCommand as Command;
         let playhead = self.playhead.unwrap_or(0);
         match command {
-            Command::TakeMarker(id) if qnc_program_view::element_edge(id).is_some() => Some(Take::ElementEdge(id.clone())),
             Command::TakeMarker(id) => Some(Take::Marker(id.clone())),
             Command::TakeSlot(id) => Some(Take::Slot(id.clone())),
             Command::TakeCover { cover_id, .. } => Some(Take::Cover(cover_id.clone())),
@@ -127,7 +121,6 @@ impl ProgramSegments {
     /// take of the same thing replaces.
     pub(crate) fn let_go_edits(&mut self, keep_sound: bool) {
         self.slot_trim = None;
-        self.element_trim = None;
         self.cut_part = crate::CutPart::Whole;
         self.slot_move = None;
         self.marker_edit = None;
@@ -144,7 +137,7 @@ impl ProgramSegments {
     }
 
     pub fn leave_panel(&mut self) -> bool {
-        let taken = self.slot_trim.take().is_some() | self.slot_move.take().is_some() | self.element_trim.take().is_some();
+        let taken = self.slot_trim.take().is_some() | self.slot_move.take().is_some();
         let taken = taken | self.marker_edit.take().is_some() | self.cover_taken.take().is_some();
         if taken {
             self.refresh_view(qnc_ui_text::text("story.msg.panel_left_edit_dropped").into());
@@ -162,8 +155,6 @@ pub(crate) enum Take {
     Slot(String),
     /// A slot and whether its start (else its end).
     SlotEdge(String, bool),
-    /// The IN or OUT of an S-Story element (its pin id).
-    ElementEdge(String),
     /// A lane (0 = A1 of a segment, 1 = A2 of a cover) and its part.
     Sound(u8, String),
     Cover(String),
@@ -178,7 +169,6 @@ impl Take {
             Self::Marker(_) => "story.take.marker",
             Self::Slot(_) => "story.take.slot",
             Self::SlotEdge(..) => "story.take.slot_edge",
-            Self::ElementEdge(_) => "story.take.element_edge",
             Self::Sound(..) => "story.take.sound",
             Self::Cover(_) => "story.take.cover",
         }

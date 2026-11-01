@@ -7,6 +7,7 @@ use std::time::{SystemTime, UNIX_EPOCH};
 
 /// The tables this module owns; it writes no other.
 mod checks;
+mod clip_slots;
 mod cover_split;
 mod covers;
 mod leads;
@@ -21,6 +22,7 @@ mod sound;
 mod spans;
 
 pub(crate) use checks::*;
+pub(crate) use clip_slots::*;
 pub(crate) use cover_split::*;
 pub(crate) use leads::*;
 pub(crate) use order::*;
@@ -246,8 +248,14 @@ impl Store {
             Operation::MoveMarker {
                 marker_id,
                 program_frame,
-            } => self.move_marker(marker_id, *program_frame),
-            Operation::MoveMarkerPicture { marker_id, program_frame } => self.move_marker_picture(marker_id, *program_frame),
+            } => match self.move_clip_border(marker_id, *program_frame) {
+                Some(done) => done,
+                None => self.move_marker(marker_id, *program_frame),
+            },
+            Operation::MoveMarkerPicture { marker_id, program_frame } => match self.move_clip_border_picture(marker_id, *program_frame) {
+                Some(done) => done,
+                None => self.move_marker_picture(marker_id, *program_frame),
+            },
             Operation::SetCutSound { marker_id, offset } => self.set_cut_sound(marker_id, *offset),
             Operation::SetJoinSound { segment_id, tail_frames, lead_frames } => {
                 self.set_join_sound(segment_id, *tail_frames, *lead_frames)
@@ -262,8 +270,14 @@ impl Store {
             Operation::SetCutSoundEdges { marker_id, tail_frames, lead_frames } => {
                 self.set_cut_sound_edges(marker_id, *tail_frames, *lead_frames)
             }
-            Operation::MoveSlot { slot_id, start_frame } => self.move_slot(slot_id, *start_frame),
-            Operation::TrimSlot { slot_id, start, frames } => self.trim_slot(slot_id, *start, *frames),
+            Operation::MoveSlot { slot_id, start_frame } => match self.move_clip_slot(slot_id, *start_frame) {
+                Some(done) => done,
+                None => self.move_slot(slot_id, *start_frame),
+            },
+            Operation::TrimSlot { slot_id, start, frames } => match self.trim_clip_slot(slot_id, *start, *frames) {
+                Some(done) => done,
+                None => self.trim_slot(slot_id, *start, *frames),
+            },
             Operation::DeleteMarker { marker_id } => self.delete_marker(marker_id),
             Operation::ListMarkers => self.list_markers(),
             Operation::ListSlots => self.list_slots(),

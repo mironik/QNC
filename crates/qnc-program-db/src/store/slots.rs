@@ -5,6 +5,8 @@ use super::*;
 pub(crate) fn finalize_story(conn: &Connection) -> Result<()> {
     sync_leads(conn)?;
     ensure_boundary_markers(conn)?;
+    // The S-Story: every clip is a slot (user 2026-10-31).
+    ensure_clip_borders(conn)?;
     // A shorter lead-in or lead-out (audit 2026-10-25) can leave a user's marker on a
     // boundary or past the end: past the story it goes, on one frame with another they are one.
     drop_markers_past_the_story(conn)?;

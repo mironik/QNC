@@ -96,13 +96,6 @@ pub(crate) fn paint_program(
         .chain(draft_span)
         .collect::<Vec<_>>();
     // Every cut is a marker (user 2026-10-29): the cuts between two clips come with the M markers.
-    // The S-Story (user 2026-10-31): an element's IN and OUT belong to its own row, and in the
-    // zoom to the element in the middle; never to a neighbour, also when a taken edge moves out.
-    let own_element = |segment_id: &str| {
-        let in_zoom = segments.zoom == Some((start, end)) && segments.zoom_element.as_deref() == Some(segment_id);
-        in_zoom || segments.rows.iter().any(|row| row.segment_id == segment_id && (row.start_frame, row.end_frame) == (start, end))
-    };
-    let elements = segments.element_edges.iter().filter(|pin| qnc_program_view::element_edge(&pin.marker_id).is_some_and(|(id, _)| own_element(id)));
     let markers = segments
         .markers
         .iter()
@@ -112,7 +105,6 @@ pub(crate) fn paint_program(
         // row takes the nearer of its own IN and OUT (v5 `local_marker_frame` drew it only at the
         // end of the earlier row, so every row could take only its end).
         .filter(|pin| (start..=end).contains(&pin.frame))
-        .chain(elements)
         .map(|pin| TimelineMarkerPin {
             id: &pin.marker_id,
             frame: local(pin.frame),

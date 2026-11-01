@@ -12,8 +12,7 @@ pub use edit_stills::{edit_stills, mark_clip_edges, program_picture, trim_stills
 
 pub use markers::{
     check_move, first_empty_slot, neighbour_marker, neighbour_segment, neighbour_slot,
-    element_edge, element_pins, join_at, join_pins, join_segment, program_frame, resolve, slot_at, slots, source_at, MarkerPin, Slot,
-    TakenPart, ELEMENT_IN, ELEMENT_OUT, JOIN_PREFIX,
+    join_at, join_pins, join_segment, program_frame, resolve, slot_at, slots, source_at, MarkerPin, Slot, TakenPart, JOIN_PREFIX,
 };
 pub use qnc_program_commands::{SegmentCommand, SegmentKind};
 
@@ -190,13 +189,6 @@ pub struct SegmentsView {
     /// The cuts between two clips on A1 where no M marker stands (user 2026-10-29: every cut
     /// is a marker); they have no slot and only their A1 sound is edited.
     pub joins: Vec<MarkerPin>,
-    /// The S-Story (user 2026-10-31: "this is not the Story"; every element is a SubClip with its
-    /// own IN and OUT): the IN (`ELEMENT_IN` + segment id) and OUT (`ELEMENT_OUT` + id) of every
-    /// element, in the place of the M markers and the cuts between two clips. Empty in the Story.
-    pub element_edges: Vec<MarkerPin>,
-    /// The element a zoom of the S-Story enlarges (its window has 15 % of the elements before
-    /// and after): only its own IN and OUT are taken there.
-    pub zoom_element: Option<String>,
     pub slots: Vec<Slot>,
     /// Covers by program frame.
     pub covers: Vec<CoverSpan>,
@@ -215,6 +207,9 @@ pub struct SegmentsView {
     /// The A1 cuts whose picture is away from their sound (the picture J of a Ton segment):
     /// (picture frame, sound frame) on the program, drawn red always (user 2026-10-22).
     pub a1_splits: Vec<(u64, u64)>,
+    /// The S-Story (user 2026-10-31): every clip is a slot, and its clip is to its slot what a
+    /// cover is to its own (the edit pictures follow it so).
+    pub clips_are_slots: bool,
     /// Sync/B-roll is on.
     pub sync_enabled: bool,
     /// The cover a Sync is writing, `[start, end)` on the program, until Enter or Delete
