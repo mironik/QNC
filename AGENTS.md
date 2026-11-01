@@ -7416,3 +7416,8 @@ IN klipa uzet bijela trim crta crtala se i na kraju klipa (kraj se mice s kracim
 playhead na OUT-u. Sada uzeti IN u S-Storyju ima samo jednu trim crtu, na IN-u (`qnc-program-segments` `refresh.rs`, test).
 Marker na samom pocetku ili kraju reda (prvi IN, zadnji OUT) crta se 1,5 px unutar reda, pa se vidi (`qnc-timeline`
 `paint_markers`; vrijedi i za Story). Testovi, conformance. Uzivo nije provjereno.
+Popravak 2026-11-01 (korisnik: "pomicu se u svim klipovima, pogledaj crvene linije... to nije ponasanje slotova i
+pokrivalica"): nacrt ruba klipa u S-Storyju pomicao je sve rezove iza uzetog ruba, a Wrap redovi ostalih klipova stoje, pa su
+se rezovi crtali usred tudih klipova. Sada se u nacrtu mice samo uzeti rub: OUT klipa; uzeti IN stoji (klip klizi ispod
+njega). Ostali klipovi i njihovi rezovi ostaju gdje jesu, kao kod slota pokrivalice; Enter i dalje upisuje pricu dulju ili
+kracu (`qnc-program-segments` `SlotTrim::moved`, test prilagoden). Uzivo nije provjereno.

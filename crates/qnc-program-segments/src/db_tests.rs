@@ -512,7 +512,7 @@ fn in_an_s_story_the_slot_tools_make_the_clip_and_the_story_longer_or_shorter() 
     for _ in 0..3 {
         segments.apply_action("step_forward_frame");
     }
-    assert_eq!(marker_frames(&segments), vec![0, 50, 103, 153], "the draft: everything after moves, the end too");
+    assert_eq!(marker_frames(&segments), vec![0, 50, 103, 150], "the draft: only the taken OUT moves, the other cuts stay (user 2026-11-01)");
     let last: Vec<_> = segments.view().edit_stills.iter().filter(|still| still.cut).filter_map(|still| still.picture.as_ref().map(|p| p.source_frame)).collect();
     assert_eq!(last, vec![152], "the clip plays on to its new last picture");
     segments.apply_action("activate_focused_item");

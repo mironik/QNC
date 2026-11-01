@@ -35,7 +35,11 @@ impl SlotTrim {
     /// end of the story excepted) it moves with the trim.
     pub(crate) fn moved(&self, frame: u64, total: u64) -> u64 {
         if self.ripple {
-            return if frame >= self.slot_end { frame.saturating_add_signed(self.frames) } else { frame };
+            // In the S-Story only the edge being edited moves in the draft: the OUT of the
+            // clip; its IN stays where it is (the clip slides under it). The other clips and
+            // their cuts stay drawn where they are, as with a slot of a cover (user 2026-11-01:
+            // "the red lines move in all the clips"); Enter writes the story longer or shorter.
+            return if !self.start && frame == self.slot_end { frame.saturating_add_signed(self.frames) } else { frame };
         }
         let reach = self.empty.map_or(total.saturating_sub(1), |(start, _)| start);
         if frame >= self.slot_end && frame <= reach && frame < total {
