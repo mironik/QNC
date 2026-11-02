@@ -7621,7 +7621,8 @@ stupac: monitor (trecina visine), red s tabovima poola i transportom, media pool
 isti panel prijepisa kao u AI Media Assistu. `qnc-editorial-layout` (`MediaOverlay.panel`, `media_overlay_layout`,
 `panel_at`: vrsta panela i tabovi na mjestu ploce), `qnc-editorial-blocks` (desni panel i panel prozora kroz istu granu,
 C10 isti 92). Conformance prolazi; test `ma_script_has_the_script_over_the_whole_form_and_the_media_in_its_overlay`
-prosiren, ali nije pokrenut: na racunalu nema MSVC linkera (`C:\Program Files\Microsoft Visual Studio\2022` je prazan),
-pa se nista ne moze prevesti. Debug cache obrisan uz dozvolu korisnika (`cargo clean --profile dev`, 12,3 GiB; disk je
-bio pun). Uzivo nije provjereno. Nije
+prosiren i prolazi (nakon ponovne instalacije Build Tools 2022 s MSVC v143 i Windows 11 SDK). Debug cache obrisan uz
+dozvolu korisnika (`cargo clean --profile dev`, 12,3 GiB; disk je bio pun). Release `qnc-app` izgraden bez znacajke
+`libav` (LLVM/libclang nije instaliran; player je zaseban program izgraden ranije s njom), pa slike zooma reza u
+aplikaciji idu kroz ffmpeg naredbu. Uzivo nije provjereno. Nije
 izvedeno: "Dodaj u pricu" u prozoru (redak ostaje ispod prozora).
