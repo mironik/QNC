@@ -226,7 +226,8 @@
       "right_panel": "script_writer_panel",
       "media_overlay": {
         "title": "@ma_script.media_title",
-        "panel": "transcript_panel"
+        "panel": "transcript_panel",
+        "bar": "script_clip_bar"
       },
       "tab_order": [
         "pool_tabs",

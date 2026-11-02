@@ -161,12 +161,15 @@ impl EditorialContracts {
         if let Some(panel) = &overlay.panel {
             parts.push(Part { size: Size::Rest, face: Some("right".into()), node: block(panel) });
         }
+        let height = qnc_action_bar_panel::height(self.shell.theme_metrics.chrome_control_height, self.editorial.board.block_pad);
+        if let Some(bar) = &overlay.bar {
+            parts.push(Part { size: px(height), face: None, node: block(bar) });
+        }
         parts.push(Part { size: px(self.dock_height()), face: None, node: block("source-dock") });
         let layout = Layout { face: Some("bg".into()), root: Node::Split { axis: Axis::Vertical, parts } };
         let layout = self.media_layout(layout);
         let bar = &self.composition().pool_actions;
         let shown = !bar.actions.is_empty() && bar.tabs.iter().any(|tab| tab_selected(tab));
-        let height = qnc_action_bar_panel::height(self.shell.theme_metrics.chrome_control_height, self.editorial.board.block_pad);
         Some(if shown { layout.split_place_below("clip-cards", POOL_ACTIONS, height) } else { layout })
     }
 
@@ -182,8 +185,8 @@ impl EditorialContracts {
         if block == "right-panel" {
             return Some((composition.right_panel.as_str(), composition.right_panel_tabs.as_slice()));
         }
-        let overlay = composition.media_overlay.as_ref()?.panel.as_deref()?;
-        (overlay == block).then_some((overlay, &[][..]))
+        let overlay = composition.media_overlay.as_ref()?;
+        [overlay.panel.as_deref(), overlay.bar.as_deref()].into_iter().flatten().find(|kind| *kind == block).map(|kind| (kind, &[][..]))
     }
 
     /// The window title of the media overlay of this group, if it has one.
@@ -370,6 +373,10 @@ pub struct MediaOverlay {
     /// transcript, user 2026-11-01); none: the pool reaches the source timeline.
     #[serde(default)]
     pub panel: Option<String>,
+    /// The panel kind of a bar over the source timeline (MA Script: the marked IN-OUT goes into
+    /// the story from there, user 2026-11-02); none: no bar.
+    #[serde(default)]
+    pub bar: Option<String>,
 }
 
 /// The buttons under the clip cards and the pool tabs they are shown on.
@@ -468,8 +475,9 @@ mod tests {
         assert_eq!(script.composition().right_panel, "script_writer_panel");
         assert_eq!(blocks(&script.board_layout(|_| false)), ["right-panel"]);
         let overlay = script.media_overlay_layout(|_| false).expect("the media overlay");
-        assert_eq!(blocks(&overlay), ["preview", "pool-head", "transport", "clip-cards", "transcript_panel", "source-dock"]);
+        assert_eq!(blocks(&overlay), ["preview", "pool-head", "transport", "clip-cards", "transcript_panel", "script_clip_bar", "source-dock"]);
         assert_eq!(script.panel_at("transcript_panel").map(|(kind, _)| kind), Some("transcript_panel"));
+        assert_eq!(script.panel_at("script_clip_bar").map(|(kind, _)| kind), Some("script_clip_bar"));
         assert_eq!(script.panel_at("right-panel").map(|(kind, _)| kind), Some("script_writer_panel"));
         assert!(script.panel_at("clip-cards").is_none());
         let audio = EditorialContracts::load("h").expect("MA Audio, group h");

@@ -239,6 +239,41 @@ fn clip_row(ui: &mut Ui, kind: &KindSpec, view: &ScriptView, theme: &qnc_desktop
     asked
 }
 
+/// The bar in the media window (user 2026-11-02: "Dodaj u priču" belongs where the IN-OUT is
+/// marked): a button per clip kind of the profile, the kind opened by its story button strong.
+/// Adding closes the media window and the kind, back to the script.
+pub fn show_clip_bar(ui: &mut Ui, view: &ScriptView, theme: &qnc_desktop_theme::Theme) -> Option<ActionEvent> {
+    let rect = ui.available_rect_before_wrap();
+    ui.painter().rect_filled(rect, 0.0, theme.surface);
+    let style = qnc_ui_kit::ChromeButtonStyle { text: theme.text, border: theme.border, focus: theme.focus, height: theme.chrome_control_height };
+    let open = open_kind(ui);
+    let mut asked = None;
+    let mut bar = ui.new_child(UiBuilder::new().max_rect(rect.shrink2(Vec2::new(12.0, 0.0))).layout(Layout::left_to_right(Align::Center)));
+    let say = qnc_ui_text::text(if view.marks { "writer.clip_bar" } else { "writer.clip_bar_no_marks" });
+    bar.label(RichText::new(say).color(if view.marks { theme.text } else { theme.text_muted }).size(theme.font_ui));
+    bar.with_layout(Layout::right_to_left(Align::Center), |ui| {
+        ui.spacing_mut().item_spacing.x = STORY_GAP;
+        for kind in view.profile.iter().flat_map(|profile| &profile.kinds).filter(|kind| kind.role == Role::Clip).collect::<Vec<_>>().into_iter().rev() {
+            let label = format!("+ {}", next_mark(kind, view));
+            let enabled = view.marks && view.recording.is_none();
+            let pressed = if open.as_deref() == Some(kind.id.as_str()) {
+                qnc_ui_kit::strong_button(ui, &label, enabled, theme.accent, theme.chrome_control_height).clicked()
+            } else {
+                qnc_ui_kit::chrome_button(ui, &label, enabled, false, style).on_hover_text(&kind.label).clicked()
+            };
+            if pressed {
+                asked = Some(ActionEvent::key(ADD_CLIP).with_target(kind.id.clone()).at(PANEL));
+            }
+        }
+    });
+    if asked.is_some() {
+        set_open_kind(ui, None);
+        qnc_media_overlay::set_open(ui.ctx(), false);
+    }
+    ui.allocate_rect(rect, Sense::hover());
+    asked
+}
+
 /// The mark the next block of `kind` gets: its numbered cue (`OFF 3`) or its short mark.
 fn next_mark(kind: &KindSpec, view: &ScriptView) -> String {
     if kind.cue.is_empty() {

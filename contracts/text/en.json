@@ -489,6 +489,8 @@
     "writer.clip_title": "{kind}: the IN-OUT marked on the source timeline goes into the story.",
     "writer.clip_no_marks": "Mark IN and OUT on the source timeline in the media window first.",
     "writer.clip_add": "Add to the story",
+    "writer.clip_bar": "Add the marked IN-OUT to the story as:",
+    "writer.clip_bar_no_marks": "Mark IN and OUT on the source timeline, then add it to the story.",
     "ai.tab_audio": "Audio AI",
     "ai.tab_video": "Video AI",
     "ma.transcribe_fast": "Fast",

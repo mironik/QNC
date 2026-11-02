@@ -7626,3 +7626,11 @@ dozvolu korisnika (`cargo clean --profile dev`, 12,3 GiB; disk je bio pun). Rele
 `libav` (LLVM/libclang nije instaliran; player je zaseban program izgraden ranije s njom), pa slike zooma reza u
 aplikaciji idu kroz ffmpeg naredbu. Uzivo nije provjereno. Nije
 izvedeno: "Dodaj u pricu" u prozoru (redak ostaje ispod prozora).
+Dopuna 2026-11-02 (korisnik: "dugme dodaj u pricu treba biti na overlay prozoru"): prozor medija MA Scripta ima iznad source
+timelinea traku "Dodaj oznaceni IN-OUT u pricu kao:" s gumbom za svaku vrstu klipa profila (+ IZJAVA 2, + STAND-UP, + NETON);
+vrsta otvorena svojim gumbom price je jaki gumb; bez IN/OUT-a gumbi su sivi. Dodavanje (`script_add_clip`) zatvara prozor i
+vrstu, natrag na scenarij. Traka je panel prozora iz ugovora rasporeda (`media_overlay.bar`: `script_clip_bar`), crta je
+`qnc-script-writer-panel` `show_clip_bar` kroz `qnc-right-panel`; vrsta `SCRIPT_CLIP_BAR` u `qnc-side-pieces`;
+`qnc-editorial-layout` (`MediaOverlay.bar`, mjesto u `media_overlay_layout`, `panel_at`), rjecnik `writer.clip_bar*`. Forma
+nije mijenjana (C10 isti). Redak ispod prozora na scenariju ostaje. Testovi `qnc-editorial-layout` (test prozora prosiren),
+`qnc-ui-text`, conformance, release build (bez `libav`). Uzivo nije provjereno.

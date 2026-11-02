@@ -188,6 +188,8 @@
     "writer.clip_title": "{kind}: IN-OUT označen na source timelineu ide u priču.",
     "writer.clip_no_marks": "Najprije u prozoru medija označi IN i OUT na source timelineu.",
     "writer.clip_add": "Dodaj u priču",
+    "writer.clip_bar": "Dodaj označeni IN-OUT u priču kao:",
+    "writer.clip_bar_no_marks": "Označi IN i OUT na source timelineu, pa ga dodaj u priču.",
     "ai.tab_audio": "AI zvuk",
     "ai.tab_video": "AI slika",
     "ma.transcribe_fast": "Brzo",

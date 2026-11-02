@@ -30,6 +30,9 @@ pub const VIDEO_AI_PANEL: &str = "video_ai_panel";
 pub const SCRIPT_PANEL: &str = "script_panel";
 /// Writing the story over the whole form (MA Script, user 2026-11-01): the same script.
 pub const SCRIPT_WRITER_PANEL: &str = "script_writer_panel";
+/// The bar in the media window of the story writer (user 2026-11-02): the marked IN-OUT goes into
+/// the story from where it is marked. It shows the script of the writer panel.
+pub const SCRIPT_CLIP_BAR: &str = "script_clip_bar";
 
 /// What the right panel pieces show; empty for a piece the form does not have.
 #[derive(Debug, Clone, Default, PartialEq)]
