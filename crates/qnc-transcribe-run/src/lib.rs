@@ -33,6 +33,9 @@ pub use qnc_transcript_db::{ClipTranscript, Line, Word};
 pub const MODULE_ID: &str = "qnc.module.transcribe-run";
 /// Seconds of one piece of a background range.
 const PIECE_SECONDS: u64 = 30;
+/// Seconds of sound before a piece that it is given again (user 2026-11-03: speech cut at the
+/// end of a piece lost its words, the engine writes nothing for speech cut off).
+const OVERLAP_SECONDS: usize = 2;
 /// How often a waiting or running background piece looks at the player.
 const LOOK_EVERY: Duration = Duration::from_millis(200);
 
@@ -204,13 +207,14 @@ fn hear_while_read(
             match read.start {
                 Some(start) if read.done || available >= window => {
                     let end = if read.done { read.samples.len() } else { processed + window };
-                    Some((read.samples[processed..end].to_vec(), start, read.done))
+                    let lead_from = processed.saturating_sub(OVERLAP_SECONDS * rate);
+                    Some((read.samples[lead_from..end].to_vec(), processed - lead_from, start, read.done))
                 }
                 _ if read.done => break,
                 _ => None,
             }
         };
-        let Some((block, start, last)) = next else {
+        let Some((with_lead, lead, start, last)) = next else {
             if cancel.load(Ordering::Relaxed) {
                 return Err(qnc_ui_text::text("transcribe.cancelled").into());
             }
@@ -218,8 +222,9 @@ fn hear_while_read(
             waited += Duration::from_millis(100);
             continue;
         };
+        let block = &with_lead[lead..];
         let block = match last {
-            true => &block[..],
+            true => block,
             false => &block[..qnc_transcribe_jobs::quiet_pieces(&block, rate, PIECE_SECONDS as usize)[0].end],
         };
         let block_start = start + processed as f64 / rate as f64;
@@ -230,10 +235,14 @@ fn hear_while_read(
         for span in qnc_transcribe_jobs::loud_spans(block, rate, floor) {
             for piece in qnc_transcribe_jobs::quiet_pieces(&block[span.clone()], rate, PIECE_SECONDS as usize) {
                 let range = span.start + piece.start..span.start + piece.end;
-                let samples = qnc_transcribe_jobs::to_whisper_rate(&block[range.clone()], rate as u32)?;
-                let piece_start = block_start + range.start as f64 / rate as f64;
+                // Each piece starts two seconds earlier, so the words a cut took from the piece
+                // before are heard again; the words already written are dropped.
+                let early = (OVERLAP_SECONDS * rate).min(lead + range.start);
+                let samples = qnc_transcribe_jobs::to_whisper_rate(&with_lead[lead + range.start - early..lead + range.end], rate as u32)?;
+                let piece_start = block_start + (range.start as f64 - early as f64) / rate as f64;
                 let heard_at = std::time::Instant::now();
                 let (heard, piece_language, by) = hear(job, ask, (busy, cancel), &samples, piece_start)?;
+                let heard = after_kept(heard, kept_until(&lines));
                 engine_time += heard_at.elapsed();
                 for line in &heard {
                     on_line(line);
@@ -289,6 +298,65 @@ fn hear(job: &Job, ask: &Ask, (busy, cancel): (&(dyn Fn() -> PlaybackLevel + Sen
             }
             Err(error) => return Err(error),
         }
+    }
+}
+
+/// The clip frame where the last word written so far ends.
+fn kept_until(lines: &[Line]) -> u64 {
+    lines.iter().flat_map(|line| line.words.iter().map(|w| w.to).chain([line.to])).max().unwrap_or(0)
+}
+
+/// The lines of a piece heard from earlier than its own start, without the words already
+/// written: a word is new when it starts at or after the end of the last written word (one
+/// frame of the engine's timing given). A line keeps its text when all its words are new; one
+/// cut in two is written again from the words left.
+fn after_kept(lines: Vec<Line>, until: u64) -> Vec<Line> {
+    let new = |from: u64| from + 1 >= until;
+    lines
+        .into_iter()
+        .filter_map(|line| {
+            if line.words.is_empty() {
+                return new(line.from).then_some(line);
+            }
+            if line.words.iter().all(|w| new(w.from)) {
+                return Some(line);
+            }
+            let words: Vec<Word> = line.words.into_iter().filter(|w| new(w.from)).collect();
+            let (first, last) = (words.first()?, words.last()?);
+            Some(Line { from: first.from, to: last.to.max(first.from), text: words.iter().map(|w| w.text.as_str()).collect::<Vec<_>>().join(" "), words })
+        })
+        .collect()
+}
+
+#[cfg(test)]
+mod overlap_tests {
+    use super::*;
+
+    fn word(from: u64, to: u64, text: &str) -> Word {
+        Word { from, to, text: text.into() }
+    }
+
+    fn line(words: Vec<Word>) -> Line {
+        let text = words.iter().map(|w| w.text.as_str()).collect::<Vec<_>>().join(" ");
+        Line { from: words[0].from, to: words[words.len() - 1].to, text, words }
+    }
+
+    #[test]
+    fn a_piece_heard_again_from_earlier_writes_only_the_words_the_cut_took() {
+        // The piece before ended mid-sentence: the engine wrote "meni je" and lost "žao".
+        let written = vec![line(vec![word(100, 110, "meni"), word(110, 118, "je")])];
+        // The next piece, two seconds earlier, heard the whole sentence again.
+        let again = vec![
+            line(vec![word(100, 111, "meni"), word(111, 118, "je"), word(120, 128, "žao")]),
+            line(vec![word(140, 150, "otišao.")]),
+        ];
+        let kept = after_kept(again, kept_until(&written));
+        assert_eq!(kept.len(), 2);
+        assert_eq!(kept[0].text, "žao");
+        assert_eq!((kept[0].from, kept[0].to), (120, 128));
+        assert_eq!(kept[1].text, "otišao.", "a line all new keeps its text");
+        assert!(after_kept(vec![line(vec![word(100, 110, "meni")])], 118).is_empty(), "a word written once is not written twice");
+        assert_eq!(after_kept(vec![line(vec![word(5, 9, "prvi")])], 0).len(), 1, "the first piece keeps everything");
     }
 }
 

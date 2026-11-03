@@ -7644,3 +7644,10 @@ iznad najnizeg suma klipa do tog mjesta, nikad visi od -42 (glasan klip kao prij
 Primjer `qnc-transcribe-jobs/examples/pieces.rs` racuna isto. Izmjereno na CH1 s kartice: 3608 808 s od 809 s (prag -58,4),
 3615 20,1 od 20,1 s, 3610 33,0 od 36,3 s, 3611 46,0 od 49,4 s. Prepisi napravljeni prije ostaju dok se klip ponovno ne
 prepise. Test `the_floor_follows_the_noise_of_its_clip`, conformance, release build. Uzivo nije provjereno.
+Dopuna 2026-11-03 (korisnik: "da, napravi preklapanje komada"): nakon praga prema klipu prepis Mironik 3608 imao je 2 rupe;
+jedna (747-757 s) je govor na granici komada od 30 s bez stanke za rez, koji Parakeet na samom isjecku prepozna. Red prepisa
+(`qnc-transcribe-run` `hear_while_read`) svaki komad daje motoru 2 s ranije (`OVERLAP_SECONDS`; i preko granice blokova
+citanja), a od rijeci tog komada zapisuje samo one koje pocinju na ili iza kraja zadnje zapisane rijeci (`kept_until`,
+`after_kept`; jedna slika tolerancije vremena motora; redak presjecen u dva pise se ponovno iz preostalih rijeci). Prvi komad
+i trim zoom nisu mijenjani. Test `a_piece_heard_again_from_earlier_writes_only_the_words_the_cut_took`, conformance, release
+build. Uzivo nije provjereno.
