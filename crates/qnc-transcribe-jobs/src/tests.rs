@@ -85,6 +85,26 @@ fn a_piece_whose_last_seconds_are_all_speech_ends_at_the_pause_before_them() {
 }
 
 #[test]
+fn the_floor_follows_the_noise_of_its_clip() {
+    let rate = 1000;
+    let level = |dbfs: f32| 10f32.powf(dbfs / 20.0);
+    // A quiet interview (as Mironik 3608, live 2026-11-03): noise at -64 dBFS, speech at -50.
+    let mut quiet = vec![level(-64.0); 3 * rate];
+    quiet.extend(vec![level(-50.0); 4 * rate]);
+    quiet.extend(vec![level(-64.0); 3 * rate]);
+    let floor = crate::clip_floor_dbfs(crate::noise_dbfs(&quiet, rate).unwrap());
+    assert!((floor + 58.0).abs() < 0.1, "6 dB over the noise: {floor}");
+    let spans = crate::loud_spans(&quiet, rate, floor);
+    assert_eq!(spans.len(), 1);
+    assert!(spans[0].start <= 3 * rate && spans[0].end >= 7 * rate, "the quiet speech is heard whole");
+    assert!(crate::loud_spans(&quiet, rate, -42.0).is_empty(), "a fixed -42 heard none of it");
+    // A loud clip keeps the floor it always had; digital silence does not take it to nothing.
+    assert_eq!(crate::clip_floor_dbfs(-30.0), crate::FLOOR_CEILING_DBFS);
+    assert_eq!(crate::clip_floor_dbfs(-120.0), -66.0);
+    assert_eq!(crate::noise_dbfs(&quiet[..rate / 2], rate), None, "under a second there is no noise to measure");
+}
+
+#[test]
 fn only_sound_over_the_floor_is_given_to_the_engine() {
     let rate = 1000;
     // 2 s quiet, 1 s loud, 0.5 s quiet, 1 s loud, 5 s quiet.

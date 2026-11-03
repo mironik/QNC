@@ -7634,3 +7634,13 @@ vrstu, natrag na scenarij. Traka je panel prozora iz ugovora rasporeda (`media_o
 `qnc-editorial-layout` (`MediaOverlay.bar`, mjesto u `media_overlay_layout`, `panel_at`), rjecnik `writer.clip_bar*`. Forma
 nije mijenjana (C10 isti). Redak ispod prozora na scenariju ostaje. Testovi `qnc-editorial-layout` (test prozora prosiren),
 `qnc-ui-text`, conformance, release build (bez `libav`). Uzivo nije provjereno.
+Otkljucano i izvedeno 2026-11-03 (korisnik: "gledam prepis... nedostaje puno teksta"; "da, otkljucaj i napravi prag prema
+klipu"; otkljucani `qnc-transcribe-run` i `qnc-transcribe-jobs`): log: Mironik 3608 (13,5 min) imao je iznad praga -42 dBFS
+samo 464 s od 809 s, tihi klipovi istog reda 1,3 od 20 s, 5,7 od 36 s, 7,8 od 49 s; izjava je snimljena na -46 do -55 dBFS
+(izmjereno ffmpegom s kartice, samo citanje), a isti Parakeet na izrezanim rupama daje cijeli tekst. Fiksni prag zamijenjen
+pragom prema klipu: sum je tihi deseti percentil desetinki sekunde bloka (`qnc-transcribe-jobs` `noise_dbfs`), prag je 6 dB
+iznad najnizeg suma klipa do tog mjesta, nikad visi od -42 (glasan klip kao prije) ni nizi od -66 dBFS (`clip_floor_dbfs`,
+`FLOOR_CEILING_DBFS`); red prepisa (`qnc-transcribe-run` `hear_while_read`) ga racuna dok cita i pise ga u log uz sum.
+Primjer `qnc-transcribe-jobs/examples/pieces.rs` racuna isto. Izmjereno na CH1 s kartice: 3608 808 s od 809 s (prag -58,4),
+3615 20,1 od 20,1 s, 3610 33,0 od 36,3 s, 3611 46,0 od 49,4 s. Prepisi napravljeni prije ostaju dok se klip ponovno ne
+prepise. Test `the_floor_follows_the_noise_of_its_clip`, conformance, release build. Uzivo nije provjereno.

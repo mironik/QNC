@@ -96,6 +96,38 @@ pub fn loud_spans(samples: &[f32], rate: usize, floor_dbfs: f32) -> Vec<std::ops
     spans
 }
 
+/// The floor never lies higher than this: a loud clip keeps the floor it always had.
+pub const FLOOR_CEILING_DBFS: f32 = -42.0;
+/// Speech is at least this much over the noise of its clip.
+const OVER_NOISE_DB: f32 = 6.0;
+/// The floor never lies lower than this, whatever the noise (digital silence has none).
+const FLOOR_BOTTOM_DBFS: f32 = -66.0;
+
+/// The noise of `samples` (at `rate`): the tenth of a second at the tenth percentile of loudness
+/// (RMS, dBFS), `None` for sound shorter than a second. A recording is quiet for at least a
+/// tenth of its time between words and sentences, so this is its room and microphone, not its
+/// speech.
+pub fn noise_dbfs(samples: &[f32], rate: usize) -> Option<f32> {
+    let tenth = (rate / 10).max(1);
+    let mut levels: Vec<f32> = samples
+        .chunks_exact(tenth)
+        .map(|w| 10.0 * (w.iter().map(|s| s * s).sum::<f32>() / w.len() as f32).max(1e-12).log10())
+        .collect();
+    if levels.len() < 10 {
+        return None;
+    }
+    levels.sort_by(f32::total_cmp);
+    Some(levels[levels.len() / 10])
+}
+
+/// The floor for a clip whose noise is `noise_dbfs`: 6 dB over it, never higher than -42 dBFS
+/// (a loud clip as before) and never lower than -66 dBFS (live 2026-11-03: an interview recorded
+/// at -46 to -55 dBFS was under the fixed -42 floor, so 43 % of its speech never reached the
+/// engine).
+pub fn clip_floor_dbfs(noise_dbfs: f32) -> f32 {
+    (noise_dbfs + OVER_NOISE_DB).clamp(FLOOR_BOTTOM_DBFS, FLOOR_CEILING_DBFS)
+}
+
 /// A tenth of a second quieter than this (RMS) is a pause, not a gap between two words.
 const PAUSE_DBFS: f32 = -45.0;
 

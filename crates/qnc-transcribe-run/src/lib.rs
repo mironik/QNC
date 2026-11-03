@@ -33,9 +33,6 @@ pub use qnc_transcript_db::{ClipTranscript, Line, Word};
 pub const MODULE_ID: &str = "qnc.module.transcribe-run";
 /// Seconds of one piece of a background range.
 const PIECE_SECONDS: u64 = 30;
-/// Sound quieter than this (RMS of a tenth of a second) is not given to the engine (user
-/// 2026-10-26: "sound under some level is skipped, not analysed").
-const SILENCE_FLOOR_DBFS: f32 = -42.0;
 /// How often a waiting or running background piece looks at the player.
 const LOOK_EVERY: Duration = Duration::from_millis(200);
 
@@ -175,7 +172,10 @@ fn read_sound(job: &Job, ask: &Ask, busy: &(dyn Fn() -> PlaybackLevel + Send + S
 
 /// Gives the sound to the engine as it is read: a piece once 35 s of sound beyond it are in
 /// (it is cut at the quietest place of its last seconds), the rest once the read is done. Only
-/// the sound over the floor goes to the engine.
+/// the sound over the clip's floor goes to the engine (user 2026-10-26: "sound under some level
+/// is skipped, not analysed"): 6 dB over the lowest noise met so far in the clip, never higher
+/// than -42 dBFS (user 2026-11-03: the floor follows the clip, a quiet interview lost 43 % of
+/// its speech under a fixed -42).
 fn hear_while_read(
     job: &Job,
     ask: &Ask,
@@ -186,6 +186,7 @@ fn hear_while_read(
 ) -> Result<(Vec<Line>, String, String), String> {
     let window = (PIECE_SECONDS as usize + 5) * rate;
     let (mut processed, mut heard_seconds) = (0usize, 0.0f64);
+    let (mut noise, mut floor) = (f32::INFINITY, qnc_transcribe_jobs::FLOOR_CEILING_DBFS);
     // Where the time goes, for the log (live 2026-10-27: "the speed is broken").
     let (started, mut engine_time, mut waited) = (std::time::Instant::now(), Duration::ZERO, Duration::ZERO);
     let mut read_took = None;
@@ -222,7 +223,11 @@ fn hear_while_read(
             false => &block[..qnc_transcribe_jobs::quiet_pieces(&block, rate, PIECE_SECONDS as usize)[0].end],
         };
         let block_start = start + processed as f64 / rate as f64;
-        for span in qnc_transcribe_jobs::loud_spans(block, rate, SILENCE_FLOOR_DBFS) {
+        if let Some(block_noise) = qnc_transcribe_jobs::noise_dbfs(block, rate) {
+            noise = noise.min(block_noise);
+            floor = qnc_transcribe_jobs::clip_floor_dbfs(noise);
+        }
+        for span in qnc_transcribe_jobs::loud_spans(block, rate, floor) {
             for piece in qnc_transcribe_jobs::quiet_pieces(&block[span.clone()], rate, PIECE_SECONDS as usize) {
                 let range = span.start + piece.start..span.start + piece.end;
                 let samples = qnc_transcribe_jobs::to_whisper_rate(&block[range.clone()], rate as u32)?;
@@ -248,7 +253,7 @@ fn hear_while_read(
         }
     }
     log(&format!(
-        "transcribe background {} {:.1}s of {:.1}s over {SILENCE_FLOOR_DBFS} dBFS; read {:.1}s, engine {:.1}s, waited for the read {:.1}s, all {:.1}s",
+        "transcribe background {} {:.1}s of {:.1}s over {floor:.1} dBFS (noise {noise:.1}); read {:.1}s, engine {:.1}s, waited for the read {:.1}s, all {:.1}s",
         ask.clip_id,
         heard_seconds,
         total,
