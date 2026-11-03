@@ -74,6 +74,9 @@ pub struct TimelineLayerFlags {
     /// (user 2026-10-15: Ctrl+click on V switches a Wrap row between filmstrip and a
     /// narrow video row).
     pub compact_video: bool,
+    /// Over the filmstrip every cover strip shows, not only under the mouse or when chosen
+    /// (user 2026-11-03: the parts of a composed statement laid out as covers are).
+    pub covers_shown: bool,
 }
 
 /// The dark band above the light middle of the video row (without audio bands).
@@ -103,7 +106,14 @@ impl TimelineLayerFlags {
             playhead: true,
             audio_bands: false,
             compact_video: false,
+            covers_shown: false,
         }
+    }
+
+    /// Every cover strip shows over the filmstrip.
+    pub fn with_covers_shown(mut self) -> Self {
+        self.covers_shown = true;
+        self
     }
 
     /// A1 above and A2 below the light middle of the video row, in its dark bands.
@@ -2159,7 +2169,7 @@ fn paint_covers(
         // Over the filmstrip the strip shows only under the mouse or when the cover is chosen
         // (user 2026-10-17); the narrow video row keeps it, it has no picture of its own.
         let strip = cover_strip(input);
-        if strip && !cover.selected && !cover.pending && !ui.rect_contains_pointer(rect) {
+        if strip && !input.layers.covers_shown && !cover.selected && !cover.pending && !ui.rect_contains_pointer(rect) {
             continue;
         }
         let base = match (cover.pending, cover.fill) {

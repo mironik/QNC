@@ -7,9 +7,10 @@
 
 use eframe::egui::{self, RichText};
 use qnc_action_event::ActionEvent;
+use qnc_segment_panel::{cover_fill, CoverLengthBand};
 use qnc_script::{SubsegmentView, DRAG_EDGE, JOIN_CUT, JOIN_GAP, PART_CHANNEL, PART_LEVEL, PART_MOVE, PART_OFF, PART_REMOVE, SUBSEGMENT_CUE, TAKE_EDGE};
 use qnc_timeline::{
-    AudioLane, TimelineFocusPaint, TimelineInput, TimelineIntent, TimelineLayerFlags, TimelineMarkerPart, TimelineMarkerPin,
+    AudioLane, TimelineCoverSpan, TimelineFocusPaint, TimelineInput, TimelineIntent, TimelineLayerFlags, TimelineMarkerPart, TimelineMarkerPin,
     TimelineMetrics, TimelinePicture, TimelineProjection, TimelineTheme, TimelineVirtualSpan,
 };
 
@@ -17,8 +18,8 @@ pub const MODULE_ID: &str = "qnc.module.subsegment-panel";
 
 /// The SubSegment as a body a dock draws under its header in place of its timeline; `None`
 /// when no SubSegment is open.
-pub fn body<'a>(subsegment: Option<&'a SubsegmentView>, theme: TimelineTheme) -> Option<impl FnMut(&mut egui::Ui) -> Option<ActionEvent> + 'a> {
-    subsegment.map(move |view| move |ui: &mut egui::Ui| show(ui, view, theme))
+pub fn body<'a>(subsegment: Option<&'a SubsegmentView>, theme: TimelineTheme, lengths: &'a [CoverLengthBand]) -> Option<impl FnMut(&mut egui::Ui) -> Option<ActionEvent> + 'a> {
+    subsegment.map(move |view| move |ui: &mut egui::Ui| show(ui, view, theme, lengths))
 }
 
 /// The dock body of whatever is open in place of the source timeline: `first` (the enlarged
@@ -27,15 +28,16 @@ pub fn or_body<'a>(
     first: Option<impl FnMut(&mut egui::Ui) -> Option<ActionEvent> + 'a>,
     subsegment: Option<&'a SubsegmentView>,
     theme: TimelineTheme,
+    lengths: &'a [CoverLengthBand],
 ) -> Option<Box<dyn FnMut(&mut egui::Ui) -> Option<ActionEvent> + 'a>> {
     match first {
         Some(first) => Some(Box::new(first)),
-        None => body(subsegment, theme).map(|body| Box::new(body) as Box<dyn FnMut(&mut egui::Ui) -> Option<ActionEvent> + 'a>),
+        None => body(subsegment, theme, lengths).map(|body| Box::new(body) as Box<dyn FnMut(&mut egui::Ui) -> Option<ActionEvent> + 'a>),
     }
 }
 
 /// Paints the SubSegment into the available rectangle.
-pub fn show(ui: &mut egui::Ui, view: &SubsegmentView, theme: TimelineTheme) -> Option<ActionEvent> {
+pub fn show(ui: &mut egui::Ui, view: &SubsegmentView, theme: TimelineTheme, lengths: &[CoverLengthBand]) -> Option<ActionEvent> {
     let rect = ui.available_rect_before_wrap();
     ui.painter().rect_filled(rect, 0.0, theme.background);
     // No title row above the timeline (user 2026-10-29: not needed); a clip of the pool brings
@@ -54,6 +56,33 @@ pub fn show(ui: &mut egui::Ui, view: &SubsegmentView, theme: TimelineTheme) -> O
         .zip(&labels)
         .zip(&ids)
         .map(|((part, label), id)| TimelineVirtualSpan { id, label, start_frame: part.start, end_frame: part.end, has_base_video: true, selected: false })
+        .collect();
+    // Every part laid out as a cover is (user 2026-11-03): a strip over its pictures in the
+    // colour of its length, with its length, always shown; the part being trimmed or heard is
+    // the chosen one.
+    let lengths_of: Vec<String> = view
+        .parts
+        .iter()
+        .map(|part| match view.rate {
+            Some((num, den)) => qnc_program_view::duration_label(part.end - part.start, num, den),
+            None => part.length.clone(),
+        })
+        .collect();
+    let covers: Vec<TimelineCoverSpan<'_>> = view
+        .parts
+        .iter()
+        .enumerate()
+        .zip(&ids)
+        .zip(&lengths_of)
+        .map(|(((index, part), id), length)| TimelineCoverSpan {
+            id,
+            start_frame: part.start,
+            end_frame: part.end,
+            selected: view.trim.is_some_and(|(at, _, _)| at == index) || view.sound == Some(index),
+            pending: false,
+            fill: cover_fill(part.end - part.start, view.rate, lengths),
+            label: Some(length.as_str()),
+        })
         .collect();
     // A line on every edge (the IN and OUT of every part): a right click near one takes it.
     let edge_ids: Vec<String> = (0..view.parts.len()).flat_map(|index| [format!("edge-{index}-in"), format!("edge-{index}-out")]).collect();
@@ -86,7 +115,7 @@ pub fn show(ui: &mut egui::Ui, view: &SubsegmentView, theme: TimelineTheme) -> O
                 ui,
                 TimelineInput {
                     state: &state,
-                    layers: TimelineLayerFlags::a1_v_a2().with_overlays().with_audio_bands(),
+                    layers: TimelineLayerFlags::a1_v_a2().with_overlays().with_audio_bands().with_covers_shown(),
                     metrics: TimelineMetrics::default(),
                     theme,
                     expanded_audio: AudioLane::None,
@@ -103,7 +132,7 @@ pub fn show(ui: &mut egui::Ui, view: &SubsegmentView, theme: TimelineTheme) -> O
                     a3_peaks: &[],
                     a4_peaks: &[],
                     virtual_spans: &spans,
-                    covers: &[],
+                    covers: &covers,
                     marker_slots: &[],
                     markers: &markers,
                     base_video_blank: false,
@@ -136,6 +165,11 @@ pub fn show(ui: &mut egui::Ui, view: &SubsegmentView, theme: TimelineTheme) -> O
         // A click on a part's picture is a click on its row (user 2026-10-29: the filmstrip did
         // not take the playhead): the parts are not chosen, the playhead goes there.
         TimelineIntent::CueFrame(frame) | TimelineIntent::SelectVirtual { frame, .. } => Some(ActionEvent::key(SUBSEGMENT_CUE).with_target(frame.to_string())),
+        // A click on a part's colour strip puts the playhead on its first frame (its IN).
+        TimelineIntent::SelectCover { frame, .. } | TimelineIntent::TakeCoverOnStrip { frame, .. } => {
+            let start = view.parts.iter().find(|part| frame >= part.start && frame < part.end).map_or(frame, |part| part.start);
+            Some(ActionEvent::key(SUBSEGMENT_CUE).with_target(start.to_string()))
+        }
         // A right click on a join takes the IN of the part after it, as Ctrl+I.
         // A right click takes the IN or OUT nearest to where it was (user 2026-10-29: every IN
         // and OUT of every part); at a join the side clicked on decides.

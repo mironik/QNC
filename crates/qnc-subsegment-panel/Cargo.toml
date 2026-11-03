@@ -7,7 +7,9 @@ description = "QNC public passive panel: the SubSegment open in place of the sou
 [dependencies]
 eframe = { workspace = true }
 qnc-action-event = { workspace = true }
+qnc-program-view = { workspace = true }
 qnc-script = { workspace = true }
+qnc-segment-panel = { workspace = true }
 qnc-timeline = { workspace = true }
 qnc-trim-overlay = { workspace = true }
 qnc-wheel-jog = { workspace = true }

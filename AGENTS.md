@@ -7682,3 +7682,13 @@ slagati"; log: Otvori slozenu izjavu pokrenuo je player na SubSegmentu, a prozor
 (`qnc-subsegment-panel`, rubovi dijelova, zoom reza, A1 dijela, pauze i spojevi) stoji na mjestu source timelinea, a u MA Scriptu
 je source timeline samo u prozoru medija. Gumb Otvori na bloku price (klip ili slozena izjava) sada otvara i prozor medija
 (`qnc-script-writer-panel`). Conformance, release build. Uzivo nije provjereno.
+Popravak i dopuna 2026-11-03 (korisnik: "nevidi se cijeli owerlay... ujedno klipovi bi trebali biti slozeni kao sto radimo s
+pokrivalicama"; snimka zaslona: prozor medija izlazio je desno i dolje preko ruba ekrana): (1) `qnc-media-overlay`: prozor je
+uvijek u sredini ekrana (`anchor`, ne pomice se, ne pamti stari polozaj), a ono sto se u njemu crta dobiva tocno njegovo tijelo
+(dijete s tim pravokutnikom i odrezom), pa sadrzaj vise ne siri prozor preko ekrana. (2) Slozena izjava: svaki dio je na
+slozenom timelineu traka kao pokrivalica, u boji svoje duljine (iste granice `cover_lengths`) s duljinom `sekunde:slike`,
+uvijek vidljiva; dio ciji je rub ili A1 uzet je izabran. Klik na traku stavlja playhead na IN dijela. `qnc-timeline`
+`TimelineLayerFlags.covers_shown` / `with_covers_shown` (trake pokrivalica preko filmstripa uvijek vidljive; drugdje kao prije),
+`qnc-subsegment-panel` (prima `cover_lengths`, ovisi o `qnc-segment-panel` i `qnc-program-view`), `qnc-script`
+`SubsegmentView.rate` (stopa klipa prvog dijela). Testovi `qnc-timeline` (zlatna tablica misa), `qnc-subsegment-panel`,
+`qnc-media-overlay`, conformance, release build. Uzivo nije provjereno.

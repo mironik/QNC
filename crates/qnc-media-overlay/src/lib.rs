@@ -52,18 +52,23 @@ pub fn show<R>(ctx: &egui::Context, theme: &Theme, title: &str, draw: impl FnOnc
     let screen = ctx.screen_rect();
     let size = window_size(screen.size());
     let frame = egui::Frame::window(&ctx.style()).fill(theme.bg).stroke(egui::Stroke::new(1.0, theme.border_soft));
+    // Always in the middle of the screen and never larger than its share: what is drawn in it
+    // gets exactly that body (user 2026-11-03: the window went past the screen's edges).
     let shown = egui::Window::new(title)
         .id(Id::new("qnc-media-overlay-window"))
         .open(&mut open)
         .collapsible(false)
         .resizable(false)
-        .movable(true)
+        .movable(false)
         .frame(frame)
         .fixed_size(size)
-        .default_pos(screen.center() - size / 2.0)
+        .anchor(egui::Align2::CENTER_CENTER, Vec2::ZERO)
         .show(ctx, |ui| {
-            ui.set_min_size(size);
-            draw(ui)
+            let body = Rect::from_min_size(ui.cursor().min, size);
+            ui.allocate_rect(body, egui::Sense::hover());
+            let mut inside = ui.new_child(egui::UiBuilder::new().max_rect(body).layout(egui::Layout::top_down(egui::Align::Min)));
+            inside.set_clip_rect(body.intersect(ui.clip_rect()));
+            draw(&mut inside)
         });
     set_open(ctx, open);
     shown.and_then(|shown| shown.inner).flatten()

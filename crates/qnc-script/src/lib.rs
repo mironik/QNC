@@ -284,6 +284,7 @@ impl Script {
             Box::new(zoom)
         });
         shown.sound = self.sound.map(|sound| sound.index);
+        shown.rate = pieces.first().and_then(|piece| names.get(&piece.clip_id)).filter(|(_, frames, seconds)| *seconds > 0.0 && *frames > 0).map(|(_, frames, seconds)| ((*frames as f64 / seconds).round() as u32, 1));
         self.view.subsegment = Some(shown);
     }
 
