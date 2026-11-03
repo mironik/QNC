@@ -7677,3 +7677,8 @@ transport i posteri; ispod panel prijepisa cijelom sirinom; dolje traka "Dodaj u
 (dio vodoravne podjele sirok koliko visina trazi za omjer slike). Testovi `qnc-board` (novi
 `a_picture_across_a_horizontal_split_is_as_wide_as_its_height_asks`), `qnc-editorial-layout`, conformance, release build.
 Uzivo nije provjereno.
+Popravak 2026-11-03 (korisnik, MA Script: "trebamo slozeni timeline koji prikazuje slozeni subsegment kako bi se mogao fino
+slagati"; log: Otvori slozenu izjavu pokrenuo je player na SubSegmentu, a prozor medija ostao je zatvoren): slozeni timeline
+(`qnc-subsegment-panel`, rubovi dijelova, zoom reza, A1 dijela, pauze i spojevi) stoji na mjestu source timelinea, a u MA Scriptu
+je source timeline samo u prozoru medija. Gumb Otvori na bloku price (klip ili slozena izjava) sada otvara i prozor medija
+(`qnc-script-writer-panel`). Conformance, release build. Uzivo nije provjereno.
