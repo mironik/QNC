@@ -191,6 +191,9 @@ struct Trim {
     out: bool,
     from: u64,
     to: u64,
+    /// The whole cut of a join taken (user 2026-11-03: edited as a cover's M marker is): the OUT
+    /// of this part and the IN of the next move together; the next part's IN as drafted.
+    roll: Option<u64>,
 }
 
 impl Default for Script {
@@ -284,6 +287,7 @@ impl Script {
             Box::new(zoom)
         });
         shown.sound = self.sound.map(|sound| sound.index);
+        shown.roll = self.trim.is_some_and(|trim| trim.roll.is_some());
         shown.rate = pieces.first().and_then(|piece| names.get(&piece.clip_id)).filter(|(_, frames, seconds)| *seconds > 0.0 && *frames > 0).map(|(_, frames, seconds)| ((*frames as f64 / seconds).round() as u32, 1));
         self.view.subsegment = Some(shown);
     }
@@ -294,6 +298,9 @@ impl Script {
         if let Some(trim) = self.trim {
             if block.pieces.len() > trim.index {
                 (block.pieces[trim.index].from_frame, block.pieces[trim.index].to_frame) = (trim.from, trim.to);
+            }
+            if let (Some(from), Some(next)) = (trim.roll, block.pieces.get_mut(trim.index + 1)) {
+                next.from_frame = from;
             }
         }
         if let Some(sound) = self.sound {
@@ -354,7 +361,7 @@ impl Script {
     fn trim_key(&mut self, action_id: &str, target: Option<&str>, preview: &SourcePreview) -> Option<bool> {
         let block = self.block(self.open_subsegment)?.clone();
         let pieces = view::block_pieces(&block);
-        let take = |index: usize, out: bool| pieces.get(index).map(|piece| Trim { index, out, from: piece.from_frame, to: piece.to_frame });
+        let take = |index: usize, out: bool| pieces.get(index).map(|piece| Trim { index, out, from: piece.from_frame, to: piece.to_frame, roll: None });
         if let Some(done) = self.sound_key(action_id, &block, &pieces, preview) {
             return Some(done);
         }
@@ -372,16 +379,19 @@ impl Script {
             TAKE_EDGE => {
                 let mut parts = target.unwrap_or_default().split(':');
                 let index = parts.next().and_then(|index| index.parse::<usize>().ok())?;
-                let out = parts.next() == Some("out");
+                let side = parts.next();
+                let (out, cut) = (side != Some("in"), side == Some("cut"));
+                // The whole cut of a join: this part's OUT with the next part's IN.
+                let take = |index: usize, out: bool| {
+                    let trim = take(index, out)?;
+                    Some(if cut { Trim { roll: Some(pieces.get(index + 1)?.from_frame), ..trim } } else { trim })
+                };
                 // Another edge taken (a picture of the zoom clicked, user 2026-10-29): a moved
                 // edge is kept first, the same part keeps its drafted range.
                 let new = match self.trim.take() {
-                    Some(old) if old.index == index => Some(Trim { out, ..old }),
+                    Some(old) if old.index == index && !cut && old.roll.is_none() => Some(Trim { out, ..old }),
                     Some(old) => {
-                        if pieces.get(old.index).is_some_and(|piece| (piece.from_frame, piece.to_frame) != (old.from, old.to)) {
-                            let (piece, id) = (self.trimmed_piece(&pieces[old.index], old), block.id);
-                            self.write(preview, move |target| qnc_script_db::set_piece(target, id, old.index, piece).map(|_| None));
-                        }
+                        self.write_trim(preview, &block, &pieces, old);
                         take(index, out)
                     }
                     None => take(index, out),
@@ -394,9 +404,7 @@ impl Script {
             "wheel_source_back" | "wheel_source_forward" if self.trim.is_some() => if qnc_wheel_jog::source_step_forward(action_id)? { 1 } else { -1 },
             "activate_focused_item" if self.trim.is_some() => {
                 let trim = self.trim.take()?;
-                let piece = self.trimmed_piece(&pieces[trim.index], trim);
-                let id = block.id;
-                return Some(self.write(preview, move |target| qnc_script_db::set_piece(target, id, trim.index, piece).map(|_| None)));
+                return Some(self.write_trim(preview, &block, &pieces, trim));
             }
             "clear_focus" if self.trim.is_some() => {
                 self.trim = None;
@@ -405,12 +413,21 @@ impl Script {
             }
             _ => return None,
         };
-        let trim = self.trim.as_mut()?;
-        let length = self.names.get(&pieces[trim.index].clip_id).map_or(u64::MAX, |(_, frames, _)| *frames);
-        match trim.out {
-            true => trim.to = trim.to.saturating_add_signed(step).clamp(trim.from + 1, length),
-            false => trim.from = trim.from.saturating_add_signed(step).min(trim.to - 1),
+        let mut trim = self.trim?;
+        match trim.roll {
+            Some(_) => {
+                let to = trim.to.saturating_add_signed(step);
+                self.roll_to(&mut trim, &pieces, to);
+            }
+            None => {
+                let length = self.names.get(&pieces[trim.index].clip_id).map_or(u64::MAX, |(_, frames, _)| *frames);
+                match trim.out {
+                    true => trim.to = trim.to.saturating_add_signed(step).clamp(trim.from + 1, length),
+                    false => trim.from = trim.from.saturating_add_signed(step).min(trim.to - 1),
+                }
+            }
         }
+        self.trim = Some(trim);
         let drafted = self.drafted(block);
         self.pieces_request = Some((view::piece_inputs(&drafted), self.edge_frame(&drafted).unwrap_or(0)));
         Some(true)
@@ -422,18 +439,61 @@ impl Script {
     fn drag_edge(&mut self, target: Option<&str>, block: &Block, pieces: &[Piece]) -> Option<bool> {
         let mut parts = target?.split(':');
         let (index, out, frame) = (parts.next()?.parse::<usize>().ok()?, parts.next()? == "out", parts.next()?.parse::<u64>().ok()?);
-        let trim = self.trim.as_mut().filter(|trim| trim.index == index && trim.out == out)?;
+        let mut trim = self.trim.filter(|trim| trim.index == index && trim.out == out)?;
         // The part's start on the axis does not move while its own edges move.
         let start = view::subsegment_view(block, None).parts.get(index)?.start;
         let piece = pieces.get(index)?;
         let length = self.names.get(&piece.clip_id).map_or(u64::MAX, |(_, frames, _)| *frames);
-        match out {
-            true => trim.to = (trim.from + frame.saturating_sub(start)).clamp(trim.from + 1, length),
-            false => trim.from = (piece.from_frame as i64 + frame as i64 - start as i64).clamp(0, trim.to as i64 - 1) as u64,
+        match (out, trim.roll) {
+            (true, Some(_)) => {
+                let to = trim.from + frame.saturating_sub(start);
+                self.roll_to(&mut trim, pieces, to);
+            }
+            (true, None) => trim.to = (trim.from + frame.saturating_sub(start)).clamp(trim.from + 1, length),
+            (false, _) => trim.from = (piece.from_frame as i64 + frame as i64 - start as i64).clamp(0, trim.to as i64 - 1) as u64,
         }
+        self.trim = Some(trim);
         let drafted = self.drafted(block.clone());
         self.pieces_request = Some((view::piece_inputs(&drafted), self.edge_frame(&drafted).unwrap_or(0)));
         Some(true)
+    }
+
+    /// The whole cut of a join moved so this part's OUT is `to`: the next part's IN moves as far,
+    /// each within its own clip and keeping at least a frame; a move one of them cannot take is
+    /// taken only as far as both can (a roll, the length of the statement stays).
+    fn roll_to(&self, trim: &mut Trim, pieces: &[Piece], to: u64) {
+        let (Some(next_from), Some(next)) = (trim.roll, pieces.get(trim.index + 1)) else { return };
+        let length = self.names.get(&pieces[trim.index].clip_id).map_or(u64::MAX, |(_, frames, _)| *frames);
+        let wanted = to as i64 - trim.to as i64;
+        let earliest = (trim.from as i64 + 1 - trim.to as i64).max(-(next_from as i64));
+        let latest = (length as i64 - trim.to as i64).min(next.to_frame as i64 - 1 - next_from as i64);
+        let moved = wanted.clamp(earliest.min(0), latest.max(0));
+        trim.to = (trim.to as i64 + moved) as u64;
+        trim.roll = Some((next_from as i64 + moved) as u64);
+    }
+
+    /// Writes the parts a trim moved (the part, and the next one of a whole cut); nothing when
+    /// nothing moved. Returns whether a write went.
+    fn write_trim(&mut self, preview: &SourcePreview, block: &Block, pieces: &[Piece], trim: Trim) -> bool {
+        let id = block.id;
+        let mut writes = Vec::new();
+        if pieces.get(trim.index).is_some_and(|piece| (piece.from_frame, piece.to_frame) != (trim.from, trim.to)) {
+            writes.push((trim.index, self.trimmed_piece(&pieces[trim.index], trim)));
+        }
+        if let (Some(from), Some(next)) = (trim.roll, pieces.get(trim.index + 1)) {
+            if from != next.from_frame {
+                writes.push((trim.index + 1, self.trimmed_piece(next, Trim { index: trim.index + 1, out: false, from, to: next.to_frame, roll: None })));
+            }
+        }
+        if writes.is_empty() {
+            return true;
+        }
+        self.write(preview, move |target| {
+            for (index, piece) in writes {
+                qnc_script_db::set_piece(target, id, index, piece)?;
+            }
+            Ok(None)
+        })
     }
 
     /// The frame of the trimmed edge on the SubSegment's axis (the last frame of an OUT).
@@ -471,7 +531,12 @@ impl Script {
     pub fn act(&mut self, action_id: &str, target: Option<&str>, (preview, timeline, timecode, transcript): (&SourcePreview, &TimelineProjection, Option<&SourceTimecode>, &TranscriptView)) -> Option<bool> {
         // While a SubSegment is open in place of the source timeline its trim keys are its own.
         if self.open_subsegment.is_some() {
-            if let Some(done) = self.trim_key(action_id, target, preview) {
+            let done = self.trim_key(action_id, target, preview);
+            if qnc_dev_diagnostics::player_diagnostics_enabled() {
+                let trim = self.trim.map(|trim| format!("{}:{}{}", trim.index, if trim.out { "out" } else { "in" }, if trim.roll.is_some() { ":cut" } else { "" }));
+                qnc_dev_diagnostics::log_line(qnc_dev_diagnostics::DiagnosticsStream::Player, format!("subsegment-key action={action_id} target={target:?} done={done:?} trim={trim:?} sound={:?}", self.sound.map(|sound| sound.index)));
+            }
+            if let Some(done) = done {
                 return Some(done);
             }
         }

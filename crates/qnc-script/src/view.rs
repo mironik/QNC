@@ -384,6 +384,8 @@ pub struct SubsegmentView {
     /// The frame rate of the parts (of the first part's clip), once known: a part's length in
     /// seconds and its colour as a cover's (user 2026-11-03).
     pub rate: Option<(u32, u32)>,
+    /// The taken edge is the whole cut of a join: the trimmed part's OUT and the next part's IN.
+    pub roll: bool,
 }
 
 /// The parts on the SubSegment's axis (a pause before a part moves it on).
@@ -401,7 +403,7 @@ pub fn subsegment_view(block: &Block, playhead: Option<u64>) -> SubsegmentView {
             part
         })
         .collect();
-    SubsegmentView { block_id: block.id, parts, total_frames: start, playhead, a1: Vec::new(), pictures: Vec::new(), trim: None, zoom: None, sound: None, rate: None }
+    SubsegmentView { block_id: block.id, parts, total_frames: start, playhead, a1: Vec::new(), pictures: Vec::new(), trim: None, zoom: None, sound: None, rate: None, roll: false }
 }
 
 /// Where the parts play on the SubSegment's axis, for its wave (channel 1 of each clip: the

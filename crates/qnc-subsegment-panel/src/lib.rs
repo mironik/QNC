@@ -94,7 +94,7 @@ pub fn show(ui: &mut egui::Ui, view: &SubsegmentView, theme: TimelineTheme, leng
         .zip(&edge_ids)
         // The taken edge is the one a drag drags (the mouse rule: only what is taken moves).
         .map(|((index, out, frame), id)| {
-            let taken = view.trim.is_some_and(|(at, trim_out, _)| at == index && trim_out == out);
+            let taken = view.trim.is_some_and(|(at, trim_out, _)| (at == index && trim_out == out) || (view.roll && !out && index == at + 1));
             TimelineMarkerPin { id, frame, taken, locked: false, part: TimelineMarkerPart::Whole, origin: None, sound_tail: None, sound_lead: None, join: false, a1_tail: None, a1_lead: None, sound_lane: 1 }
         })
         .collect();
@@ -144,7 +144,7 @@ pub fn show(ui: &mut egui::Ui, view: &SubsegmentView, theme: TimelineTheme, leng
                     trim_playheads: &trim,
                     a1_splits: &[],
                     pictures: &pictures,
-                    holding: false,
+                    holding: view.trim.is_some() || view.sound.is_some(),
                 },
             )
         })
@@ -152,7 +152,12 @@ pub fn show(ui: &mut egui::Ui, view: &SubsegmentView, theme: TimelineTheme, leng
     // A drag of the taken edge (user 2026-10-29): the edge follows the pointer as a draft;
     // letting go keeps it, as Enter.
     let dragging = egui::Id::new("qnc_subsegment_edge_drag");
-    let dragged = qnc_timeline::take_marker_drag(ui.ctx()).and_then(|(id, frame)| drag_target(&id, frame));
+    // A whole cut taken: a drag of either of its edges drags the cut (the OUT before it).
+    let rolled = |id: String| match view.trim.filter(|_| view.roll) {
+        Some((at, _, _)) if id == format!("edge-{}-in", at + 1) => format!("edge-{at}-out"),
+        _ => id,
+    };
+    let dragged = qnc_timeline::take_marker_drag(ui.ctx()).and_then(|(id, frame)| drag_target(&rolled(id), frame));
     let was_dragging = ui.ctx().data(|d| d.get_temp::<bool>(dragging)).unwrap_or(false);
     ui.ctx().data_mut(|d| d.insert_temp(dragging, dragged.is_some() || (was_dragging && ui.ctx().input(|i| i.pointer.primary_down()))));
     let drag_event = match dragged {
@@ -161,7 +166,11 @@ pub fn show(ui: &mut egui::Ui, view: &SubsegmentView, theme: TimelineTheme, leng
         None => None,
     };
     answer = answer.or(drag_event);
+    let holding = view.trim.is_some() || view.sound.is_some();
     let event = match intent {
+        // While an edge, a cut or a part's A1 is taken a left click keeps it, as Enter (the mouse
+        // rule, as on a cover's row; user 2026-11-03).
+        TimelineIntent::CueFrame(_) | TimelineIntent::SelectVirtual { .. } | TimelineIntent::SelectCover { .. } | TimelineIntent::Keep(_) if holding => Some(ActionEvent::key("activate_focused_item")),
         // A click on a part's picture is a click on its row (user 2026-10-29: the filmstrip did
         // not take the playhead): the parts are not chosen, the playhead goes there.
         TimelineIntent::CueFrame(frame) | TimelineIntent::SelectVirtual { frame, .. } => Some(ActionEvent::key(SUBSEGMENT_CUE).with_target(frame.to_string())),
@@ -173,7 +182,7 @@ pub fn show(ui: &mut egui::Ui, view: &SubsegmentView, theme: TimelineTheme, leng
         // A right click on a join takes the IN of the part after it, as Ctrl+I.
         // A right click takes the IN or OUT nearest to where it was (user 2026-10-29: every IN
         // and OUT of every part); at a join the side clicked on decides.
-        TimelineIntent::TakeMarker { frame, .. } => nearest_edge(view, frame).map(|(index, out)| ActionEvent::key(TAKE_EDGE).with_target(format!("{index}:{}", if out { "out" } else { "in" }))),
+        TimelineIntent::TakeMarker { frame, .. } => nearest_edge(view, frame).map(|(index, side)| ActionEvent::key(TAKE_EDGE).with_target(format!("{index}:{side}"))),
         // The wheel moves the playhead, or the taken edge, a frame as the arrows do.
         TimelineIntent::Wheel(wheel) if !wheel.ctrl => Some(ActionEvent::key(if wheel.up == qnc_wheel_jog::source_step_forward("wheel_source_forward").unwrap_or(true) { "step_forward_frame" } else { "step_back_frame" })),
         // Ctrl+wheel: the level of the taken A1 (Ctrl+1), as on a cover's lane.
@@ -253,16 +262,26 @@ pub fn drag_target(id: &str, frame: u64) -> Option<String> {
     matches!(side, "in" | "out").then(|| format!("{index}:{side}:{frame}"))
 }
 
-/// The edge nearest to `frame`: its part and whether it is the OUT. An OUT lies past the part's
-/// last frame, an IN on its first; where an OUT and the next IN meet (a join without a pause),
-/// the frame before the join takes the OUT, the frame on or after it the IN.
-pub fn nearest_edge(view: &SubsegmentView, frame: u64) -> Option<(usize, bool)> {
-    view.parts
+/// The edge nearest to `frame`: its part and its side, `in`, `out` or `cut`. A right click takes
+/// the whole of what it is on, as on a cover's row (user 2026-11-03): where an OUT and the next
+/// IN meet (a join without a pause) that is the cut of both (`cut`, on the part before it, a
+/// roll); an IN after a pause, an OUT before one, the first IN and the last OUT are their own.
+/// Only one side of a cut is taken in its zoom (the picture left of the cut its OUT, the one
+/// right of it the next IN) or with Ctrl+I / Ctrl+O.
+pub fn nearest_edge(view: &SubsegmentView, frame: u64) -> Option<(usize, &'static str)> {
+    let (index, out, at) = view
+        .parts
         .iter()
         .enumerate()
         .flat_map(|(index, part)| [(index, false, part.start), (index, true, part.end)])
-        .min_by_key(|(_, out, at)| (frame.abs_diff(*at), (*out && frame >= *at) || (!*out && frame < *at)))
-        .map(|(index, out, _)| (index, out))
+        .min_by_key(|(_, out, at)| (frame.abs_diff(*at), (*out && frame >= *at) || (!*out && frame < *at)))?;
+    let joined = |before: usize| view.parts.get(before + 1).is_some_and(|next| next.start == view.parts[before].end);
+    Some(match (out, index) {
+        (true, index) if joined(index) => (index, "cut"),
+        (false, index) if index > 0 && joined(index - 1) && view.parts[index - 1].end == at => (index - 1, "cut"),
+        (true, index) => (index, "out"),
+        (false, index) => (index, "in"),
+    })
 }
 
 #[cfg(test)]
@@ -277,12 +296,12 @@ mod tests {
     #[test]
     fn a_right_click_takes_every_in_and_out_of_every_part() {
         let view = SubsegmentView { parts: vec![part(0, 50), part(50, 90), part(95, 145)], total_frames: 145, ..Default::default() };
-        assert_eq!(nearest_edge(&view, 2), Some((0, false)), "the first part's IN");
-        assert_eq!(nearest_edge(&view, 48), Some((0, true)), "the first part's OUT, before the join");
-        assert_eq!(nearest_edge(&view, 52), Some((1, false)), "the next part's IN, after the join");
-        assert_eq!(nearest_edge(&view, 91), Some((1, true)), "an OUT before a pause");
-        assert_eq!(nearest_edge(&view, 94), Some((2, false)), "an IN after a pause");
-        assert_eq!(nearest_edge(&view, 140), Some((2, true)), "the last part's OUT");
+        assert_eq!(nearest_edge(&view, 2), Some((0, "in")), "the first part's IN");
+        assert_eq!(nearest_edge(&view, 48), Some((0, "cut")), "a join without a pause is one cut, before it");
+        assert_eq!(nearest_edge(&view, 52), Some((0, "cut")), "and after it");
+        assert_eq!(nearest_edge(&view, 91), Some((1, "out")), "an OUT before a pause");
+        assert_eq!(nearest_edge(&view, 94), Some((2, "in")), "an IN after a pause");
+        assert_eq!(nearest_edge(&view, 140), Some((2, "out")), "the last part's OUT");
     }
 
     #[test]

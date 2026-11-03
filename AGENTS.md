@@ -7700,3 +7700,13 @@ ponovno (prije: pokretanje ffmpega na pokvarenu karticu svakih ~100 ms; nakon po
 kanal daje gresku i proces zavrsava uredno umjesto panica "failed printing to stdout: The pipe is being closed". Player i
 `qnc-app` izgradeni s `libav` (bindgen dobiva MSVC i Windows SDK include kroz `BINDGEN_EXTRA_CLANG_ARGS`). Testovi
 `qnc-trim-stills`, conformance. Uzivo nije provjereno.
+Dopuna 2026-11-03 (korisnik: "uredivanje subsegmenta treba imati sve mogucnosti kao kod pokrivalica i slota"; log: play
+radi, rad samo klikovima, uredivanje se nije zapisivalo): slozena izjava se uredjuje po pravilu misa pokrivalica i slota.
+(1) Desni klik na spoju dvaju dijelova bez pauze uzima cijeli rez (kao M marker): OUT dijela prije i IN dijela poslije
+pomicu se zajedno (roll, duljina izjave ostaje), svaki unutar svog klipa; strelice, kotacic i povlacenje bilo kojeg od dva
+ruba ga pomicu, zoom pokazuje zadnju sliku prije i prvu poslije reza, Enter ili lijevi klik sprema oba dijela. Rubovi uz
+pauzu, prvi IN i zadnji OUT uzimaju se sami; samo jedna strana reza u zoomu (klik na lijevu/desnu sliku) ili Ctrl+I/O.
+(2) Lijevi klik dok je rub, rez ili A1 dijela uzet sprema kao Enter (prije je samo pomicao playhead). (3) Svaka radnja
+slozene izjave pise se u player log (`subsegment-key`). `qnc-script` (`Trim.roll`, `roll_to`, `write_trim`,
+`SubsegmentView.roll`), `qnc-subsegment-panel` (`nearest_edge` daje `in`/`out`/`cut`, test). Testovi, conformance, release
+build s libav. Uzivo nije provjereno.
