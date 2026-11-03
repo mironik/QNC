@@ -103,17 +103,13 @@ fn run(
     )?;
     let mut session =
         session::Session::new(player, boot.session_id.clone(), boot.source_generation);
-    println!(
-        "{}",
-        serde_json::json!({
-            "contract_version": qnc_player_contract::VERSION,
-            "session_id": boot.session_id, "source_generation": boot.source_generation,
-            "wire_url": control.address,
-            "monitor_transport": if monitor_post.is_some() { "qnc-player-frame-map" } else { "qnc-player+tcp" },
-            "output": output_scope
-        })
-    );
-    io::stdout().flush()?;
+    say(&serde_json::json!({
+        "contract_version": qnc_player_contract::VERSION,
+        "session_id": boot.session_id, "source_generation": boot.source_generation,
+        "wire_url": control.address,
+        "monitor_transport": if monitor_post.is_some() { "qnc-player-frame-map" } else { "qnc-player+tcp" },
+        "output": output_scope
+    }))?;
     stage("listening");
     let mut last_contact = Instant::now();
     let mut last_report = Instant::now();
@@ -527,8 +523,7 @@ fn host_sessions() -> Result<()> {
             Err(error) => {
                 // Said at once, so the client does not wait for a hello that never comes.
                 eprintln!("player host: {error}");
-                println!("{}", serde_json::json!({ "session_refused": error.to_string() }));
-                io::stdout().flush()?;
+                say(&serde_json::json!({ "session_refused": error.to_string() }))?;
                 continue;
             }
         };
@@ -539,10 +534,17 @@ fn host_sessions() -> Result<()> {
         if let Err(error) = run(boot, None, stop.clone()) {
             eprintln!("player session {session_id}: {error}");
         }
-        println!("{}", serde_json::json!({ "session_ended": session_id, "source_generation": generation }));
-        io::stdout().flush()?;
+        say(&serde_json::json!({ "session_ended": session_id, "source_generation": generation }))?;
     }
     Ok(())
+}
+
+/// One line to the client on stdout. A client that has closed the pipe is an error that ends
+/// the process in order, never a panic (`println!` panicked: "The pipe is being closed").
+fn say(value: &serde_json::Value) -> io::Result<()> {
+    let mut out = io::stdout().lock();
+    writeln!(out, "{value}")?;
+    out.flush()
 }
 
 /// When the process started (diagnostics only).

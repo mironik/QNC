@@ -7692,3 +7692,11 @@ uvijek vidljiva; dio ciji je rub ili A1 uzet je izabran. Klik na traku stavlja p
 `qnc-subsegment-panel` (prima `cover_lengths`, ovisi o `qnc-segment-panel` i `qnc-program-view`), `qnc-script`
 `SubsegmentView.rate` (stopa klipa prvog dijela). Testovi `qnc-timeline` (zlatna tablica misa), `qnc-subsegment-panel`,
 `qnc-media-overlay`, conformance, release build. Uzivo nije provjereno.
+Popravak 2026-11-03 (log: play slozene izjave nije radio jer kartica D: javlja "fatal device hardware error" na Mironik
+3608.MXF; korisnik: "da, popravi oboje"): (1) `qnc-trim-stills`: slika zooma reza koja ne uspije stavlja svoj klip na 5 s
+odmora (`REST`, `resting`): za to vrijeme nista od tog klipa se ne dekodira, zatim se njegove neuspjele slike pokusaju
+ponovno (prije: pokretanje ffmpega na pokvarenu karticu svakih ~100 ms; nakon ponovno utaknute kartice slike se vrate same).
+(2) `tools/qnc-player-runner`: poruke klijentu na stdout idu kroz `say` (writeln + flush), pa klijent koji je zatvorio
+kanal daje gresku i proces zavrsava uredno umjesto panica "failed printing to stdout: The pipe is being closed". Player i
+`qnc-app` izgradeni s `libav` (bindgen dobiva MSVC i Windows SDK include kroz `BINDGEN_EXTRA_CLANG_ARGS`). Testovi
+`qnc-trim-stills`, conformance. Uzivo nije provjereno.

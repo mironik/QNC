@@ -49,6 +49,8 @@ const KEPT: usize = 160;
 const ZOOM_COLUMNS: usize = 900;
 /// A pass taking longer is cancelled and the worker starts again.
 const STUCK: Duration = Duration::from_secs(8);
+/// How long a clip whose picture failed rests before it is decoded again.
+const REST: Duration = Duration::from_secs(5);
 
 type Decoded = Vec<(StillPicture, Result<Arc<RgbaImage>, String>)>;
 type Located = Arc<Mutex<HashMap<String, LocatedPicture>>>;
@@ -72,6 +74,10 @@ pub struct TrimStills {
     cache: HashMap<StillPicture, Arc<RgbaImage>>,
     order: VecDeque<StillPicture>,
     failed: HashSet<StillPicture>,
+    /// Clips whose picture could not be made and since when: nothing more of them is decoded
+    /// for `REST`, then their failed pictures are tried again (user 2026-11-03: a card with a
+    /// device error was read every 100 ms; once it is put back, the pictures come back).
+    resting: HashMap<String, Instant>,
     located: Located,
     job: Option<Job>,
     /// The pictures last asked for, as logged (diagnostics only).
@@ -129,6 +135,12 @@ impl TrimStills {
             *self = Self { project_id: Some(locator.project_id().to_string()), ..Self::default() };
         }
         let arrived = self.take_finished();
+        // A clip that has rested is tried again, its failed pictures with it.
+        let rested: Vec<String> = self.resting.iter().filter(|(_, since)| since.elapsed() >= REST).map(|(clip, _)| clip.clone()).collect();
+        for clip in rested {
+            self.resting.remove(&clip);
+            self.failed.retain(|picture| picture.clip_id != clip);
+        }
         let asked = describe(view);
         if asked != self.asked {
             log(&format!("trim-stills asked {asked}"));
@@ -206,6 +218,7 @@ impl TrimStills {
                 wants.push((picture, first, RUN));
             }
         }
+        wants.retain(|(picture, _, _)| !self.resting.contains_key(&picture.clip_id));
         match &self.job {
             Some(job) => {
                 if let Ok(mut wanted) = job.wanted.lock() {
@@ -297,6 +310,7 @@ impl TrimStills {
                 }
                 Err(error) => {
                     log(&format!("trim-still {}:{} {error}", picture.clip_id, picture.source_frame));
+                    self.resting.entry(picture.clip_id.clone()).or_insert_with(Instant::now);
                     self.failed.insert(picture);
                 }
             }
