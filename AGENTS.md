@@ -7651,3 +7651,9 @@ citanja), a od rijeci tog komada zapisuje samo one koje pocinju na ili iza kraja
 `after_kept`; jedna slika tolerancije vremena motora; redak presjecen u dva pise se ponovno iz preostalih rijeci). Prvi komad
 i trim zoom nisu mijenjani. Test `a_piece_heard_again_from_earlier_writes_only_the_words_the_cut_took`, conformance, release
 build. Uzivo nije provjereno.
+Popravak 2026-11-03 (log probe: prepis 3608 popunio je 750 s, 1797 rijeci, ostala je jedna rupa oko 539 s gdje motor ni na
+samom isjecku ne prepozna govor; na granici komada oko 168 s rijec "i" upisana je dvaput, motor ju je u preklopu stavio 5
+slika kasnije): prva nova rijec komada ne upisuje se kad je ista kao zadnja upisana (bez velikih slova i interpunkcije) i
+pocinje unutar pola sekunde iza nje (`qnc-transcribe-run` `ECHO_FRAMES`, `same_word`, `kept_until` daje i tekst zadnje
+rijeci); ponavljanje unutar jednog komada ("ne, ne,") ostaje. Test `the_last_word_heard_again_a_little_later_is_not_written_twice`,
+conformance, release build. Uzivo nije provjereno.

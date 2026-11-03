@@ -242,7 +242,8 @@ fn hear_while_read(
                 let piece_start = block_start + (range.start as f64 - early as f64) / rate as f64;
                 let heard_at = std::time::Instant::now();
                 let (heard, piece_language, by) = hear(job, ask, (busy, cancel), &samples, piece_start)?;
-                let heard = after_kept(heard, kept_until(&lines));
+                let (until, last) = kept_until(&lines);
+                let heard = after_kept(heard, (until, &last));
                 engine_time += heard_at.elapsed();
                 for line in &heard {
                     on_line(line);
@@ -301,27 +302,50 @@ fn hear(job: &Job, ask: &Ask, (busy, cancel): (&(dyn Fn() -> PlaybackLevel + Sen
     }
 }
 
-/// The clip frame where the last word written so far ends.
-fn kept_until(lines: &[Line]) -> u64 {
-    lines.iter().flat_map(|line| line.words.iter().map(|w| w.to).chain([line.to])).max().unwrap_or(0)
+/// Frames after the last written word within which the same word is that word heard again.
+const ECHO_FRAMES: u64 = 25;
+
+/// Where the last word written so far ends (clip frame) and its text.
+fn kept_until(lines: &[Line]) -> (u64, String) {
+    let last = lines.iter().flat_map(|line| line.words.iter()).max_by_key(|w| w.to);
+    let until = lines.iter().flat_map(|line| line.words.iter().map(|w| w.to).chain([line.to])).max().unwrap_or(0);
+    (until, last.map(|w| w.text.clone()).unwrap_or_default())
+}
+
+/// One word, its case and punctuation aside.
+fn same_word(a: &str, b: &str) -> bool {
+    let bare = |s: &str| s.chars().filter(|c| c.is_alphanumeric()).flat_map(char::to_lowercase).collect::<String>();
+    let a = bare(a);
+    !a.is_empty() && a == bare(b)
 }
 
 /// The lines of a piece heard from earlier than its own start, without the words already
 /// written: a word is new when it starts at or after the end of the last written word (one
-/// frame of the engine's timing given). A line keeps its text when all its words are new; one
-/// cut in two is written again from the words left.
-fn after_kept(lines: Vec<Line>, until: u64) -> Vec<Line> {
-    let new = |from: u64| from + 1 >= until;
+/// frame of the engine's timing given), except that the first such word is dropped when it is
+/// the last written word again within half a second (live 2026-11-03: "di sam i i mi" at the
+/// edge of a piece, the engine timed the word heard twice five frames apart). A line keeps its
+/// text when all its words are new; one cut in two is written again from the words left.
+fn after_kept(lines: Vec<Line>, (until, last): (u64, &str)) -> Vec<Line> {
+    let mut first = true;
+    let mut new = |from: u64, text: &str| {
+        if from + 1 < until {
+            return false;
+        }
+        let echo = std::mem::take(&mut first) && from < until + ECHO_FRAMES && same_word(text, last);
+        !echo
+    };
     lines
         .into_iter()
         .filter_map(|line| {
             if line.words.is_empty() {
-                return new(line.from).then_some(line);
+                let text = line.text.clone();
+                return new(line.from, &text).then_some(line);
             }
-            if line.words.iter().all(|w| new(w.from)) {
+            let keep: Vec<bool> = line.words.iter().map(|w| new(w.from, &w.text)).collect();
+            if keep.iter().all(|k| *k) {
                 return Some(line);
             }
-            let words: Vec<Word> = line.words.into_iter().filter(|w| new(w.from)).collect();
+            let words: Vec<Word> = line.words.into_iter().zip(keep).filter_map(|(w, k)| k.then_some(w)).collect();
             let (first, last) = (words.first()?, words.last()?);
             Some(Line { from: first.from, to: last.to.max(first.from), text: words.iter().map(|w| w.text.as_str()).collect::<Vec<_>>().join(" "), words })
         })
@@ -350,13 +374,29 @@ mod overlap_tests {
             line(vec![word(100, 111, "meni"), word(111, 118, "je"), word(120, 128, "žao")]),
             line(vec![word(140, 150, "otišao.")]),
         ];
-        let kept = after_kept(again, kept_until(&written));
+        let (until, last) = kept_until(&written);
+        let kept = after_kept(again, (until, &last));
         assert_eq!(kept.len(), 2);
         assert_eq!(kept[0].text, "žao");
         assert_eq!((kept[0].from, kept[0].to), (120, 128));
         assert_eq!(kept[1].text, "otišao.", "a line all new keeps its text");
-        assert!(after_kept(vec![line(vec![word(100, 110, "meni")])], 118).is_empty(), "a word written once is not written twice");
-        assert_eq!(after_kept(vec![line(vec![word(5, 9, "prvi")])], 0).len(), 1, "the first piece keeps everything");
+        assert!(after_kept(vec![line(vec![word(100, 110, "meni")])], (118, "je")).is_empty(), "a word written once is not written twice");
+        assert_eq!(after_kept(vec![line(vec![word(5, 9, "prvi")])], (0, "")).len(), 1, "the first piece keeps everything");
+    }
+
+    #[test]
+    fn the_last_word_heard_again_a_little_later_is_not_written_twice() {
+        // Mironik 3608 at 168 s: "di sam i" written, the next piece heard "i" five frames later.
+        let written = vec![line(vec![word(8364, 8368, "di"), word(8372, 8376, "sam"), word(8380, 8388, "i")])];
+        let (until, last) = kept_until(&written);
+        let again = vec![line(vec![word(8393, 8397, "i"), word(8397, 8401, "mi"), word(8417, 8421, "više")])];
+        assert_eq!(after_kept(again, (until, &last))[0].text, "mi više");
+        // A word said twice inside one piece stays twice ("ne, ne,").
+        let said = vec![line(vec![word(9000, 9006, "ne,"), word(9010, 9016, "ne,")])];
+        assert_eq!(after_kept(said, (until, &last))[0].text, "ne, ne,");
+        // The same word said again later is a new word.
+        let later = vec![line(vec![word(8388 + 40, 8388 + 44, "i")])];
+        assert_eq!(after_kept(later, (until, &last)).len(), 1);
     }
 }
 
