@@ -8,7 +8,7 @@
 use eframe::egui::{self, RichText};
 use qnc_action_event::ActionEvent;
 use qnc_segment_panel::{cover_fill, CoverLengthBand};
-use qnc_script::{SubsegmentView, DRAG_EDGE, JOIN_CUT, JOIN_GAP, PART_CHANNEL, PART_LEVEL, PART_MOVE, PART_OFF, PART_REMOVE, SUBSEGMENT_CUE, TAKE_EDGE};
+use qnc_script::{SubsegmentView, DRAG_EDGE, JOIN_CUT, JOIN_GAP, PART_CHANNEL, PART_LEVEL, PART_MOVE, PART_OFF, PART_REMOVE, SUBSEGMENT_CUE, SUBSEGMENT_SELECT, TAKE_EDGE};
 use qnc_timeline::{
     AudioLane, TimelineCoverSpan, TimelineFocusPaint, TimelineInput, TimelineIntent, TimelineLayerFlags, TimelineMarkerPart, TimelineMarkerPin,
     TimelineMetrics, TimelinePicture, TimelineProjection, TimelineTheme, TimelineVirtualSpan,
@@ -78,7 +78,7 @@ pub fn show(ui: &mut egui::Ui, view: &SubsegmentView, theme: TimelineTheme, leng
             id,
             start_frame: part.start,
             end_frame: part.end,
-            selected: view.trim.is_some_and(|(at, _, _)| at == index) || view.sound == Some(index),
+            selected: view.chosen == Some(index) || view.trim.is_some_and(|(at, _, _)| at == index) || view.sound == Some(index),
             pending: false,
             fill: cover_fill(part.end - part.start, view.rate, lengths),
             label: Some(length.as_str()),
@@ -170,14 +170,14 @@ pub fn show(ui: &mut egui::Ui, view: &SubsegmentView, theme: TimelineTheme, leng
     let event = match intent {
         // While an edge, a cut or a part's A1 is taken a left click keeps it, as Enter (the mouse
         // rule, as on a cover's row; user 2026-11-03).
-        TimelineIntent::CueFrame(_) | TimelineIntent::SelectVirtual { .. } | TimelineIntent::SelectCover { .. } | TimelineIntent::Keep(_) if holding => Some(ActionEvent::key("activate_focused_item")),
+        TimelineIntent::CueFrame(_) | TimelineIntent::SelectVirtual { .. } | TimelineIntent::SelectCover { .. } | TimelineIntent::SelectMarkerSlot { .. } | TimelineIntent::Keep(_) if holding => Some(ActionEvent::key("activate_focused_item")),
         // A click on a part's picture is a click on its row (user 2026-10-29: the filmstrip did
         // not take the playhead): the parts are not chosen, the playhead goes there.
         TimelineIntent::CueFrame(frame) | TimelineIntent::SelectVirtual { frame, .. } => Some(ActionEvent::key(SUBSEGMENT_CUE).with_target(frame.to_string())),
-        // A click on a part's colour strip puts the playhead on its first frame (its IN).
-        TimelineIntent::SelectCover { frame, .. } | TimelineIntent::TakeCoverOnStrip { frame, .. } => {
-            let start = view.parts.iter().find(|part| frame >= part.start && frame < part.end).map_or(frame, |part| part.start);
-            Some(ActionEvent::key(SUBSEGMENT_CUE).with_target(start.to_string()))
+        // A click on a part's length strip chooses the part, as a click on a cover's strip
+        // chooses its slot (user 2026-11-03); the playhead goes to its IN.
+        TimelineIntent::SelectCover { frame, .. } | TimelineIntent::TakeCoverOnStrip { frame, .. } | TimelineIntent::SelectMarkerSlot { frame, .. } => {
+            view.parts.iter().position(|part| frame >= part.start && frame < part.end).map(|index| ActionEvent::key(SUBSEGMENT_SELECT).with_target(index.to_string()))
         }
         // A right click on a join takes the IN of the part after it, as Ctrl+I.
         // A right click takes the IN or OUT nearest to where it was (user 2026-10-29: every IN

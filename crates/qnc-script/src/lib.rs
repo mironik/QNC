@@ -67,6 +67,9 @@ pub const REMOVE: &str = "script_remove";
 pub const OPEN: &str = "script_open";
 /// The playhead of the open SubSegment on frame `target` (a click on its timeline).
 pub const SUBSEGMENT_CUE: &str = "subsegment_cue";
+/// A part of the open SubSegment chosen, as a slot is (a click on its length strip): `target`
+/// is its index. Ctrl+I / Ctrl+O and Ctrl+1 then take its edges and its A1, Delete takes it out.
+pub const SUBSEGMENT_SELECT: &str = "subsegment_select";
 /// The pause before a part one frame longer or shorter: `target` is `block:part:1` or `-1`.
 pub const JOIN_GAP: &str = "subsegment_join_gap";
 /// The join before a part a cut or a crossfade: `target` is `block:part`.
@@ -151,6 +154,8 @@ pub struct Script {
     pieces_request: Option<(Vec<qnc_source_preview::PieceInput>, u64)>,
     /// The edge of a part being trimmed on the SubSegment timeline, not written yet.
     trim: Option<Trim>,
+    /// The part of the open SubSegment chosen by a click on its length strip, as a slot is.
+    chosen: Option<usize>,
     /// The waves of the SubSegment's clips (read in the background).
     waves: qnc_program_waveform::ProgramWaves,
     /// The filmstrips of the SubSegment's clips (read in the background).
@@ -198,7 +203,7 @@ struct Trim {
 
 impl Default for Script {
     fn default() -> Self {
-        Self { view: ScriptView::default(), blocks: Vec::new(), project: None, reading: None, read_at: None, writing: None, source_request: None, names: HashMap::new(), words_per_second: Ok(0.0), take: None, taking: None, exporting: None, draft: Default::default(), open_subsegment: None, pieces_request: None, trim: None, waves: qnc_program_waveform::ProgramWaves::new(), filmstrips: qnc_program_filmstrip::ProgramFilmstrips::new(), waves_project: None, trim_stills: qnc_trim_stills::TrimStills::new(), zoom_follow: Default::default(), sound: None, voices: Vec::new(), voice_request: None, voice_after_write: None, message_after_write: None, clear_after_write: false }
+        Self { view: ScriptView::default(), blocks: Vec::new(), project: None, reading: None, read_at: None, writing: None, source_request: None, names: HashMap::new(), words_per_second: Ok(0.0), take: None, taking: None, exporting: None, draft: Default::default(), open_subsegment: None, pieces_request: None, trim: None, chosen: None, waves: qnc_program_waveform::ProgramWaves::new(), filmstrips: qnc_program_filmstrip::ProgramFilmstrips::new(), waves_project: None, trim_stills: qnc_trim_stills::TrimStills::new(), zoom_follow: Default::default(), sound: None, voices: Vec::new(), voice_request: None, voice_after_write: None, message_after_write: None, clear_after_write: false }
     }
 }
 
@@ -288,6 +293,7 @@ impl Script {
         });
         shown.sound = self.sound.map(|sound| sound.index);
         shown.roll = self.trim.is_some_and(|trim| trim.roll.is_some());
+        shown.chosen = self.chosen.filter(|index| *index < shown.parts.len());
         shown.rate = pieces.first().and_then(|piece| names.get(&piece.clip_id)).filter(|(_, frames, seconds)| *seconds > 0.0 && *frames > 0).map(|(_, frames, seconds)| ((*frames as f64 / seconds).round() as u32, 1));
         self.view.subsegment = Some(shown);
     }
@@ -320,7 +326,7 @@ impl Script {
         let at = self.view.subsegment.as_ref().and_then(|view| view.playhead).unwrap_or(0);
         match key {
             qnc_timeline::LaneKey::Take(0) => {
-                let index = self.view.subsegment.as_ref().and_then(|view| view.parts.iter().position(|part| at < part.end)).unwrap_or(0);
+                let index = self.part_in_hand();
                 let piece = pieces.get(index)?;
                 self.trim = None;
                 self.sound = Some(PartSound { index, channel: piece.a1_channel, level_db: piece.a1_level_db, off: piece.a1_off });
@@ -368,10 +374,35 @@ impl Script {
         if action_id == DRAG_EDGE {
             return self.drag_edge(target, &block, &pieces);
         }
+        // A part chosen as a slot is (user 2026-11-03: a click on its length strip): the
+        // playhead on its IN; Esc lets it go, Delete takes it out of the statement.
+        match action_id {
+            SUBSEGMENT_SELECT => {
+                let index = target.and_then(|index| index.parse::<usize>().ok()).filter(|index| *index < pieces.len())?;
+                self.chosen = Some(index);
+                let start = self.view.subsegment.as_ref().and_then(|view| view.parts.get(index)).map_or(0, |part| part.start);
+                self.pieces_request = Some((view::piece_inputs(&block), start));
+                return Some(true);
+            }
+            "clear_focus" if self.chosen.is_some() && self.trim.is_none() && self.sound.is_none() => {
+                self.chosen = None;
+                return Some(true);
+            }
+            "delete_marker" if self.trim.is_none() && self.sound.is_none() => {
+                let index = self.chosen?;
+                if pieces.len() < 2 {
+                    self.view.message = qnc_ui_text::text("db.script_last_piece").into();
+                    return Some(true);
+                }
+                self.chosen = None;
+                let id = block.id;
+                return Some(self.write(preview, move |target| qnc_script_db::remove_piece(target, id, index).map(|_| None)));
+            }
+            _ => {}
+        }
         let step = match action_id {
             "select_mark_in" | "select_mark_out" => {
-                let at = self.view.subsegment.as_ref().and_then(|view| view.playhead).unwrap_or(0);
-                let index = self.view.subsegment.as_ref().and_then(|view| view.parts.iter().position(|part| at < part.end)).unwrap_or(0);
+                let index = self.part_in_hand();
                 self.sound = None;
                 self.trim = take(index, action_id == "select_mark_out");
                 0
@@ -456,6 +487,20 @@ impl Script {
         let drafted = self.drafted(block.clone());
         self.pieces_request = Some((view::piece_inputs(&drafted), self.edge_frame(&drafted).unwrap_or(0)));
         Some(true)
+    }
+
+    /// The part Ctrl+I / Ctrl+O and Ctrl+1 work on: the chosen one, else the one under the
+    /// playhead (as a slot: the chosen slot, else the slot under the Wrap playhead).
+    fn part_in_hand(&self) -> usize {
+        let view = self.view.subsegment.as_ref();
+        let count = view.map_or(0, |view| view.parts.len());
+        match self.chosen.filter(|index| *index < count) {
+            Some(index) => index,
+            None => {
+                let at = view.and_then(|view| view.playhead).unwrap_or(0);
+                view.and_then(|view| view.parts.iter().position(|part| at < part.end)).unwrap_or(0)
+            }
+        }
     }
 
     /// The whole cut of a join moved so this part's OUT is `to`: the next part's IN moves as far,
@@ -699,6 +744,7 @@ impl Script {
             OPEN if self.block(id()).is_some_and(|block| block.pieces.len() > 1) => {
                 let block = self.block(id())?.clone();
                 self.open_subsegment = Some(block.id);
+                self.chosen = None;
                 self.pieces_request = Some((view::piece_inputs(&block), 0));
                 self.view.subsegment = Some(view::subsegment_view(&block, None));
                 true
@@ -706,6 +752,8 @@ impl Script {
             SUBSEGMENT_CUE => {
                 let (Some(block), Some(frame)) = (self.block(self.open_subsegment), target.and_then(|frame| frame.parse::<u64>().ok())) else { return Some(false) };
                 self.pieces_request = Some((view::piece_inputs(block), frame));
+                // A click off the length strip only places the playhead: a chosen part is let go.
+                self.chosen = None;
                 true
             }
             SUBSEGMENT_CLOSE => {
@@ -730,7 +778,7 @@ impl Script {
             PART_MOVE | PART_REMOVE => {
                 let mut parts = target.unwrap_or_default().split(':');
                 let (Some(id), Some(index)) = (parts.next().and_then(|id| id.parse::<i64>().ok()), parts.next().and_then(|index| index.parse::<usize>().ok())) else { return Some(false) };
-                (self.trim, self.sound) = (None, None);
+                (self.trim, self.sound, self.chosen) = (None, None, None);
                 if action_id == PART_REMOVE {
                     return Some(self.write(preview, move |target| qnc_script_db::remove_piece(target, id, index).map(|_| None)));
                 }

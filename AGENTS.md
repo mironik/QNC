@@ -7710,3 +7710,9 @@ pauzu, prvi IN i zadnji OUT uzimaju se sami; samo jedna strana reza u zoomu (kli
 slozene izjave pise se u player log (`subsegment-key`). `qnc-script` (`Trim.roll`, `roll_to`, `write_trim`,
 `SubsegmentView.roll`), `qnc-subsegment-panel` (`nearest_edge` daje `in`/`out`/`cut`, test). Testovi, conformance, release
 build s libav. Uzivo nije provjereno.
+Dopuna 2026-11-03 (korisnik: "klik na duljinu trajanja ne selektira slot"; log: roll reza radi, klik na traku samo je stavljao
+playhead na IN dijela): klik na traku s duljinom bira dio kao slot (nova radnja kataloga `subsegment_select`, bez tipke):
+traka je istaknuta, playhead na IN dijela; Ctrl+I/O i Ctrl+1 tada rade na izabranom dijelu (inace na dijelu pod
+playheadom), Delete ga izbacuje iz izjave (zadnji dio ne), Esc ga pusta, klik izvan trake pusta izbor i samo stavlja
+playhead. `qnc-script` (`SUBSEGMENT_SELECT`, `chosen`, `part_in_hand`, `SubsegmentView.chosen`), `qnc-subsegment-panel`.
+Testovi, conformance, release build s libav. Uzivo nije provjereno.

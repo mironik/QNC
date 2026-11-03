@@ -199,6 +199,9 @@
     "subsegment_cue": {
       "label": "Playhead SubSegmenta na kliknutu sliku"
     },
+    "subsegment_select": {
+      "label": "Odaberi dio SubSegmenta (klik na traku s duljinom)"
+    },
     "subsegment_join_gap": {
       "label": "Razmak prije dijela SubSegmenta (slika vise ili manje)"
     },

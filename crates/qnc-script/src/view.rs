@@ -386,6 +386,8 @@ pub struct SubsegmentView {
     pub rate: Option<(u32, u32)>,
     /// The taken edge is the whole cut of a join: the trimmed part's OUT and the next part's IN.
     pub roll: bool,
+    /// The part chosen by a click on its length strip, as a slot is.
+    pub chosen: Option<usize>,
 }
 
 /// The parts on the SubSegment's axis (a pause before a part moves it on).
@@ -403,7 +405,7 @@ pub fn subsegment_view(block: &Block, playhead: Option<u64>) -> SubsegmentView {
             part
         })
         .collect();
-    SubsegmentView { block_id: block.id, parts, total_frames: start, playhead, a1: Vec::new(), pictures: Vec::new(), trim: None, zoom: None, sound: None, rate: None, roll: false }
+    SubsegmentView { block_id: block.id, parts, total_frames: start, playhead, a1: Vec::new(), pictures: Vec::new(), trim: None, zoom: None, sound: None, rate: None, roll: false, chosen: None }
 }
 
 /// Where the parts play on the SubSegment's axis, for its wave (channel 1 of each clip: the
