@@ -22,6 +22,8 @@ const STORY_GAP: f32 = 10.0;
 /// The editor above the story buttons: its widest and its height.
 const EDITOR_WIDTH: f32 = 860.0;
 const EDITOR_HEIGHT: f32 = 230.0;
+/// The id the editor keeps its cursor under.
+const EDITOR_ID: &str = "qnc_script_writer_editor";
 
 fn open_id() -> Id {
     Id::new("qnc-script-writer-open")
@@ -95,6 +97,14 @@ pub fn show(ui: &mut Ui, view: &ScriptView, theme: &qnc_desktop_theme::Theme) ->
         ui.painter().rect(area.expand(6.0), 6.0, theme.surface, egui::Stroke::new(1.0, theme.focus), egui::StrokeKind::Outside);
         let mut panel = ui.new_child(UiBuilder::new().max_rect(area).layout(Layout::top_down(Align::Min)));
         panel.set_clip_rect(area.expand(6.0).intersect(ui.clip_rect()));
+        // The editor takes the keyboard when it opens for a kind or for a block (user
+        // 2026-11-03: the cursor has to be in the box at once).
+        let shown = (kind.id.clone(), view.editing);
+        let last = Id::new("qnc_script_writer_editor_for");
+        if kind.role != Role::Clip && ui.ctx().data(|data| data.get_temp::<(String, Option<i64>)>(last)) != Some(shown.clone()) {
+            qnc_text_source_editor::focus(ui.ctx(), EDITOR_ID);
+        }
+        ui.ctx().data_mut(|data| data.insert_temp(last, shown));
         let answer = if kind.role == Role::Clip { clip_row(&mut panel, kind, view, theme, style) } else { editor(&mut panel, kind, view, theme) };
         if let Some((event, close)) = answer {
             if close {
@@ -206,7 +216,7 @@ fn editor(ui: &mut Ui, kind: &KindSpec, view: &ScriptView, theme: &qnc_desktop_t
         EditorButton { label: qnc_ui_text::text("common.cancel"), action_id: CLEAR_EDITOR, target: "", enabled: true, group: 0 },
     ];
     let info = qnc_ui_text::fill("script.editor_info", &[("words", &view.editor.split_whitespace().count().to_string()), ("length", &seconds_label(view.editor_seconds))]);
-    let editor = Editor { id: "qnc_script_writer_editor", title: &title, text: &view.editor, info: &info, hint: qnc_ui_text::text("script.editor_hint"), buttons: &buttons };
+    let editor = Editor { id: EDITOR_ID, title: &title, text: &view.editor, info: &info, hint: qnc_ui_text::text("script.editor_hint"), buttons: &buttons };
     match qnc_text_source_editor::show(ui, &editor, theme)? {
         Answer::Text(text) => Some((ActionEvent::key(EDITOR_TEXT).with_target(text).at(PANEL), false)),
         Answer::Button(action, target) => {

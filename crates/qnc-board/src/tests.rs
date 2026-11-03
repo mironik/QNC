@@ -169,3 +169,16 @@ fn a_bar_above_one_block_takes_its_height_on_top_of_the_whole_board() {
     assert_eq!((panel.top(), panel.bottom(), panel.width()), (40.0, 700.0, 1000.0));
     assert_eq!(face(&s, "right"), rect);
 }
+
+#[test]
+fn a_picture_across_a_horizontal_split_is_as_wide_as_its_height_asks() {
+    let block = |name: &str| Some(Node::Block { name: name.into() });
+    let parts = vec![
+        Part { size: Size::Across { ratio: 16.0 / 9.0 }, face: None, node: block("monitor") },
+        Part { size: Size::Rest, face: None, node: block("pool") },
+    ];
+    // A top of 1600 x 360: the monitor 640 wide, the pool the other 960.
+    assert_eq!(part_lengths(&parts, 1600.0, 360.0), vec![640.0, 960.0]);
+    // Never wider than the split.
+    assert_eq!(part_lengths(&parts, 500.0, 360.0), vec![500.0, 0.0]);
+}

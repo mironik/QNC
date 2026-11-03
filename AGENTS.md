@@ -7667,3 +7667,13 @@ playera i exporta nije diran. Izmjereno (Parakeet, CH1 3608): pocetak daje "Moli
 inace fotorekorter novinar, cetrdeset dva godine...", rupa oko 539 s daje "I onda je to doslo do onda je buklo i tako.";
 isjecak 9-24 s isti tekst kao prije. Test `quiet_speech_reaches_the_engine_at_the_level_of_speech`, conformance, release
 build. Uzivo kroz aplikaciju nije provjereno.
+Izmjena 2026-11-03 (korisnik, MA Script: "klik na najavu otvara tekst box, treba ukljuciti prompt u tekst, isto i za ostale
+akcije"; "overlay prozor: oko monitora puno izgubljenog prostora, posteri nepregledni, tekst nema dovoljno prostora"; izabrao
+raspored "Monitor i posteri gore"): (1) Kad se editor price otvori za vrstu (NAJAVA, OFF...) ili za tekstualni blok, odmah
+preuzme tipkovnicu, jednom, pa klik drugdje zadrzava svoj fokus (`qnc-text-source-editor` `focus`, `qnc-script-writer-panel`
+pamti za koju vrstu i blok je editor otvoren). (2) Prozor medija: gore monitor tocno 16:9 i uz njega tabovi poola,
+transport i posteri; ispod panel prijepisa cijelom sirinom; dolje traka "Dodaj u pricu" i source timeline
+(`qnc-editorial-layout` `media_overlay_layout`, `OVERLAY_TOP_SHARE` 0,42). `qnc-board`: nova velicina `Size::Across { ratio }`
+(dio vodoravne podjele sirok koliko visina trazi za omjer slike). Testovi `qnc-board` (novi
+`a_picture_across_a_horizontal_split_is_as_wide_as_its_height_asks`), `qnc-editorial-layout`, conformance, release build.
+Uzivo nije provjereno.

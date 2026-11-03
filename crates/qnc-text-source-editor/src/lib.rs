@@ -38,6 +38,17 @@ pub struct Editor<'a> {
     pub buttons: &'a [EditorButton<'a>],
 }
 
+fn focus_id(id: &str) -> egui::Id {
+    egui::Id::new(("qnc_text_source_editor_focus", id))
+}
+
+/// The editor `id` takes the keyboard the next time it is shown, so the cursor is in it at once
+/// (user 2026-11-03: a click on NAJAVA opens the box, the cursor has to be in it). Once only;
+/// a click elsewhere afterwards keeps its focus.
+pub fn focus(ctx: &egui::Context, id: &str) {
+    ctx.data_mut(|data| data.insert_temp(focus_id(id), true));
+}
+
 /// What the editor gave back.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Answer {
@@ -78,7 +89,11 @@ pub fn show(ui: &mut egui::Ui, editor: &Editor<'_>, theme: &qnc_desktop_theme::T
             .desired_width(f32::INFINITY)
             .desired_rows(4)
             .frame(true);
-        if ui.add_sized([ui.available_width(), height.max(ui.available_height())], edit).changed() && answer.is_none() {
+        let response = ui.add_sized([ui.available_width(), height.max(ui.available_height())], edit);
+        if ui.ctx().data_mut(|data| data.remove_temp::<bool>(focus_id(editor.id))).is_some() {
+            response.request_focus();
+        }
+        if response.changed() && answer.is_none() {
             answer = Some(Answer::Text(text.clone()));
         }
     });

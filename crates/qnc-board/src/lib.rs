@@ -124,6 +124,10 @@ pub enum Size {
     Share { ratio: f32, min: f32, rest_min: f32 },
     /// Keeps a picture shape in the width of a vertical split.
     Aspect(MonitorAspect),
+    /// As long as the split's cross length times `ratio`: a picture of width over height
+    /// `ratio` in a horizontal split, as wide as its height asks (user 2026-11-03: the monitor
+    /// beside the posters, without black on its sides).
+    Across { ratio: f32 },
     /// What the other parts leave.
     Rest,
 }
@@ -386,6 +390,7 @@ fn part_lengths(parts: &[Part], total: f32, cross: f32) -> Vec<f32> {
                     (usable * ratio).clamp(min, usable - rest_min)
                 }
                 Size::Aspect(aspect) => aspect.height(cross, total),
+                Size::Across { ratio } => cross * ratio.max(0.0),
                 Size::Rest => return None,
             };
             let length = wanted.clamp(0.0, left.max(0.0));

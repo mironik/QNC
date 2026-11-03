@@ -152,12 +152,25 @@ impl EditorialContracts {
         let block = |name: &str| Some(Node::Block { name: name.to_string() });
         let share = |ratio| Size::Share { ratio, min: 120.0, rest_min: 120.0 };
         let px = |px| Size::Px { px, max_share: None };
-        let pool = if overlay.panel.is_some() { share(OVERLAY_POOL_SHARE) } else { Size::Rest };
-        let mut parts = vec![
-            Part { size: share(OVERLAY_MONITOR_SHARE), face: Some("left".into()), node: block("preview") },
-            Part { size: px(self.shell.theme_metrics.chrome_row_height), face: None, node: block("pool-head") },
-            Part { size: pool, face: None, node: block("clip-cards") },
-        ];
+        // On top the monitor as wide as its picture and the pool beside it; the panel under
+        // them over the whole width (user 2026-11-03: black wasted around the monitor, the
+        // posters cramped, too little room for the text).
+        let pool = Node::Split {
+            axis: Axis::Vertical,
+            parts: vec![
+                Part { size: px(self.shell.theme_metrics.chrome_row_height), face: None, node: block("pool-head") },
+                Part { size: Size::Rest, face: None, node: block("clip-cards") },
+            ],
+        };
+        let top = Node::Split {
+            axis: Axis::Horizontal,
+            parts: vec![
+                Part { size: Size::Across { ratio: self.editorial.preview.aspect_ratio() }, face: Some("left".into()), node: block("preview") },
+                Part { size: Size::Rest, face: None, node: Some(pool) },
+            ],
+        };
+        let top_size = if overlay.panel.is_some() { share(OVERLAY_TOP_SHARE) } else { Size::Rest };
+        let mut parts = vec![Part { size: top_size, face: None, node: Some(top) }];
         if let Some(panel) = &overlay.panel {
             parts.push(Part { size: Size::Rest, face: Some("right".into()), node: block(panel) });
         }
@@ -361,9 +374,9 @@ pub struct GroupComposition {
 
 /// The place of the pool action bar on the board.
 pub const POOL_ACTIONS: &str = "pool-actions";
-/// The shares of the media overlay's height for the monitor and, with a panel under it, the pool.
-const OVERLAY_MONITOR_SHARE: f32 = 0.32;
-const OVERLAY_POOL_SHARE: f32 = 0.24;
+/// The share of the media overlay's height for the monitor and the pool beside it, with a
+/// panel under them.
+const OVERLAY_TOP_SHARE: f32 = 0.42;
 
 /// The title of the media overlay's window (the panel of the group opens it).
 #[derive(Debug, Clone, Deserialize)]
