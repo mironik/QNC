@@ -7657,3 +7657,13 @@ slika kasnije): prva nova rijec komada ne upisuje se kad je ista kao zadnja upis
 pocinje unutar pola sekunde iza nje (`qnc-transcribe-run` `ECHO_FRAMES`, `same_word`, `kept_until` daje i tekst zadnje
 rijeci); ponavljanje unutar jednog komada ("ne, ne,") ostaje. Test `the_last_word_heard_again_a_little_later_is_not_written_twice`,
 conformance, release build. Uzivo nije provjereno.
+Dopuna 2026-11-03 (korisnik: "najdulji klip, nedostaje pocetak"; "da, napravi normalizaciju za motor"): Mironik 3608 imao je
+prvu rijec na 8,6 s; pocetak intervjua (-47 do -56 dBFS) motor je dobio, ali Parakeet u njemu nije cuo rijeci, a isti zvuk
+pojacan za 20 dB dao je "Ja sam Stanko Karaman..." (whisper i pitanje "Molim vas, predstavite se"). Motor sad dobiva svoju
+kopiju zvuka na razini govora: glasni deseti dio sekunde (90. percentil RMS) dignut na -20 dBFS, nikad stisan, najvise
++30 dB, iznad 0,8 vrh se meko savija prema punoj skali (`qnc-transcribe-jobs` `at_speech_level`); vrijedi za red prepisa i
+zoom (`qnc-transcribe-run` `Job::transcribe`, jedino mjesto gdje se pise WAV za motor) i primjer `transcribe_wav`. Ton price,
+playera i exporta nije diran. Izmjereno (Parakeet, CH1 3608): pocetak daje "Molim vas predstavite se. Ja sam stanko karaman,
+inace fotorekorter novinar, cetrdeset dva godine...", rupa oko 539 s daje "I onda je to doslo do onda je buklo i tako.";
+isjecak 9-24 s isti tekst kao prije. Test `quiet_speech_reaches_the_engine_at_the_level_of_speech`, conformance, release
+build. Uzivo kroz aplikaciju nije provjereno.

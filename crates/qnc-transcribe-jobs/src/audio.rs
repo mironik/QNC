@@ -128,6 +128,47 @@ pub fn clip_floor_dbfs(noise_dbfs: f32) -> f32 {
     (noise_dbfs + OVER_NOISE_DB).clamp(FLOOR_BOTTOM_DBFS, FLOOR_CEILING_DBFS)
 }
 
+/// The level the loud tenth of speech is brought to for the engine (RMS, dBFS).
+const SPEECH_LEVEL_DBFS: f32 = -20.0;
+/// The most the engine's copy is raised.
+const SPEECH_GAIN_MAX_DB: f32 = 30.0;
+/// Over this the raised copy is bent softly towards full scale instead of clipped.
+const SPEECH_KNEE: f32 = 0.8;
+
+/// The engine's copy of `samples` (at `rate`) at the level of speech: raised so its loud tenth
+/// of a second (the 90th percentile, RMS) is at -20 dBFS, never lowered, at most by 30 dB; what
+/// would go over 0.8 bends softly towards full scale (user 2026-11-03: the start of an interview
+/// at -47 to -56 dBFS gave no words, the same sound 20 dB louder gave the whole sentence). Only
+/// the engine hears this copy; the sound of the story, the player and the export are not touched.
+pub fn at_speech_level(samples: &[f32], rate: usize) -> Vec<f32> {
+    let tenth = (rate / 10).max(1);
+    let mut levels: Vec<f32> = samples
+        .chunks(tenth)
+        .map(|w| 10.0 * (w.iter().map(|s| s * s).sum::<f32>() / w.len().max(1) as f32).max(1e-12).log10())
+        .collect();
+    if levels.is_empty() {
+        return samples.to_vec();
+    }
+    levels.sort_by(f32::total_cmp);
+    let loud = levels[(levels.len() * 9 / 10).min(levels.len() - 1)];
+    let gain_db = (SPEECH_LEVEL_DBFS - loud).clamp(0.0, SPEECH_GAIN_MAX_DB);
+    if gain_db <= 0.0 {
+        return samples.to_vec();
+    }
+    let gain = 10f32.powf(gain_db / 20.0);
+    let room = 1.0 - SPEECH_KNEE;
+    samples
+        .iter()
+        .map(|&s| {
+            let x = s * gain;
+            match x.abs() <= SPEECH_KNEE {
+                true => x,
+                false => x.signum() * (SPEECH_KNEE + room * ((x.abs() - SPEECH_KNEE) / room).tanh()),
+            }
+        })
+        .collect()
+}
+
 /// A tenth of a second quieter than this (RMS) is a pause, not a gap between two words.
 const PAUSE_DBFS: f32 = -45.0;
 

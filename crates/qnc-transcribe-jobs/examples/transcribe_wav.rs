@@ -20,7 +20,8 @@ fn main() -> Result<(), String> {
     let folder = std::env::temp_dir().join(format!("qnc-transcribe-wav-{}", std::process::id()));
     std::fs::create_dir_all(&folder).map_err(|e| e.to_string())?;
     let wav = folder.join("sound.wav");
-    write_wav(&wav, &samples)?;
+    // As the application gives it: at the level of speech.
+    write_wav(&wav, &qnc_transcribe_jobs::at_speech_level(&samples, 16_000))?;
     let job = Transcribe {
         model: PathBuf::from(&args[1]),
         vad_model: Some(PathBuf::from(&args[2])),

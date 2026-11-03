@@ -472,7 +472,9 @@ impl Job<'_> {
         let folder = std::env::temp_dir().join(format!("qnc-transcribe-{}-{}", std::process::id(), unique()));
         std::fs::create_dir_all(&folder).map_err(|e| e.to_string())?;
         let wav = folder.join("sound.wav");
-        let result = qnc_transcribe_jobs::write_wav(&wav, samples).and_then(|()| {
+        // The engine hears the sound at the level of speech (user 2026-11-03).
+        let heard = qnc_transcribe_jobs::at_speech_level(samples, qnc_transcribe_jobs::WHISPER_RATE as usize);
+        let result = qnc_transcribe_jobs::write_wav(&wav, &heard).and_then(|()| {
             let job = Transcribe {
                 model: self.engine.model.clone(),
                 vad_model: self.engine.vad_model.clone(),

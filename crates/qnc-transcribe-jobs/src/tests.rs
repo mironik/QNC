@@ -85,6 +85,26 @@ fn a_piece_whose_last_seconds_are_all_speech_ends_at_the_pause_before_them() {
 }
 
 #[test]
+fn quiet_speech_reaches_the_engine_at_the_level_of_speech() {
+    let rate = 1000;
+    let level = |dbfs: f32| 10f32.powf(dbfs / 20.0);
+    let rms_db = |s: &[f32]| 10.0 * (s.iter().map(|x| x * x).sum::<f32>() / s.len() as f32).log10();
+    // Mironik 3608 started at -47 to -56 dBFS: raised to -20, the noise with it.
+    let mut quiet = vec![level(-70.0); 2 * rate];
+    quiet.extend((0..8 * rate).map(|i| if i % 2 == 0 { level(-50.0) } else { -level(-50.0) }));
+    let raised = crate::at_speech_level(&quiet, rate);
+    assert!((rms_db(&raised[3 * rate..]) + 20.0).abs() < 0.5, "speech at -20: {}", rms_db(&raised[3 * rate..]));
+    // Loud speech is not lowered, nothing goes over full scale, and very quiet sound is raised at most 30 dB.
+    let loud: Vec<f32> = (0..rate).map(|i| if i % 2 == 0 { 0.9 } else { -0.9 }).collect();
+    assert_eq!(crate::at_speech_level(&loud, rate), loud);
+    let faint = vec![level(-90.0); rate];
+    assert!((rms_db(&crate::at_speech_level(&faint, rate)) + 60.0).abs() < 0.5);
+    let peaks = crate::at_speech_level(&[vec![level(-40.0); rate], vec![0.5; 10]].concat(), rate);
+    assert!(peaks.iter().all(|s| s.abs() <= 1.0), "a peak never goes over full scale");
+    assert!(peaks.iter().any(|s| s.abs() > 0.8), "it is bent, not cut at the knee");
+}
+
+#[test]
 fn the_floor_follows_the_noise_of_its_clip() {
     let rate = 1000;
     let level = |dbfs: f32| 10f32.powf(dbfs / 20.0);
