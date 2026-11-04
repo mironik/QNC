@@ -3648,6 +3648,13 @@ dependencies = [
 ]
 
 [[package]]
+name = "qnc-edit-verbs"
+version = "0.1.0"
+dependencies = [
+ "qnc-action-event",
+]
+
+[[package]]
 name = "qnc-editorial-application"
 version = "0.1.0"
 dependencies = [
@@ -6527,6 +6534,7 @@ version = "0.1.0"
 dependencies = [
  "eframe",
  "qnc-action-event",
+ "qnc-edit-verbs",
  "qnc-program-view",
  "qnc-touchpad",
  "qnc-ui-kit",

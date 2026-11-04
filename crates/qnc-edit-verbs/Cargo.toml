@@ -1,0 +1,8 @@
+[package]
+name = "qnc-edit-verbs"
+version = "0.1.0"
+edition = "2021"
+description = "QNC public block: the one vocabulary of editing on a timeline and its zoom (cue, take, side, keep, drop, word) as catalog system actions"
+
+[dependencies]
+qnc-action-event = { workspace = true }

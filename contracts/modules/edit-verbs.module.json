@@ -1,0 +1,37 @@
+{
+  "module_id": "qnc.module.edit-verbs",
+  "module_name": "Edit verbs",
+  "module_version": "0.1.0",
+  "module_kind": "library",
+  "capabilities": [
+    "edit.verbs"
+  ],
+  "input_contract_version": "0.1.0",
+  "output_contract_version": "0.1.0",
+  "supported_os": [
+    "windows",
+    "linux",
+    "macos"
+  ],
+  "supported_cpu": [
+    "x86_64",
+    "aarch64"
+  ],
+  "transport_protocol_version": "0.1.0",
+  "forbidden_calls": [
+    "ffprobe",
+    "media.decode",
+    "database.write",
+    "business.workflow"
+  ],
+  "forbidden_dependencies": [
+    "qnc.module.media-probe",
+    "qnc.module.content-store"
+  ],
+  "state_policy": "stateless",
+  "database_write_policy": "no_db_writes",
+  "runtime_crate": "qnc-edit-verbs",
+  "input": "What a view of the axis asks of its owner: cue, keep, drop, undo, take a cut's picture or sound, pick a side of a cut, take or drag the J/L side of its sound, a word said.",
+  "output": "The one catalog system action of that verb on the owner's panel, and back; the same for a timeline and its zoom.",
+  "specification": "AGENTS 0.12 (user 2026-11-04): a timeline and its zoom have the same tools, only the drawing differs; docs/97. The block holds no state, no owner rules and no drawing."
+}

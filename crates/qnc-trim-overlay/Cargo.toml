@@ -12,3 +12,4 @@ qnc-action-event = { workspace = true }
 qnc-touchpad = { workspace = true }
 qnc-wheel-jog = { workspace = true }
 qnc-ui-text = { workspace = true }
+qnc-edit-verbs = { workspace = true }

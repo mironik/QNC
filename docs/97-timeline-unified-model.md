@@ -83,11 +83,76 @@ Vlasnik daje samo **os** (slike, komadi, rezovi kakvi jesu) i **pravila objekta*
 slide, granice klipa, sto smije J/L) te **upis** u bazu. Vlasnici: klip (source), prica (Story,
 S-Story), scenarij (SubSegment). Vlasnik ne mapira geste i nema vlastite radnje.
 
+### 3.5. Kocke, ne monolit (provjera 2026-11-04)
+
+Model se ne pise kao jedan crate s "dispatcherom" koji zna Story, klip i scenarij - to bi bio
+novi centralni kontroler (zabranjen, odjeljak 0.11 i 12). Podjela:
+
+| Kocka | Jedna odgovornost | Stanje |
+|---|---|---|
+| `qnc-edit-verbs` | rjecnik radnji (3.2) <-> sistemske radnje kataloga; bez stanja, bez pravila vlasnika | IZVEDENO (korak 1) |
+| `qnc-mouse-map` (postojeca) | gesta na mjestu -> radnja; ista mapa za timeline i zoom | postoji, zoom ga jos ne koristi |
+| `qnc-timeline` (postojeca) | crtanje osi i pogodak mjesta (rez, strana, traka) | postoji |
+| `qnc-trim-overlay` (postojeca) | crtanje uvecanog prozora; dogadaje gradi kroz `qnc-edit-verbs` | izvedeno za sve dogadaje zooma |
+| `qnc-edit-cut` | pravila reza: strane, slika, ton, J/L (spaja `cut_part` i `JoinSound`) | predvideno (korak 4) |
+| `qnc-edit-edge` | pravila ruba: take/nudge/drag/mark/keep/drop, roll, ripple (spaja `SlotTrim`, `EdgeTrim`, SubSegment `Trim`, `mark_focus`) | predvideno (korak 5) |
+| `qnc-edit-lane` | traka komada: kanal, razina, off (spaja `route_lane`, `segments_keys::draft`, `sound_key`) | predvideno |
+| `qnc-edit-words` | rijec na osi: cue, rub na granicu rijeci, par IN/OUT | predvideno (korak 6) |
+
+Vlasnici (`qnc-program-segments`, `qnc-source-timeline`, `qnc-script`) zovu te kocke sa svojom
+osi i svojim upisom; sami ne mapiraju geste.
+
+### 3.6. Prekrivanje reza bez pokrivalice (predvideno, kocke se ne pisu odmah)
+
+Izbor na spoju dvaju komada istog govornika (korisnik 2026-11-04: pitanje; "predvidi ih"):
+
+| Nacin | Sto radi | Kocka (predvidena) | Gdje se racuna |
+|---|---|---|---|
+| Rez | kao danas | - | - |
+| Pretapanje | 3-6 slika miksa slike preko reza | `qnc-cut-dissolve` (miks dviju slika, opis prijelaza na spoju) | player uzivo + prerender |
+| Punch-in | drugi komad povecan 10-15 %, kao promjena plana | `qnc-cut-punch-in` (izrez i skaliranje slike komada) | player uzivo + prerender |
+| Smooth cut (AI, offline) | medjuslike preko reza (RIFE ncnn-Vulkan, MIT; FILM za vece pokrete) | `qnc-cut-smooth` (radnik u pozadini, dodatak po ugovoru kao prijepis) + `qnc-frame-interp` (program dodatka) | pozadinski render u prerender, player pusta gotov spoj |
+| Bljesak | bijeli bljesak | (ne za vijesti) | - |
+
+Zapis: nacin prijelaza i duljina uz spoj (kao pauza i rez/crossfade dijela), u bazi vlasnika.
+Uredivacka napomena: smooth cut skriva montazu izjave; neke redakcije to ne dopustaju, pa nije zadano.
+
+### 3.7. Alati suvremenih montaznih programa koje QNC nema (Premiere Pro, Resolve, Final Cut, Avid, Edius)
+
+Iz poznavanja tih programa (nije provjereno na internetu). Ono sto QNC vec ima: roll, ripple
+ruba, slide komada, J/L, overwrite (pokrivalica), markeri, undo i undo izabranog, montaza po
+tekstu i prijepis, analiza kadrova, normalizacija glasnoce (EBU R 128), proxy, XML, HDMI izlaz.
+
+| Alat | Opis | Vaznost za vijesti |
+|---|---|---|
+| JKL shuttle | J nazad, K stop, L naprijed; ponovljeni pritisak brze (2x, 4x) | visoka |
+| Trim mode / dinamicni trim | rub se mice dok svira, JKL u trimu, prikaz dviju slika (imamo zoom bez playa) | visoka |
+| Slip | pomak sadrzaja komada unutar istih IN/OUT (bez promjene trajanja) | visoka |
+| Lift / Extract | izvadi komad i ostavi rupu / zatvori rupu | visoka |
+| Ripple delete i brisanje rupe | | srednja |
+| Insert edit / 3-point i 4-point edit | umetanje izvora na playhead s pomicanjem ostatka | srednja |
+| Match frame | iz price na isti kadar izvora i obrnuto | visoka |
+| Snapping | rub, playhead i marker se lijepe za rezove | visoka |
+| Brzina i freeze frame | usporeno, ubrzano, zamrznuta slika | srednja |
+| Keyframeovi razine (rubber band) i automatsko stisavanje ambijenta pod govorom (ducking) | | visoka |
+| Ciscenje govora (noise reduction, dialog isolation) | offline, npr. RNNoise / DeepFilterNet | visoka |
+| Titlovi i potpisi (lower thirds), predlosci grafike | | visoka |
+| Titlovi iz prijepisa (SRT/burn-in) | | visoka |
+| Zamagljivanje lica i tablica (GDPR) s pracenjem | offline detekcija lica | visoka |
+| Smart reframe 16:9 -> 9:16 / 1:1 za drustvene mreze | pracenje lica | srednja |
+| Stabilizacija | | niska |
+| Osnovna korekcija boje / LUT | | niska |
+| Multicam i sinkronizacija po zvuku | | niska za news cutter |
+| Biljeske na markerima, boje markera | | srednja |
+| Usporedni prikaz izvor / program (dva monitora) | | srednja |
+
 ## 4. Plan objedinjavanja (svaki korak zakljucan zlatnom tablicom)
 
-1. **Ugovor radnji i jedan dispatcher**: nova cista kocka `qnc-edit-model` (objekti 3.1, radnje
-   3.2, svojstvo `EditOwner`); zoom salje radnje panela svog vlasnika (bez hardkodiranog
-   `segments`); zlatna tablica gesta -> radnja za timeline i zoom (mora biti ista).
+1. **Rjecnik radnji** (IZVEDENO 2026-11-04): kocka `qnc-edit-verbs` (bez dispatchera, vidi 3.5);
+   svaki dogadaj zooma (strana, V, A1/A2, desni klik na ton, J/L klik i povlacenje, rijec, Undo,
+   Save, Cancel) gradi se kroz nju na panelu vlasnika zooma (bez hardkodiranog `segments`).
+   Sljedece u ovom koraku: dogadaji `qnc-timeline` (`events.rs`) kroz istu kocku i zlatna
+   tablica gesta -> radnja, ista za timeline i zoom.
 2. **SubSegment na mapu misa**: prestaje rucno mapiranje; dobiva srednji klik, dvoklik, J/L klik i
    povlacenje, izbor kanala na traci.
 3. **Trake u zoomu = trake timelinea**: iste oznake A1/A2, izbor kanala, razina i off, crta ih
