@@ -156,6 +156,10 @@ pub struct Script {
     trim: Option<Trim>,
     /// The part of the open SubSegment chosen by a click on its length strip, as a slot is.
     chosen: Option<usize>,
+    /// The sound of a join taken (Ctrl+1 with its whole cut taken, user 2026-11-03), as drafted.
+    join_sound: Option<JoinSound>,
+    /// The value of the action being handled (the frame of a click in the trim zoom).
+    value: Option<i64>,
     /// The waves of the SubSegment's clips (read in the background).
     waves: qnc_program_waveform::ProgramWaves,
     /// The filmstrips of the SubSegment's clips (read in the background).
@@ -201,9 +205,47 @@ struct Trim {
     roll: Option<u64>,
 }
 
+/// The J and L of the join before part `index` being moved: both sides together, or only the
+/// J (the sound of the part after starts earlier) or only the L (the part before's goes on).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct JoinSound {
+    pub index: usize,
+    pub lead: u64,
+    pub tail: u64,
+    pub side: JoinSide,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum JoinSide {
+    Both,
+    Lead,
+    Tail,
+}
+
+/// The longest J or L of a join (frames); the sources limit it further where it plays.
+const JOIN_SOUND_MAX: u64 = 10_000;
+
+impl JoinSound {
+    /// One step later (`step` > 0) or earlier: the sound cut moves (a J that shrinks becomes an
+    /// L that grows); with both a J and an L the overlap moves whole; one side moves alone.
+    fn moved(mut self, step: i64) -> Self {
+        let shift = |value: u64, by: i64| (value as i64 + by).clamp(0, JOIN_SOUND_MAX as i64) as u64;
+        match self.side {
+            JoinSide::Lead => self.lead = shift(self.lead, -step),
+            JoinSide::Tail => self.tail = shift(self.tail, step),
+            JoinSide::Both if self.lead > 0 && self.tail > 0 => (self.lead, self.tail) = (shift(self.lead, -step), shift(self.tail, step)),
+            JoinSide::Both => {
+                let offset = self.tail as i64 - self.lead as i64 + step;
+                (self.lead, self.tail) = ((-offset).clamp(0, JOIN_SOUND_MAX as i64) as u64, offset.clamp(0, JOIN_SOUND_MAX as i64) as u64);
+            }
+        }
+        self
+    }
+}
+
 impl Default for Script {
     fn default() -> Self {
-        Self { view: ScriptView::default(), blocks: Vec::new(), project: None, reading: None, read_at: None, writing: None, source_request: None, names: HashMap::new(), words_per_second: Ok(0.0), take: None, taking: None, exporting: None, draft: Default::default(), open_subsegment: None, pieces_request: None, trim: None, chosen: None, waves: qnc_program_waveform::ProgramWaves::new(), filmstrips: qnc_program_filmstrip::ProgramFilmstrips::new(), waves_project: None, trim_stills: qnc_trim_stills::TrimStills::new(), zoom_follow: Default::default(), sound: None, voices: Vec::new(), voice_request: None, voice_after_write: None, message_after_write: None, clear_after_write: false }
+        Self { view: ScriptView::default(), blocks: Vec::new(), project: None, reading: None, read_at: None, writing: None, source_request: None, names: HashMap::new(), words_per_second: Ok(0.0), take: None, taking: None, exporting: None, draft: Default::default(), open_subsegment: None, pieces_request: None, trim: None, chosen: None, join_sound: None, value: None, waves: qnc_program_waveform::ProgramWaves::new(), filmstrips: qnc_program_filmstrip::ProgramFilmstrips::new(), waves_project: None, trim_stills: qnc_trim_stills::TrimStills::new(), zoom_follow: Default::default(), sound: None, voices: Vec::new(), voice_request: None, voice_after_write: None, message_after_write: None, clear_after_write: false }
     }
 }
 
@@ -287,6 +329,27 @@ impl Script {
         let pieces = view::block_pieces(&block);
         let rate = pieces.first().and_then(|piece| names.get(&piece.clip_id)).filter(|(_, _, seconds)| *seconds > 0.0).map_or(25, |(_, frames, seconds)| (*frames as f64 / seconds).round() as u64);
         let zoom = self.trim.and_then(|trim| view::subsegment_zoom(&shown, &pieces, (trim.index, trim.out), (rate, Some((&self.zoom_follow, preview.playing_at().filter(|(program, _, _)| *program).map(|(_, frame, playing)| (frame, playing))))), |clip| names.get(clip).map(|(_, frames, _)| *frames)));
+        // A whole cut taken: the zoom's A1 takes its sound (its label, a right click), and the
+        // taken join sound shows its J and L there, red, moved by click and drag (user
+        // 2026-11-03: the same zoom as a story's cut).
+        let joined = self.trim.filter(|trim| trim.roll.is_some()).map(|trim| trim.index + 1);
+        let join_sound = self.join_sound;
+        let zoom = zoom.map(|mut zoom| {
+            if let (Some(index), Some(sound)) = (joined.or(join_sound.map(|join| join.index)), zoom.zoom_sound.as_mut()) {
+                let marker_id = format!("join:{index}");
+                sound.taken_cut = Some(marker_id.clone());
+                if let Some(join) = join_sound {
+                    let (lead, tail) = (sound.cut.saturating_sub(join.lead), sound.cut + join.tail);
+                    let moving = match join.side {
+                        JoinSide::Both => vec![lead, tail],
+                        JoinSide::Lead => vec![lead],
+                        JoinSide::Tail => vec![tail],
+                    };
+                    sound.cut_sound = Some(qnc_program_view::ZoomCutSound { marker_id, lane: 0, lead: Some(lead), tail: Some(tail), moving });
+                }
+            }
+            zoom
+        });
         shown.zoom = zoom.map(|mut zoom| {
             self.trim_stills.fill(&mut zoom, preview.still_locator(), None);
             Box::new(zoom)
@@ -294,6 +357,7 @@ impl Script {
         shown.sound = self.sound.map(|sound| sound.index);
         shown.roll = self.trim.is_some_and(|trim| trim.roll.is_some());
         shown.chosen = self.chosen.filter(|index| *index < shown.parts.len());
+        shown.join_sound = self.join_sound.map(|join| (join.index, join.side));
         shown.rate = pieces.first().and_then(|piece| names.get(&piece.clip_id)).filter(|(_, frames, seconds)| *seconds > 0.0 && *frames > 0).map(|(_, frames, seconds)| ((*frames as f64 / seconds).round() as u32, 1));
         self.view.subsegment = Some(shown);
     }
@@ -307,6 +371,11 @@ impl Script {
             }
             if let (Some(from), Some(next)) = (trim.roll, block.pieces.get_mut(trim.index + 1)) {
                 next.from_frame = from;
+            }
+        }
+        if let Some(join) = self.join_sound {
+            if let Some(piece) = block.pieces.get_mut(join.index) {
+                (piece.a1_lead_frames, piece.a1_tail_frames) = (join.lead, join.tail);
             }
         }
         if let Some(sound) = self.sound {
@@ -368,6 +437,9 @@ impl Script {
         let block = self.block(self.open_subsegment)?.clone();
         let pieces = view::block_pieces(&block);
         let take = |index: usize, out: bool| pieces.get(index).map(|piece| Trim { index, out, from: piece.from_frame, to: piece.to_frame, roll: None });
+        if let Some(done) = self.join_key(action_id, &block, &pieces, preview) {
+            return Some(done);
+        }
         if let Some(done) = self.sound_key(action_id, &block, &pieces, preview) {
             return Some(done);
         }
@@ -427,7 +499,7 @@ impl Script {
                     }
                     None => take(index, out),
                 };
-                self.sound = None;
+                (self.sound, self.join_sound) = (None, None);
                 self.trim = new;
                 0
             }
@@ -487,6 +559,92 @@ impl Script {
         let drafted = self.drafted(block.clone());
         self.pieces_request = Some((view::piece_inputs(&drafted), self.edge_frame(&drafted).unwrap_or(0)));
         Some(true)
+    }
+
+    /// The value of the next action (a frame of the trim zoom's click or drag).
+    pub fn set_value(&mut self, value: Option<i64>) {
+        self.value = value;
+    }
+
+    /// The J and L of a join (user 2026-11-03), as at a story's cut: with the whole cut of a join
+    /// taken, Ctrl+1 takes its sound (both sides); then Ctrl+I only the J (the part after's sound
+    /// starts earlier), Ctrl+O only the L (the part before's goes on), Ctrl+1 both again; arrows
+    /// and the wheel move it a frame and it is heard at once; Enter (or a left click) keeps it,
+    /// Esc gives it up. `None` for a key that is not the join sound's.
+    fn join_key(&mut self, action_id: &str, block: &Block, pieces: &[Piece], preview: &SourcePreview) -> Option<bool> {
+        let take_sound = matches!(qnc_timeline::LaneKey::of(action_id), Some(qnc_timeline::LaneKey::Take(0)));
+        let mut join = match self.join_sound {
+            Some(join) => join,
+            None => {
+                let trim = self.trim.filter(|trim| trim.roll.is_some() && take_sound)?;
+                let index = trim.index + 1;
+                let piece = pieces.get(index)?;
+                if pieces.get(trim.index).is_some_and(|before| (before.from_frame, before.to_frame) != (trim.from, trim.to)) {
+                    self.write_trim(preview, block, pieces, trim);
+                }
+                self.sound = None;
+                self.join_sound = Some(JoinSound { index, lead: piece.a1_lead_frames, tail: piece.a1_tail_frames, side: JoinSide::Both });
+                return Some(true);
+            }
+        };
+        let step = match action_id {
+            _ if take_sound => {
+                join.side = JoinSide::Both;
+                0
+            }
+            "select_mark_in" => {
+                join.side = JoinSide::Lead;
+                0
+            }
+            "select_mark_out" => {
+                join.side = JoinSide::Tail;
+                0
+            }
+            "step_back_frame" => -1,
+            "step_forward_frame" => 1,
+            "wheel_source_back" | "wheel_source_forward" => if qnc_wheel_jog::source_step_forward(action_id)? { 1 } else { -1 },
+            // In the zoom (the same system actions as on a story's row): a click near a side takes
+            // that side, a drag moves the moving side to the frame.
+            "timeline_take_cut_edge" | "timeline_drag_cut_edge" => {
+                let frame = u64::try_from(self.value?).ok()?;
+                let cut = view::subsegment_view(&self.drafted(block.clone()), None).parts.get(join.index)?.start;
+                let (lead_at, tail_at) = (cut.saturating_sub(join.lead), cut + join.tail);
+                if action_id == "timeline_take_cut_edge" {
+                    join.side = if frame.abs_diff(lead_at) <= frame.abs_diff(tail_at) { JoinSide::Lead } else { JoinSide::Tail };
+                    self.join_sound = Some(join);
+                    return Some(true);
+                }
+                let to = |from: u64| frame as i64 - from as i64;
+                match join.side {
+                    JoinSide::Lead => to(lead_at),
+                    JoinSide::Tail | JoinSide::Both => to(tail_at),
+                }
+            }
+            "activate_focused_item" => {
+                (self.join_sound, self.trim) = (None, None);
+                let (id, index) = (block.id, join.index);
+                return Some(self.write(preview, move |target| qnc_script_db::set_join_sound(target, id, index, join.lead, join.tail).map(|_| None)));
+            }
+            "clear_focus" => {
+                self.join_sound = None;
+                self.pieces_request = Some((view::piece_inputs(block), self.join_hear_from(block, join.index)));
+                return Some(true);
+            }
+            _ => return None,
+        };
+        self.join_sound = Some(join.moved(step));
+        if step != 0 {
+            let drafted = self.drafted(block.clone());
+            self.pieces_request = Some((view::piece_inputs(&drafted), self.join_hear_from(&drafted, join.index)));
+        }
+        Some(true)
+    }
+
+    /// Where a join sound is heard from: a second before its cut.
+    fn join_hear_from(&self, block: &Block, index: usize) -> u64 {
+        let at = view::subsegment_view(block, None).parts.get(index).map_or(0, |part| part.start);
+        let rate = self.view.subsegment.as_ref().and_then(|view| view.rate).map_or(25, |(num, den)| u64::from(num / den.max(1)));
+        at.saturating_sub(rate)
     }
 
     /// The part Ctrl+I / Ctrl+O and Ctrl+1 work on: the chosen one, else the one under the
@@ -744,7 +902,7 @@ impl Script {
             OPEN if self.block(id()).is_some_and(|block| block.pieces.len() > 1) => {
                 let block = self.block(id())?.clone();
                 self.open_subsegment = Some(block.id);
-                self.chosen = None;
+                (self.chosen, self.join_sound, self.trim, self.sound) = (None, None, None, None);
                 self.pieces_request = Some((view::piece_inputs(&block), 0));
                 self.view.subsegment = Some(view::subsegment_view(&block, None));
                 true
@@ -778,7 +936,7 @@ impl Script {
             PART_MOVE | PART_REMOVE => {
                 let mut parts = target.unwrap_or_default().split(':');
                 let (Some(id), Some(index)) = (parts.next().and_then(|id| id.parse::<i64>().ok()), parts.next().and_then(|index| index.parse::<usize>().ok())) else { return Some(false) };
-                (self.trim, self.sound, self.chosen) = (None, None, None);
+                (self.trim, self.sound, self.chosen, self.join_sound) = (None, None, None, None);
                 if action_id == PART_REMOVE {
                     return Some(self.write(preview, move |target| qnc_script_db::remove_piece(target, id, index).map(|_| None)));
                 }
@@ -866,6 +1024,8 @@ impl Script {
             a1_channel: None,
             a1_level_db: 0,
             a1_off: false,
+            a1_lead_frames: 0,
+            a1_tail_frames: 0,
         })
     }
 

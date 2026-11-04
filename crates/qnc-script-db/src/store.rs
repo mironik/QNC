@@ -53,6 +53,7 @@ impl Store {
             Operation::AddPiece { id, piece } => self.add_piece(*id, piece),
             Operation::SetJoin { id, index, gap_before, cut } => self.set_join(*id, *index, *gap_before, *cut),
             Operation::SetPiece { id, index, piece } => self.set_piece(*id, *index, piece),
+            Operation::SetJoinSound { id, index, lead, tail } => self.set_join_sound(*id, *index, *lead, *tail),
             Operation::MovePiece { id, index, earlier } => self.move_piece(*id, *index, *earlier),
             Operation::RemovePiece { id, index } => self.remove_piece(*id, *index),
             Operation::ReadVoices => self.voices().map(Data::Voices),
@@ -274,7 +275,7 @@ impl Store {
         if block.pieces.is_empty() {
             block.pieces.push(Piece::of(&block));
         }
-        block.pieces.push(Piece { gap_before: 0, cut: false, ..piece.clone() });
+        block.pieces.push(Piece { gap_before: 0, cut: false, a1_lead_frames: 0, a1_tail_frames: 0, ..piece.clone() });
         self.store_pieces(id, block)
     }
 
@@ -298,7 +299,17 @@ impl Store {
         if piece.clip_id != stored.clip_id || piece.to_frame <= piece.from_frame {
             return Err(qnc_ui_text::fill("db.script_clip_range", &[("kind", &block.kind)]));
         }
-        *stored = Piece { gap_before: stored.gap_before, cut: stored.cut, ..piece.clone() };
+        *stored = Piece { gap_before: stored.gap_before, cut: stored.cut, a1_lead_frames: stored.a1_lead_frames, a1_tail_frames: stored.a1_tail_frames, ..piece.clone() };
+        self.store_pieces(id, block)
+    }
+
+    /// The J and L of the join before part `index` (user 2026-11-03); the first part has none.
+    fn set_join_sound(&mut self, id: i64, index: usize, lead: u64, tail: u64) -> Result<Data> {
+        let mut block = self.read()?.into_iter().find(|block| block.id == id).ok_or_else(|| qnc_ui_text::text("db.script_no_block").to_string())?;
+        let Some(piece) = block.pieces.get_mut(index).filter(|_| index > 0) else {
+            return Err(qnc_ui_text::text("db.script_no_join").into());
+        };
+        (piece.a1_lead_frames, piece.a1_tail_frames) = (lead, tail);
         self.store_pieces(id, block)
     }
 
@@ -310,10 +321,10 @@ impl Store {
         let Some(other) = other.filter(|other| index < block.pieces.len() && *other < block.pieces.len()) else {
             return Err(qnc_ui_text::text("db.script_no_join").into());
         };
-        let joins: Vec<(u64, bool)> = block.pieces.iter().map(|piece| (piece.gap_before, piece.cut)).collect();
+        let joins: Vec<(u64, bool, u64, u64)> = block.pieces.iter().map(|piece| (piece.gap_before, piece.cut, piece.a1_lead_frames, piece.a1_tail_frames)).collect();
         block.pieces.swap(index, other);
-        for (piece, (gap, cut)) in block.pieces.iter_mut().zip(joins) {
-            (piece.gap_before, piece.cut) = (gap, cut);
+        for (piece, (gap, cut, lead, tail)) in block.pieces.iter_mut().zip(joins) {
+            (piece.gap_before, piece.cut, piece.a1_lead_frames, piece.a1_tail_frames) = (gap, cut, lead, tail);
         }
         self.store_pieces(id, block)
     }
@@ -330,7 +341,7 @@ impl Store {
         }
         block.pieces.remove(index);
         if let Some(first) = block.pieces.first_mut() {
-            (first.gap_before, first.cut) = (0, false);
+            (first.gap_before, first.cut, first.a1_lead_frames, first.a1_tail_frames) = (0, false, 0, 0);
         }
         self.store_pieces(id, block)
     }

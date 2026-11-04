@@ -13,6 +13,12 @@ pub struct PieceInput {
     /// The part's own A1: camera channel (`None`: the one kept for its clip), level in dB and
     /// off (user 2026-10-29); `None`: the sound kept for its clip.
     pub a1: Option<(Option<u16>, i8, bool)>,
+    /// The J and L of the join before it (user 2026-11-03), in its clip's frames: its sound
+    /// starts `sound_lead` before its picture, the part before's goes on `sound_tail` after its
+    /// OUT. Either one crosses the two sounds as at a story's cut (`cross_a1`), in place of the
+    /// join's crossfade; after a pause there is nothing to cross.
+    pub sound_lead: u64,
+    pub sound_tail: u64,
 }
 
 /// The program of a SubSegment: its parts one after another on V1 and A1 (a pause is black
@@ -37,6 +43,8 @@ pub fn load_pieces(
     let program_timebase = timebase(rate.0, rate.1, "subsegment")?;
     let crossfade = i64::from(clips.crossfade_frames()?);
     let (mut segments, mut joins, mut start) = (Vec::new(), Vec::new(), 0i64);
+    // The story frames per frame of the part before (its L is counted in its own clip).
+    let mut before_scale = (1i64, 1i64);
     for (index, piece) in pieces.iter().enumerate() {
         // A pause may come before the first part too (a draft story that starts with an OFF
         // not recorded yet, user 2026-10-30).
@@ -60,9 +68,18 @@ pub fn load_pieces(
             None => kept,
         };
         let record_range = ProgramFrameRange::new(start + gap, start + gap + frames).map_err(|error| error.message)?;
-        if index > 0 {
-            joins.push(qnc_program_playlist::A1Join { end: start, start: start + gap, frames: if piece.crossfade { crossfade } else { 0 } });
+        // The J and L of the join (only where two parts meet, no pause): the sounds cross as at
+        // a story's cut, in place of the join's crossfade.
+        let (lead, tail) = if index > 0 && gap == 0 { (frame(piece.sound_lead)? * num / den, frame(piece.sound_tail)? * before_scale.0 / before_scale.1) } else { (0, 0) };
+        if lead + tail > 0 {
+            if let Some(before) = segments.last_mut() {
+                before.a1_tail_frames = tail;
+            }
         }
+        if index > 0 {
+            joins.push(qnc_program_playlist::A1Join { end: start, start: start + gap, frames: if piece.crossfade && lead + tail == 0 { crossfade } else { 0 } });
+        }
+        before_scale = (num, den);
         segments.push(ProgramSegmentInput {
             segment_id: format!("piece-{index}"),
             kind: "tonovi".into(),
@@ -76,7 +93,7 @@ pub fn load_pieces(
             covers: Vec::new(),
             v_lead_frames: 0,
             v_tail_frames: 0,
-            a1_lead_frames: 0,
+            a1_lead_frames: lead,
             a1_tail_frames: 0,
             a2_source_channel: 0,
             a2_level_db: 0,

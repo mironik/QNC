@@ -38,6 +38,8 @@ pub fn piece_inputs(block: &Block) -> Vec<PieceInput> {
             crossfade: !piece.cut,
             // The part's own A1 once any of it is set; else its clip's kept sound.
             a1: (piece.a1_channel.is_some() || piece.a1_level_db != 0 || piece.a1_off).then_some((piece.a1_channel, piece.a1_level_db, piece.a1_off)),
+            sound_lead: if index == 0 { 0 } else { piece.a1_lead_frames },
+            sound_tail: if index == 0 { 0 } else { piece.a1_tail_frames },
         })
         .collect()
 }
@@ -71,6 +73,7 @@ pub fn draft_pieces(blocks: &[Block], voices: &[Voice], profile: &ScriptProfile,
                         piece.gap_before = pause;
                         // A cut where the script goes from one block to the next.
                         piece.crossfade = false;
+                        (piece.sound_lead, piece.sound_tail) = (0, 0);
                     }
                     pieces.push(piece);
                 }
@@ -86,6 +89,8 @@ pub fn draft_pieces(blocks: &[Block], voices: &[Voice], profile: &ScriptProfile,
                         crossfade: false,
                         // The take used is its channel of the record (user 2026-10-30).
                         a1: Some((Some(take.take.saturating_sub(1)), 0, false)),
+                        sound_lead: 0,
+                        sound_tail: 0,
                     });
                     pause = 0;
                 }

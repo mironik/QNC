@@ -138,12 +138,21 @@ pub struct Piece {
     pub a1_level_db: i8,
     #[serde(default)]
     pub a1_off: bool,
+    /// The J and L of the join before this part (user 2026-11-03: as at a cut of a story): this
+    /// part's sound starts `a1_lead_frames` before its picture, the part before's sound goes on
+    /// `a1_tail_frames` after its OUT; with either the sounds cross over that window instead
+    /// of the join's cut or crossfade. Like the pause, they belong to the join (none before the
+    /// first part).
+    #[serde(default)]
+    pub a1_lead_frames: u64,
+    #[serde(default)]
+    pub a1_tail_frames: u64,
 }
 
 impl Piece {
     /// The block's own range as its first part (a clip block that had one range).
     pub fn of(block: &Block) -> Self {
-        Self { clip_id: block.clip_id.clone(), clip_name: block.clip_name.clone(), from_frame: block.from_frame, to_frame: block.to_frame, start_tc: block.start_tc.clone(), end_tc: block.end_tc.clone(), length: block.length.clone(), seconds: block.seconds, text: block.text.clone(), gap_before: 0, cut: false, a1_channel: None, a1_level_db: 0, a1_off: false }
+        Self { clip_id: block.clip_id.clone(), clip_name: block.clip_name.clone(), from_frame: block.from_frame, to_frame: block.to_frame, start_tc: block.start_tc.clone(), end_tc: block.end_tc.clone(), length: block.length.clone(), seconds: block.seconds, text: block.text.clone(), gap_before: 0, cut: false, a1_channel: None, a1_level_db: 0, a1_off: false, a1_lead_frames: 0, a1_tail_frames: 0 }
     }
 }
 
@@ -223,6 +232,8 @@ pub enum Operation {
     SetJoin { id: i64, index: usize, gap_before: u64, cut: bool },
     /// Part `index` with a new range (its pause and join stay).
     SetPiece { id: i64, index: usize, piece: Piece },
+    /// The J and L of the join before part `index` (frames; the first part has no join).
+    SetJoinSound { id: i64, index: usize, lead: u64, tail: u64 },
     /// Part `index` changes places with the part before it (`earlier`) or after it; the pauses
     /// and joins stay where they are between the parts.
     MovePiece { id: i64, index: usize, earlier: bool },
@@ -396,4 +407,9 @@ pub fn remove_piece(target: &ProjectDbTarget, id: i64, index: usize) -> Result<(
 /// Part `index` of block `id` with a new range (an edge trimmed on the SubSegment timeline).
 pub fn set_piece(target: &ProjectDbTarget, id: i64, index: usize, piece: Piece) -> Result<()> {
     write(target, Operation::SetPiece { id, index, piece }).map(drop)
+}
+
+/// The J (`lead`) and L (`tail`) of the join before part `index` of block `id`.
+pub fn set_join_sound(target: &ProjectDbTarget, id: i64, index: usize, lead: u64, tail: u64) -> Result<()> {
+    write(target, Operation::SetJoinSound { id, index, lead, tail }).map(drop)
 }

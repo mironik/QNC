@@ -231,7 +231,7 @@ fn a_block_keeps_only_the_fields_of_its_kind_and_a_choice_only_one_of_its_choice
 }
 
 fn piece(clip: &str, from: u64, to: u64, text: &str) -> Piece {
-    Piece { clip_id: clip.into(), clip_name: clip.into(), from_frame: from, to_frame: to, start_tc: format!("tc{from}"), end_tc: format!("tc{to}"), length: "1:00".into(), seconds: 1.0, text: text.into(), gap_before: 0, cut: false, a1_channel: None, a1_level_db: 0, a1_off: false }
+    Piece { clip_id: clip.into(), clip_name: clip.into(), from_frame: from, to_frame: to, start_tc: format!("tc{from}"), end_tc: format!("tc{to}"), length: "1:00".into(), seconds: 1.0, text: text.into(), gap_before: 0, cut: false, a1_channel: None, a1_level_db: 0, a1_off: false, a1_lead_frames: 0, a1_tail_frames: 0 }
 }
 
 #[test]
@@ -265,6 +265,24 @@ fn a_join_keeps_its_pause_and_cut_the_first_part_has_none() {
 a drugi dio", "the words stay");
     assert!(set_join(&target, id, 0, 5, false).is_err(), "the first part has no join");
     assert!(set_join(&target, id, 2, 5, false).is_err(), "no such part");
+}
+
+#[test]
+fn a_join_keeps_its_j_and_l_through_a_trim_and_a_move_and_the_first_part_has_none() {
+    let (_dir, target) = written();
+    let id = add(&target, None, sot("2002")).unwrap();
+    add_piece(&target, id, piece("2002", 500, 550, "drugi")).unwrap();
+    add_piece(&target, id, piece("2679", 10, 60, "treci")).unwrap();
+    set_join_sound(&target, id, 1, 4, 6).unwrap();
+    let join = |target: &ProjectDbTarget| read(target).unwrap()[0].pieces.iter().map(|p| (p.a1_lead_frames, p.a1_tail_frames)).collect::<Vec<_>>();
+    assert_eq!(join(&target), [(0, 0), (4, 6), (0, 0)]);
+    // A trimmed edge keeps the J and L of its join.
+    set_piece(&target, id, 1, piece("2002", 505, 550, "drugi")).unwrap();
+    assert_eq!(join(&target)[1], (4, 6));
+    // They stay with the join's place when the parts change places.
+    move_piece(&target, id, 2, true).unwrap();
+    assert_eq!(join(&target), [(0, 0), (4, 6), (0, 0)]);
+    assert!(set_join_sound(&target, id, 0, 1, 1).is_err(), "the first part has no join");
 }
 
 #[test]

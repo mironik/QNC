@@ -95,7 +95,22 @@ pub fn show(ui: &mut egui::Ui, view: &SubsegmentView, theme: TimelineTheme, leng
         // The taken edge is the one a drag drags (the mouse rule: only what is taken moves).
         .map(|((index, out, frame), id)| {
             let taken = view.trim.is_some_and(|(at, trim_out, _)| (at == index && trim_out == out) || (view.roll && !out && index == at + 1));
-            TimelineMarkerPin { id, frame, taken, locked: false, part: TimelineMarkerPart::Whole, origin: None, sound_tail: None, sound_lead: None, join: false, a1_tail: None, a1_lead: None, sound_lane: 1 }
+            // The J and L of the join before a part (user 2026-11-03), on the IN of the part
+            // after it, drawn red on A1 as at a story's cut: where the sound before ends and where
+            // the sound after starts.
+            let part = &view.parts[index];
+            let split = !out && (part.a1_lead > 0 || part.a1_tail > 0);
+            let (a1_lead, a1_tail) = if split { (Some(frame.saturating_sub(part.a1_lead)), Some(frame + part.a1_tail)) } else { (None, None) };
+            let taken_part = match view.join_sound {
+                Some((at, side)) if at == index && !out => match side {
+                    qnc_script::JoinSide::Both => TimelineMarkerPart::Sound,
+                    qnc_script::JoinSide::Lead => TimelineMarkerPart::SoundLead,
+                    qnc_script::JoinSide::Tail => TimelineMarkerPart::SoundTail,
+                },
+                _ => TimelineMarkerPart::Whole,
+            };
+            let sound_taken = taken_part != TimelineMarkerPart::Whole;
+            TimelineMarkerPin { id, frame, taken: taken || sound_taken, locked: false, part: taken_part, origin: None, sound_tail: None, sound_lead: None, join: false, a1_tail, a1_lead, sound_lane: 0 }
         })
         .collect();
     // The edge being trimmed, as the trim playhead of a cover's edge.
@@ -144,7 +159,7 @@ pub fn show(ui: &mut egui::Ui, view: &SubsegmentView, theme: TimelineTheme, leng
                     trim_playheads: &trim,
                     a1_splits: &[],
                     pictures: &pictures,
-                    holding: view.trim.is_some() || view.sound.is_some(),
+                    holding: view.trim.is_some() || view.sound.is_some() || view.join_sound.is_some(),
                 },
             )
         })
@@ -166,7 +181,7 @@ pub fn show(ui: &mut egui::Ui, view: &SubsegmentView, theme: TimelineTheme, leng
         None => None,
     };
     answer = answer.or(drag_event);
-    let holding = view.trim.is_some() || view.sound.is_some();
+    let holding = view.trim.is_some() || view.sound.is_some() || view.join_sound.is_some();
     let event = match intent {
         // While an edge, a cut or a part's A1 is taken a left click keeps it, as Enter (the mouse
         // rule, as on a cover's row; user 2026-11-03).
@@ -290,7 +305,7 @@ mod tests {
     use qnc_script::SubsegmentPart;
 
     fn part(start: u64, end: u64) -> SubsegmentPart {
-        SubsegmentPart { start, end, clip_name: String::new(), length: String::new(), gap_before: 0, cut: false, a1_channel: None, a1_level_db: 0, a1_off: false, channels: None }
+        SubsegmentPart { start, end, clip_name: String::new(), length: String::new(), gap_before: 0, cut: false, a1_channel: None, a1_level_db: 0, a1_off: false, channels: None, a1_lead: 0, a1_tail: 0 }
     }
 
     #[test]

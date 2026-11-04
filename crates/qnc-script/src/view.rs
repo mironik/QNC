@@ -359,6 +359,9 @@ pub struct SubsegmentPart {
     pub a1_off: bool,
     /// How many channels its clip has (from its stored wave), once read.
     pub channels: Option<u16>,
+    /// The J and L of the join before it (frames), as drafted.
+    pub a1_lead: u64,
+    pub a1_tail: u64,
 }
 
 /// The SubSegment open in place of the source timeline (user 2026-10-29): its parts one after
@@ -388,6 +391,8 @@ pub struct SubsegmentView {
     pub roll: bool,
     /// The part chosen by a click on its length strip, as a slot is.
     pub chosen: Option<usize>,
+    /// The sound of the join before this part taken (Ctrl+1 on a taken cut) and which side moves.
+    pub join_sound: Option<(usize, crate::JoinSide)>,
 }
 
 /// The parts on the SubSegment's axis (a pause before a part moves it on).
@@ -400,12 +405,12 @@ pub fn subsegment_view(block: &Block, playhead: Option<u64>) -> SubsegmentView {
             let gap = if index == 0 { 0 } else { piece.gap_before };
             start += gap;
             let end = start + piece.to_frame.saturating_sub(piece.from_frame);
-            let part = SubsegmentPart { start, end, clip_name: piece.clip_name, length: piece.length, gap_before: gap, cut: piece.cut, a1_channel: piece.a1_channel, a1_level_db: piece.a1_level_db, a1_off: piece.a1_off, channels: None };
+            let part = SubsegmentPart { start, end, clip_name: piece.clip_name, length: piece.length, gap_before: gap, cut: piece.cut, a1_channel: piece.a1_channel, a1_level_db: piece.a1_level_db, a1_off: piece.a1_off, channels: None, a1_lead: if index == 0 || gap > 0 { 0 } else { piece.a1_lead_frames }, a1_tail: if index == 0 || gap > 0 { 0 } else { piece.a1_tail_frames } };
             start = end;
             part
         })
         .collect();
-    SubsegmentView { block_id: block.id, parts, total_frames: start, playhead, a1: Vec::new(), pictures: Vec::new(), trim: None, zoom: None, sound: None, rate: None, roll: false, chosen: None }
+    SubsegmentView { block_id: block.id, parts, total_frames: start, playhead, a1: Vec::new(), pictures: Vec::new(), trim: None, zoom: None, sound: None, rate: None, roll: false, chosen: None, join_sound: None }
 }
 
 /// Where the parts play on the SubSegment's axis, for its wave (channel 1 of each clip: the

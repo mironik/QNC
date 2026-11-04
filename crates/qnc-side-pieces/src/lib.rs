@@ -125,6 +125,7 @@ impl SidePieces {
         if let Some(script) = &mut self.script {
             let empty = TranscriptView::default();
             let transcript = self.transcript.as_ref().map_or(&empty, Transcript::view);
+            script.set_value(value);
             if let Some(done) = script.act(action_id, target, (preview, timeline, timecode, transcript)) {
                 play_pieces(script, preview);
                 // What the action changed is seen at once (the next poll compares from here).

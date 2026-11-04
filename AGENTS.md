@@ -7716,3 +7716,17 @@ traka je istaknuta, playhead na IN dijela; Ctrl+I/O i Ctrl+1 tada rade na izabra
 playheadom), Delete ga izbacuje iz izjave (zadnji dio ne), Esc ga pusta, klik izvan trake pusta izbor i samo stavlja
 playhead. `qnc-script` (`SUBSEGMENT_SELECT`, `chosen`, `part_in_hand`, `SubsegmentView.chosen`), `qnc-subsegment-panel`.
 Testovi, conformance, release build s libav. Uzivo nije provjereno.
+Dopuna 2026-11-04 (korisnik: "provjeri radi li L i J ton" -> u slozenoj izjavi ih nije bilo; "da, dodaj J i L"; "desni klik
+na ton u zumu trebao bi raditi isto"; "to je isto postojeca kocka"): spoj dvaju dijelova slozene izjave ima J i L tona A1
+kao rez u prici, istim kockama: spajanje tona `qnc-program-playlist` `cross_a1` (kroz `a1_lead_frames`/`a1_tail_frames`
+segmenata programa slozene izjave; J ili L zamjenjuje crossfade spoja; uz pauzu nista), crtanje strana J/L na timelineu
+`qnc-timeline` (`TimelineMarkerPin.a1_lead/a1_tail`, uzeta strana kao `TimelineMarkerPart::Sound/SoundLead/SoundTail`),
+zoom reza `qnc-trim-overlay` (A1 gumb, strane, povlacenje). Zapis: `qnc-script-db` `Piece.a1_lead_frames` (J zvuka dijela
+nakon spoja) i `a1_tail_frames` (L zvuka dijela prije), pripadaju spoju kao pauza (ostaju uz pomak ruba i premjestanje
+dijelova, prvi dio ih nema), operacija `SetJoinSound`, test. Uredivanje: s uzetim cijelim rezom Ctrl+1, klik na A1 u zoomu
+ili desni klik na ton A1 u zoomu uzima ton spoja (obje strane); Ctrl+I samo J, Ctrl+O samo L, Ctrl+1 opet obje; strelice,
+kotacic, klik i povlacenje strane u zoomu pomicu; svaki korak odmah se cuje (sekundu prije reza); Enter ili lijevi klik
+sprema, Esc odustaje (`qnc-script` `JoinSound`, `JoinSide`, `join_key`, `set_value`; `qnc-side-pieces` predaje vrijednost
+radnje). `qnc-trim-overlay`: desni klik na ton trake A1/A2 u svakom zoomu reza dok je rez uzet radi isto sto gumb A1/A2
+(Ctrl+1/Ctrl+2), i u Storyju. `qnc-program-input` `PieceInput.sound_lead/sound_tail`, `qnc-script-draft`. Testovi
+`qnc-script` (pomak tona spoja), `qnc-script-db` (J/L spoja), conformance, release build s libav. Uzivo nije provjereno.

@@ -200,6 +200,16 @@ fn paint_sound(ui: &mut egui::Ui, area: Rect, sound: &ZoomSound, gap_at: Option<
         if let Some(clicked) = paint_lane_label(ui, band, lane, sound.taken_cut.as_deref(), taken_lane, visuals) {
             side = Some(clicked);
         }
+        // A right click on the lane's sound is Ctrl+ (user 2026-11-03: "a right click on the
+        // sound in the zoom should do the same"): it takes the cut's sound on that lane, as the
+        // lane's label does.
+        if let Some(cut) = sound.taken_cut.as_deref() {
+            let right = ui.input(|i| i.pointer.secondary_clicked() && i.pointer.interact_pos().is_some_and(|pos| band.contains(pos)));
+            if right {
+                let action = if lane == 0 { "select_audio_a1" } else { "select_audio_a2" };
+                side = Some(ActionEvent::key(action).with_target(cut.to_string()).at("segments"));
+            }
+        }
     }
     // One thin line from between the pictures down through both waves when the cut is there.
     let from_top = match gap_at {

@@ -79,8 +79,22 @@ fn the_story_has_the_first_and_last_words_of_its_blocks_in_its_length() {
     assert_eq!(story.items[1].cues, None);
 }
 
+#[test]
+fn the_sound_of_a_join_moves_as_a_storys_cut() {
+    use crate::{JoinSide, JoinSound};
+    let join = |lead, tail, side| JoinSound { index: 1, lead, tail, side };
+    // Both sides with no overlap: the sound cut moves, a J that shrinks becomes an L.
+    assert_eq!(join(2, 0, JoinSide::Both).moved(3), join(0, 1, JoinSide::Both));
+    assert_eq!(join(0, 1, JoinSide::Both).moved(-3), join(2, 0, JoinSide::Both));
+    // With a J and an L the overlap moves whole.
+    assert_eq!(join(4, 6, JoinSide::Both).moved(2), join(2, 8, JoinSide::Both));
+    // One side alone; never below none.
+    assert_eq!(join(4, 6, JoinSide::Lead).moved(-1), join(5, 6, JoinSide::Lead));
+    assert_eq!(join(4, 6, JoinSide::Tail).moved(-10), join(4, 0, JoinSide::Tail));
+}
+
 fn part(clip: &str, from: u64, to: u64, gap: u64) -> Piece {
-    Piece { clip_id: clip.into(), clip_name: clip.into(), from_frame: from, to_frame: to, start_tc: String::new(), end_tc: String::new(), length: String::new(), seconds: 1.0, text: String::new(), gap_before: gap, cut: false, a1_channel: None, a1_level_db: 0, a1_off: false }
+    Piece { clip_id: clip.into(), clip_name: clip.into(), from_frame: from, to_frame: to, start_tc: String::new(), end_tc: String::new(), length: String::new(), seconds: 1.0, text: String::new(), gap_before: gap, cut: false, a1_channel: None, a1_level_db: 0, a1_off: false, a1_lead_frames: 0, a1_tail_frames: 0 }
 }
 
 #[test]
