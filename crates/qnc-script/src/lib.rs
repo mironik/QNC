@@ -30,8 +30,10 @@ use qnc_timeline::TimelineProjection;
 use qnc_transcript::TranscriptView;
 use qnc_voice_take::{Recorded, Take};
 
+mod pointer;
 mod read;
 mod view;
+pub use pointer::{drag_target, nearest_edge, ROW_ACTIONS};
 
 pub use view::*;
 
@@ -1046,6 +1048,14 @@ impl Script {
     /// The script's own actions; `None` for any other.
     pub fn act(&mut self, action_id: &str, target: Option<&str>, (preview, timeline, timecode, transcript): (&SourcePreview, &TimelineProjection, Option<&SourceTimecode>, &TranscriptView)) -> Option<bool> {
         // While a SubSegment is open in place of the source timeline its trim keys are its own.
+        // A pointer on the SubSegment's timeline comes as the mouse map's row action (AGENTS
+        // 0.12): the SubSegment's own action of it, with the frame or part it points at.
+        let holding = self.trim.is_some() || self.sound.is_some() || self.join_sound.is_some() || self.slide.is_some();
+        let own = self.open_subsegment.and(self.view.subsegment.as_ref()).and_then(|view| pointer::own_action(view, action_id, self.value, target, holding));
+        let (action_id, target) = match &own {
+            Some((action, own_target)) => (action.as_str(), own_target.as_deref()),
+            None => (action_id, target),
+        };
         if self.open_subsegment.is_some() {
             let done = self.trim_key(action_id, target, preview);
             if qnc_dev_diagnostics::player_diagnostics_enabled() {

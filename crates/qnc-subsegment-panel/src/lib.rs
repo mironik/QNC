@@ -8,9 +8,9 @@
 use eframe::egui::{self, RichText};
 use qnc_action_event::ActionEvent;
 use qnc_segment_panel::{cover_fill, CoverLengthBand};
-use qnc_script::{SubsegmentView, DRAG_EDGE, JOIN_CUT, JOIN_GAP, PART_CHANNEL, PART_LEVEL, PART_MOVE, PART_OFF, PART_REMOVE, SUBSEGMENT_CUE, SUBSEGMENT_SELECT, SUBSEGMENT_TAKE, TAKE_EDGE};
+use qnc_script::{SubsegmentView, JOIN_CUT, JOIN_GAP, PART_CHANNEL, PART_LEVEL, PART_MOVE, PART_OFF, PART_REMOVE};
 use qnc_timeline::{
-    AudioLane, TimelineCoverSpan, TimelineFocusPaint, TimelineInput, TimelineIntent, TimelineLayerFlags, TimelineMarkerPart, TimelineMarkerPin,
+    AudioLane, TimelineCoverSpan, TimelineFocusPaint, TimelineInput, TimelineLayerFlags, TimelineMarkerPart, TimelineMarkerPin,
     TimelineMetrics, TimelinePicture, TimelineProjection, TimelineTheme, TimelineVirtualSpan,
 };
 
@@ -178,48 +178,23 @@ pub fn show(ui: &mut egui::Ui, view: &SubsegmentView, theme: TimelineTheme, leng
         Some((at, _, _)) if id == format!("edge-{}-in", at + 1) => format!("edge-{at}-out"),
         _ => id,
     };
-    let dragged = qnc_timeline::take_marker_drag(ui.ctx()).and_then(|(id, frame)| drag_target(&rolled(id), frame));
+    // The mouse map of a program's row (AGENTS 0.12, docs/97 step 2): the SubSegment's timeline
+    // sends what a Wrap row sends; the script, the owner of its axis, says what it does.
+    let axis = |frame: u64| frame;
+    let dragged = qnc_timeline::take_marker_drag_event(ui.ctx(), ROW_PANEL, &axis).map(|event| match event.target.clone() {
+        Some(id) if event.action_id == "timeline_drag_marker" => ActionEvent { target: Some(rolled(id)), ..event },
+        _ => event,
+    });
     let was_dragging = ui.ctx().data(|d| d.get_temp::<bool>(dragging)).unwrap_or(false);
     ui.ctx().data_mut(|d| d.insert_temp(dragging, dragged.is_some() || (was_dragging && ui.ctx().input(|i| i.pointer.primary_down()))));
+    // Letting go of a drag keeps it, as Enter.
     let drag_event = match dragged {
-        Some(target) => Some(ActionEvent::key(DRAG_EDGE).with_target(target)),
+        Some(event) => Some(event),
         None if was_dragging && !ui.ctx().input(|i| i.pointer.primary_down()) => Some(ActionEvent::key("activate_focused_item")),
         None => None,
     };
     answer = answer.or(drag_event);
-    let holding = view.trim.is_some() || view.sound.is_some() || view.join_sound.is_some() || view.slide.is_some();
-    let event = match intent {
-        // While an edge, a cut or a part's A1 is taken a left click keeps it, as Enter (the mouse
-        // rule, as on a cover's row; user 2026-11-03).
-        TimelineIntent::CueFrame(_) | TimelineIntent::SelectVirtual { .. } | TimelineIntent::SelectCover { .. } | TimelineIntent::SelectMarkerSlot { .. } | TimelineIntent::Keep(_) if holding => Some(ActionEvent::key("activate_focused_item")),
-        // A click on a part's picture is a click on its row (user 2026-10-29: the filmstrip did
-        // not take the playhead): the parts are not chosen, the playhead goes there.
-        TimelineIntent::CueFrame(frame) | TimelineIntent::SelectVirtual { frame, .. } => Some(ActionEvent::key(SUBSEGMENT_CUE).with_target(frame.to_string())),
-        // A click on a part's length strip chooses the part, as a click on a cover's strip
-        // chooses its slot (user 2026-11-03); the playhead goes to its IN.
-        TimelineIntent::SelectCover { frame, .. } | TimelineIntent::SelectMarkerSlot { frame, .. } => {
-            view.parts.iter().position(|part| frame >= part.start && frame < part.end).map(|index| ActionEvent::key(SUBSEGMENT_SELECT).with_target(index.to_string()))
-        }
-        // A right click (or Ctrl + click) on a part's length strip takes it whole, as a slot's
-        // strip does (Ctrl+S): arrows and the wheel then move it (user 2026-11-04).
-        TimelineIntent::TakeSlot { frame, .. } | TimelineIntent::TakeCover { frame, .. } | TimelineIntent::TakeCoverOnStrip { frame, .. } => {
-            view.parts.iter().position(|part| frame >= part.start && frame < part.end).map(|index| ActionEvent::key(SUBSEGMENT_TAKE).with_target(index.to_string()))
-        }
-        // A right click on A1: the sound of the part there, as Ctrl+1 (a slot's sound).
-        TimelineIntent::TakeSound { lane: AudioLane::A1, frame } => {
-            view.parts.iter().position(|part| frame >= part.start && frame < part.end).map(|index| ActionEvent::key("select_audio_a1").with_target(index.to_string()))
-        }
-        // A right click on a join takes the IN of the part after it, as Ctrl+I.
-        // A right click takes the IN or OUT nearest to where it was (user 2026-10-29: every IN
-        // and OUT of every part); at a join the side clicked on decides.
-        TimelineIntent::TakeMarker { frame, .. } => nearest_edge(view, frame).map(|(index, side)| ActionEvent::key(TAKE_EDGE).with_target(format!("{index}:{side}"))),
-        // The wheel moves the playhead, or the taken edge, a frame as the arrows do.
-        TimelineIntent::Wheel(wheel) if !wheel.ctrl => Some(ActionEvent::key(if wheel.up == qnc_wheel_jog::source_step_forward("wheel_source_forward").unwrap_or(true) { "step_forward_frame" } else { "step_back_frame" })),
-        // Ctrl+wheel: the level of the taken A1 (Ctrl+1), as on a cover's lane.
-        TimelineIntent::Wheel(wheel) => Some(ActionEvent::key(wheel.action(qnc_wheel_jog::SOURCE_ACTIONS))),
-        _ => None,
-    };
-    answer = answer.or(event);
+    answer = answer.or_else(|| qnc_timeline::event(&intent, ROW_PANEL, &axis).filter(|event| qnc_script::ROW_ACTIONS.contains(&event.action_id.as_str())));
     // The trim zoom of a taken edge, as a cover's: its wheel moves the edge; a click on a word
     // moves the taken edge to it (user 2026-11-04), on the SubSegment's axis.
     let zoomed = view.zoom.as_deref().and_then(|zoom| qnc_trim_overlay::show(ui.ctx(), zoom)).map(|event| match event.action_id.as_str() {
@@ -288,59 +263,5 @@ pub fn show(ui: &mut egui::Ui, view: &SubsegmentView, theme: TimelineTheme, leng
     answer
 }
 
-/// The target of a drag of edge marker `id` ("edge-{part}-in|out") to `frame`: `part:in|out:frame`.
-pub fn drag_target(id: &str, frame: u64) -> Option<String> {
-    let mut parts = id.strip_prefix("edge-")?.split('-');
-    let (index, side) = (parts.next()?.parse::<usize>().ok()?, parts.next()?);
-    matches!(side, "in" | "out").then(|| format!("{index}:{side}:{frame}"))
-}
-
-/// The edge nearest to `frame`: its part and its side, `in`, `out` or `cut`. A right click takes
-/// the whole of what it is on, as on a cover's row (user 2026-11-03): where an OUT and the next
-/// IN meet (a join without a pause) that is the cut of both (`cut`, on the part before it, a
-/// roll); an IN after a pause, an OUT before one, the first IN and the last OUT are their own.
-/// Only one side of a cut is taken in its zoom (the picture left of the cut its OUT, the one
-/// right of it the next IN) or with Ctrl+I / Ctrl+O.
-pub fn nearest_edge(view: &SubsegmentView, frame: u64) -> Option<(usize, &'static str)> {
-    let (index, out, at) = view
-        .parts
-        .iter()
-        .enumerate()
-        .flat_map(|(index, part)| [(index, false, part.start), (index, true, part.end)])
-        .min_by_key(|(_, out, at)| (frame.abs_diff(*at), (*out && frame >= *at) || (!*out && frame < *at)))?;
-    let joined = |before: usize| view.parts.get(before + 1).is_some_and(|next| next.start == view.parts[before].end);
-    Some(match (out, index) {
-        (true, index) if joined(index) => (index, "cut"),
-        (false, index) if index > 0 && joined(index - 1) && view.parts[index - 1].end == at => (index - 1, "cut"),
-        (true, index) => (index, "out"),
-        (false, index) => (index, "in"),
-    })
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use qnc_script::SubsegmentPart;
-
-    fn part(start: u64, end: u64) -> SubsegmentPart {
-        SubsegmentPart { start, end, clip_name: String::new(), length: String::new(), gap_before: 0, cut: false, a1_channel: None, a1_level_db: 0, a1_off: false, channels: None, a1_lead: 0, a1_tail: 0 }
-    }
-
-    #[test]
-    fn a_right_click_takes_every_in_and_out_of_every_part() {
-        let view = SubsegmentView { parts: vec![part(0, 50), part(50, 90), part(95, 145)], total_frames: 145, ..Default::default() };
-        assert_eq!(nearest_edge(&view, 2), Some((0, "in")), "the first part's IN");
-        assert_eq!(nearest_edge(&view, 48), Some((0, "cut")), "a join without a pause is one cut, before it");
-        assert_eq!(nearest_edge(&view, 52), Some((0, "cut")), "and after it");
-        assert_eq!(nearest_edge(&view, 91), Some((1, "out")), "an OUT before a pause");
-        assert_eq!(nearest_edge(&view, 94), Some((2, "in")), "an IN after a pause");
-        assert_eq!(nearest_edge(&view, 140), Some((2, "out")), "the last part's OUT");
-    }
-
-    #[test]
-    fn a_drag_of_an_edge_names_its_part_side_and_frame() {
-        assert_eq!(drag_target("edge-2-out", 120).as_deref(), Some("2:out:120"));
-        assert_eq!(drag_target("edge-0-in", 3).as_deref(), Some("0:in:3"));
-        assert_eq!(drag_target("part-1", 3), None);
-    }
-}
+/// The mouse map's panel of a program's row: the SubSegment's timeline is one (AGENTS 0.12).
+const ROW_PANEL: &str = "segments";

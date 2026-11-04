@@ -159,8 +159,14 @@ tekstu i prijepis, analiza kadrova, normalizacija glasnoce (EBU R 128), proxy, X
    radnju koju zoom gradi kroz rjecnik, na panelu vlasnika. Ostaje za korak 3: oznaka A1/A2 na
    timelineu uzima ton komada pod playheadom, u zoomu ton uzetog reza; klik na sliku u zoomu
    (PickSide) nema jos istu gestu na Wrap retku (klik lijevo/desno od uzetog reza).
-2. **SubSegment na mapu misa**: prestaje rucno mapiranje; dobiva srednji klik, dvoklik, J/L klik i
-   povlacenje, izbor kanala na traci.
+2. **SubSegment na mapu misa** (IZVEDENO 2026-11-04): panel salje radnje mape misa za red programa
+   (`segments`), isto sto Wrap red; vlasnik osi (`qnc-script` `pointer.rs` `own_action`) kaze
+   sto svaka znaci za dijelove (klik playhead ili Keep, traka bira, desni klik na traku uzima dio,
+   desni klik na A1 ton dijela, desni klik kod ruba najblizi rub ili rez, povlacenje uzetog ruba,
+   klik i povlacenje J/L linije, kotacic i Ctrl+kotacic). `nearest_edge` i `drag_target` presli
+   iz panela u vlasnika. Radnje reda koje SubSegment nema (M marker srednjim klikom, Wrap zoom,
+   Edit segmenta) ne idu nikamo (`ROW_ACTIONS`). Jos nema: srednji klik/dvoklik (rez dijela),
+   izbor kanala na traci (stupac kanala na timelineu; zasad gumbi u retku dijela) - korak 3.
 3. **Trake u zoomu = trake timelinea**: iste oznake A1/A2, izbor kanala, razina i off, crta ih
    ista kocka traka iz `qnc-timeline`.
 4. **Jedan model reza** (J/L slike i tona, strana prije/poslije): `cut_part` i `JoinSound` iza
