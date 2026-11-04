@@ -51,7 +51,12 @@ pub fn show(ui: &mut egui::Ui, kind: &str, theme: &qnc_desktop_theme::Theme, sho
     match kind {
         // The draft story's segment panel is the same panel (S-Story).
         SEGMENT_PANEL | DRAFT_SEGMENT_PANEL => (qnc_segment_panel::show(ui, shown.segments, theme, shown.cover_lengths), true),
-        TRANSCRIPT_PANEL => (qnc_transcript_panel::show(ui, shown.transcript, theme, shown.timecode), false),
+        // A statement of the script open as a SubSegment: its own text there, the same block as
+        // in the script (user 2026-11-04); otherwise the transcript of the clip shown.
+        TRANSCRIPT_PANEL => match qnc_script_panel::show_open_statement(ui, shown.script, theme) {
+            Some(asked) => (asked, false),
+            None => (qnc_transcript_panel::show(ui, shown.transcript, theme, shown.timecode), false),
+        },
         VIDEO_AI_PANEL => (qnc_shot_panel::show(ui, shown.shots, theme, shown.timecode, shown.cover_lengths), false),
         SCRIPT_PANEL => (qnc_script_panel::show(ui, shown.script, shown.transcript, theme), false),
         SCRIPT_WRITER_PANEL => (qnc_script_writer_panel::show(ui, shown.script, theme), false),

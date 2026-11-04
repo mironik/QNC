@@ -141,6 +141,21 @@ fn paint_script(ui: &mut egui::Ui, view: &ScriptView, transcript: &TranscriptVie
     asked
 }
 
+/// The statement open as a SubSegment on the source timeline's place, alone (user 2026-11-04:
+/// the overlay where statements are put together shows its text, interactive): the same block
+/// as in the script, its parts' words with their times, the chosen slot's words marked. `None`
+/// when no statement of the script is open.
+pub fn show_open_statement(ui: &mut egui::Ui, view: &ScriptView, theme: &qnc_desktop_theme::Theme) -> Option<Option<ActionEvent>> {
+    let open = view.subsegment.as_ref()?;
+    let row = view.blocks.iter().find(|row| row.block.id == open.block_id)?;
+    let style = qnc_ui_kit::ChromeButtonStyle { text: theme.text, border: theme.border, focus: theme.focus, height: theme.chrome_control_height };
+    let mut asked = None;
+    egui::ScrollArea::vertical().id_salt("qnc_script_open_statement").auto_shrink([false, false]).show(ui, |ui| {
+        asked = paint_block(ui, row, view, theme, style);
+    });
+    Some(asked)
+}
+
 /// One block: its mark, length and buttons on top, its text below; a click chooses it (a text
 /// block's text goes into the editor), a clip block can open its clip. Public: every panel of
 /// the script draws its blocks with it (MA Audio's and MA Script's).
