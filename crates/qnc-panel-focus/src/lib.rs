@@ -62,6 +62,9 @@ pub struct PanelFocus {
     /// Up/Down on a taken edit: the key picture search and what its answer moves.
     keyframes: qnc_keyframe_nav::KeyframeNav,
     jump: Option<Jump>,
+    /// The JKL shuttle (docs/98 1.1) and the frame it last cued.
+    shuttle: qnc_shuttle::Shuttle,
+    shuttle_cued: Option<u64>,
     /// The one focus walk of every form (piece `qnc-focus-walk`): the panels in the form's
     /// order, the pool tabs and the source dock buttons the arrows walk, and the keys on the
     /// media pool as numbered steps for the card grid (a step is not taken on read: one arrow
@@ -158,6 +161,7 @@ impl PanelFocus {
         if last != self.panel && matches!(self.panel, Panel::Pool | Panel::PoolTabs) && segments.view().zoom.is_some() {
             segments.apply(qnc_program_segments::SegmentCommand::CloseZoom);
         }
+        self.shuttle_tick(preview); // the shuttle's own speed moves the playhead
         qnc_segments_keys::dropped(preview, wrap, segments); // another edit took over
         qnc_sync_session::poll(preview, wrap, segments); // an IN pressed while the source plays starts Sync
         preview.normalize_program(segments.normalization()); // the program's A1/A2 to the project's targets
@@ -193,7 +197,34 @@ impl PanelFocus {
 
     /// Whether a key picture search runs (the caller repaints soon).
     pub fn busy(&self) -> bool {
-        self.keyframes.busy() || self.side.busy()
+        self.keyframes.busy() || self.side.busy() || self.shuttle.running()
+    }
+
+    /// J, K or L: the shuttle's speed; at 1x forward the player plays, at any other speed the
+    /// shuttle moves the playhead (`poll`). `None` for another action.
+    pub(crate) fn shuttle_key(&mut self, action_id: &str, preview: &mut SourcePreview) -> Option<bool> {
+        let (_, frame, playing) = preview.playing_at().unwrap_or((false, 0, false));
+        let frame = preview.clip_frame().or(preview.program_frame()).unwrap_or(frame);
+        let done = self.shuttle.press(action_id, std::time::Instant::now(), frame)?;
+        self.shuttle_cued = None;
+        Some(match done {
+            qnc_shuttle::Do::Play if !playing => preview.toggle_play(),
+            qnc_shuttle::Do::Play => true,
+            qnc_shuttle::Do::Pause => {
+                preview.pause();
+                true
+            }
+        })
+    }
+
+    /// While the shuttle runs: the playhead to the frame of its speed now.
+    fn shuttle_tick(&mut self, preview: &mut SourcePreview) {
+        let Some(interval) = preview.player_view().source_frame_interval() else { return };
+        let Some(frame) = self.shuttle.frame_at(std::time::Instant::now(), interval) else { return };
+        if self.shuttle_cued != Some(frame) {
+            self.shuttle_cued = Some(frame);
+            preview.cue(frame);
+        }
     }
 
     /// Whether a transcription of this process runs in the background (the caller repaints

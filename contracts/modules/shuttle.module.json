@@ -1,0 +1,37 @@
+{
+  "module_id": "qnc.module.shuttle",
+  "module_name": "Shuttle",
+  "module_version": "0.1.0",
+  "module_kind": "library",
+  "capabilities": [
+    "transport.shuttle"
+  ],
+  "input_contract_version": "0.1.0",
+  "output_contract_version": "0.1.0",
+  "supported_os": [
+    "windows",
+    "linux",
+    "macos"
+  ],
+  "supported_cpu": [
+    "x86_64",
+    "aarch64"
+  ],
+  "transport_protocol_version": "0.1.0",
+  "forbidden_calls": [
+    "ffprobe",
+    "media.decode",
+    "database.write",
+    "business.workflow"
+  ],
+  "forbidden_dependencies": [
+    "qnc.module.media-probe",
+    "qnc.module.content-store"
+  ],
+  "state_policy": "session_local",
+  "database_write_policy": "no_db_writes",
+  "runtime_crate": "qnc-shuttle",
+  "input": "J, K or L (shuttle_back, shuttle_stop, shuttle_forward) with the frame the playhead is on, and the time.",
+  "output": "Play or Pause for the player; while a speed other than stop and 1x forward runs, the frame the playhead goes to at that speed (2x, 4x, 8x forward, 1x to 8x back).",
+  "specification": "docs/98 1.1 (user 2026-11-04): the JKL shuttle every editor has. Pure; the preview plays, pauses and cues. Nothing is written."
+}

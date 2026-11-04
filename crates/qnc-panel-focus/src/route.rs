@@ -17,6 +17,14 @@ impl PanelFocus {
         let event = event.into();
         let action_id = event.action_id.as_str();
         let panel = self.panel;
+        // J, K, L: the shuttle (`qnc-shuttle`, docs/98 1.1), whatever the panel; any other
+        // transport (Space, a click on a timeline) ends its own movement.
+        if let Some(done) = self.shuttle_key(action_id, pieces.0) {
+            return Some(done);
+        }
+        if matches!(action_id, "play_pause" | "timeline_cue_frame") {
+            self.shuttle.stop();
+        }
         // The one meaning of a word (`qnc-edit-words`, AGENTS 0.12): a click on a word of the
         // transcript while the source IN or OUT is taken brings that mark to the word (as in
         // the zoom), it does not only cue.

@@ -4964,6 +4964,7 @@ dependencies = [
  "qnc-program-segments",
  "qnc-script",
  "qnc-segments-keys",
+ "qnc-shuttle",
  "qnc-side-pieces",
  "qnc-skeleton-versions",
  "qnc-snap",
@@ -5988,6 +5989,10 @@ dependencies = [
  "qnc-work-settings",
  "tempfile",
 ]
+
+[[package]]
+name = "qnc-shuttle"
+version = "0.1.0"
 
 [[package]]
 name = "qnc-side-pieces"

@@ -1,0 +1,7 @@
+[package]
+name = "qnc-shuttle"
+version = "0.1.0"
+edition = "2021"
+description = "QNC public block: the JKL shuttle (J back, K stop, L forward; again for 2x, 4x, 8x), the frame the playhead goes to while it runs"
+
+[dependencies]
