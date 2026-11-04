@@ -186,6 +186,12 @@ tekstu i prijepis, analiza kadrova, normalizacija glasnoce (EBU R 128), proxy, X
    (Story `SetJoinPicture`, slozena izjava je nema). Klik na sliku u zoomu bira stranu reza; na
    timelineu ta strana se bira desnim klikom na polovicu klipa (S-Story) - geste ostaju kakve
    jesu (zakljucana mapa misa: lijevi klik dok je nesto uzeto sprema).
-5. **Jedan model ruba**: `SlotTrim`, `EdgeTrim`, SubSegment `Trim`, source `mark_focus` iza istih
-   radnji Take/Nudge/DragTo/Mark/Keep/Drop.
+5. **Jedan model ruba** (IZVEDENO 2026-11-04 za rub komada u klipu): nova cista kocka
+   `qnc-edit-edge` (`Edge` In/Out, `Range` [from, to) u klipu: `nudged` (odbije kad bi presao
+   drugi rub ili izasao iz klipa), `moved` i `dragged` (koliko moze), `at`, `picture`; `rolled`
+   dva komada). Source IN/OUT (`qnc-source-mark-focus` `nudge`, `drag`; rub segmenta Ctrl+Shift+I/O
+   ide istim putem) i dio slozene izjave (`qnc-script`: strelice/kotacic, povlacenje, roll reza)
+   imaju jedno pravilo; ponasanje isto. Ostaje: rub slota u prici (`SlotTrim`) je rub izmedju
+   dva M markera na osi price s rippleom, ne komad u klipu; u S-Storyju ga treba prevesti na
+   `Range` klipa slota (sljedeci rez).
 6. **Rijeci**: jedna radnja s istim znacenjem u prijepisu, scenariju i zoomu.

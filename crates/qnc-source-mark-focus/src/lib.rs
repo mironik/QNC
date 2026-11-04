@@ -5,6 +5,7 @@
 //! playhead. It changes only the marks of the source timeline it is given and says
 //! which source frame the player should cue; it plays nothing.
 
+use qnc_edit_edge::{Edge, Range};
 use qnc_timeline::{TimelineProjection, TimelineSourceMarkFocus};
 
 /// What a key did: the source frame to cue, or only a change of the marks.
@@ -44,16 +45,16 @@ pub fn drag(timeline: &mut TimelineProjection, in_mark: bool, frame: u64) -> Mar
     let Some((in_frame, out_frame)) = timeline.visible_source_marks() else {
         return MarkKey::Refused;
     };
+    // The one rule of an edge (`qnc-edit-edge`, AGENTS 0.12): as far as it can go in the clip.
+    let range = Range { from: in_frame, to: out_frame }.dragged(Edge::of_out(!in_mark), frame, timeline.duration_frames);
     if in_mark {
-        let frame = frame.min(out_frame.saturating_sub(1));
-        timeline.source_in_frame = Some(frame);
+        timeline.source_in_frame = Some(range.from);
         timeline.source_mark_focus = TimelineSourceMarkFocus::In;
-        MarkKey::Cue(cue_frame(timeline, frame, false))
+        MarkKey::Cue(cue_frame(timeline, range.from, false))
     } else {
-        let frame = frame.clamp(in_frame + 1, timeline.duration_frames.max(in_frame + 1));
-        timeline.source_out_frame = Some(frame);
+        timeline.source_out_frame = Some(range.to);
         timeline.source_mark_focus = TimelineSourceMarkFocus::Out;
-        MarkKey::Cue(cue_frame(timeline, frame, true))
+        MarkKey::Cue(cue_frame(timeline, range.to, true))
     }
 }
 
@@ -64,19 +65,20 @@ pub fn nudge(timeline: &mut TimelineProjection, frames: i64) -> MarkKey {
     let Some((in_frame, out_frame)) = timeline.visible_source_marks() else {
         return MarkKey::Refused;
     };
-    let moved = |frame: u64| u64::try_from(frame as i64 + frames).ok();
+    // The one rule of an edge (`qnc-edit-edge`, AGENTS 0.12): a key that cannot move does nothing.
+    let range = Range { from: in_frame, to: out_frame };
     match timeline.source_mark_focus {
-        TimelineSourceMarkFocus::In => match moved(in_frame).filter(|next| *next < out_frame) {
+        TimelineSourceMarkFocus::In => match range.nudged(Edge::In, frames, duration.max(out_frame)) {
             Some(next) => {
-                timeline.source_in_frame = Some(next);
-                MarkKey::Cue(cue_frame(timeline, next, false))
+                timeline.source_in_frame = Some(next.from);
+                MarkKey::Cue(cue_frame(timeline, next.from, false))
             }
             None => MarkKey::Refused, // v5: qnc_ui_text::text("story.msg.in_past_out")
         },
-        TimelineSourceMarkFocus::Out => match moved(out_frame).filter(|next| *next > in_frame && *next <= duration) {
+        TimelineSourceMarkFocus::Out => match range.nudged(Edge::Out, frames, duration) {
             Some(next) => {
-                timeline.source_out_frame = Some(next);
-                MarkKey::Cue(cue_frame(timeline, next, true))
+                timeline.source_out_frame = Some(next.to);
+                MarkKey::Cue(cue_frame(timeline, next.to, true))
             }
             None => MarkKey::Refused,
         },

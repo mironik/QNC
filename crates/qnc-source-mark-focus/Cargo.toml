@@ -7,3 +7,4 @@ description = "QNC public block: Ctrl+I / Ctrl+O take the source IN or OUT, the 
 [dependencies]
 qnc-ui-text = { workspace = true }
 qnc-timeline = { workspace = true }
+qnc-edit-edge = { workspace = true }

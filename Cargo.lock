@@ -3652,6 +3652,10 @@ name = "qnc-edit-cut"
 version = "0.1.0"
 
 [[package]]
+name = "qnc-edit-edge"
+version = "0.1.0"
+
+[[package]]
 name = "qnc-edit-verbs"
 version = "0.1.0"
 dependencies = [
@@ -5667,6 +5671,7 @@ dependencies = [
  "qnc-db-broker",
  "qnc-dev-diagnostics",
  "qnc-edit-cut",
+ "qnc-edit-edge",
  "qnc-edit-verbs",
  "qnc-export-launch",
  "qnc-image-assets",
@@ -6143,6 +6148,7 @@ dependencies = [
 name = "qnc-source-mark-focus"
 version = "0.1.0"
 dependencies = [
+ "qnc-edit-edge",
  "qnc-timeline",
  "qnc-ui-text",
 ]

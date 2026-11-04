@@ -1,0 +1,37 @@
+{
+  "module_id": "qnc.module.edit-edge",
+  "module_name": "Edit edge",
+  "module_version": "0.1.0",
+  "module_kind": "library",
+  "capabilities": [
+    "edit.edge"
+  ],
+  "input_contract_version": "0.1.0",
+  "output_contract_version": "0.1.0",
+  "supported_os": [
+    "windows",
+    "linux",
+    "macos"
+  ],
+  "supported_cpu": [
+    "x86_64",
+    "aarch64"
+  ],
+  "transport_protocol_version": "0.1.0",
+  "forbidden_calls": [
+    "ffprobe",
+    "media.decode",
+    "database.write",
+    "business.workflow"
+  ],
+  "forbidden_dependencies": [
+    "qnc.module.media-probe",
+    "qnc.module.content-store"
+  ],
+  "state_policy": "stateless",
+  "database_write_policy": "no_db_writes",
+  "runtime_crate": "qnc-edit-edge",
+  "input": "What a piece plays of its clip [from, to), the clip's length, which edge (IN or OUT), a step or a frame; for a roll the piece before and the piece after.",
+  "output": "The edge nudged (refused when it would cross the other edge or leave the clip), moved or dragged as far as it can go, its frame and picture; a roll of two pieces as far as both can take.",
+  "specification": "AGENTS 0.12, docs/97 step 5 (user 2026-11-04): one rule of an edge for a source timeline's IN/OUT and a SubSegment's part. Pure: no state, no database, no drawing."
+}

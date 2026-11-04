@@ -669,11 +669,10 @@ impl Script {
                 self.roll_to(&mut trim, &pieces, to);
             }
             None => {
+                // The one rule of an edge (`qnc-edit-edge`): as far as it can go in its clip.
                 let length = self.names.get(&pieces[trim.index].clip_id).map_or(u64::MAX, |(_, frames, _)| *frames);
-                match trim.out {
-                    true => trim.to = trim.to.saturating_add_signed(step).clamp(trim.from + 1, length),
-                    false => trim.from = trim.from.saturating_add_signed(step).min(trim.to - 1),
-                }
+                let range = qnc_edit_edge::Range { from: trim.from, to: trim.to }.moved(qnc_edit_edge::Edge::of_out(trim.out), step, length);
+                (trim.from, trim.to) = (range.from, range.to);
             }
         }
         self.trim = Some(trim);
@@ -698,8 +697,9 @@ impl Script {
                 let to = trim.from + frame.saturating_sub(start);
                 self.roll_to(&mut trim, pieces, to);
             }
-            (true, None) => trim.to = (trim.from + frame.saturating_sub(start)).clamp(trim.from + 1, length),
-            (false, _) => trim.from = (piece.from_frame as i64 + frame as i64 - start as i64).clamp(0, trim.to as i64 - 1) as u64,
+            // The one rule of an edge (`qnc-edit-edge`): the edge on the clip's frame under the pointer.
+            (true, None) => trim.to = qnc_edit_edge::Range { from: trim.from, to: trim.to }.dragged(qnc_edit_edge::Edge::Out, trim.from + frame.saturating_sub(start), length).to,
+            (false, _) => trim.from = qnc_edit_edge::Range { from: trim.from, to: trim.to }.dragged(qnc_edit_edge::Edge::In, (piece.from_frame as i64 + frame as i64 - start as i64).max(0) as u64, length).from,
         }
         self.trim = Some(trim);
         let drafted = self.drafted(block.clone());
@@ -923,12 +923,10 @@ impl Script {
     fn roll_to(&self, trim: &mut Trim, pieces: &[Piece], to: u64) {
         let (Some(next_from), Some(next)) = (trim.roll, pieces.get(trim.index + 1)) else { return };
         let length = self.names.get(&pieces[trim.index].clip_id).map_or(u64::MAX, |(_, frames, _)| *frames);
-        let wanted = to as i64 - trim.to as i64;
-        let earliest = (trim.from as i64 + 1 - trim.to as i64).max(-(next_from as i64));
-        let latest = (length as i64 - trim.to as i64).min(next.to_frame as i64 - 1 - next_from as i64);
-        let moved = wanted.clamp(earliest.min(0), latest.max(0));
-        trim.to = (trim.to as i64 + moved) as u64;
-        trim.roll = Some((next_from as i64 + moved) as u64);
+        // The one rule of a roll (`qnc-edit-edge`).
+        let (before, after) = qnc_edit_edge::rolled(qnc_edit_edge::Range { from: trim.from, to: trim.to }, length, qnc_edit_edge::Range { from: next_from, to: next.to_frame }, to as i64 - trim.to as i64);
+        trim.to = before.to;
+        trim.roll = Some(after.from);
     }
 
     /// Writes the parts a trim moved (the part, and the next one of a whole cut); nothing when
