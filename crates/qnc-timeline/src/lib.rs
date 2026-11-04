@@ -1585,11 +1585,23 @@ fn mark_drag_intent(response: &egui::Response, track: Rect, input: &TimelineInpu
     let in_mark = response.ctx.data(|data| data.get_temp::<bool>(key))?;
     if response.dragged() || response.is_pointer_button_down_on() {
         let x = response.interact_pointer_pos()?.x;
-        let frame = frame_for_x(track, range_start, duration, x).saturating_sub(range_start);
+        // Snapping (`qnc-snap`): the dragged IN or OUT sticks to the playhead or a cut.
+        let at = qnc_snap::snapped(frame_for_x(track, range_start, duration, x), snap_targets(input, None), qnc_snap::reach_frames(track.width(), duration));
+        let frame = at.saturating_sub(range_start);
         return Some(TimelineIntent::DragMark { in_mark, frame });
     }
     response.ctx.data_mut(|data| data.remove::<bool>(key));
     Some(TimelineIntent::Keep(None))
+}
+
+/// What a drag sticks to (`qnc-snap`): the playhead, the markers (not the one dragged), the
+/// edges of the covers and of the pieces of the row; frames of the row's axis.
+fn snap_targets(input: &TimelineInput<'_>, except: Option<&str>) -> Vec<u64> {
+    let mut targets: Vec<u64> = input.state.playhead_frame.into_iter().collect();
+    targets.extend(input.markers.iter().filter(|marker| Some(marker.id) != except).map(|marker| marker.frame));
+    targets.extend(input.covers.iter().flat_map(|cover| [cover.start_frame, cover.end_frame]));
+    targets.extend(input.virtual_spans.iter().flat_map(|span| [span.start_frame, span.end_frame]));
+    targets
 }
 
 /// Which of IN and OUT the mouse may drag: only the taken one (Ctrl+I/O, a right click,
@@ -2556,7 +2568,8 @@ fn track_marker_drag(response: &egui::Response, track: Rect, input: &TimelineInp
         .interact_pointer_pos()
         .filter(|_| response.dragged())
     {
-        let frame = frame_for_x(track, start, duration, pos.x);
+        // Snapping (`qnc-snap`): a dragged marker or side sticks to a cut, marker or the playhead.
+        let frame = qnc_snap::snapped(frame_for_x(track, start, duration, pos.x), snap_targets(input, Some(&id)), qnc_snap::reach_frames(track.width(), duration));
         let edge = ctx.data(|d| d.get_temp::<bool>(active.with("cut_edge"))).unwrap_or(false);
         let key = if edge { CUT_EDGE_DRAG } else { MARKER_DRAG };
         ctx.data_mut(|d| d.insert_temp(egui::Id::new(key), (id, frame)));

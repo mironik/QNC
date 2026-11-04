@@ -325,6 +325,15 @@
     "toggle_loudness_normalize": {
       "label": "Preview: glasnoca A1 i A2 price na cilj projekta (EBU R 128) ili kako je montirano"
     },
+    "toggle_snapping": {
+      "label": "Snapping: povuceni rub ili marker se lijepi za rez, marker i playhead (ukljuci/iskljuci)"
+    },
+    "select_slip": {
+      "label": "Slip: segment ili dio izjave pusta svoj klip kasnije ili ranije, iste duljine na istom mjestu (strelice, Enter sprema, Esc odustaje)"
+    },
+    "match_frame": {
+      "label": "Match frame: iz price na isti kadar izvora, iz izvora na mjesto u prici (ponovo: sljedece mjesto)"
+    },
     "toggle_wrap_video": {
       "label": "Wrap redovi: filmstrip ili uska video traka (Ctrl+klik na V)"
     },
@@ -793,6 +802,9 @@
         "navigate_next_object": [{ "code": "ArrowRight", "alt": true }],
         "playlist_input_start": [{ "key": "Home", "code": "Home" }],
         "go_to_mark_in": [{ "code": "KeyI", "alt": true }],
+        "toggle_snapping": [{ "code": "KeyS", "ctrl": false, "shift": false, "alt": false }],
+        "match_frame": [{ "code": "KeyF", "ctrl": false, "shift": false, "alt": false }],
+        "select_slip": [{ "code": "KeyS", "ctrl": true, "shift": true }],
         "clear_focus": [{ "key": "Escape" }],
         "activate_focused_item": [{ "key": "Enter" }],
         "step_prev_part": [{ "key": "ArrowUp" }],
@@ -1037,6 +1049,9 @@
             "shift": false
           }
         ],
+        "toggle_snapping": [{ "code": "KeyS", "ctrl": false, "shift": false, "alt": false }],
+        "match_frame": [{ "code": "KeyF", "ctrl": false, "shift": false, "alt": false }],
+        "select_slip": [{ "code": "KeyS", "ctrl": true, "shift": true }],
         "toggle_loudness_normalize": [
           {
             "code": "KeyN",

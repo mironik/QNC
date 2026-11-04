@@ -416,7 +416,28 @@ impl Store {
     /// inside the segment keep their place in the picture (program frame = start +
     /// source frame - new IN); those outside the new range go with their slots and
     /// covers; the markers after the segment move by the change of length.
-    pub(crate) fn trim_segment(&mut self, segment_id: &str, (in_frame, out_frame): (u64, u64)) -> Result<Data> {
+    pub(crate) fn trim_segment(&mut self, segment_id: &str, range: (u64, u64)) -> Result<Data> {
+        self.retrim_segment(segment_id, range, false)
+    }
+
+    /// A slip (docs/98 1.5, user 2026-11-04): the segment plays another part of its clip of
+    /// the same length (IN and OUT `frames` along the clip); its place in the story, its M
+    /// markers, slots and covers stay where they are.
+    pub(crate) fn slip_segment(&mut self, segment_id: &str, frames: i64) -> Result<Data> {
+        let (old_in, old_out): (i64, i64) = self
+            .conn
+            .query_row("SELECT source_in_frame, source_out_frame FROM story_items WHERE role = 'segment' AND item_id = ?1 AND active = 1", [segment_id], |row| Ok((row.get(0)?, row.get(1)?)))
+            .optional()
+            .map_err(err)?
+            .ok_or_else(|| format!("part not found: {segment_id}"))?;
+        let (in_frame, out_frame) = (old_in + frames, old_out + frames);
+        if in_frame < 0 {
+            return Err(qnc_ui_text::text("story.msg.clip_at_end").into());
+        }
+        self.retrim_segment(segment_id, (in_frame as u64, out_frame as u64), true)
+    }
+
+    fn retrim_segment(&mut self, segment_id: &str, (in_frame, out_frame): (u64, u64), markers_stay: bool) -> Result<Data> {
         if out_frame <= in_frame {
             return Err(qnc_ui_text::text("story.out_after_in").into());
         }
@@ -452,7 +473,8 @@ impl Store {
             // The picture under the marker stays under it, counted in story frames (audit
             // 2026-10-25: through source frames a 25p source in a 50p story lost the odd
             // frame and could cut markers that stay inside the segment).
-            let moved_to = frame + (old_in - in_frame) * num / den;
+            // A slip keeps every marker in its place in the story.
+            let moved_to = if markers_stay { frame } else { frame + (old_in - in_frame) * num / den };
             if moved_to <= start || moved_to >= start + length {
                 cut.push(marker_id);
             } else {

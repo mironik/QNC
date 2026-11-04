@@ -4589,6 +4589,10 @@ dependencies = [
 ]
 
 [[package]]
+name = "qnc-match-frame"
+version = "0.1.0"
+
+[[package]]
 name = "qnc-media-assist-audio"
 version = "0.1.0"
 dependencies = [
@@ -4955,12 +4959,14 @@ dependencies = [
  "qnc-focus-walk",
  "qnc-key-list",
  "qnc-keyframe-nav",
+ "qnc-match-frame",
  "qnc-pool-tabs",
  "qnc-program-segments",
  "qnc-script",
  "qnc-segments-keys",
  "qnc-side-pieces",
  "qnc-skeleton-versions",
+ "qnc-snap",
  "qnc-source-mark-focus",
  "qnc-source-panel",
  "qnc-source-preview",
@@ -6021,6 +6027,10 @@ dependencies = [
 ]
 
 [[package]]
+name = "qnc-snap"
+version = "0.1.0"
+
+[[package]]
 name = "qnc-sony-metadata"
 version = "0.1.0"
 dependencies = [
@@ -6376,6 +6386,7 @@ dependencies = [
  "qnc-filmstrip",
  "qnc-lane-choice",
  "qnc-mouse-map",
+ "qnc-snap",
  "qnc-touch-gestures",
  "qnc-touchpad",
  "qnc-ui-kit",

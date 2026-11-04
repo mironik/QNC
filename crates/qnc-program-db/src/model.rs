@@ -226,6 +226,12 @@ pub enum Operation {
         in_frame: u64,
         out_frame: u64,
     },
+    /// A slip (docs/98 1.5): the segment plays its clip `frames` later (negative: earlier),
+    /// the same length; its place, markers, slots and covers stay.
+    SlipSegment {
+        segment_id: String,
+        frames: i64,
+    },
     /// The story as it was before the last edit comes back (UNDO).
     UndoStory,
     /// Undo of the selected (user 2026-10-29): the newest change of one segment, M marker or
@@ -345,6 +351,7 @@ impl Operation {
                 | Self::IncludeSegment { .. }
                 | Self::ReplaceSegment { .. }
                 | Self::TrimSegment { .. }
+                | Self::SlipSegment { .. }
                 | Self::PurgeSegment { .. }
                 | Self::MoveSegment { .. }
                 | Self::CreateMarker { .. }

@@ -18,6 +18,7 @@ qnc-lane-choice = { workspace = true }
 qnc-filmstrip = { workspace = true }
 qnc-ui-kit = { workspace = true }
 qnc-wave-view = { workspace = true }
+qnc-snap = { workspace = true }
 
 [dev-dependencies]
 qnc-edit-verbs = { workspace = true }

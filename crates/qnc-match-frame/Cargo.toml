@@ -1,0 +1,7 @@
+[package]
+name = "qnc-match-frame"
+version = "0.1.0"
+edition = "2021"
+description = "QNC public block: match frame, the same picture between a story and its source clip both ways (the source frame under the story's playhead, the story frame that plays a source frame)"
+
+[dependencies]

@@ -54,6 +54,14 @@ impl Range {
         }
     }
 
+    /// A slip (docs/98 1.5): both edges `step` frames along the clip, the piece's length and its
+    /// place in the story the same, as far as the clip lets it go.
+    pub fn slipped(self, step: i64, length: u64) -> Range {
+        let span = self.to - self.from;
+        let from = (self.from as i64 + step).clamp(0, length.saturating_sub(span) as i64) as u64;
+        Range { from, to: from + span }
+    }
+
     /// The frame the edge stands on (IN, or OUT exclusive).
     pub fn at(self, edge: Edge) -> u64 {
         match edge {
@@ -110,6 +118,13 @@ mod tests {
         assert_eq!(R.moved(Edge::Out, 50, 30), Range { from: 10, to: 30 });
         assert_eq!(R.dragged(Edge::Out, 3, 30), Range { from: 10, to: 11 });
         assert_eq!(R.picture(Edge::Out), 19);
+    }
+
+    #[test]
+    fn a_slip_moves_both_edges_and_keeps_the_length_inside_the_clip() {
+        assert_eq!(R.slipped(5, 100), Range { from: 15, to: 25 });
+        assert_eq!(R.slipped(-50, 100), Range { from: 0, to: 10 }, "not before the clip");
+        assert_eq!(R.slipped(500, 100), Range { from: 90, to: 100 }, "not past it");
     }
 
     #[test]

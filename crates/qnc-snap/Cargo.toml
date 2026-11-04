@@ -1,0 +1,7 @@
+[package]
+name = "qnc-snap"
+version = "0.1.0"
+edition = "2021"
+description = "QNC public block: snapping, a dragged edge or marker sticks to the nearest cut, marker, playhead or IN/OUT within a few pixels"
+
+[dependencies]

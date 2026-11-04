@@ -4,12 +4,16 @@ impl ProgramSegments {
     /// Whether a keyboard catalog action belongs to the program.
     pub fn handles(&self, action_id: &str) -> bool {
         self.command_for(action_id).is_some()
-            || ((self.slot_move.is_some() || self.slot_trim.is_some())
+            || action_id == crate::SLIP
+            || ((self.slot_move.is_some() || self.slot_trim.is_some() || self.slip.is_some())
                 && matches!(action_id, "step_back_frame" | "step_forward_frame" | "clear_focus"))
     }
 
     /// Applies a keyboard catalog action of the program; false if it is not one.
     pub fn apply_action(&mut self, action_id: &str) -> bool {
+        if let Some(done) = self.slip_key(action_id) {
+            return done; // a slip of a segment (`select_slip`)
+        }
         if let Some(done) = self.trim_key(action_id) {
             return done; // a taken slot edge (segment panel)
         }

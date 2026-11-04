@@ -211,6 +211,8 @@
     "story.msg.no_marker_to_move": "Nema M markera za pomicanje.",
     "story.msg.edge_markers_locked": "Početni i završni M marker su zaključani.",
     "story.msg.clip_at_end": "Klip je na kraju: u tom smjeru dalje ne ide.",
+    "story.msg.slip": "Slip {frames} slika: segment pusta svoj klip kasnije ili ranije, iste duljine na istom mjestu (strelice, Enter sprema, Esc odustaje).",
+    "story.msg.no_segment_under_playhead": "Pod Wrap playheadom nema segmenta.",
     "story.msg.marker_taken": "Marker: strelice lijevo/desno ga pomiču, M ga stavlja na playhead, Enter potvrđuje, Esc odustaje",
     "story.msg.marker_move_cancelled": "Pomicanje markera otkazano.",
     "story.msg.no_slot_under_playhead": "Nema M-M slota pod playheadom",

@@ -36,6 +36,7 @@ impl ProgramSegments {
     /// Ctrl+S or the slot edge taken with Ctrl+I/O.
     pub fn confirm_program(&mut self) -> bool {
         self.commit_part_sound()
+            || self.commit_slip()
             || self.commit_marker_edit()
             || self.commit_slot_move()
             || self.commit_slot_trim()
@@ -178,6 +179,7 @@ impl ProgramSegments {
     /// new take is refused while another waits (`refused`), so this lets go only of what a
     /// take of the same thing replaces.
     pub(crate) fn let_go_edits(&mut self, keep_sound: bool) {
+        self.slip = None;
         self.slot_trim = None;
         self.cut_part = crate::CutPart::Whole;
         self.slot_move = None;

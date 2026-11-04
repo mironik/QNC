@@ -291,6 +291,25 @@ fn an_edited_segment_takes_a_new_range_and_its_markers_follow_the_picture() {
     );
 }
 
+/// A slip (docs/98 1.5): the segment plays another part of its clip of the same length; its
+/// place and its markers stay.
+#[test]
+fn a_slipped_segment_plays_another_part_of_its_clip_and_everything_stays() {
+    let dir = tempfile::tempdir().unwrap();
+    let mut store = imported_store(&dir.path().join("db"));
+    let ids = three_segments(&mut store);
+    for frame in [3, 14, 17, 25] {
+        marker(&mut store, frame).unwrap();
+    }
+    run(&mut store, Operation::SlipSegment { segment_id: ids[1].clone(), frames: 30 }).unwrap();
+    let rows = segments(&mut store);
+    assert_eq!((rows[1].in_frame, rows[1].out_frame), (130, 140), "10 frames of the clip 30 later");
+    assert_eq!(markers(&mut store), vec![3, 14, 17, 25], "the markers stay in the story");
+    run(&mut store, Operation::UndoStory).unwrap();
+    assert_eq!(segments(&mut store)[1].in_frame, 100);
+    assert!(run(&mut store, Operation::SlipSegment { segment_id: ids[1].clone(), frames: -200 }).is_err(), "not before the clip");
+}
+
 #[test]
 fn a_source_of_half_or_twice_the_story_rate_joins_with_its_length_in_story_frames() {
     // A 50p story: a 1080i50 source (25 frames) is two story frames per frame.

@@ -31,6 +31,25 @@ impl PanelFocus {
         if let Some(done) = self.side.act(action_id, event.value, event.target.as_deref(), pieces.0, pieces.3, self.source.view().timecode.as_ref()) {
             return Some(done);
         }
+        // F: match frame (`qnc-match-frame`, docs/98 1.3): from the story to the same picture of
+        // its clip on the source timeline, from the source timeline to where the story plays it.
+        if action_id == qnc_match_frame::MATCH_FRAME {
+            return Some(self.match_frame(pieces.0, pieces.1, pieces.2));
+        }
+        // Ctrl+Shift+S: a slip of the segment under the Wrap playhead (docs/98 1.5); the
+        // SubSegment's own slip its script took above.
+        if action_id == qnc_program_segments::SLIP {
+            self.panel = Panel::Segments;
+            return Some(pieces.2.apply_action(action_id));
+        }
+        // S: snapping off and on (`qnc-snap`, docs/98 1.2), whatever the panel.
+        if action_id == qnc_snap::TOGGLE {
+            let on = qnc_snap::toggle();
+            if qnc_dev_diagnostics::player_diagnostics_enabled() {
+                qnc_dev_diagnostics::log_line(qnc_dev_diagnostics::DiagnosticsStream::Player, format!("snapping on={on}"));
+            }
+            return Some(true);
+        }
         // The zoom's Save (user 2026-11-04: "after Save do not close"): what is taken is written
         // and stays taken. On the source timeline a taken IN or OUT is already where it is shown
         // (it stays taken); a taken lane is kept and taken again.
@@ -187,6 +206,26 @@ impl PanelFocus {
                 None
             }
         }
+    }
+
+    /// F (match frame): on the segment panel the clip and frame under the Wrap playhead open on
+    /// the source timeline; elsewhere the story's place of the source picture shown becomes the
+    /// Wrap playhead (F again: the next place it is used). False when there is no such picture.
+    fn match_frame(&mut self, preview: &mut SourcePreview, wrap: &mut WrapSession, segments: &mut ProgramSegments) -> bool {
+        let view = segments.view();
+        // Covers first: a cover is over its segment.
+        let mut pieces: Vec<qnc_match_frame::Piece<'_>> = view.covers.iter().map(|cover| qnc_match_frame::Piece { clip_id: &cover.clip_id, source_in: cover.source_in_frame, source_out: cover.source_out_frame, start: cover.start_frame, end: cover.end_frame }).collect();
+        pieces.extend(view.rows.iter().filter(|row| !row.clip_id.is_empty()).map(|row| qnc_match_frame::Piece { clip_id: &row.clip_id, source_in: row.source_in_frame, source_out: row.source_out_frame, start: row.start_frame, end: row.end_frame }));
+        if self.panel == Panel::Segments {
+            let Some((clip, frame)) = qnc_match_frame::source_at(&pieces, wrap.playhead()).map(|(clip, frame)| (clip.to_string(), frame)) else { return false };
+            self.to_source(wrap);
+            self.panel = Panel::SourceTimeline;
+            return preview.open_at(&clip, frame) || preview.cue(frame);
+        }
+        let (Some(clip), Some(frame)) = (preview.view().clip_id.clone(), preview.clip_frame()) else { return false };
+        let Some(at) = qnc_match_frame::story_at(&pieces, &clip, frame, wrap.playhead() + 1) else { return false };
+        self.panel = Panel::Segments;
+        segments.apply(qnc_program_segments::SegmentCommand::Cue(at))
     }
 
     /// The taken source IN or OUT to a word (`qnc-edit-words`): IN to its start, OUT to its end;

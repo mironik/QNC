@@ -78,6 +78,8 @@ pub const SUBSEGMENT_TAKE: &str = "subsegment_take";
 /// A word clicked in the trim zoom of a SubSegment (value: its first frame, target: the frame
 /// after its last, on the SubSegment's axis): the taken edge goes to it (user 2026-11-04).
 pub const ZOOM_WORD: &str = "subsegment_zoom_word";
+/// Ctrl+Shift+S: a slip of the part in hand (docs/98 1.5; the same action as a story's slip).
+pub const SLIP: &str = "select_slip";
 /// A click on a word of a statement in the script (user 2026-11-04: edited by its text): the
 /// statement opens in place of the source timeline and the playhead goes to the word. `target`
 /// is `block:part:frame`.
@@ -183,6 +185,8 @@ pub struct Script {
     /// A part taken whole (Ctrl+S, a right click on its length strip), as a slot is (user
     /// 2026-11-04): its index and how far it is drafted to move (frames; later is positive).
     slide: Option<(usize, i64)>,
+    /// A part slipped (Ctrl+Shift+S): its index and the frames it plays its clip later.
+    slip_part: Option<(usize, i64)>,
     /// The waves of the SubSegment's clips (read in the background).
     waves: qnc_program_waveform::ProgramWaves,
     /// The filmstrips of the SubSegment's clips (read in the background).
@@ -317,7 +321,7 @@ impl JoinSound {
 
 impl Default for Script {
     fn default() -> Self {
-        Self { view: ScriptView::default(), blocks: Vec::new(), project: None, reading: None, read_at: None, writing: None, source_request: None, names: HashMap::new(), words_per_second: Ok(0.0), take: None, taking: None, exporting: None, draft: Default::default(), open_subsegment: None, pieces_request: None, trim: None, chosen: None, join_sound: None, value: None, transcripts: HashMap::new(), word_cut: qnc_edit_words::WordPair::new(), slide: None, waves: qnc_program_waveform::ProgramWaves::new(), filmstrips: qnc_program_filmstrip::ProgramFilmstrips::new(), waves_project: None, trim_stills: qnc_trim_stills::TrimStills::new(), zoom_follow: Default::default(), sound: None, voices: Vec::new(), voice_request: None, voice_after_write: None, message_after_write: None, clear_after_write: false }
+        Self { view: ScriptView::default(), blocks: Vec::new(), project: None, reading: None, read_at: None, writing: None, source_request: None, names: HashMap::new(), words_per_second: Ok(0.0), take: None, taking: None, exporting: None, draft: Default::default(), open_subsegment: None, pieces_request: None, trim: None, chosen: None, join_sound: None, value: None, transcripts: HashMap::new(), word_cut: qnc_edit_words::WordPair::new(), slide: None, slip_part: None, waves: qnc_program_waveform::ProgramWaves::new(), filmstrips: qnc_program_filmstrip::ProgramFilmstrips::new(), waves_project: None, trim_stills: qnc_trim_stills::TrimStills::new(), zoom_follow: Default::default(), sound: None, voices: Vec::new(), voice_request: None, voice_after_write: None, message_after_write: None, clear_after_write: false }
     }
 }
 
@@ -504,6 +508,12 @@ impl Script {
         if let Some((index, by)) = self.slide {
             slide_pieces(&mut block.pieces, index, by);
         }
+        // A slipped part: the same length, `by` frames along its clip.
+        if let Some((index, by)) = self.slip_part {
+            if let Some(piece) = block.pieces.get_mut(index) {
+                (piece.from_frame, piece.to_frame) = ((piece.from_frame as i64 + by) as u64, (piece.to_frame as i64 + by) as u64);
+            }
+        }
         if let Some(sound) = self.sound {
             if let Some(piece) = block.pieces.get_mut(sound.index) {
                 (piece.a1_channel, piece.a1_level_db, piece.a1_off) = (sound.channel, sound.level_db, sound.off);
@@ -569,6 +579,9 @@ impl Script {
         let block = self.block(self.open_subsegment)?.clone();
         let pieces = view::block_pieces(&block);
         let take = |index: usize, out: bool| pieces.get(index).map(|piece| Trim { index, out, from: piece.from_frame, to: piece.to_frame, roll: None });
+        if let Some(done) = self.slip_key(action_id, &block, &pieces, preview) {
+            return Some(done);
+        }
         if let Some(done) = self.slide_key(action_id, target, &block, &pieces, preview) {
             return Some(done);
         }
@@ -725,7 +738,7 @@ impl Script {
     /// another; a statement of one range is one part), the playhead at `at` on its axis.
     fn open_as_subsegment(&mut self, block: &Block, at: u64) {
         self.open_subsegment = Some(block.id);
-        (self.chosen, self.join_sound, self.trim, self.sound, self.slide) = (None, None, None, None, None);
+        (self.chosen, self.join_sound, self.trim, self.sound, self.slide, self.slip_part) = (None, None, None, None, None, None);
         self.pieces_request = Some((view::piece_inputs(block), at));
         self.view.subsegment = Some(view::subsegment_view(block, None));
     }
@@ -1009,9 +1022,66 @@ impl Script {
         }
     }
 
+    /// A slip of a part (docs/98 1.5, Ctrl+Shift+S): the part in hand plays its clip later or
+    /// earlier, the same length in the same place (`qnc-edit-edge` `slipped`); the arrows and the
+    /// wheel move it a frame and the draft plays at once, Enter (or Save) writes it, Esc gives
+    /// it up. `None` for any other key.
+    fn slip_key(&mut self, action_id: &str, block: &Block, pieces: &[Piece], preview: &SourcePreview) -> Option<bool> {
+        if action_id == SLIP {
+            let index = self.part_in_hand();
+            pieces.get(index)?;
+            (self.trim, self.sound, self.join_sound, self.slide) = (None, None, None, None);
+            self.slip_part = Some((index, 0));
+            self.view.message = qnc_ui_text::fill("story.msg.slip", &[("frames", "+0")]).into();
+            return Some(true);
+        }
+        let (index, by) = self.slip_part?;
+        let piece = pieces.get(index)?;
+        let step = match action_id {
+            "step_back_frame" => -1,
+            "step_forward_frame" => 1,
+            "wheel_source_back" | "wheel_source_forward" => if qnc_wheel_jog::source_step_forward(action_id)? { 1 } else { -1 },
+            "activate_focused_item" => {
+                self.slip_part = None;
+                return Some(self.write_slip(preview, block, piece, index, by));
+            }
+            "clear_focus" => {
+                self.slip_part = None;
+                self.pieces_request = Some((view::piece_inputs(block), self.edge_frame(block).unwrap_or(0)));
+                return Some(true);
+            }
+            _ => return None,
+        };
+        let length = self.names.get(&piece.clip_id).map_or(u64::MAX, |(_, frames, _)| *frames);
+        let range = qnc_edit_edge::Range { from: piece.from_frame, to: piece.to_frame }.slipped(by + step, length);
+        let by = range.from as i64 - piece.from_frame as i64;
+        self.slip_part = Some((index, by));
+        self.view.message = qnc_ui_text::fill("story.msg.slip", &[("frames", &format!("{by:+}"))]).into();
+        let drafted = self.drafted(block.clone());
+        let at = view::subsegment_view(&drafted, None).parts.get(index).map_or(0, |part| part.start);
+        self.pieces_request = Some((view::piece_inputs(&drafted), at));
+        Some(true)
+    }
+
+    /// Writes a part slipped `by` frames along its clip; nothing when it did not move.
+    fn write_slip(&mut self, preview: &SourcePreview, block: &Block, piece: &Piece, index: usize, by: i64) -> bool {
+        if by == 0 {
+            return true;
+        }
+        let (from, to) = ((piece.from_frame as i64 + by) as u64, (piece.to_frame as i64 + by) as u64);
+        let slipped = self.trimmed_piece(piece, Trim { index, out: true, from, to, roll: None });
+        let id = block.id;
+        self.write(preview, move |target| qnc_script_db::set_piece(target, id, index, slipped).map(|_| None))
+    }
+
     /// The zoom's Save (user 2026-11-04: "after Save do not close"): what is taken is written
     /// as Enter writes it and stays taken, so the editing goes on; Close (Escape) lets it go.
     fn save_and_keep(&mut self, block: &Block, pieces: &[Piece], preview: &SourcePreview) -> Option<bool> {
+        if let Some((index, by)) = self.slip_part {
+            let piece = pieces.get(index)?.clone();
+            self.slip_part = Some((index, 0));
+            return Some(self.write_slip(preview, block, &piece, index, by));
+        }
         if let Some(trim) = self.trim {
             return Some(self.write_trim(preview, block, pieces, trim));
         }

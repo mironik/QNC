@@ -211,6 +211,8 @@
     "story.msg.no_marker_to_move": "No M marker to move.",
     "story.msg.edge_markers_locked": "The start and end M markers are locked.",
     "story.msg.clip_at_end": "The clip is at its end: it goes no further this way.",
+    "story.msg.slip": "Slip {frames} frames: the segment plays its clip later or earlier, the same length in the same place (arrows, Enter saves, Esc drops).",
+    "story.msg.no_segment_under_playhead": "No segment under the Wrap playhead.",
     "story.msg.marker_taken": "Marker: left/right arrows move it, M puts it on the playhead, Enter confirms, Esc cancels",
     "story.msg.marker_move_cancelled": "Marker move cancelled.",
     "story.msg.no_slot_under_playhead": "No M-M slot under the playhead",

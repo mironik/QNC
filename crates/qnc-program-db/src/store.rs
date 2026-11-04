@@ -174,6 +174,7 @@ impl Store {
             | Operation::IncludeSegment { segment_id }
             | Operation::ReplaceSegment { segment_id, .. }
             | Operation::TrimSegment { segment_id, .. }
+            | Operation::SlipSegment { segment_id, .. }
             | Operation::PurgeSegment { segment_id }
             | Operation::MoveSegment { segment_id, .. }
             | Operation::SetSegmentSound { segment_id, .. }
@@ -238,6 +239,7 @@ impl Store {
                 in_frame,
                 out_frame,
             } => self.trim_segment(segment_id, (*in_frame, *out_frame)),
+            Operation::SlipSegment { segment_id, frames } => self.slip_segment(segment_id, *frames),
             Operation::PurgeSegment { segment_id } => self.purge_segment(segment_id),
             Operation::MoveSegment { segment_id, up } => self.move_segment(segment_id, *up),
             Operation::ListSegments => self.list_segments(),

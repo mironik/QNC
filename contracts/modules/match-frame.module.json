@@ -1,0 +1,37 @@
+{
+  "module_id": "qnc.module.match-frame",
+  "module_name": "Match frame",
+  "module_version": "0.1.0",
+  "module_kind": "library",
+  "capabilities": [
+    "edit.match_frame"
+  ],
+  "input_contract_version": "0.1.0",
+  "output_contract_version": "0.1.0",
+  "supported_os": [
+    "windows",
+    "linux",
+    "macos"
+  ],
+  "supported_cpu": [
+    "x86_64",
+    "aarch64"
+  ],
+  "transport_protocol_version": "0.1.0",
+  "forbidden_calls": [
+    "ffprobe",
+    "media.decode",
+    "database.write",
+    "business.workflow"
+  ],
+  "forbidden_dependencies": [
+    "qnc.module.media-probe",
+    "qnc.module.content-store"
+  ],
+  "state_policy": "stateless",
+  "database_write_policy": "no_db_writes",
+  "runtime_crate": "qnc-match-frame",
+  "input": "The pieces of a story (covers before segments): which clip's range plays over which story range; a story frame, or a clip and its frame.",
+  "output": "The clip and its frame the story shows at a story frame; the story frame that plays a clip's frame (the next place from a frame, else the first).",
+  "specification": "docs/98 1.3 (user 2026-11-04): F, match frame both ways between a story and its source clips. Pure."
+}

@@ -1,0 +1,37 @@
+{
+  "module_id": "qnc.module.snap",
+  "module_name": "Snap",
+  "module_version": "0.1.0",
+  "module_kind": "library",
+  "capabilities": [
+    "edit.snap"
+  ],
+  "input_contract_version": "0.1.0",
+  "output_contract_version": "0.1.0",
+  "supported_os": [
+    "windows",
+    "linux",
+    "macos"
+  ],
+  "supported_cpu": [
+    "x86_64",
+    "aarch64"
+  ],
+  "transport_protocol_version": "0.1.0",
+  "forbidden_calls": [
+    "ffprobe",
+    "media.decode",
+    "database.write",
+    "business.workflow"
+  ],
+  "forbidden_dependencies": [
+    "qnc.module.media-probe",
+    "qnc.module.content-store"
+  ],
+  "state_policy": "session_local",
+  "database_write_policy": "no_db_writes",
+  "runtime_crate": "qnc-snap",
+  "input": "The frame a drag is at, the frames it may stick to (cuts, markers, the playhead, marks) and the reach in frames at the timeline's zoom.",
+  "output": "The frame stuck to the nearest target within reach when snapping is on; the switch (S) turns it off and on for this process.",
+  "specification": "docs/98 1.2 (user 2026-11-04): snapping of a dragged IN/OUT, M marker or J/L side on every timeline. Nothing is written."
+}

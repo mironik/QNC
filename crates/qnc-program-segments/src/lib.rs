@@ -11,6 +11,8 @@
 //! form and no application, and never plays, probes or opens media.
 
 mod confirm;
+mod slip;
+pub use slip::SLIP;
 mod delete;
 mod undo_selected;
 mod zoom;
@@ -275,6 +277,8 @@ pub struct ProgramSegments {
     marker_committing: bool,
     /// What the zoom's Save wrote, to take again once the story is read (user 2026-11-04).
     retake: Option<confirm::Retake>,
+    /// A slip taken (Ctrl+Shift+S): the segment, the frames it plays later, its source IN.
+    slip: Option<(String, i64, u64)>,
     /// Program playhead of the Wrap view (`qnc-wrap-session`), given by the caller.
     playhead: Option<u64>,
     /// Program frame the user pointed at, for the Wrap view to take once.
