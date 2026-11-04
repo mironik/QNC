@@ -21,6 +21,7 @@
     "common.select": "Select",
     "common.cancel": "Cancel",
     "common.save": "Save",
+    "zoom.close": "Close (Esc)",
     "common.export": "Export",
     "export.to_xml": "Export to XML",
     "export.project_settings": "Project export settings",

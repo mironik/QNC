@@ -87,6 +87,8 @@ impl ProgramSegments {
                 }
                 self.refresh_view(String::new());
                 self.resolve_sync();
+                // The zoom's Save: what it wrote is taken again on the story as read now.
+                self.take_again();
             }
             Err(error) => self.refresh_view(error),
         }

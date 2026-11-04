@@ -576,6 +576,9 @@ impl Script {
         if action_id == ZOOM_WORD {
             return self.zoom_word(target, &block);
         }
+        if action_id == qnc_edit_verbs::SAVE {
+            return self.save_and_keep(&block, &pieces, preview);
+        }
         if action_id == DRAG_EDGE {
             return self.drag_edge(target, &block, &pieces);
         }
@@ -968,6 +971,29 @@ impl Script {
                 Some(self.write(preview, move |target| qnc_script_db::set_piece(target, id, index, piece).map(|_| None)))
             }
         }
+    }
+
+    /// The zoom's Save (user 2026-11-04: "after Save do not close"): what is taken is written
+    /// as Enter writes it and stays taken, so the editing goes on; Close (Escape) lets it go.
+    fn save_and_keep(&mut self, block: &Block, pieces: &[Piece], preview: &SourcePreview) -> Option<bool> {
+        if let Some(trim) = self.trim {
+            return Some(self.write_trim(preview, block, pieces, trim));
+        }
+        if let Some(join) = self.join_sound {
+            let (id, index) = (block.id, join.index);
+            return Some(self.write(preview, move |target| qnc_script_db::set_join_sound(target, id, index, join.lead, join.tail).map(|_| None)));
+        }
+        if let Some(sound) = self.sound {
+            let done = self.sound_key("activate_focused_item", None, block, pieces, preview);
+            self.sound = Some(sound);
+            return done;
+        }
+        if let Some((index, _)) = self.slide {
+            let done = self.slide_key("activate_focused_item", None, block, pieces, preview);
+            self.slide = Some((index, 0));
+            return done;
+        }
+        None
     }
 
     /// A word of the trim zoom clicked: the taken edge goes to it (IN to its start, OUT to its

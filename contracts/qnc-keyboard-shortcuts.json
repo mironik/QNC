@@ -211,6 +211,9 @@
     "subsegment_zoom_word": {
       "label": "Uzeti rub dijela SubSegmenta na rijec kliknutu u zoomu"
     },
+    "zoom_save": {
+      "label": "Spremi uzeto u zoomu, uzeto ostaje uzeto (gumb Spremi)"
+    },
     "script_word_cue": {
       "label": "Playhead na rijec izjave u scenariju"
     },

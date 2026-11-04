@@ -21,6 +21,7 @@
     "common.select": "Odaberi",
     "common.cancel": "Odustani",
     "common.save": "Spremi",
+    "zoom.close": "Zatvori (Esc)",
     "common.export": "Izvoz",
     "export.to_xml": "Export u XML",
     "export.project_settings": "Postavke exporta projekta",

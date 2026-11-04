@@ -52,6 +52,8 @@ pub enum Verb {
     Drop,
     /// Take back the last change (Backspace).
     Undo,
+    /// Write what is taken and keep it taken (the zoom's Save).
+    Save,
     /// Take the picture of a cut only (V, Ctrl+I on a taken cut).
     TakePicture { cut: String },
     /// Take a sound of a cut (A1/A2 label, a right click on its lane, Ctrl+1/Ctrl+2).
@@ -77,6 +79,8 @@ pub const CUE: &str = "timeline_cue_frame";
 pub const KEEP: &str = "activate_focused_item";
 pub const DROP: &str = "clear_focus";
 pub const UNDO: &str = "undo_object";
+/// Write what is taken and keep it taken (the zoom's Save, user 2026-11-04).
+pub const SAVE: &str = "zoom_save";
 pub const TAKE_PICTURE: &str = "select_mark_in";
 pub const TAKE_A1: &str = "select_audio_a1";
 pub const TAKE_A2: &str = "select_audio_a2";
@@ -98,6 +102,7 @@ impl Verb {
             Verb::Keep => ActionEvent::key(KEEP),
             Verb::Drop => ActionEvent::key(DROP),
             Verb::Undo => ActionEvent::key(UNDO),
+            Verb::Save => ActionEvent::key(SAVE),
             Verb::TakePicture { cut } => ActionEvent::key(TAKE_PICTURE).with_target(cut.clone()),
             Verb::TakeSound { cut, lane } => ActionEvent::key(match lane {
                 Lane::A1 => TAKE_A1,
@@ -138,6 +143,7 @@ impl Verb {
             KEEP | KEEP_ON_SEGMENTS | KEEP_ON_SOURCE => Verb::Keep,
             DROP => Verb::Drop,
             UNDO => Verb::Undo,
+            SAVE => Verb::Save,
             TAKE_PICTURE => Verb::TakePicture { cut: cut()? },
             TAKE_A1 | TAKE_A2 => {
                 let lane = if event.action_id == TAKE_A1 { Lane::A1 } else { Lane::A2 };
@@ -170,6 +176,7 @@ mod tests {
             Verb::Keep,
             Verb::Drop,
             Verb::Undo,
+            Verb::Save,
             Verb::TakePicture { cut: cut.clone() },
             Verb::TakeSound { cut: cut.clone(), lane: Lane::A1 },
             Verb::TakeSound { cut: cut.clone(), lane: Lane::A2 },

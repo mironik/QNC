@@ -31,6 +31,18 @@ impl PanelFocus {
         if let Some(done) = self.side.act(action_id, event.value, event.target.as_deref(), pieces.0, pieces.3, self.source.view().timecode.as_ref()) {
             return Some(done);
         }
+        // The zoom's Save (user 2026-11-04: "after Save do not close"): what is taken is written
+        // and stays taken. On the source timeline a taken IN or OUT is already where it is shown
+        // (it stays taken); a taken lane is kept and taken again.
+        if action_id == qnc_edit_verbs::SAVE {
+            if pieces.2.save_and_keep() {
+                return Some(true);
+            }
+            if self.source.mark_taken(pieces.3) {
+                return Some(true);
+            }
+            return Some(false);
+        }
         // A double click on a word is a cut (user 2026-10-26): IN at its start, OUT at the end
         // of a word after the first cut; the source timeline keeps the pair as for scissors.
         if action_id == qnc_transcript::CUT_WORD {

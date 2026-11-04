@@ -47,7 +47,8 @@ const UNHEARD_FILL: Color32 = Color32::from_rgba_premultiplied(70, 10, 10, 70);
 /// "so placing the playhead and saving are not confused"); each is its key's action.
 const BUTTONS_HEIGHT: f32 = 30.0;
 const BUTTON_SIZE: Vec2 = Vec2::new(78.0, 24.0);
-const BUTTONS: [(&str, &str); 3] = [("story.ui.undo", qnc_edit_verbs::UNDO), ("common.save", qnc_edit_verbs::KEEP), ("common.cancel", qnc_edit_verbs::DROP)];
+/// Save keeps what is taken (user 2026-11-04: "after Save do not close"); Close is Escape.
+const BUTTONS: [(&str, &str); 3] = [("story.ui.undo", qnc_edit_verbs::UNDO), ("common.save", qnc_edit_verbs::SAVE), ("zoom.close", qnc_edit_verbs::DROP)];
 /// The share of the screen width the window may take.
 const SCREEN_SHARE: f32 = 0.92;
 
@@ -117,12 +118,8 @@ pub fn show(ctx: &egui::Context, segments: &SegmentsView) -> Option<ActionEvent>
                     turned = Some(clicked);
                 }
             }
-            // The buttons stand over the playhead: the cut's line through the sound, else the
-            // marker between the pictures (user 2026-10-30).
-            let mut centre = gap_at;
             if let Some(sound) = sound {
                 let area = Rect::from_min_size(egui::pos2(top.x, top.y + picture.y + LABEL_HEIGHT + BUTTONS_HEIGHT + LANES_GAP), Vec2::new(row_width, 2.0 * LANE_HEIGHT + GAP / 2.0 + WORDS_HEIGHT));
-                centre = Some(cut_line_x(area, sound));
                 let (word, side) = paint_sound(ui, area, sound, gap_at, top.y, (panel, source), lane_choices(sound, segments), &visuals);
                 // A word in every zoom (user 2026-11-04): the taken cut goes to it, else a cut.
                 if let Some((from, to)) = word {
@@ -132,16 +129,18 @@ pub fn show(ctx: &egui::Context, segments: &SegmentsView) -> Option<ActionEvent>
                     turned = side;
                 }
             }
+            // The buttons stand in the middle of the window (user 2026-11-04: "the buttons ran
+            // away, not centred" when the cut lay at the edge of the window).
             let row = Rect::from_min_size(egui::pos2(top.x, top.y + picture.y + LABEL_HEIGHT), Vec2::new(row_width, BUTTONS_HEIGHT));
-            if let Some(pressed) = paint_buttons(ui, row, centre.unwrap_or(row.center().x)) {
+            if let Some(pressed) = paint_buttons(ui, row, row.center().x) {
                 turned = Some(pressed);
             }
         });
     turned
 }
 
-/// Undo, Save and Cancel in one row centred on the cut (kept inside the window); a press is the
-/// same system action as Backspace, Enter or Escape on the panel in focus.
+/// Undo, Save and Close in one row in the middle of the window; a press is the system action of
+/// Backspace, of saving what is taken (it stays taken) or of Escape on the panel in focus.
 fn paint_buttons(ui: &mut egui::Ui, row: Rect, centre: f32) -> Option<ActionEvent> {
     let width = BUTTONS.len() as f32 * BUTTON_SIZE.x + (BUTTONS.len() as f32 - 1.0) * GAP;
     let left = (centre - width / 2.0).clamp(row.left(), (row.right() - width).max(row.left()));

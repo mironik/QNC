@@ -273,6 +273,8 @@ pub struct ProgramSegments {
     cover_taken: Option<String>,
     /// A marker move was confirmed; Enter stays taken until it lands.
     marker_committing: bool,
+    /// What the zoom's Save wrote, to take again once the story is read (user 2026-11-04).
+    retake: Option<confirm::Retake>,
     /// Program playhead of the Wrap view (`qnc-wrap-session`), given by the caller.
     playhead: Option<u64>,
     /// Program frame the user pointed at, for the Wrap view to take once.

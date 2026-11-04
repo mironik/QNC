@@ -6,6 +6,13 @@
 
 use crate::ProgramSegments;
 
+/// What the zoom's Save takes again after it wrote it.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) enum Retake {
+    SlotEdge { start: bool },
+    Marker { id: String, part: crate::CutPart },
+}
+
 
 impl ProgramSegments {
     /// Enter on the source timeline: the segment edit or Sync (a taken lane is the source
@@ -32,6 +39,53 @@ impl ProgramSegments {
             || self.commit_marker_edit()
             || self.commit_slot_move()
             || self.commit_slot_trim()
+    }
+
+    /// The zoom's Save (user 2026-11-04: "after Save do not close"): what is taken is written
+    /// as Enter writes it, and once the story is read again it is taken again (the same marker
+    /// with the same part, the same slot edge), so the editing goes on; Close (Escape) lets it
+    /// go. False when nothing is taken that Save keeps.
+    pub fn save_and_keep(&mut self) -> bool {
+        let again = if let Some(trim) = &self.slot_trim {
+            Some(Retake::SlotEdge { start: trim.start })
+        } else {
+            self.marker_edit.as_ref().map(|(id, _)| Retake::Marker { id: id.clone(), part: self.cut_part })
+        };
+        let Some(again) = again else {
+            return false;
+        };
+        let done = self.confirm_program();
+        if done {
+            self.retake = Some(again);
+        }
+        done
+    }
+
+    /// Takes again what Save wrote, once every write has landed and the story is read.
+    pub(crate) fn take_again(&mut self) {
+        if self.has_pending_work() {
+            return;
+        }
+        match self.retake.take() {
+            Some(Retake::SlotEdge { start }) => {
+                self.take_slot_edge(start);
+            }
+            Some(Retake::Marker { id, part }) => {
+                let Some(frame) = self.cut_frame(&id) else { return };
+                self.start_marker_edit(id.clone(), frame);
+                match part {
+                    crate::CutPart::Whole => {}
+                    crate::CutPart::Picture => _ = self.take_cut_part(Some(id), true, 0),
+                    crate::CutPart::Sound { lane, edge, .. } => {
+                        self.take_cut_part(Some(id), false, lane);
+                        if edge != crate::SoundEdge::Both {
+                            self.take_sound_edge(edge == crate::SoundEdge::Lead);
+                        }
+                    }
+                }
+            }
+            None => {}
+        }
     }
 
     /// Ctrl+I (`start`) or Ctrl+O on the segment panel: that edge of the slot under the

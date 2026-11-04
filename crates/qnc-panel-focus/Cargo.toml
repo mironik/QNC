@@ -32,3 +32,4 @@ qnc-skeleton-versions = { workspace = true }
 qnc-pool-tabs = { workspace = true }
 qnc-edit-words = { workspace = true }
 qnc-edit-edge = { workspace = true }
+qnc-edit-verbs = { workspace = true }

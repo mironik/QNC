@@ -4950,6 +4950,7 @@ dependencies = [
  "qnc-db-broker",
  "qnc-dev-diagnostics",
  "qnc-edit-edge",
+ "qnc-edit-verbs",
  "qnc-edit-words",
  "qnc-focus-walk",
  "qnc-key-list",
