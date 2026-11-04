@@ -26,6 +26,20 @@ impl PanelFocus {
         if action_id == qnc_transcript::CUT_WORD {
             let word = event.value.and_then(|from| u64::try_from(from).ok()).zip(event.target.as_deref().and_then(|to| to.parse().ok()));
             let Some((from, to)) = word else { return Some(false) };
+            // In the zoom of the Wrap rows (user 2026-11-04: "a click on a word in Story's zoom
+            // too") the taken cut goes to the nearer edge of the word, the same steps as the
+            // arrows give it, so every kind of taken cut (marker, slot edge, J/L) follows.
+            if event.at.as_deref() == Some("segments") {
+                let Some(cut) = pieces.2.view().zoom_sound.as_ref().map(|sound| sound.cut) else { return Some(false) };
+                self.panel = Panel::Segments;
+                let goal = if cut.abs_diff(from) <= cut.abs_diff(to) { from } else { to };
+                let action = if goal > cut { "step_forward_frame" } else { "step_back_frame" };
+                let mut done = false;
+                for _ in 0..goal.abs_diff(cut).min(500) {
+                    done |= self.route_on_panel(action, (&mut *pieces.0, &mut *pieces.1, &mut *pieces.2, &mut *pieces.3)).unwrap_or(false);
+                }
+                return Some(done);
+            }
             // In the trim zoom of a taken IN or OUT the word moves that mark: IN to its start,
             // OUT to its end; the mark stays taken.
             if self.source.mark_taken(pieces.3) {

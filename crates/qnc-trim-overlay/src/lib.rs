@@ -124,8 +124,9 @@ pub fn show(ctx: &egui::Context, segments: &SegmentsView) -> Option<ActionEvent>
                 centre = Some(cut_line_x(area, sound));
                 let (word, side) = paint_sound(ui, area, sound, gap_at, top.y, &visuals);
                 // A double clicked word on a source timeline's zoom is a cut, as on the transcript.
-                if let Some((from, to)) = word.filter(|_| source) {
-                    turned = Some(ActionEvent::key(CUT_WORD).with_value(from).with_target(to.to_string()).at("source_timeline"));
+                // In every zoom (user 2026-11-04): on the Wrap rows the taken cut goes to the word.
+                if let Some((from, to)) = word {
+                    turned = Some(ActionEvent::key(CUT_WORD).with_value(from).with_target(to.to_string()).at(if source { "source_timeline" } else { "segments" }));
                 }
                 if side.is_some() {
                     turned = side;
