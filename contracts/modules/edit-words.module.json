@@ -1,0 +1,37 @@
+{
+  "module_id": "qnc.module.edit-words",
+  "module_name": "Edit words",
+  "module_version": "0.1.0",
+  "module_kind": "library",
+  "capabilities": [
+    "edit.words"
+  ],
+  "input_contract_version": "0.1.0",
+  "output_contract_version": "0.1.0",
+  "supported_os": [
+    "windows",
+    "linux",
+    "macos"
+  ],
+  "supported_cpu": [
+    "x86_64",
+    "aarch64"
+  ],
+  "transport_protocol_version": "0.1.0",
+  "forbidden_calls": [
+    "ffprobe",
+    "media.decode",
+    "database.write",
+    "business.workflow"
+  ],
+  "forbidden_dependencies": [
+    "qnc.module.media-probe",
+    "qnc.module.content-store"
+  ],
+  "state_policy": "session_local",
+  "database_write_policy": "no_db_writes",
+  "runtime_crate": "qnc-edit-words",
+  "input": "A word said on an axis [from, to), what is taken (an IN, an OUT, a cut) and where it is; for a cut by text two words of one place.",
+  "output": "Where a taken thing goes when the word is clicked (IN to its start, OUT to its end, a cut to its nearer edge); the IN-OUT range of two words, whichever comes first. It keeps only the first word of a pair.",
+  "specification": "AGENTS 0.12, docs/97 step 6 (user 2026-11-04): one meaning of a word in the transcript, the script and the trim zoom, for the source timeline, a SubSegment and a story."
+}

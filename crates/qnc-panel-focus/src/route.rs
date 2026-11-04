@@ -17,6 +17,16 @@ impl PanelFocus {
         let event = event.into();
         let action_id = event.action_id.as_str();
         let panel = self.panel;
+        // The one meaning of a word (`qnc-edit-words`, AGENTS 0.12): a click on a word of the
+        // transcript while the source IN or OUT is taken brings that mark to the word (as in
+        // the zoom), it does not only cue.
+        if action_id == qnc_transcript::CUE_WORD && self.source.mark_taken(pieces.3) {
+            let from = event.value.and_then(|from| u64::try_from(from).ok());
+            if let Some(from) = from {
+                let to = event.target.as_deref().and_then(|to| to.parse().ok()).unwrap_or(from + 1);
+                return Some(self.source_mark_to_word(qnc_edit_words::Word::new(from, to), pieces.0, pieces.3));
+            }
+        }
         // The own actions of the right panel pieces this form has (transcript, script, shots).
         if let Some(done) = self.side.act(action_id, event.value, event.target.as_deref(), pieces.0, pieces.3, self.source.view().timecode.as_ref()) {
             return Some(done);
@@ -26,13 +36,14 @@ impl PanelFocus {
         if action_id == qnc_transcript::CUT_WORD {
             let word = event.value.and_then(|from| u64::try_from(from).ok()).zip(event.target.as_deref().and_then(|to| to.parse().ok()));
             let Some((from, to)) = word else { return Some(false) };
+            let word = qnc_edit_words::Word::new(from, to);
             // In the zoom of the Wrap rows (user 2026-11-04: "a click on a word in Story's zoom
             // too") the taken cut goes to the nearer edge of the word, the same steps as the
             // arrows give it, so every kind of taken cut (marker, slot edge, J/L) follows.
             if event.at.as_deref() == Some("segments") {
                 let Some(cut) = pieces.2.view().zoom_sound.as_ref().map(|sound| sound.cut) else { return Some(false) };
                 self.panel = Panel::Segments;
-                let goal = if cut.abs_diff(from) <= cut.abs_diff(to) { from } else { to };
+                let goal = word.goal(None, cut);
                 let action = if goal > cut { "step_forward_frame" } else { "step_back_frame" };
                 let mut done = false;
                 for _ in 0..goal.abs_diff(cut).min(500) {
@@ -43,10 +54,9 @@ impl PanelFocus {
             // In the trim zoom of a taken IN or OUT the word moves that mark: IN to its start,
             // OUT to its end; the mark stays taken.
             if self.source.mark_taken(pieces.3) {
-                let in_mark = pieces.3.source_mark_focus == qnc_timeline::TimelineSourceMarkFocus::In;
-                return Some(self.source.drag(in_mark, if in_mark { from } else { to }, pieces.0, pieces.3));
+                return Some(self.source_mark_to_word(word, pieces.0, pieces.3));
             }
-            return Some(self.source.cut_word(pieces.3, from, to));
+            return Some(self.source.cut_word(pieces.3, word.from, word.to));
         }
         // The Export button opens the box of the project's export settings (user 2026-10-24);
         // while it is open its keys are its own.
@@ -165,6 +175,13 @@ impl PanelFocus {
                 None
             }
         }
+    }
+
+    /// The taken source IN or OUT to a word (`qnc-edit-words`): IN to its start, OUT to its end;
+    /// the mark stays taken.
+    fn source_mark_to_word(&mut self, word: qnc_edit_words::Word, preview: &mut SourcePreview, timeline: &mut TimelineProjection) -> bool {
+        let edge = if timeline.source_mark_focus == qnc_timeline::TimelineSourceMarkFocus::In { qnc_edit_edge::Edge::In } else { qnc_edit_edge::Edge::Out };
+        self.source.drag(edge == qnc_edit_edge::Edge::In, word.goal(Some(edge), 0), preview, timeline)
     }
 
     pub(crate) fn route_on_panel(

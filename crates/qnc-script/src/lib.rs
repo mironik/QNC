@@ -179,7 +179,7 @@ pub struct Script {
     /// The transcripts of the clips of the clip blocks, as last read.
     transcripts: HashMap<String, Vec<qnc_transcript_db::ClipTranscript>>,
     /// The first word of a cut by text (a double click on a word): its block, part and frames.
-    word_cut: Option<(i64, usize, u64, u64)>,
+    word_cut: qnc_edit_words::WordPair<(i64, usize)>,
     /// A part taken whole (Ctrl+S, a right click on its length strip), as a slot is (user
     /// 2026-11-04): its index and how far it is drafted to move (frames; later is positive).
     slide: Option<(usize, i64)>,
@@ -312,7 +312,7 @@ impl JoinSound {
 
 impl Default for Script {
     fn default() -> Self {
-        Self { view: ScriptView::default(), blocks: Vec::new(), project: None, reading: None, read_at: None, writing: None, source_request: None, names: HashMap::new(), words_per_second: Ok(0.0), take: None, taking: None, exporting: None, draft: Default::default(), open_subsegment: None, pieces_request: None, trim: None, chosen: None, join_sound: None, value: None, transcripts: HashMap::new(), word_cut: None, slide: None, waves: qnc_program_waveform::ProgramWaves::new(), filmstrips: qnc_program_filmstrip::ProgramFilmstrips::new(), waves_project: None, trim_stills: qnc_trim_stills::TrimStills::new(), zoom_follow: Default::default(), sound: None, voices: Vec::new(), voice_request: None, voice_after_write: None, message_after_write: None, clear_after_write: false }
+        Self { view: ScriptView::default(), blocks: Vec::new(), project: None, reading: None, read_at: None, writing: None, source_request: None, names: HashMap::new(), words_per_second: Ok(0.0), take: None, taking: None, exporting: None, draft: Default::default(), open_subsegment: None, pieces_request: None, trim: None, chosen: None, join_sound: None, value: None, transcripts: HashMap::new(), word_cut: qnc_edit_words::WordPair::new(), slide: None, waves: qnc_program_waveform::ProgramWaves::new(), filmstrips: qnc_program_filmstrip::ProgramFilmstrips::new(), waves_project: None, trim_stills: qnc_trim_stills::TrimStills::new(), zoom_follow: Default::default(), sound: None, voices: Vec::new(), voice_request: None, voice_after_write: None, message_after_write: None, clear_after_write: false }
     }
 }
 
@@ -979,7 +979,9 @@ impl Script {
         let part = view::subsegment_view(&drafted, None).parts.get(trim.index).cloned()?;
         let piece = view::block_pieces(&drafted).get(trim.index).cloned()?;
         let source = |axis: u64| piece.from_frame + axis.clamp(part.start, part.end).saturating_sub(part.start);
-        let (new_from, new_to) = if trim.out { (trim.from, source(to)) } else { (source(from), trim.to) };
+        // The one meaning of a word (`qnc-edit-words`): the taken edge goes to it.
+        let goal = source(qnc_edit_words::Word::new(from, to).goal(Some(qnc_edit_edge::Edge::of_out(trim.out)), 0));
+        let (new_from, new_to) = if trim.out { (trim.from, goal) } else { (goal, trim.to) };
         if new_to <= new_from {
             return Some(true);
         }
@@ -1235,7 +1237,9 @@ impl Script {
                 // An edge of this part taken: the word moves it (IN to the word's start, OUT to
                 // its end), drafted as the arrows do, Enter keeps it (user 2026-11-04).
                 if let Some(trim) = self.trim.filter(|trim| self.open_subsegment == Some(id) && trim.index == index && trim.roll.is_none()) {
-                    let (from, to) = if trim.out { (trim.from, word_to) } else { (frame, trim.to) };
+                    // The one meaning of a word (`qnc-edit-words`): the taken edge goes to it.
+                    let goal = qnc_edit_words::Word::new(frame, word_to).goal(Some(qnc_edit_edge::Edge::of_out(trim.out)), 0);
+                    let (from, to) = if trim.out { (trim.from, goal) } else { (goal, trim.to) };
                     if to > from {
                         self.trim = Some(Trim { from, to, ..trim });
                         let drafted = self.drafted(block.clone());
@@ -1259,21 +1263,18 @@ impl Script {
                 let mut parts = target.unwrap_or_default().split(':').map(|v| v.parse::<u64>().ok());
                 let (Some(Some(id)), Some(Some(index)), Some(Some(from)), Some(Some(to))) = (parts.next(), parts.next(), parts.next(), parts.next()) else { return Some(false) };
                 let (id, index) = (id as i64, index as usize);
-                match self.word_cut.take() {
-                    Some((first_id, first_index, first_from, first_to)) if (first_id, first_index) == (id, index) => {
+                // The one meaning of two words (`qnc-edit-words`, AGENTS 0.12).
+                match self.word_cut.give((id, index), qnc_edit_words::Word::new(from, to)) {
+                    qnc_edit_words::Paired::Range(range) => {
                         let Some(block) = self.block(Some(id)).cloned() else { return Some(false) };
                         let pieces = view::block_pieces(&block);
                         let Some(piece) = pieces.get(index) else { return Some(false) };
-                        let trim = Trim { index, out: true, from: first_from.min(from), to: first_to.max(to), roll: None };
-                        if trim.to <= trim.from {
-                            return Some(false);
-                        }
+                        let trim = Trim { index, out: true, from: range.from, to: range.to, roll: None };
                         let piece = self.trimmed_piece(piece, trim);
                         self.view.message = qnc_ui_text::text("script.word_cut_done").into();
                         self.write(preview, move |target| qnc_script_db::set_piece(target, id, index, piece).map(|_| None))
                     }
-                    _ => {
-                        self.word_cut = Some((id, index, from, to));
+                    qnc_edit_words::Paired::First(_) => {
                         self.view.message = qnc_ui_text::text("script.word_cut_first").into();
                         true
                     }

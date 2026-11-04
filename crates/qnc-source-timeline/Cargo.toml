@@ -26,3 +26,4 @@ qnc-timeline-assets = { workspace = true }
 qnc-ui-text = { workspace = true }
 qnc-wheel-jog = { workspace = true }
 qnc-clip-sound = { workspace = true }
+qnc-edit-words = { workspace = true }

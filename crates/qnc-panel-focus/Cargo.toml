@@ -30,3 +30,5 @@ qnc-clip-shots = { workspace = true }
 qnc-script = { workspace = true }
 qnc-skeleton-versions = { workspace = true }
 qnc-pool-tabs = { workspace = true }
+qnc-edit-words = { workspace = true }
+qnc-edit-edge = { workspace = true }

@@ -3663,6 +3663,13 @@ dependencies = [
 ]
 
 [[package]]
+name = "qnc-edit-words"
+version = "0.1.0"
+dependencies = [
+ "qnc-edit-edge",
+]
+
+[[package]]
 name = "qnc-editorial-application"
 version = "0.1.0"
 dependencies = [
@@ -4942,6 +4949,8 @@ dependencies = [
  "qnc-clip-shots",
  "qnc-db-broker",
  "qnc-dev-diagnostics",
+ "qnc-edit-edge",
+ "qnc-edit-words",
  "qnc-focus-walk",
  "qnc-key-list",
  "qnc-keyframe-nav",
@@ -5673,6 +5682,7 @@ dependencies = [
  "qnc-edit-cut",
  "qnc-edit-edge",
  "qnc-edit-verbs",
+ "qnc-edit-words",
  "qnc-export-launch",
  "qnc-image-assets",
  "qnc-newsroom-sheet-db",
@@ -6233,6 +6243,7 @@ dependencies = [
  "qnc-clip-sound",
  "qnc-desktop-theme",
  "qnc-dev-diagnostics",
+ "qnc-edit-words",
  "qnc-key-intents",
  "qnc-lane-choice",
  "qnc-level-bar",

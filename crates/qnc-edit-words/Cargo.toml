@@ -1,0 +1,8 @@
+[package]
+name = "qnc-edit-words"
+version = "0.1.0"
+edition = "2021"
+description = "QNC public block: the one meaning of a word said on an axis (a click cues it or brings a taken edge to it, two words are an IN-OUT pair) for every view of words"
+
+[dependencies]
+qnc-edit-edge = { workspace = true }

@@ -64,7 +64,8 @@ pub fn show(ui: &mut egui::Ui, view: &TranscriptView, theme: &qnc_desktop_theme:
     asked.map(|(from, to, double)| match double {
         // A double click on a word is a cut there (user 2026-10-26); its first click cued it.
         true => ActionEvent::key(CUT_WORD).with_value(from).with_target(to.to_string()).at(PANEL),
-        false => ActionEvent::key(CUE_WORD).with_value(from).at(PANEL),
+        // (Its end too: with an OUT taken the click brings the OUT to it, AGENTS 0.12.)
+        false => ActionEvent::key(CUE_WORD).with_value(from).with_target(to.to_string()).at(PANEL),
     }).or(early)
 }
 

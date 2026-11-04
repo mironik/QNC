@@ -194,4 +194,9 @@ tekstu i prijepis, analiza kadrova, normalizacija glasnoce (EBU R 128), proxy, X
    imaju jedno pravilo; ponasanje isto. Ostaje: rub slota u prici (`SlotTrim`) je rub izmedju
    dva M markera na osi price s rippleom, ne komad u klipu; u S-Storyju ga treba prevesti na
    `Range` klipa slota (sljedeci rez).
-6. **Rijeci**: jedna radnja s istim znacenjem u prijepisu, scenariju i zoomu.
+6. **Rijeci** (IZVEDENO 2026-11-04): nova kocka `qnc-edit-words` (`Word`, `goal`: uzeti IN na
+   pocetak rijeci, OUT na kraj, rez na bliziu granicu; `WordPair`: dvije rijeci istog mjesta su
+   raspon od pocetka ranije do kraja kasnije). Jedno znacenje svugdje: klik na rijec pomakne
+   playhead, a dok je rub ili rez uzet donese ga na rijec (prijepis: novo, prije je samo pomicao
+   playhead; scenarij; zoom source timelinea, Storyja i slozene izjave); dvoklik na dvije rijeci
+   je IN-OUT par (source timeline `cut_word` i scenarij `WORD_CUT` kroz isti `WordPair`).

@@ -96,7 +96,7 @@ pub struct SourceTimeline {
     /// The first cut of a pair (its frame), until the second.
     first_cut: Option<u64>,
     /// The first double clicked word of a pair (its frames), until the second.
-    first_word: Option<(u64, u64)>,
+    first_word: qnc_edit_words::WordPair<()>,
 }
 
 impl SourceTimeline {
@@ -112,7 +112,7 @@ impl SourceTimeline {
         if self.clip.as_deref() != clip_id {
             self.clip = clip_id.map(str::to_string);
             self.first_cut = None; // a pair of cuts belongs to its clip
-            self.first_word = None;
+            self.first_word.forget();
             self.lanes.new_clip();
             self.sound_known = false;
             self.message.clear();
@@ -237,7 +237,7 @@ impl SourceTimeline {
         };
         self.keys.set_mark_taken(false);
         qnc_source_mark_focus::release(timeline);
-        self.first_word = None;
+        self.first_word.forget();
         *timeline = match self.first_cut.take() {
             Some(first) if first != at => timeline.clone().with_second_cut(first, at),
             _ => {
@@ -256,12 +256,10 @@ impl SourceTimeline {
         self.keys.set_mark_taken(false);
         qnc_source_mark_focus::release(timeline);
         self.first_cut = None;
-        *timeline = match self.first_word.take() {
-            Some((first_from, first_to)) => timeline.clone().with_second_cut(first_from.min(from), first_to.max(to)),
-            None => {
-                self.first_word = Some((from, to));
-                timeline.clone().with_first_cut_at(from)
-            }
+        // The one meaning of two words (`qnc-edit-words`, AGENTS 0.12).
+        *timeline = match self.first_word.give((), qnc_edit_words::Word::new(from, to)) {
+            qnc_edit_words::Paired::Range(range) => timeline.clone().with_second_cut(range.from, range.to),
+            qnc_edit_words::Paired::First(word) => timeline.clone().with_first_cut_at(word.from),
         };
         true
     }

@@ -39,3 +39,4 @@ serde_json = { workspace = true }
 qnc-edit-verbs = { workspace = true }
 qnc-edit-cut = { workspace = true }
 qnc-edit-edge = { workspace = true }
+qnc-edit-words = { workspace = true }
