@@ -208,6 +208,9 @@
     "subsegment_take": {
       "label": "Uzmi dio SubSegmenta cijeli kao slot (desni klik na traku s duljinom)"
     },
+    "subsegment_zoom_word": {
+      "label": "Uzeti rub dijela SubSegmenta na rijec kliknutu u zoomu"
+    },
     "script_word_cue": {
       "label": "Playhead na rijec izjave u scenariju"
     },

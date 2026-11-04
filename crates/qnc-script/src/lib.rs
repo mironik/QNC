@@ -73,6 +73,9 @@ pub const SUBSEGMENT_SELECT: &str = "subsegment_select";
 /// A part taken whole, as a slot (a right click on its length strip, as Ctrl+S): `target` is its
 /// index; arrows and the wheel then move it along the statement.
 pub const SUBSEGMENT_TAKE: &str = "subsegment_take";
+/// A word clicked in the trim zoom of a SubSegment (value: its first frame, target: the frame
+/// after its last, on the SubSegment's axis): the taken edge goes to it (user 2026-11-04).
+pub const ZOOM_WORD: &str = "subsegment_zoom_word";
 /// A click on a word of a statement in the script (user 2026-11-04: edited by its text): the
 /// statement opens in place of the source timeline and the playhead goes to the word. `target`
 /// is `block:part:frame`.
@@ -561,6 +564,15 @@ impl Script {
         if let Some(done) = self.sound_key(action_id, target, &block, &pieces, preview) {
             return Some(done);
         }
+        // I and O on the SubSegment's timeline as on every timeline (user 2026-11-04: "IN/OUT
+        // functions on every timeline must work"): the part under the playhead gets its IN or OUT
+        // there; a taken edge of that part moves there as a draft (Enter keeps it).
+        if matches!(action_id, "mark_in" | "mark_out") {
+            return self.mark_part(action_id == "mark_out", &block, &pieces, preview);
+        }
+        if action_id == ZOOM_WORD {
+            return self.zoom_word(target, &block);
+        }
         if action_id == DRAG_EDGE {
             return self.drag_edge(target, &block, &pieces);
         }
@@ -919,6 +931,65 @@ impl Script {
 
     /// Writes the parts a trim moved (the part, and the next one of a whole cut); nothing when
     /// nothing moved. Returns whether a write went.
+    /// I or O at the playhead of the open SubSegment: the IN or OUT (the OUT after the frame
+    /// shown) of the part under it. Its taken edge moves there as a draft; otherwise it is
+    /// written at once, a taken edge of another part kept first.
+    fn mark_part(&mut self, out: bool, block: &Block, pieces: &[Piece], preview: &SourcePreview) -> Option<bool> {
+        let drafted = self.drafted(block.clone());
+        let at = preview.program_frame()?;
+        let parts = view::subsegment_view(&drafted, None).parts;
+        let drafted_pieces = view::block_pieces(&drafted);
+        let Some(index) = parts.iter().position(|part| (part.start..part.end).contains(&at)) else {
+            self.view.message = qnc_ui_text::text("subsegment.mark_in_pause").into();
+            return Some(true);
+        };
+        let (part, piece) = (&parts[index], &drafted_pieces[index]);
+        let frame = piece.from_frame + (at - part.start);
+        let (from, to) = if out { (piece.from_frame, frame + 1) } else { (frame, piece.to_frame) };
+        if to <= from {
+            return Some(true);
+        }
+        match self.trim {
+            Some(trim) if trim.index == index && trim.roll.is_none() => {
+                self.trim = Some(Trim { from, to, out, ..trim });
+                let drafted = self.drafted(block.clone());
+                let edge = view::subsegment_view(&drafted, None).parts.get(index).map_or(at, |part| if out { part.end.saturating_sub(1) } else { part.start });
+                self.pieces_request = Some((view::piece_inputs(&drafted), edge));
+                Some(true)
+            }
+            held => {
+                if let Some(held) = held {
+                    self.trim = None;
+                    self.write_trim(preview, block, pieces, held);
+                }
+                let stored = pieces.get(index)?;
+                let piece = self.trimmed_piece(stored, Trim { index, out, from, to, roll: None });
+                let id = block.id;
+                Some(self.write(preview, move |target| qnc_script_db::set_piece(target, id, index, piece).map(|_| None)))
+            }
+        }
+    }
+
+    /// A word of the trim zoom clicked: the taken edge goes to it (IN to its start, OUT to its
+    /// end), within the taken part, drafted as the arrows do; the zoom follows the edge.
+    fn zoom_word(&mut self, target: Option<&str>, block: &Block) -> Option<bool> {
+        let (from, to) = (u64::try_from(self.value?).ok()?, target?.parse::<u64>().ok()?);
+        let Some(trim) = self.trim.filter(|trim| trim.roll.is_none()) else { return Some(true) };
+        let drafted = self.drafted(block.clone());
+        let part = view::subsegment_view(&drafted, None).parts.get(trim.index).cloned()?;
+        let piece = view::block_pieces(&drafted).get(trim.index).cloned()?;
+        let source = |axis: u64| piece.from_frame + axis.clamp(part.start, part.end).saturating_sub(part.start);
+        let (new_from, new_to) = if trim.out { (trim.from, source(to)) } else { (source(from), trim.to) };
+        if new_to <= new_from {
+            return Some(true);
+        }
+        self.trim = Some(Trim { from: new_from, to: new_to, ..trim });
+        let drafted = self.drafted(block.clone());
+        let edge = view::subsegment_view(&drafted, None).parts.get(trim.index).map_or(0, |part| if trim.out { part.end.saturating_sub(1) } else { part.start });
+        self.pieces_request = Some((view::piece_inputs(&drafted), edge));
+        Some(true)
+    }
+
     fn write_trim(&mut self, preview: &SourcePreview, block: &Block, pieces: &[Piece], trim: Trim) -> bool {
         let id = block.id;
         let mut writes = Vec::new();
@@ -1151,7 +1222,20 @@ impl Script {
             WORD_CUE => {
                 let mut parts = target.unwrap_or_default().split(':');
                 let (Some(id), Some(index), Some(frame)) = (parts.next().and_then(|v| v.parse::<i64>().ok()), parts.next().and_then(|v| v.parse::<usize>().ok()), parts.next().and_then(|v| v.parse::<u64>().ok())) else { return Some(false) };
+                let word_to = parts.next().and_then(|v| v.parse::<u64>().ok()).unwrap_or(frame + 1);
                 let Some(block) = self.block(Some(id)).cloned() else { return Some(false) };
+                // An edge of this part taken: the word moves it (IN to the word's start, OUT to
+                // its end), drafted as the arrows do, Enter keeps it (user 2026-11-04).
+                if let Some(trim) = self.trim.filter(|trim| self.open_subsegment == Some(id) && trim.index == index && trim.roll.is_none()) {
+                    let (from, to) = if trim.out { (trim.from, word_to) } else { (frame, trim.to) };
+                    if to > from {
+                        self.trim = Some(Trim { from, to, ..trim });
+                        let drafted = self.drafted(block.clone());
+                        let edge = view::subsegment_view(&drafted, None).parts.get(index).map_or(0, |part| if trim.out { part.end.saturating_sub(1) } else { part.start });
+                        self.pieces_request = Some((view::piece_inputs(&drafted), edge));
+                    }
+                    return Some(true);
+                }
                 let pieces = view::block_pieces(&block);
                 let (Some(piece), Some(part)) = (pieces.get(index), view::subsegment_view(&block, None).parts.get(index).cloned()) else { return Some(false) };
                 let at = part.start + frame.saturating_sub(piece.from_frame).min(part.end.saturating_sub(part.start + 1));

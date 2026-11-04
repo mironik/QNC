@@ -336,7 +336,9 @@ fn paint_words(ui: &mut egui::Ui, row: Rect, sound: &ZoomSound, x_of: &dyn Fn(u6
         if response.hovered() {
             ui.ctx().set_cursor_icon(egui::CursorIcon::PointingHand);
         }
-        if response.double_clicked() {
+        // A click is enough (user 2026-11-04: "a click on the text in the zoom puts the wave
+        // exactly at the playhead"): the taken edge goes to the word, the window follows it.
+        if response.clicked() || response.double_clicked() {
             clicked = Some((word.from, word.to.max(word.from + 1)));
         }
     }

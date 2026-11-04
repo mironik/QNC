@@ -308,7 +308,7 @@ pub fn paint_block(ui: &mut egui::Ui, row: &qnc_script::BlockRow, view: &ScriptV
                         if response.double_clicked() {
                             asked = Some(ActionEvent::key(WORD_CUT).with_target(format!("{id}:{index}:{}:{}", word.from, word.to)).at(PANEL));
                         } else if response.clicked() {
-                            asked = Some(ActionEvent::key(WORD_CUE).with_target(format!("{id}:{index}:{}", word.from)).at(PANEL));
+                            asked = Some(ActionEvent::key(WORD_CUE).with_target(format!("{id}:{index}:{}:{}", word.from, word.to)).at(PANEL));
                         }
                         if response.hovered() {
                             ui.ctx().set_cursor_icon(egui::CursorIcon::PointingHand);

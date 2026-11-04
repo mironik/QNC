@@ -665,6 +665,7 @@
     "subsegment.move_hint": "The part changes places with the part before or after it; the pauses and joins stay where they are.",
     "subsegment.slide_locked": "The first and the last part do not move whole; take their IN or OUT.",
     "subsegment.no_join_sound": "This slot has no join on that side (a pause or the end): no J or L there.",
+    "subsegment.mark_in_pause": "The playhead is in a pause: put it on a part to give it an IN or OUT.",
     "subsegment.remove": "Delete",
     "subsegment.remove_hint": "The part leaves the SubSegment (its clip stays in the project).",
     "script.no_profile": "No script profile is there on this computer (catalogs/script-profiles).",

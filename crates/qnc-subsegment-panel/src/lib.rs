@@ -220,9 +220,12 @@ pub fn show(ui: &mut egui::Ui, view: &SubsegmentView, theme: TimelineTheme, leng
         _ => None,
     };
     answer = answer.or(event);
-    // The trim zoom of a taken edge, as a cover's: its wheel moves the edge; a double click on
-    // a word is not a cut here (the source timeline is not shown).
-    let zoomed = view.zoom.as_deref().and_then(|zoom| qnc_trim_overlay::show(ui.ctx(), zoom)).filter(|event| event.action_id != "transcript_cut_word");
+    // The trim zoom of a taken edge, as a cover's: its wheel moves the edge; a click on a word
+    // moves the taken edge to it (user 2026-11-04), on the SubSegment's axis.
+    let zoomed = view.zoom.as_deref().and_then(|zoom| qnc_trim_overlay::show(ui.ctx(), zoom)).map(|event| match event.action_id.as_str() {
+        "transcript_cut_word" => ActionEvent { action_id: qnc_script::ZOOM_WORD.to_string(), ..event },
+        _ => event,
+    });
     answer = answer.or(zoomed);
     // Every part: the pause and join before it (after the first) and its own A1, the camera
     // channel, level and on/off (user 2026-10-29).

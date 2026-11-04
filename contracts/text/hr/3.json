@@ -38,6 +38,7 @@
     "subsegment.move_hint": "Dio mijenja mjesto s dijelom prije ili poslije sebe; pauze i spojevi ostaju gdje jesu.",
     "subsegment.slide_locked": "Prvi i zadnji dio ne pomiču se cijeli; uzmi njihov IN ili OUT.",
     "subsegment.no_join_sound": "Ovaj slot s te strane nema spoj (pauza ili kraj): tamo nema J ni L.",
+    "subsegment.mark_in_pause": "Playhead je u pauzi: stavi ga na dio da mu das IN ili OUT.",
     "subsegment.remove": "Obriši",
     "subsegment.remove_hint": "Dio izlazi iz SubSegmenta (njegov klip ostaje u projektu).",
     "script.no_profile": "Na ovom računalu nema profila scenarija (catalogs/script-profiles).",
