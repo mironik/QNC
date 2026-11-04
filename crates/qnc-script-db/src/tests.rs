@@ -231,7 +231,7 @@ fn a_block_keeps_only_the_fields_of_its_kind_and_a_choice_only_one_of_its_choice
 }
 
 fn piece(clip: &str, from: u64, to: u64, text: &str) -> Piece {
-    Piece { clip_id: clip.into(), clip_name: clip.into(), from_frame: from, to_frame: to, start_tc: format!("tc{from}"), end_tc: format!("tc{to}"), length: "1:00".into(), seconds: 1.0, text: text.into(), gap_before: 0, cut: false, a1_channel: None, a1_level_db: 0, a1_off: false, a1_lead_frames: 0, a1_tail_frames: 0 }
+    Piece { clip_id: clip.into(), clip_name: clip.into(), from_frame: from, to_frame: to, start_tc: format!("tc{from}"), end_tc: format!("tc{to}"), length: "1:00".into(), seconds: 1.0, text: text.into(), gap_before: 0, cut: false, a1_channel: None, a1_level_db: 0, a1_off: false, a1_lead_frames: 0, a1_tail_frames: 0, v_lead_frames: 0, v_tail_frames: 0 }
 }
 
 #[test]
@@ -283,6 +283,20 @@ fn a_join_keeps_its_j_and_l_through_a_trim_and_a_move_and_the_first_part_has_non
     move_piece(&target, id, 2, true).unwrap();
     assert_eq!(join(&target), [(0, 0), (4, 6), (0, 0)]);
     assert!(set_join_sound(&target, id, 0, 1, 1).is_err(), "the first part has no join");
+}
+
+#[test]
+fn a_join_keeps_the_j_and_l_of_its_picture_apart_from_its_sound() {
+    let (_dir, target) = written();
+    let id = add(&target, None, sot("2002")).unwrap();
+    add_piece(&target, id, piece("2002", 500, 550, "drugi")).unwrap();
+    set_join_sound(&target, id, 1, 4, 6).unwrap();
+    set_join_picture(&target, id, 1, 3, 0).unwrap();
+    let part = read(&target).unwrap()[0].pieces[1].clone();
+    assert_eq!((part.v_lead_frames, part.v_tail_frames, part.a1_lead_frames, part.a1_tail_frames), (3, 0, 4, 6), "the picture and the sound of the join apart");
+    set_piece(&target, id, 1, piece("2002", 505, 550, "drugi")).unwrap();
+    assert_eq!(read(&target).unwrap()[0].pieces[1].v_lead_frames, 3, "a trimmed edge keeps them");
+    assert!(set_join_picture(&target, id, 0, 1, 1).is_err(), "the first part has no join");
 }
 
 #[test]

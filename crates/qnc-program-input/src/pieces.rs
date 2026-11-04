@@ -21,6 +21,11 @@ pub struct PieceInput {
     /// the sound before ends before it).
     pub sound_lead: i64,
     pub sound_tail: i64,
+    /// The J and L of the join's picture (user 2026-11-04, as at a story's cut), in its clip's
+    /// frames: its picture starts `picture_lead` before the join, the part before's goes on
+    /// `picture_tail` after it; the sound stays. Nothing after a pause.
+    pub picture_lead: u64,
+    pub picture_tail: u64,
 }
 
 /// The program of a SubSegment: its parts one after another on V1 and A1 (a pause is black
@@ -86,6 +91,14 @@ pub fn load_pieces(
                 before.a1_tail_frames = tail;
             }
         }
+        // The J and L of the picture, as at a story's cut (`picture_lead.rs` of the playlist).
+        let joined = index > 0 && gap == 0;
+        let picture_lead = if joined { frame(piece.picture_lead)? * num / den } else { 0 };
+        if joined && piece.picture_tail > 0 {
+            if let Some(before) = segments.last_mut() {
+                before.v_tail_frames = (frame(piece.picture_tail)? * before_scale.0 / before_scale.1).try_into().unwrap_or_default();
+            }
+        }
         if index > 0 {
             let shaped = piece.sound_lead != 0 || piece.sound_tail != 0;
             joins.push(qnc_program_playlist::A1Join { end: start, start: start + gap, frames: if piece.crossfade && !shaped { crossfade } else { 0 } });
@@ -102,7 +115,7 @@ pub fn load_pieces(
             a1_level_db: sound.map_or(0, |sound| sound.1),
             a1_off: sound.is_some_and(|sound| sound.2),
             covers: Vec::new(),
-            v_lead_frames: 0,
+            v_lead_frames: picture_lead.try_into().unwrap_or_default(),
             v_tail_frames: 0,
             a1_lead_frames: lead,
             a1_tail_frames: 0,

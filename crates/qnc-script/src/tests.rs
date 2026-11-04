@@ -114,7 +114,7 @@ fn a_part_slides_as_a_slot_its_neighbours_edges_or_pauses_give_way() {
 #[test]
 fn the_sound_of_a_join_moves_as_a_storys_cut() {
     use crate::{JoinSide, JoinSound};
-    let join = |lead, tail, side| JoinSound { index: 1, lead, tail, side };
+    let join = |lead, tail, side| JoinSound { index: 1, lead, tail, side, picture: false };
     let room = (-40, -40);
     // Both sides together: the sound cut (or the overlap between them) moves whole.
     assert_eq!(join(0, 0, JoinSide::Both).moved(3, room), join(-3, 3, JoinSide::Both), "the sound cut 3 frames after the picture cut");
@@ -128,7 +128,7 @@ fn the_sound_of_a_join_moves_as_a_storys_cut() {
 }
 
 fn part(clip: &str, from: u64, to: u64, gap: u64) -> Piece {
-    Piece { clip_id: clip.into(), clip_name: clip.into(), from_frame: from, to_frame: to, start_tc: String::new(), end_tc: String::new(), length: String::new(), seconds: 1.0, text: String::new(), gap_before: gap, cut: false, a1_channel: None, a1_level_db: 0, a1_off: false, a1_lead_frames: 0, a1_tail_frames: 0 }
+    Piece { clip_id: clip.into(), clip_name: clip.into(), from_frame: from, to_frame: to, start_tc: String::new(), end_tc: String::new(), length: String::new(), seconds: 1.0, text: String::new(), gap_before: gap, cut: false, a1_channel: None, a1_level_db: 0, a1_off: false, a1_lead_frames: 0, a1_tail_frames: 0, v_lead_frames: 0, v_tail_frames: 0 }
 }
 
 #[test]

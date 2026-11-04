@@ -282,7 +282,10 @@ pub(crate) use device_sink_adapter;
 
 pub(crate) struct Audio {
     pub sink: DeviceSink,
-    decoders: Vec<Decoder>,
+    /// Opened at start; after a cue the sound in memory cannot serve, opened again on threads of
+    /// their own (log 2026-11-04: four camera channels opened one after another on the player's
+    /// thread kept it from answering for over 2 s, "control read header timed out").
+    decoders: Vec<Opening>,
     input: Rc<DecodeInput>,
     pending_seek: Option<u64>,
     tracks: Vec<PcmTrack>,
@@ -304,7 +307,7 @@ impl Audio {
         let decoders = plan
             .audio_streams
             .iter()
-            .map(|stream| input.open(stream.stream_index, None))
+            .map(|stream| input.open(stream.stream_index, None).map(Opening::Ready))
             .collect::<Result<Vec<_>>>()?;
         Ok(Self {
             sink,
@@ -367,7 +370,7 @@ impl AudioOutputAdapter for Audio {
                 retire(std::mem::take(&mut self.decoders));
                 for track in &mut self.tracks {
                     track.restart(from, start);
-                    self.decoders.push(self.input.open(track.stream_index, seek)?);
+                    self.decoders.push(self.input.open_in_background(track.stream_index, seek)?);
                 }
             }
             self.consumed_through = start;
@@ -383,7 +386,12 @@ impl AudioOutputAdapter for Audio {
         }
         let sample_frames = usize::try_from(end - start).map_err(error)?;
         // Poll each existing decoder fairly; drain nothing until all channels are ready.
-        for (track, decoder) in self.tracks.iter_mut().zip(&mut self.decoders) {
+        for (track, opening) in self.tracks.iter_mut().zip(&mut self.decoders) {
+            // Still opening: the sound waits as a decoder with no samples yet does.
+            let Some(decoder) = opening.ready()? else {
+                track.settle();
+                continue;
+            };
             // On the way to a cue the decoder catches up faster.
             let packets = if track.aiming() { 64 } else { 2 };
             for _ in 0..packets {

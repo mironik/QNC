@@ -149,12 +149,19 @@ pub struct Piece {
     pub a1_lead_frames: i64,
     #[serde(default)]
     pub a1_tail_frames: i64,
+    /// The J and L of the join's picture (user 2026-11-04, as at a story's cut): this part's
+    /// picture starts `v_lead_frames` before the join, the part before's goes on `v_tail_frames`
+    /// after it; the sound stays where it is. They belong to the join, as the pause does.
+    #[serde(default)]
+    pub v_lead_frames: u64,
+    #[serde(default)]
+    pub v_tail_frames: u64,
 }
 
 impl Piece {
     /// The block's own range as its first part (a clip block that had one range).
     pub fn of(block: &Block) -> Self {
-        Self { clip_id: block.clip_id.clone(), clip_name: block.clip_name.clone(), from_frame: block.from_frame, to_frame: block.to_frame, start_tc: block.start_tc.clone(), end_tc: block.end_tc.clone(), length: block.length.clone(), seconds: block.seconds, text: block.text.clone(), gap_before: 0, cut: false, a1_channel: None, a1_level_db: 0, a1_off: false, a1_lead_frames: 0, a1_tail_frames: 0 }
+        Self { clip_id: block.clip_id.clone(), clip_name: block.clip_name.clone(), from_frame: block.from_frame, to_frame: block.to_frame, start_tc: block.start_tc.clone(), end_tc: block.end_tc.clone(), length: block.length.clone(), seconds: block.seconds, text: block.text.clone(), gap_before: 0, cut: false, a1_channel: None, a1_level_db: 0, a1_off: false, a1_lead_frames: 0, a1_tail_frames: 0, v_lead_frames: 0, v_tail_frames: 0 }
     }
 }
 
@@ -236,6 +243,8 @@ pub enum Operation {
     SetPiece { id: i64, index: usize, piece: Piece },
     /// The J and L of the join before part `index` (frames; the first part has no join).
     SetJoinSound { id: i64, index: usize, lead: i64, tail: i64 },
+    /// The J and L of the picture at the join before part `index`.
+    SetJoinPicture { id: i64, index: usize, lead: u64, tail: u64 },
     /// Part `index` changes places with the part before it (`earlier`) or after it; the pauses
     /// and joins stay where they are between the parts.
     MovePiece { id: i64, index: usize, earlier: bool },
@@ -414,4 +423,9 @@ pub fn set_piece(target: &ProjectDbTarget, id: i64, index: usize, piece: Piece) 
 /// The J (`lead`) and L (`tail`) of the join before part `index` of block `id`.
 pub fn set_join_sound(target: &ProjectDbTarget, id: i64, index: usize, lead: i64, tail: i64) -> Result<()> {
     write(target, Operation::SetJoinSound { id, index, lead, tail }).map(drop)
+}
+
+/// The J and L of the picture at the join before part `index` of block `id`.
+pub fn set_join_picture(target: &ProjectDbTarget, id: i64, index: usize, lead: u64, tail: u64) -> Result<()> {
+    write(target, Operation::SetJoinPicture { id, index, lead, tail }).map(drop)
 }

@@ -238,6 +238,9 @@ pub struct JoinSound {
     /// Frames the part before's sound goes on after its OUT (negative: it ends before it).
     pub tail: i64,
     pub side: JoinSide,
+    /// The join's picture, not its sound (user 2026-11-04: J and L of the picture, as at a
+    /// story's cut, the V of the zoom): the parts' pictures cross the join, the sound stays.
+    pub picture: bool,
 }
 
 /// Which side of a join's sound moves: the one rule of a cut's sound (`qnc-edit-cut`, docs/97
@@ -300,8 +303,10 @@ impl JoinSound {
     /// the sound before ends; both move together (the overlap or the hole between them moves
     /// whole), or one alone. `lowest` keeps each side inside its own part.
     fn moved(self, step: i64, lowest: (i64, i64)) -> Self {
-        // A join allows holes (user 2026-11-04): the rule of a cut's sound with negative sides.
-        let moved = self.sound().moved(self.side, step, true).bounded(lowest, JOIN_SOUND_MAX);
+        // A join's sound allows holes (user 2026-11-04): the rule of a cut's sound with negative
+        // sides; its picture does not (the pictures cross the join or meet at it).
+        let lowest = if self.picture { (0, 0) } else { lowest };
+        let moved = self.sound().moved(self.side, step, !self.picture).bounded(lowest, JOIN_SOUND_MAX);
         JoinSound { lead: moved.lead, tail: moved.tail, ..self }
     }
 
@@ -424,7 +429,9 @@ impl Script {
             if let (Some(index), Some(sound)) = (joined.or(join_sound.map(|join| join.index)), zoom.zoom_sound.as_mut()) {
                 let marker_id = format!("join:{index}");
                 sound.taken_cut = Some(marker_id.clone());
-                if let Some(join) = join_sound {
+                // The join's picture taken: its V framed red, its sound not shown as taken.
+                sound.picture_taken = join_sound.is_some_and(|join| join.picture);
+                if let Some(join) = join_sound.filter(|join| !join.picture) {
                     let (lead, tail) = join.sound().sides_at(sound.cut);
                     let moving = join.sound().moving(join.side, sound.cut);
                     sound.cut_sound = Some(qnc_program_view::ZoomCutSound { marker_id, lane: 0, lead: Some(lead), tail: Some(tail), moving });
@@ -487,7 +494,11 @@ impl Script {
         }
         if let Some(join) = self.join_sound {
             if let Some(piece) = block.pieces.get_mut(join.index) {
-                (piece.a1_lead_frames, piece.a1_tail_frames) = (join.lead, join.tail);
+                if join.picture {
+                    (piece.v_lead_frames, piece.v_tail_frames) = (join.lead.max(0) as u64, join.tail.max(0) as u64);
+                } else {
+                    (piece.a1_lead_frames, piece.a1_tail_frames) = (join.lead, join.tail);
+                }
             }
         }
         if let Some((index, by)) = self.slide {
@@ -561,7 +572,7 @@ impl Script {
         if let Some(done) = self.slide_key(action_id, target, &block, &pieces, preview) {
             return Some(done);
         }
-        if let Some(done) = self.join_key(action_id, &block, &pieces, preview) {
+        if let Some(done) = self.join_key(action_id, target, &block, &pieces, preview) {
             return Some(done);
         }
         if let Some(done) = self.sound_key(action_id, target, &block, &pieces, preview) {
@@ -797,8 +808,22 @@ impl Script {
     /// starts earlier), Ctrl+O only the L (the part before's goes on), Ctrl+1 both again; arrows
     /// and the wheel move it a frame and it is heard at once; Enter (or a left click) keeps it,
     /// Esc gives it up. `None` for a key that is not the join sound's.
-    fn join_key(&mut self, action_id: &str, block: &Block, pieces: &[Piece], preview: &SourcePreview) -> Option<bool> {
+    fn join_key(&mut self, action_id: &str, target: Option<&str>, block: &Block, pieces: &[Piece], preview: &SourcePreview) -> Option<bool> {
         let take_sound = matches!(qnc_timeline::LaneKey::of(action_id), Some(qnc_timeline::LaneKey::Take(0)));
+        // The V of the zoom on a taken join (user 2026-11-04): its picture, as at a story's cut.
+        let take_picture = action_id == "select_mark_in" && target.is_some_and(|target| target.starts_with("join:"));
+        // A part's J and L of sound or of picture, as stored.
+        let stored = |piece: &Piece, picture: bool| if picture { (piece.v_lead_frames as i64, piece.v_tail_frames as i64) } else { (piece.a1_lead_frames, piece.a1_tail_frames) };
+        if let Some(join) = self.join_sound.filter(|join| (take_sound && join.picture) || (take_picture && !join.picture)) {
+            // The other of picture and sound of the same join: the moved one is written first.
+            let piece = pieces.get(join.index)?;
+            if stored(piece, join.picture) != (join.lead, join.tail) {
+                self.write_join(preview, block, join);
+            }
+            let (lead, tail) = stored(piece, take_picture);
+            self.join_sound = Some(JoinSound { lead, tail, picture: take_picture, ..join });
+            return Some(true);
+        }
         // With a slot chosen (a picture of the zoom clicked, user 2026-11-04), its sound at the cut
         // is taken alone: the part before's end (its L), the part after's start (its J).
         let side_of = |chosen: Option<usize>, index: usize| match chosen {
@@ -809,19 +834,20 @@ impl Script {
             Some(join) => join,
             None => {
                 // An edge taken at a join (the whole cut, the OUT before it or the IN after it).
-                let trim = self.trim.filter(|_| take_sound)?;
+                let trim = self.trim.filter(|_| take_sound || take_picture)?;
                 let index = if trim.out || trim.roll.is_some() { trim.index + 1 } else { trim.index };
                 let piece = pieces.get(index).filter(|piece| index > 0 && piece.gap_before == 0)?;
                 if pieces.get(trim.index).is_some_and(|stored| (stored.from_frame, stored.to_frame) != (trim.from, trim.to)) || trim.roll.is_some_and(|from| pieces.get(trim.index + 1).is_some_and(|next| next.from_frame != from)) {
                     self.write_trim(preview, block, pieces, trim);
                 }
                 self.sound = None;
-                self.join_sound = Some(JoinSound { index, lead: piece.a1_lead_frames, tail: piece.a1_tail_frames, side: side_of(self.chosen, index) });
+                let (lead, tail) = stored(piece, take_picture);
+                self.join_sound = Some(JoinSound { index, lead, tail, side: side_of(self.chosen, index), picture: take_picture });
                 return Some(true);
             }
         };
         let step = match action_id {
-            _ if take_sound => {
+            _ if take_sound || take_picture => {
                 join.side = side_of(self.chosen, join.index);
                 0
             }
@@ -841,11 +867,11 @@ impl Script {
                     return Some(true);
                 };
                 if index != join.index {
-                    if pieces.get(join.index).is_some_and(|stored| (stored.a1_lead_frames, stored.a1_tail_frames) != (join.lead, join.tail)) {
-                        let (id, at, lead, tail) = (block.id, join.index, join.lead, join.tail);
-                        self.write(preview, move |target| qnc_script_db::set_join_sound(target, id, at, lead, tail).map(|_| None));
+                    if pieces.get(join.index).is_some_and(|piece| stored(piece, join.picture) != (join.lead, join.tail)) {
+                        self.write_join(preview, block, join);
                     }
-                    join = JoinSound { index, lead: piece.a1_lead_frames, tail: piece.a1_tail_frames, side };
+                    let (lead, tail) = stored(piece, join.picture);
+                    join = JoinSound { index, lead, tail, side, picture: join.picture };
                 } else {
                     join.side = side;
                 }
@@ -878,8 +904,7 @@ impl Script {
             }
             "activate_focused_item" => {
                 (self.join_sound, self.trim) = (None, None);
-                let (id, index) = (block.id, join.index);
-                return Some(self.write(preview, move |target| qnc_script_db::set_join_sound(target, id, index, join.lead, join.tail).map(|_| None)));
+                return Some(self.write_join(preview, block, join));
             }
             "clear_focus" => {
                 self.join_sound = None;
@@ -897,6 +922,17 @@ impl Script {
             self.pieces_request = Some((view::piece_inputs(&drafted), self.join_hear_from(&drafted, join.index)));
         }
         Some(true)
+    }
+
+    /// Writes the J and L of a join: of its picture or of its sound.
+    fn write_join(&mut self, preview: &SourcePreview, block: &Block, join: JoinSound) -> bool {
+        let (id, index) = (block.id, join.index);
+        if join.picture {
+            let (lead, tail) = (join.lead.max(0) as u64, join.tail.max(0) as u64);
+            self.write(preview, move |target| qnc_script_db::set_join_picture(target, id, index, lead, tail).map(|_| None))
+        } else {
+            self.write(preview, move |target| qnc_script_db::set_join_sound(target, id, index, join.lead, join.tail).map(|_| None))
+        }
     }
 
     /// Where a join sound is heard from: a second before its cut.
@@ -980,8 +1016,7 @@ impl Script {
             return Some(self.write_trim(preview, block, pieces, trim));
         }
         if let Some(join) = self.join_sound {
-            let (id, index) = (block.id, join.index);
-            return Some(self.write(preview, move |target| qnc_script_db::set_join_sound(target, id, index, join.lead, join.tail).map(|_| None)));
+            return Some(self.write_join(preview, block, join));
         }
         if let Some(sound) = self.sound {
             let done = self.sound_key("activate_focused_item", None, block, pieces, preview);
@@ -1425,6 +1460,8 @@ impl Script {
             a1_off: false,
             a1_lead_frames: 0,
             a1_tail_frames: 0,
+            v_lead_frames: 0,
+            v_tail_frames: 0,
         })
     }
 

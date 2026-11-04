@@ -9,12 +9,12 @@ svaki trajni podatak je u bazi projekta kroz javnog pisca. Red je po vaznosti za
 
 ## 0. Ostaci objedinjavanja (docs/97)
 
-| Stavka | Kocka | Opis |
+| Stavka | Kocka | Stanje |
 |---|---|---|
-| Rub slota u prici na `qnc-edit-edge` | `qnc-edit-edge` + `qnc-program-segments` | S-Story: slot je klip, rub slota = `Range` klipa; Story: rub izmedju dva M markera ostaje pravilo price (ripple) |
-| J/L slike u slozenoj izjavi | `qnc-edit-cut` (slika) + `qnc-script-db` | `v_lead/v_tail` dijela kao `SetJoinPicture` u prici; zoom V gumb isti glagol |
-| Klik lijevo/desno od uzetog reza | mapa misa | treba odluku: danas lijevi klik dok je nesto uzeto sprema (zakljucano 20. 10.) |
-| `control read header timed out` | `qnc-broadcast-engine` / klijent | log 4. 11.: player 2 s ne odgovara (otvaranje dekodera na niti playera); nastavak popravka od 27. 10. |
+| `control read header timed out` | `qnc-broadcast-engine` | IZVEDENO 2026-11-04: nakon skoka zvuk klipa otvarao je dekoder za svaki kanal kamere na niti playera (4 ffmpega na kartici, preko 2 s); sada u pozadini kao slika (`Opening`) |
+| J/L slike u slozenoj izjavi | `qnc-script-db` (`v_lead/v_tail`, `SetJoinPicture`), `qnc-program-input`, `qnc-script` | IZVEDENO 2026-11-04: V u zoomu uzetog reza spoja uzima sliku spoja; Ctrl+I J, Ctrl+O L, strelice/kotacic, Enter/Spremi, Esc; pravilo `qnc-edit-cut` bez rupa |
+| Rub slota u prici na `qnc-edit-edge` | - | NE PRENOSI SE: rub slota je rub izmedju dva M markera na osi price (ripple, prazni slot, zadnji slot, zakljucani markeri), ne komad u klipu; granice klipa ima vec `past_clip_end`. Isti alat (Ctrl+I/O, strelice, zoom, Spremi) vec vrijedi |
+| Klik lijevo/desno od uzetog reza | mapa misa | CEKA ODLUKU: danas lijevi klik dok je nesto uzeto sprema (zakljucano 20. 10.) |
 
 ## 1. Brzina montaze (prvo)
 

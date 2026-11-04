@@ -40,6 +40,8 @@ pub fn piece_inputs(block: &Block) -> Vec<PieceInput> {
             a1: (piece.a1_channel.is_some() || piece.a1_level_db != 0 || piece.a1_off).then_some((piece.a1_channel, piece.a1_level_db, piece.a1_off)),
             sound_lead: if index == 0 { 0 } else { piece.a1_lead_frames },
             sound_tail: if index == 0 { 0 } else { piece.a1_tail_frames },
+            picture_lead: if index == 0 { 0 } else { piece.v_lead_frames },
+            picture_tail: if index == 0 { 0 } else { piece.v_tail_frames },
         })
         .collect()
 }
@@ -73,7 +75,7 @@ pub fn draft_pieces(blocks: &[Block], voices: &[Voice], profile: &ScriptProfile,
                         piece.gap_before = pause;
                         // A cut where the script goes from one block to the next.
                         piece.crossfade = false;
-                        (piece.sound_lead, piece.sound_tail) = (0, 0);
+                        (piece.sound_lead, piece.sound_tail, piece.picture_lead, piece.picture_tail) = (0, 0, 0, 0);
                     }
                     pieces.push(piece);
                 }
@@ -91,6 +93,8 @@ pub fn draft_pieces(blocks: &[Block], voices: &[Voice], profile: &ScriptProfile,
                         a1: Some((Some(take.take.saturating_sub(1)), 0, false)),
                         sound_lead: 0,
                         sound_tail: 0,
+                        picture_lead: 0,
+                        picture_tail: 0,
                     });
                     pause = 0;
                 }
