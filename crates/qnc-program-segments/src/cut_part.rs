@@ -123,6 +123,13 @@ impl ProgramSegments {
         self.marker_edit = Some((marker_id.clone(), cut));
         let sound = self.stored_cut_sound(lane, &marker_id, cut);
         self.cut_part = CutPart::Sound { lane, stored: sound, draft: sound, edge: SoundEdge::Both };
+        // A side in focus in the zoom (a picture clicked): only that side's sound is taken.
+        if let Some(after) = self.zoom_side {
+            let (before_side, after_side) = self.cut_sides(lane, &marker_id, cut);
+            if (after && after_side) || (!after && before_side) {
+                return self.take_sound_edge(after);
+            }
+        }
         self.say_cut()
     }
 
@@ -151,6 +158,32 @@ impl ProgramSegments {
         let edge = if lead { SoundEdge::Lead } else { SoundEdge::Tail };
         self.cut_part = CutPart::Sound { lane, stored, draft, edge };
         self.say_cut()
+    }
+
+    /// A picture of the trim zoom clicked (user 2026-11-04, one zoom for every edit): the side of
+    /// the taken cut it shows is in focus; with the cut's sound taken that side's sound moves
+    /// alone (the L of what is before, the J of what is after), else the next right click on
+    /// the sound takes it.
+    pub(crate) fn zoom_side(&mut self, marker_id: &str, after: bool) -> bool {
+        if self.marker_edit.as_ref().map(|(id, _)| id.as_str()) != Some(marker_id) {
+            return false;
+        }
+        self.zoom_side = Some(after);
+        if self.cut_sound_taken() {
+            return self.take_sound_edge(after);
+        }
+        self.refresh_view(String::new());
+        true
+    }
+
+    /// The side in focus in the trim zoom: the side of the cut's sound that moves alone, else
+    /// the side whose picture was clicked.
+    pub(crate) fn zoom_focus(&self) -> Option<bool> {
+        match self.cut_part {
+            CutPart::Sound { edge: SoundEdge::Lead, .. } => Some(true),
+            CutPart::Sound { edge: SoundEdge::Tail, .. } => Some(false),
+            _ => self.zoom_side.filter(|_| self.marker_edit.is_some()),
+        }
     }
 
     /// A click on a side of the taken cut's sound (`frame`, story): the nearer side is taken.

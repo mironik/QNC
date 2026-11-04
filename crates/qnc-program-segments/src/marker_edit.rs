@@ -33,6 +33,8 @@ impl ProgramSegments {
 
     /// A draft for a marker: Ctrl+M, M on a selected marker, or a drag.
     pub(crate) fn start_marker_edit(&mut self, marker_id: String, frame: u64) {
+        // A cut newly taken has no side in focus yet.
+        self.zoom_side = None;
         let pins = self.stored_pins();
         let Some(pin) = pins
             .iter()

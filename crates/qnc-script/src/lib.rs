@@ -401,16 +401,18 @@ impl Script {
         let join_sound = self.join_sound;
         let chosen = self.chosen;
         let zoom = zoom.map(|mut zoom| {
-            // The red frame of the zoom is the focus (user 2026-11-04: a click on a picture moves
-            // it): the picture of the chosen slot, once one is chosen.
-            if let Some(chosen) = chosen.map(|index| index.to_string()) {
-                let stills = zoom.source_edit_stills.iter_mut().chain(zoom.edit_stills.iter_mut());
-                let clicked: Vec<_> = stills.collect();
-                if clicked.iter().any(|still| still.click.as_ref().is_some_and(|(_, target)| *target == chosen)) {
-                    for still in clicked {
-                        still.cut = still.click.as_ref().is_some_and(|(_, target)| *target == chosen);
-                    }
-                }
+            // The side in focus (user 2026-11-04: the zoom frames it red, the same in every zoom):
+            // the side of the join sound that moves alone, else the side of the chosen slot.
+            let chosen_side = chosen.map(|index| index.to_string()).and_then(|chosen| {
+                zoom.source_edit_stills.iter().chain(&zoom.edit_stills).find(|still| still.click.as_ref().is_some_and(|(_, target)| *target == chosen)).map(|still| still.after)
+            });
+            let sound_side = match join_sound.map(|join| join.side) {
+                Some(JoinSide::Lead) => Some(true),
+                Some(JoinSide::Tail) => Some(false),
+                _ => None,
+            };
+            if let Some(sound) = zoom.zoom_sound.as_mut() {
+                sound.focus_side = sound_side.or(chosen_side);
             }
             if let (Some(index), Some(sound)) = (joined.or(join_sound.map(|join| join.index)), zoom.zoom_sound.as_mut()) {
                 let marker_id = format!("join:{index}");

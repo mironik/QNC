@@ -112,6 +112,11 @@ pub struct ZoomSound {
     pub taken_cut: Option<String>,
     /// Only the picture of the taken cut is taken (its V button framed red).
     pub picture_taken: bool,
+    /// The side of the cut in focus (user 2026-11-04: one zoom for every edit): `false` before
+    /// it, `true` after it. The zoom frames the pictures of that side red; a click on a picture
+    /// asks for its side (`zoom_pick_side`); the sound a right click then takes is that side's.
+    /// `None`: the owner's own red frame (the picture at the cut, `EditStill.cut`).
+    pub focus_side: Option<bool>,
     /// The frame the player plays, on the zoom's axis, while it plays (user 2026-10-30: the
     /// playhead moves in the zoom and the wave goes with it).
     pub playhead: Option<u64>,

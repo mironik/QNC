@@ -255,6 +255,9 @@ pub struct ProgramSegments {
     slot_trim: Option<slot_trim::SlotTrim>,
     /// What of the taken marker's cut moves (`cut_part.rs`).
     cut_part: cut_part::CutPart,
+    /// The side of the taken cut in focus in the trim zoom (a picture clicked, user 2026-11-04):
+    /// `true` after the cut; its sound is the side a right click on the sound takes.
+    zoom_side: Option<bool>,
     /// A cover taken with Ctrl+click; Delete removes it.
     cover_taken: Option<String>,
     /// A marker move was confirmed; Enter stays taken until it lands.

@@ -17,6 +17,9 @@ pub const MODULE_ID: &str = "qnc.module.trim-overlay";
 pub const VERSION: &str = env!("CARGO_PKG_VERSION");
 /// The catalog action of a cut at a word (contracts/qnc-keyboard-shortcuts.json).
 const CUT_WORD: &str = "transcript_cut_word";
+/// The side of the taken cut a picture shows, picked by a click (`target` the cut, `value` 0
+/// before it, 1 after it; contracts/qnc-keyboard-shortcuts.json).
+pub const PICK_SIDE: &str = "zoom_pick_side";
 
 /// The largest picture (16:9) and the gaps of the window.
 const MAX_PICTURE: Vec2 = Vec2::new(480.0, 270.0);
@@ -80,15 +83,22 @@ pub fn show(ctx: &egui::Context, segments: &SegmentsView) -> Option<ActionEvent>
             let top = rect.min + Vec2::splat(MARGIN);
             let row_width = size.x - 2.0 * MARGIN;
             let mut gap_at = None;
+            // The side in focus (user 2026-11-04): its pictures framed red, the same in every zoom.
+            let focus = sound.and_then(|sound| sound.focus_side);
+            let taken_cut = sound.and_then(|sound| sound.taken_cut.clone());
             for (index, still) in stills.iter().enumerate() {
                 let left = top.x + index as f32 * (picture.x + GAP);
                 let pane = Rect::from_min_size(egui::pos2(left, top.y), picture);
-                paint_still(ui, pane, still, &visuals);
-                // A picture that switches what is edited (a SubSegment's zoom) is clicked.
-                if let Some((action, target)) = &still.click {
+                paint_still(ui, pane, still, focus.map_or(still.cut, |side| still.after == side), &visuals);
+                // A click on a picture picks its side of the cut: the owner's own action when it
+                // gives one (a SubSegment's slot), else the one system action of every zoom.
+                let click = still.click.clone().map(|(action, target)| ActionEvent::key(&action).with_target(target)).or_else(|| {
+                    taken_cut.clone().map(|cut| ActionEvent::key(PICK_SIDE).with_target(cut).with_value(i64::from(still.after)).at(if source { "source_timeline" } else { "segments" }))
+                });
+                if let Some(click) = click {
                     let response = ui.interact(pane, ui.id().with(("still", index)), Sense::click()).on_hover_cursor(egui::CursorIcon::PointingHand);
                     if response.clicked() {
-                        turned = Some(ActionEvent::key(action).with_target(target.clone()));
+                        turned = Some(click);
                     }
                 }
                 // The marker lies between the picture before it and the one after it.
@@ -333,7 +343,7 @@ fn paint_words(ui: &mut egui::Ui, row: Rect, sound: &ZoomSound, x_of: &dyn Fn(u6
     clicked
 }
 
-fn paint_still(ui: &mut egui::Ui, pane: Rect, still: &EditStill, visuals: &egui::Visuals) {
+fn paint_still(ui: &mut egui::Ui, pane: Rect, still: &EditStill, framed: bool, visuals: &egui::Visuals) {
     ui.painter().rect_filled(pane, 0.0, Color32::BLACK);
     if let Some(image) = still.image.as_deref().filter(|_| still.picture.is_some()) {
         let _ = qnc_ui_kit::paint_rgba_image(ui, pane, &still.id, image.content_key, image.size, &image.pixels);
@@ -349,8 +359,9 @@ fn paint_still(ui: &mut egui::Ui, pane: Rect, still: &EditStill, visuals: &egui:
         };
         ui.painter().rect_filled(band, 0.0, Color32::from_rgb(230, 30, 30));
     }
-    if still.cut {
-        // The picture at the cut being moved (user 2026-10-13: a red frame).
+    if framed {
+        // The focus: the side in focus, else the picture at the cut being moved (user
+        // 2026-10-13: a red frame).
         ui.painter().rect_stroke(pane, 0.0, Stroke::new(4.0, Color32::from_rgb(230, 30, 30)), StrokeKind::Inside);
     }
     ui.painter().text(

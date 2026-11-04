@@ -917,6 +917,28 @@ fn a_taken_marker_moves_whole_or_only_its_sound_or_only_its_picture() {
     assert!(segments.cut_sound_taken());
 }
 
+/// User 2026-11-04 (one zoom for every edit): a click on a picture of the trim zoom puts its side
+/// of the taken cut in focus (framed red); the sound then taken is that side's alone.
+#[test]
+fn a_picture_clicked_in_the_zoom_is_the_side_whose_sound_is_taken() {
+    let mut segments = component();
+    segments.stored_covers = vec![cover("c0", "S|m1", (0, 15)), cover("c1", "m1|m2", (15, 33))];
+    segments.refresh_view(String::new());
+    segments.apply(SegmentCommand::TakeMarker("m1".into()));
+    segments.set_playhead(Some(20));
+    segments.apply_action("wrap_zoom");
+    assert!(segments.apply(SegmentCommand::ZoomSide { marker_id: "m1".into(), after: false }));
+    assert_eq!(segments.view().zoom_sound.as_ref().and_then(|sound| sound.focus_side), Some(false), "the side before in focus");
+    assert!(segments.take_cut_part(None, false, 1));
+    let marker = segments.view().markers.iter().find(|pin| pin.marker_id == "m1").cloned().unwrap();
+    assert_eq!(marker.taken_part, qnc_program_view::TakenPart::SoundTail, "the L of the cover before, alone");
+    // A click on the picture after: the J of the cover after.
+    assert!(segments.apply(SegmentCommand::ZoomSide { marker_id: "m1".into(), after: true }));
+    let marker = segments.view().markers.iter().find(|pin| pin.marker_id == "m1").cloned().unwrap();
+    assert_eq!(marker.taken_part, qnc_program_view::TakenPart::SoundLead);
+    assert!(!segments.apply(SegmentCommand::ZoomSide { marker_id: "m2".into(), after: true }), "another cut than the one taken");
+}
+
 /// User 2026-10-29: the A2 sound of a cut has two sides, the J of the cover after and the L of
 /// the cover before; with the sound taken (Ctrl+2) a side is taken alone (a click on its line,
 /// as Ctrl+I/O), moved by the arrows or a drag, and both are written at once.

@@ -308,6 +308,7 @@ impl ProgramSegments {
                 }
             }
             SegmentCommand::TakeCutEdge { marker_id, frame } => return self.take_sound_edge_at(&marker_id, frame),
+            SegmentCommand::ZoomSide { marker_id, after } => return self.zoom_side(&marker_id, after),
             SegmentCommand::DragCutEdge { marker_id, frame } => return self.drag_sound_edge(&marker_id, frame),
             SegmentCommand::SelectSlotAtPlayhead => self.select_slot_at_playhead(),
             SegmentCommand::FocusEmptySlot => self.focus_empty_slot(),

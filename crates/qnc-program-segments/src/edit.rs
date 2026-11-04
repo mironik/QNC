@@ -181,7 +181,8 @@ impl ProgramSegments {
         let reach = qnc_program_view::zoom_reach(from, to, playhead);
         let near = |placements: Vec<qnc_program_waveform::Placement>| placements.into_iter().filter(|at| at.program_start < reach && from < at.program_end).collect();
         let taken_cut = self.marker_edit.as_ref().map(|(id, _)| id.clone());
-        Some(qnc_program_view::ZoomSound { from, to, cut, lanes: [near(segments), near(covers)], cut_sound, picture_taken: taken_cut.is_some() && matches!(self.cut_part, crate::CutPart::Picture), taken_cut, playhead, ..Default::default() })
+        let focus_side = self.zoom_focus();
+        Some(qnc_program_view::ZoomSound { from, to, cut, lanes: [near(segments), near(covers)], cut_sound, picture_taken: taken_cut.is_some() && matches!(self.cut_part, crate::CutPart::Picture), taken_cut, playhead, focus_side, ..Default::default() })
     }
 
     /// The zoom of a taken S-Story clip edge is the zoom of an IN or OUT on the source timeline

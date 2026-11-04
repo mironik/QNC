@@ -202,6 +202,9 @@
     "subsegment_select": {
       "label": "Odaberi dio SubSegmenta (klik na traku s duljinom)"
     },
+    "zoom_pick_side": {
+      "label": "Zoom reza: strana reza u fokusu (klik na sliku prije ili poslije reza)"
+    },
     "subsegment_take": {
       "label": "Uzmi dio SubSegmenta cijeli kao slot (desni klik na traku s duljinom)"
     },

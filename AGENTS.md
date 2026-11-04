@@ -7777,3 +7777,15 @@ zoom kocke `qnc-trim-overlay` (pasivna, puni je vlasnik prikaza: `qnc-program-se
 source IN/OUT, `qnc-script` za slozenu izjavu): klik na sliku postoji samo u slozenoj izjavi, okvir fokusa, gumbi V/A1/A2 i
 `taken_cut` puni svaki vlasnik na svoj nacin, Undo u zoomu ne radi za slozenu izjavu, rez dvoklikom na rijec samo u source
 zoomu. Plan ujednacavanja ceka korisnika.
+Izvedeno 2026-11-04 (korisnik: "da, kreni s 1-3"; zoom univerzalan za sve opcije montaze): (1) Fokus odlucuje kocka:
+`qnc-program-view` `ZoomSound.focus_side` (`false` strana prije reza, `true` poslije); `qnc-trim-overlay` crveno uokviruje
+slike strane u fokusu (bez nje vlastiti okvir vlasnika `EditStill.cut`). (2) Klik na sliku u svakom zoomu s uzetim rezom
+salje jednu univerzalnu radnju `zoom_pick_side` (cilj rez, vrijednost 0/1), osim kad vlasnik slici da vlastitu radnju (slot
+slozene izjave); novi id u katalogu tipki. (3) Story i S-Story (`qnc-program-segments`): `SegmentCommand::ZoomSide`
+(`qnc-program-commands`), stanje `zoom_side` (novi uzeti rez ga brise); s uzetim tonom reza klik na sliku pomice samo ton te
+strane (L omota prije, J omota poslije), inace sljedeci desni klik na ton (ili gumb A1/A2, Ctrl+1/Ctrl+2) uzima samo ton te
+strane; fokus u zoomu je strana tona koja se mice, inace kliknuta strana. Slozena izjava (`qnc-script`) puni `focus_side`
+iz strane tona spoja ili izabranog slota (zamjenjuje okvir iz prethodnog popravka). Test
+`a_picture_clicked_in_the_zoom_is_the_side_whose_sound_is_taken`, testovi dotaknutih kocki, conformance, release build s
+libav. Uzivo nije provjereno. Nije izvedeno: zoom source IN/OUT nema uzeti rez (klik na sliku tamo ne radi nista), Undo za
+slozenu izjavu, dvoklik na rijec izvan source zooma.
