@@ -99,6 +99,19 @@ fn a_statement_shows_the_words_of_its_range_with_their_timecodes() {
 }
 
 #[test]
+fn a_part_slides_as_a_slot_its_neighbours_edges_or_pauses_give_way() {
+    // Parts 0..50 of a, then b 100..150 straight after, then c 10..60 after a pause of 8.
+    let mut pieces = vec![part("a", 0, 50, 0), part("b", 100, 150, 0), part("c", 10, 60, 8)];
+    let length = |_: &str| 80;
+    assert_eq!(crate::slide_range(&pieces, 1, length), Some((-49, 8)), "a keeps a frame and its clip; the pause after never goes below none");
+    assert_eq!(crate::slide_range(&pieces, 0, length), None, "the first part does not move whole");
+    assert_eq!(crate::slide_range(&pieces, 2, length), None, "nor the last");
+    crate::slide_pieces(&mut pieces, 1, 5);
+    let shown: Vec<_> = pieces.iter().map(|p| (p.from_frame, p.to_frame, p.gap_before)).collect();
+    assert_eq!(shown, [(0, 55, 0), (100, 150, 0), (10, 60, 3)], "the part keeps its own range; a plays on, the pause after shrinks");
+}
+
+#[test]
 fn the_sound_of_a_join_moves_as_a_storys_cut() {
     use crate::{JoinSide, JoinSound};
     let join = |lead, tail, side| JoinSound { index: 1, lead, tail, side };

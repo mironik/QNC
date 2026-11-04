@@ -202,6 +202,9 @@
     "subsegment_select": {
       "label": "Odaberi dio SubSegmenta (klik na traku s duljinom)"
     },
+    "subsegment_take": {
+      "label": "Uzmi dio SubSegmenta cijeli kao slot (desni klik na traku s duljinom)"
+    },
     "script_word_cue": {
       "label": "Playhead na rijec izjave u scenariju"
     },

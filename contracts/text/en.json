@@ -663,6 +663,7 @@
     "subsegment.move_earlier": "<",
     "subsegment.move_later": ">",
     "subsegment.move_hint": "The part changes places with the part before or after it; the pauses and joins stay where they are.",
+    "subsegment.slide_locked": "The first and the last part do not move whole; take their IN or OUT.",
     "subsegment.remove": "Delete",
     "subsegment.remove_hint": "The part leaves the SubSegment (its clip stays in the project).",
     "script.no_profile": "No script profile is there on this computer (catalogs/script-profiles).",

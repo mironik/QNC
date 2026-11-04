@@ -8,7 +8,7 @@
 use eframe::egui::{self, RichText};
 use qnc_action_event::ActionEvent;
 use qnc_segment_panel::{cover_fill, CoverLengthBand};
-use qnc_script::{SubsegmentView, DRAG_EDGE, JOIN_CUT, JOIN_GAP, PART_CHANNEL, PART_LEVEL, PART_MOVE, PART_OFF, PART_REMOVE, SUBSEGMENT_CUE, SUBSEGMENT_SELECT, TAKE_EDGE};
+use qnc_script::{SubsegmentView, DRAG_EDGE, JOIN_CUT, JOIN_GAP, PART_CHANNEL, PART_LEVEL, PART_MOVE, PART_OFF, PART_REMOVE, SUBSEGMENT_CUE, SUBSEGMENT_SELECT, SUBSEGMENT_TAKE, TAKE_EDGE};
 use qnc_timeline::{
     AudioLane, TimelineCoverSpan, TimelineFocusPaint, TimelineInput, TimelineIntent, TimelineLayerFlags, TimelineMarkerPart, TimelineMarkerPin,
     TimelineMetrics, TimelinePicture, TimelineProjection, TimelineTheme, TimelineVirtualSpan,
@@ -78,7 +78,7 @@ pub fn show(ui: &mut egui::Ui, view: &SubsegmentView, theme: TimelineTheme, leng
             id,
             start_frame: part.start,
             end_frame: part.end,
-            selected: view.chosen == Some(index) || view.trim.is_some_and(|(at, _, _)| at == index) || view.sound == Some(index),
+            selected: view.chosen == Some(index) || view.slide == Some(index) || view.trim.is_some_and(|(at, _, _)| at == index) || view.sound == Some(index),
             pending: false,
             fill: cover_fill(part.end - part.start, view.rate, lengths),
             label: Some(length.as_str()),
@@ -115,7 +115,11 @@ pub fn show(ui: &mut egui::Ui, view: &SubsegmentView, theme: TimelineTheme, leng
         .collect();
     // The edge being trimmed, as the trim playhead of a cover's edge.
     let trim_label = qnc_ui_text::text("subsegment.trimming");
-    let trim: Vec<(u64, &str)> = view.trim.map(|(_, _, frame)| (frame, trim_label)).into_iter().collect();
+    let mut trim: Vec<(u64, &str)> = view.trim.map(|(_, _, frame)| (frame, trim_label)).into_iter().collect();
+    // A part taken whole (Ctrl+S): its two edges, as a taken slot's two markers.
+    if let Some(part) = view.slide.and_then(|index| view.parts.get(index)) {
+        trim.extend([(part.start, trim_label), (part.end.saturating_sub(1), trim_label)]);
+    }
     // The parts' filmstrip on V1, as a Wrap row shows its segments (user 2026-10-29).
     let pictures: Vec<TimelinePicture<'_>> = view
         .pictures
@@ -159,7 +163,7 @@ pub fn show(ui: &mut egui::Ui, view: &SubsegmentView, theme: TimelineTheme, leng
                     trim_playheads: &trim,
                     a1_splits: &[],
                     pictures: &pictures,
-                    holding: view.trim.is_some() || view.sound.is_some() || view.join_sound.is_some(),
+                    holding: view.trim.is_some() || view.sound.is_some() || view.join_sound.is_some() || view.slide.is_some(),
                 },
             )
         })
@@ -181,7 +185,7 @@ pub fn show(ui: &mut egui::Ui, view: &SubsegmentView, theme: TimelineTheme, leng
         None => None,
     };
     answer = answer.or(drag_event);
-    let holding = view.trim.is_some() || view.sound.is_some() || view.join_sound.is_some();
+    let holding = view.trim.is_some() || view.sound.is_some() || view.join_sound.is_some() || view.slide.is_some();
     let event = match intent {
         // While an edge, a cut or a part's A1 is taken a left click keeps it, as Enter (the mouse
         // rule, as on a cover's row; user 2026-11-03).
@@ -191,8 +195,17 @@ pub fn show(ui: &mut egui::Ui, view: &SubsegmentView, theme: TimelineTheme, leng
         TimelineIntent::CueFrame(frame) | TimelineIntent::SelectVirtual { frame, .. } => Some(ActionEvent::key(SUBSEGMENT_CUE).with_target(frame.to_string())),
         // A click on a part's length strip chooses the part, as a click on a cover's strip
         // chooses its slot (user 2026-11-03); the playhead goes to its IN.
-        TimelineIntent::SelectCover { frame, .. } | TimelineIntent::TakeCoverOnStrip { frame, .. } | TimelineIntent::SelectMarkerSlot { frame, .. } => {
+        TimelineIntent::SelectCover { frame, .. } | TimelineIntent::SelectMarkerSlot { frame, .. } => {
             view.parts.iter().position(|part| frame >= part.start && frame < part.end).map(|index| ActionEvent::key(SUBSEGMENT_SELECT).with_target(index.to_string()))
+        }
+        // A right click (or Ctrl + click) on a part's length strip takes it whole, as a slot's
+        // strip does (Ctrl+S): arrows and the wheel then move it (user 2026-11-04).
+        TimelineIntent::TakeSlot { frame, .. } | TimelineIntent::TakeCover { frame, .. } | TimelineIntent::TakeCoverOnStrip { frame, .. } => {
+            view.parts.iter().position(|part| frame >= part.start && frame < part.end).map(|index| ActionEvent::key(SUBSEGMENT_TAKE).with_target(index.to_string()))
+        }
+        // A right click on A1: the sound of the part there, as Ctrl+1 (a slot's sound).
+        TimelineIntent::TakeSound { lane: AudioLane::A1, frame } => {
+            view.parts.iter().position(|part| frame >= part.start && frame < part.end).map(|index| ActionEvent::key("select_audio_a1").with_target(index.to_string()))
         }
         // A right click on a join takes the IN of the part after it, as Ctrl+I.
         // A right click takes the IN or OUT nearest to where it was (user 2026-10-29: every IN

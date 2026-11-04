@@ -70,6 +70,9 @@ pub const SUBSEGMENT_CUE: &str = "subsegment_cue";
 /// A part of the open SubSegment chosen, as a slot is (a click on its length strip): `target`
 /// is its index. Ctrl+I / Ctrl+O and Ctrl+1 then take its edges and its A1, Delete takes it out.
 pub const SUBSEGMENT_SELECT: &str = "subsegment_select";
+/// A part taken whole, as a slot (a right click on its length strip, as Ctrl+S): `target` is its
+/// index; arrows and the wheel then move it along the statement.
+pub const SUBSEGMENT_TAKE: &str = "subsegment_take";
 /// A click on a word of a statement in the script (user 2026-11-04: edited by its text): the
 /// statement opens in place of the source timeline and the playhead goes to the word. `target`
 /// is `block:part:frame`.
@@ -172,6 +175,9 @@ pub struct Script {
     transcripts: HashMap<String, Vec<qnc_transcript_db::ClipTranscript>>,
     /// The first word of a cut by text (a double click on a word): its block, part and frames.
     word_cut: Option<(i64, usize, u64, u64)>,
+    /// A part taken whole (Ctrl+S, a right click on its length strip), as a slot is (user
+    /// 2026-11-04): its index and how far it is drafted to move (frames; later is positive).
+    slide: Option<(usize, i64)>,
     /// The waves of the SubSegment's clips (read in the background).
     waves: qnc_program_waveform::ProgramWaves,
     /// The filmstrips of the SubSegment's clips (read in the background).
@@ -234,6 +240,52 @@ pub enum JoinSide {
     Tail,
 }
 
+/// Part `index` moved `by` frames along the statement as a slot moves with its two markers
+/// (user 2026-11-04: all the slot's functions): it keeps its own picture and sound; the part
+/// before plays on longer (its OUT later) or its pause grows, and the part after starts later in
+/// its clip (its IN later) or its pause shrinks. The statement keeps its length.
+fn slide_pieces(pieces: &mut [Piece], index: usize, by: i64) {
+    if index == 0 || index + 1 >= pieces.len() {
+        return;
+    }
+    let add = |value: u64, by: i64| (value as i64 + by).max(0) as u64;
+    if pieces[index].gap_before == 0 {
+        pieces[index - 1].to_frame = add(pieces[index - 1].to_frame, by);
+    } else {
+        pieces[index].gap_before = add(pieces[index].gap_before, by);
+    }
+    let next = &mut pieces[index + 1];
+    if next.gap_before == 0 {
+        next.from_frame = add(next.from_frame, by);
+    } else {
+        next.gap_before = add(next.gap_before, -by);
+    }
+}
+
+/// How far part `index` can slide: the part before keeps a frame and stays in its clip
+/// (`length` of a clip by its id), a pause never goes below none, the part after keeps a frame.
+/// `None` for the first and the last part (a slot at the start or end marker does not move).
+fn slide_range(pieces: &[Piece], index: usize, length: impl Fn(&str) -> u64) -> Option<(i64, i64)> {
+    if index == 0 || index + 1 >= pieces.len() {
+        return None;
+    }
+    let (before, this, next) = (&pieces[index - 1], &pieces[index], &pieces[index + 1]);
+    let (mut low, mut high) = (i64::MIN, i64::MAX);
+    if this.gap_before == 0 {
+        low = low.max(before.from_frame as i64 + 1 - before.to_frame as i64);
+        high = high.min(length(&before.clip_id) as i64 - before.to_frame as i64);
+    } else {
+        low = low.max(-(this.gap_before as i64));
+    }
+    if next.gap_before == 0 {
+        low = low.max(-(next.from_frame as i64));
+        high = high.min(next.to_frame as i64 - 1 - next.from_frame as i64);
+    } else {
+        high = high.min(next.gap_before as i64);
+    }
+    Some((low.min(0), high.max(0)))
+}
+
 /// The longest J or L of a join (frames); the sources limit it further where it plays.
 const JOIN_SOUND_MAX: u64 = 10_000;
 
@@ -257,7 +309,7 @@ impl JoinSound {
 
 impl Default for Script {
     fn default() -> Self {
-        Self { view: ScriptView::default(), blocks: Vec::new(), project: None, reading: None, read_at: None, writing: None, source_request: None, names: HashMap::new(), words_per_second: Ok(0.0), take: None, taking: None, exporting: None, draft: Default::default(), open_subsegment: None, pieces_request: None, trim: None, chosen: None, join_sound: None, value: None, transcripts: HashMap::new(), word_cut: None, waves: qnc_program_waveform::ProgramWaves::new(), filmstrips: qnc_program_filmstrip::ProgramFilmstrips::new(), waves_project: None, trim_stills: qnc_trim_stills::TrimStills::new(), zoom_follow: Default::default(), sound: None, voices: Vec::new(), voice_request: None, voice_after_write: None, message_after_write: None, clear_after_write: false }
+        Self { view: ScriptView::default(), blocks: Vec::new(), project: None, reading: None, read_at: None, writing: None, source_request: None, names: HashMap::new(), words_per_second: Ok(0.0), take: None, taking: None, exporting: None, draft: Default::default(), open_subsegment: None, pieces_request: None, trim: None, chosen: None, join_sound: None, value: None, transcripts: HashMap::new(), word_cut: None, slide: None, waves: qnc_program_waveform::ProgramWaves::new(), filmstrips: qnc_program_filmstrip::ProgramFilmstrips::new(), waves_project: None, trim_stills: qnc_trim_stills::TrimStills::new(), zoom_follow: Default::default(), sound: None, voices: Vec::new(), voice_request: None, voice_after_write: None, message_after_write: None, clear_after_write: false }
     }
 }
 
@@ -370,6 +422,7 @@ impl Script {
         shown.roll = self.trim.is_some_and(|trim| trim.roll.is_some());
         shown.chosen = self.chosen.filter(|index| *index < shown.parts.len());
         shown.join_sound = self.join_sound.map(|join| (join.index, join.side));
+        shown.slide = self.slide.map(|(index, _)| index);
         shown.rate = pieces.first().and_then(|piece| names.get(&piece.clip_id)).filter(|(_, frames, seconds)| *seconds > 0.0 && *frames > 0).map(|(_, frames, seconds)| ((*frames as f64 / seconds).round() as u32, 1));
         self.view.subsegment = Some(shown);
     }
@@ -390,6 +443,9 @@ impl Script {
                 (piece.a1_lead_frames, piece.a1_tail_frames) = (join.lead, join.tail);
             }
         }
+        if let Some((index, by)) = self.slide {
+            slide_pieces(&mut block.pieces, index, by);
+        }
         if let Some(sound) = self.sound {
             if let Some(piece) = block.pieces.get_mut(sound.index) {
                 (piece.a1_channel, piece.a1_level_db, piece.a1_off) = (sound.channel, sound.level_db, sound.off);
@@ -402,14 +458,15 @@ impl Script {
     /// part under the playhead, up/down its camera channel, left off and right on, Ctrl+arrows
     /// and Ctrl+wheel its level a dB, Enter keeps it, Esc gives it up. Every key plays the
     /// draft at once. `None` for a key that is not the sound's.
-    fn sound_key(&mut self, action_id: &str, block: &Block, pieces: &[Piece], preview: &SourcePreview) -> Option<bool> {
+    fn sound_key(&mut self, action_id: &str, target: Option<&str>, block: &Block, pieces: &[Piece], preview: &SourcePreview) -> Option<bool> {
         let key = qnc_timeline::LaneKey::of(action_id)?;
         let at = self.view.subsegment.as_ref().and_then(|view| view.playhead).unwrap_or(0);
         match key {
             qnc_timeline::LaneKey::Take(0) => {
-                let index = self.part_in_hand();
+                // A right click on A1 names the part it was on (user 2026-11-04, as a slot's sound).
+                let index = target.and_then(|index| index.parse::<usize>().ok()).filter(|index| *index < pieces.len()).unwrap_or_else(|| self.part_in_hand());
                 let piece = pieces.get(index)?;
-                self.trim = None;
+                (self.trim, self.slide) = (None, None);
                 self.sound = Some(PartSound { index, channel: piece.a1_channel, level_db: piece.a1_level_db, off: piece.a1_off });
                 return Some(true);
             }
@@ -449,10 +506,13 @@ impl Script {
         let block = self.block(self.open_subsegment)?.clone();
         let pieces = view::block_pieces(&block);
         let take = |index: usize, out: bool| pieces.get(index).map(|piece| Trim { index, out, from: piece.from_frame, to: piece.to_frame, roll: None });
+        if let Some(done) = self.slide_key(action_id, target, &block, &pieces, preview) {
+            return Some(done);
+        }
         if let Some(done) = self.join_key(action_id, &block, &pieces, preview) {
             return Some(done);
         }
-        if let Some(done) = self.sound_key(action_id, &block, &pieces, preview) {
+        if let Some(done) = self.sound_key(action_id, target, &block, &pieces, preview) {
             return Some(done);
         }
         if action_id == DRAG_EDGE {
@@ -487,6 +547,7 @@ impl Script {
         let step = match action_id {
             "select_mark_in" | "select_mark_out" => {
                 let index = self.part_in_hand();
+                self.slide = None;
                 self.sound = None;
                 self.trim = take(index, action_id == "select_mark_out");
                 0
@@ -511,7 +572,7 @@ impl Script {
                     }
                     None => take(index, out),
                 };
-                (self.sound, self.join_sound) = (None, None);
+                (self.sound, self.join_sound, self.slide) = (None, None, None);
                 self.trim = new;
                 0
             }
@@ -577,9 +638,77 @@ impl Script {
     /// another; a statement of one range is one part), the playhead at `at` on its axis.
     fn open_as_subsegment(&mut self, block: &Block, at: u64) {
         self.open_subsegment = Some(block.id);
-        (self.chosen, self.join_sound, self.trim, self.sound) = (None, None, None, None);
+        (self.chosen, self.join_sound, self.trim, self.sound, self.slide) = (None, None, None, None, None);
         self.pieces_request = Some((view::piece_inputs(block), at));
         self.view.subsegment = Some(view::subsegment_view(block, None));
+    }
+
+    /// A part taken whole as a slot is (user 2026-11-04): Ctrl+S takes the chosen part (else
+    /// the one under the playhead), a right click on its length strip takes that one; arrows and
+    /// the wheel move it a frame along the statement with its neighbours' edges (heard at once),
+    /// Enter or a left click keeps it, Esc gives it up. `None` for a key that is not the slide's.
+    fn slide_key(&mut self, action_id: &str, target: Option<&str>, block: &Block, pieces: &[Piece], preview: &SourcePreview) -> Option<bool> {
+        let length = |clip: &str| self.names.get(clip).map_or(u64::MAX / 2, |(_, frames, _)| *frames);
+        if action_id == "select_current_marker_slot" || action_id == SUBSEGMENT_TAKE {
+            let index = target.and_then(|index| index.parse::<usize>().ok()).unwrap_or_else(|| self.part_in_hand());
+            if slide_range(pieces, index, length).is_none() {
+                self.view.message = qnc_ui_text::text("subsegment.slide_locked").into();
+                return Some(true);
+            }
+            (self.trim, self.sound, self.join_sound, self.chosen) = (None, None, None, Some(index));
+            self.slide = Some((index, 0));
+            return Some(true);
+        }
+        let (index, by) = self.slide?;
+        let step = match action_id {
+            "step_back_frame" => -1,
+            "step_forward_frame" => 1,
+            "wheel_source_back" | "wheel_source_forward" => if qnc_wheel_jog::source_step_forward(action_id)? { 1 } else { -1 },
+            "activate_focused_item" => {
+                self.slide = None;
+                let mut moved = pieces.to_vec();
+                slide_pieces(&mut moved, index, by);
+                let id = block.id;
+                let mut writes = Vec::new();
+                for at in [index - 1, index + 1] {
+                    if (moved[at].from_frame, moved[at].to_frame) != (pieces[at].from_frame, pieces[at].to_frame) {
+                        let trim = Trim { index: at, out: at < index, from: moved[at].from_frame, to: moved[at].to_frame, roll: None };
+                        writes.push((at, Some(self.trimmed_piece(&pieces[at], trim)), None));
+                    }
+                }
+                for at in [index, index + 1] {
+                    if moved[at].gap_before != pieces[at].gap_before {
+                        writes.push((at, None, Some((moved[at].gap_before, moved[at].cut))));
+                    }
+                }
+                if writes.is_empty() {
+                    return Some(true);
+                }
+                return Some(self.write(preview, move |target| {
+                    for (at, piece, join) in writes {
+                        if let Some(piece) = piece {
+                            qnc_script_db::set_piece(target, id, at, piece)?;
+                        }
+                        if let Some((gap, cut)) = join {
+                            qnc_script_db::set_join(target, id, at, gap, cut)?;
+                        }
+                    }
+                    Ok(None)
+                }));
+            }
+            "clear_focus" => {
+                self.slide = None;
+                self.pieces_request = Some((view::piece_inputs(block), self.view.subsegment.as_ref().and_then(|view| view.playhead).unwrap_or(0)));
+                return Some(true);
+            }
+            _ => return None,
+        };
+        let (low, high) = slide_range(pieces, index, length)?;
+        self.slide = Some((index, (by + step).clamp(low, high)));
+        let drafted = self.drafted(block.clone());
+        let start = view::subsegment_view(&drafted, None).parts.get(index).map_or(0, |part| part.start);
+        self.pieces_request = Some((view::piece_inputs(&drafted), start));
+        Some(true)
     }
 
     /// The value of the next action (a frame of the trim zoom's click or drag).
@@ -995,7 +1124,7 @@ impl Script {
             PART_MOVE | PART_REMOVE => {
                 let mut parts = target.unwrap_or_default().split(':');
                 let (Some(id), Some(index)) = (parts.next().and_then(|id| id.parse::<i64>().ok()), parts.next().and_then(|index| index.parse::<usize>().ok())) else { return Some(false) };
-                (self.trim, self.sound, self.chosen, self.join_sound) = (None, None, None, None);
+                (self.trim, self.sound, self.chosen, self.join_sound, self.slide) = (None, None, None, None, None);
                 if action_id == PART_REMOVE {
                     return Some(self.write(preview, move |target| qnc_script_db::remove_piece(target, id, index).map(|_| None)));
                 }

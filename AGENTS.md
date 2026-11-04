@@ -7741,3 +7741,14 @@ se citaju uz scenarij izvan niti sucelja (`qnc-script` `read.rs`). Nove radnje k
 `qnc-script-db` (`set_piece` za izjavu od jednog raspona), `qnc-script-panel`, `qnc-script-writer-panel`, rjecnik. Test
 `a_statement_shows_the_words_of_its_range_with_their_timecodes`, conformance, release build s libav. Uzivo nije provjereno.
 Nije izvedeno (ceka plan): fino prepisivanje odabranog dijela po slovima.
+Dopuna 2026-11-04 (korisnik: "nisu implementirane sve funkcije za slot, pogledaj pokrivalice kocke"): dio slozene izjave
+dobiva funkcije slota iz pokrivalica. (1) Ctrl+S (izabrani dio, inace dio pod playheadom) ili desni klik / Ctrl+klik na
+traku s duljinom uzima dio cijeli: strelice i kotacic ga pomicu po izjavi kao slot s oba markera (dio zadrzava svoju sliku i
+ton; dio prije svira dulje ili kraće, odnosno pauza prije raste ili se smanjuje; dio poslije pocinje kasnije ili ranije u
+klipu, odnosno pauza poslije se smanjuje ili raste; duljina izjave ostaje), bijele crte na oba ruba, odmah se cuje, Enter ili
+lijevi klik sprema (`SetPiece` / `SetJoin` susjeda), Esc odustaje. Prvi i zadnji dio se ne pomicu cijeli (kao slot uz pocetni
+i zavrsni marker). (2) Desni klik na A1 uzima ton dijela na kliknutom mjestu (kao Ctrl+1). Nova radnja kataloga
+`subsegment_take` (bez tipke), rjecnik `subsegment.slide_locked`. `qnc-script` (`slide`, `slide_key`, `slide_pieces`,
+`slide_range`, `SubsegmentView.slide`), `qnc-subsegment-panel`. Test `a_part_slides_as_a_slot_...`, conformance, release
+build s libav. Uzivo nije provjereno. Nije izvedeno: dvoklik za uvecani prikaz dijela, Undo za slozenu izjavu (baza
+scenarija nema korake undoa).
