@@ -70,6 +70,14 @@ pub const SUBSEGMENT_CUE: &str = "subsegment_cue";
 /// A part of the open SubSegment chosen, as a slot is (a click on its length strip): `target`
 /// is its index. Ctrl+I / Ctrl+O and Ctrl+1 then take its edges and its A1, Delete takes it out.
 pub const SUBSEGMENT_SELECT: &str = "subsegment_select";
+/// A click on a word of a statement in the script (user 2026-11-04: edited by its text): the
+/// statement opens in place of the source timeline and the playhead goes to the word. `target`
+/// is `block:part:frame`.
+pub const WORD_CUE: &str = "script_word_cue";
+/// A double click on a word of a statement: the first is where the part starts or ends, the
+/// second on a word of the same part sets its IN at the earlier word's start and its OUT at
+/// the later word's end (whichever is first). `target` is `block:part:from:to`.
+pub const WORD_CUT: &str = "script_word_cut";
 /// The pause before a part one frame longer or shorter: `target` is `block:part:1` or `-1`.
 pub const JOIN_GAP: &str = "subsegment_join_gap";
 /// The join before a part a cut or a crossfade: `target` is `block:part`.
@@ -160,6 +168,10 @@ pub struct Script {
     join_sound: Option<JoinSound>,
     /// The value of the action being handled (the frame of a click in the trim zoom).
     value: Option<i64>,
+    /// The transcripts of the clips of the clip blocks, as last read.
+    transcripts: HashMap<String, Vec<qnc_transcript_db::ClipTranscript>>,
+    /// The first word of a cut by text (a double click on a word): its block, part and frames.
+    word_cut: Option<(i64, usize, u64, u64)>,
     /// The waves of the SubSegment's clips (read in the background).
     waves: qnc_program_waveform::ProgramWaves,
     /// The filmstrips of the SubSegment's clips (read in the background).
@@ -245,7 +257,7 @@ impl JoinSound {
 
 impl Default for Script {
     fn default() -> Self {
-        Self { view: ScriptView::default(), blocks: Vec::new(), project: None, reading: None, read_at: None, writing: None, source_request: None, names: HashMap::new(), words_per_second: Ok(0.0), take: None, taking: None, exporting: None, draft: Default::default(), open_subsegment: None, pieces_request: None, trim: None, chosen: None, join_sound: None, value: None, waves: qnc_program_waveform::ProgramWaves::new(), filmstrips: qnc_program_filmstrip::ProgramFilmstrips::new(), waves_project: None, trim_stills: qnc_trim_stills::TrimStills::new(), zoom_follow: Default::default(), sound: None, voices: Vec::new(), voice_request: None, voice_after_write: None, message_after_write: None, clear_after_write: false }
+        Self { view: ScriptView::default(), blocks: Vec::new(), project: None, reading: None, read_at: None, writing: None, source_request: None, names: HashMap::new(), words_per_second: Ok(0.0), take: None, taking: None, exporting: None, draft: Default::default(), open_subsegment: None, pieces_request: None, trim: None, chosen: None, join_sound: None, value: None, transcripts: HashMap::new(), word_cut: None, waves: qnc_program_waveform::ProgramWaves::new(), filmstrips: qnc_program_filmstrip::ProgramFilmstrips::new(), waves_project: None, trim_stills: qnc_trim_stills::TrimStills::new(), zoom_follow: Default::default(), sound: None, voices: Vec::new(), voice_request: None, voice_after_write: None, message_after_write: None, clear_after_write: false }
     }
 }
 
@@ -559,6 +571,15 @@ impl Script {
         let drafted = self.drafted(block.clone());
         self.pieces_request = Some((view::piece_inputs(&drafted), self.edge_frame(&drafted).unwrap_or(0)));
         Some(true)
+    }
+
+    /// Opens `block` as a SubSegment in place of the source timeline (its parts one after
+    /// another; a statement of one range is one part), the playhead at `at` on its axis.
+    fn open_as_subsegment(&mut self, block: &Block, at: u64) {
+        self.open_subsegment = Some(block.id);
+        (self.chosen, self.join_sound, self.trim, self.sound) = (None, None, None, None);
+        self.pieces_request = Some((view::piece_inputs(block), at));
+        self.view.subsegment = Some(view::subsegment_view(block, None));
     }
 
     /// The value of the next action (a frame of the trim zoom's click or drag).
@@ -901,11 +922,49 @@ impl Script {
             // A block of several parts opens as a SubSegment in place of the source timeline.
             OPEN if self.block(id()).is_some_and(|block| block.pieces.len() > 1) => {
                 let block = self.block(id())?.clone();
-                self.open_subsegment = Some(block.id);
-                (self.chosen, self.join_sound, self.trim, self.sound) = (None, None, None, None);
-                self.pieces_request = Some((view::piece_inputs(&block), 0));
-                self.view.subsegment = Some(view::subsegment_view(&block, None));
+                self.open_as_subsegment(&block, 0);
                 true
+            }
+            // A word of a statement: the statement opens (as a SubSegment, one part or more) and
+            // the playhead goes to the word.
+            WORD_CUE => {
+                let mut parts = target.unwrap_or_default().split(':');
+                let (Some(id), Some(index), Some(frame)) = (parts.next().and_then(|v| v.parse::<i64>().ok()), parts.next().and_then(|v| v.parse::<usize>().ok()), parts.next().and_then(|v| v.parse::<u64>().ok())) else { return Some(false) };
+                let Some(block) = self.block(Some(id)).cloned() else { return Some(false) };
+                let pieces = view::block_pieces(&block);
+                let (Some(piece), Some(part)) = (pieces.get(index), view::subsegment_view(&block, None).parts.get(index).cloned()) else { return Some(false) };
+                let at = part.start + frame.saturating_sub(piece.from_frame).min(part.end.saturating_sub(part.start + 1));
+                if self.open_subsegment == Some(id) {
+                    self.pieces_request = Some((view::piece_inputs(&block), at));
+                } else {
+                    self.open_as_subsegment(&block, at);
+                }
+                true
+            }
+            // A cut by text: two words of one part set its IN and OUT (user 2026-11-04).
+            WORD_CUT => {
+                let mut parts = target.unwrap_or_default().split(':').map(|v| v.parse::<u64>().ok());
+                let (Some(Some(id)), Some(Some(index)), Some(Some(from)), Some(Some(to))) = (parts.next(), parts.next(), parts.next(), parts.next()) else { return Some(false) };
+                let (id, index) = (id as i64, index as usize);
+                match self.word_cut.take() {
+                    Some((first_id, first_index, first_from, first_to)) if (first_id, first_index) == (id, index) => {
+                        let Some(block) = self.block(Some(id)).cloned() else { return Some(false) };
+                        let pieces = view::block_pieces(&block);
+                        let Some(piece) = pieces.get(index) else { return Some(false) };
+                        let trim = Trim { index, out: true, from: first_from.min(from), to: first_to.max(to), roll: None };
+                        if trim.to <= trim.from {
+                            return Some(false);
+                        }
+                        let piece = self.trimmed_piece(piece, trim);
+                        self.view.message = qnc_ui_text::text("script.word_cut_done").into();
+                        self.write(preview, move |target| qnc_script_db::set_piece(target, id, index, piece).map(|_| None))
+                    }
+                    _ => {
+                        self.word_cut = Some((id, index, from, to));
+                        self.view.message = qnc_ui_text::text("script.word_cut_first").into();
+                        true
+                    }
+                }
             }
             SUBSEGMENT_CUE => {
                 let (Some(block), Some(frame)) = (self.block(self.open_subsegment), target.and_then(|frame| frame.parse::<u64>().ok())) else { return Some(false) };
@@ -1263,6 +1322,19 @@ impl Script {
         self.view.blocks = rows(&self.blocks, self.view.profile.as_ref(), self.reading_speed());
         for row in &mut self.view.blocks {
             row.voice = self.voices.iter().find(|(voice, _)| voice.block_id == row.block.id).map(|(voice, present)| VoiceRow::of(voice, *present, &row.block.text));
+            // The words of a statement with their times (user 2026-11-04: edited by its text).
+            if row.is_clip() {
+                let names = &self.names;
+                row.words = view::block_pieces(&row.block)
+                    .iter()
+                    .map(|piece| {
+                        let fps = names.get(&piece.clip_id).filter(|(_, frames, seconds)| *frames > 0 && *seconds > 0.0).map_or(0, |(_, frames, seconds)| (*frames as f64 / seconds).round() as u32);
+                        let start = qnc_source_timecode::parse_timecode(&piece.start_tc, fps).filter(|_| fps > 0);
+                        let tc = |frame: u64| start.map_or_else(String::new, |start| qnc_source_timecode::format_frames(start + frame.saturating_sub(piece.from_frame), fps));
+                        self.transcripts.get(&piece.clip_id).map_or_else(Vec::new, |transcripts| view::timed_words(transcripts, piece, tc))
+                    })
+                    .collect();
+            }
         }
         let profile = self.view.profile.as_ref();
         let counts = |row: &BlockRow| profile.and_then(|profile| profile.kind(&row.block.kind)).map(|kind| kind.counts);
@@ -1355,8 +1427,9 @@ impl Script {
         if let Some(reading) = &self.reading {
             if let Ok(result) = reading.try_recv() {
                 match result {
-                    Ok(read::Script { blocks, profile, target, title, voices }) => {
+                    Ok(read::Script { blocks, profile, target, title, voices, transcripts }) => {
                         self.blocks = blocks;
+                        self.transcripts = transcripts;
                         self.view.profile = profile;
                         self.view.target_seconds = target;
                         self.view.title = title;

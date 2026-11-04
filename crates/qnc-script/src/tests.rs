@@ -80,6 +80,25 @@ fn the_story_has_the_first_and_last_words_of_its_blocks_in_its_length() {
 }
 
 #[test]
+fn a_statement_shows_the_words_of_its_range_with_their_timecodes() {
+    use qnc_transcript_db::{ClipTranscript, Line, Word};
+    let word = |from, to, text: &str| Word { from, to, text: text.into() };
+    let line = |words: Vec<Word>| Line { from: words[0].from, to: words.last().unwrap().to, text: String::new(), words };
+    let transcripts = vec![ClipTranscript {
+        clip_id: "c".into(),
+        from_frame: 0,
+        to_frame: 1000,
+        language: "hr".into(),
+        engine: "test".into(),
+        lines: vec![line(vec![word(90, 100, "prije"), word(100, 120, "Dobar"), word(120, 140, "dan.")]), line(vec![word(150, 170, "Kako"), word(170, 195, "ste?"), word(300, 320, "poslije")])],
+    }];
+    let words = crate::view::timed_words(&transcripts, &part("c", 100, 200, 0), |frame| format!("tc{frame}"));
+    let shown: Vec<(&str, &str, bool)> = words.iter().map(|w| (w.text.as_str(), w.tc.as_str(), w.line)).collect();
+    // Only the words of the part, each line of speech with its timecode in front.
+    assert_eq!(shown, [("Dobar", "tc100", true), ("dan.", "tc120", false), ("Kako", "tc150", true), ("ste?", "tc170", false)]);
+}
+
+#[test]
 fn the_sound_of_a_join_moves_as_a_storys_cut() {
     use crate::{JoinSide, JoinSound};
     let join = |lead, tail, side| JoinSound { index: 1, lead, tail, side };

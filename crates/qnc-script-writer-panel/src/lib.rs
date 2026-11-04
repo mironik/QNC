@@ -126,7 +126,7 @@ pub fn show(ui: &mut Ui, view: &ScriptView, theme: &qnc_desktop_theme::Theme) ->
             if let Some(event) = qnc_script_panel::paint_block(ui, row, view, theme, style) {
                 // Open shows the clip, or the composed SubSegment, where it is worked on: in place
                 // of the source timeline in the media window (user 2026-11-03).
-                if event.action_id == qnc_script::OPEN {
+                if event.action_id == qnc_script::OPEN || event.action_id == qnc_script::WORD_CUE {
                     qnc_media_overlay::set_open(ui.ctx(), true);
                 }
                 asked = Some(event);

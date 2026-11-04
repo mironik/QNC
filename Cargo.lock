@@ -5672,6 +5672,7 @@ dependencies = [
  "qnc-status-line",
  "qnc-timeline",
  "qnc-transcript",
+ "qnc-transcript-db",
  "qnc-trim-stills",
  "qnc-ui-text",
  "qnc-voice-catalog",

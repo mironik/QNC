@@ -15,6 +15,9 @@ pub(crate) struct Script {
     pub title: Option<String>,
     /// Every voice record, and whether its clip and the take used are in the project folder.
     pub voices: Vec<(Voice, bool)>,
+    /// The transcripts of the clips of the clip blocks (user 2026-11-04: the words of a
+    /// statement with their times, to edit it by its text).
+    pub transcripts: std::collections::HashMap<String, Vec<qnc_transcript_db::ClipTranscript>>,
 }
 
 pub(crate) type Read = Result<Script, String>;
@@ -53,5 +56,15 @@ pub(crate) fn read_script(target: &ProjectDbTarget, locator: Option<&StillLocato
             (voice, present)
         })
         .collect();
-    Ok(Script { blocks, profile, target: length, title, voices })
+    let mut transcripts = std::collections::HashMap::new();
+    for block in &blocks {
+        for clip in crate::view::block_pieces(block).into_iter().map(|piece| piece.clip_id).filter(|clip| !clip.is_empty()) {
+            if !transcripts.contains_key(&clip) {
+                // A clip without a transcript, or one not readable, shows its words as they are.
+                let read = qnc_transcript_db::read_clip(target, &clip).unwrap_or_default();
+                transcripts.insert(clip, read);
+            }
+        }
+    }
+    Ok(Script { blocks, profile, target: length, title, voices, transcripts })
 }

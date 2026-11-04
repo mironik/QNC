@@ -59,6 +59,46 @@ pub struct BlockRow {
     pub in_story: bool,
     /// Its voice record (a recorded block that has none is not recorded yet).
     pub voice: Option<VoiceRow>,
+    /// For a clip block, the words said in each of its parts with their times (user
+    /// 2026-11-04: the transcript in the script has its timecodes, to edit by its text); empty
+    /// for a part whose clip has no transcript there.
+    pub words: Vec<Vec<TimedWord>>,
+}
+
+/// A word of a statement: its clip frames `[from, to)`, its text, the source timecode of its
+/// first frame and whether a line of speech starts with it.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct TimedWord {
+    pub from: u64,
+    pub to: u64,
+    pub text: String,
+    pub tc: String,
+    pub line: bool,
+}
+
+/// The words said in `[piece.from_frame, piece.to_frame)` of its clip, in order, from every
+/// transcript of the clip (where two overlap, the word that starts first is kept). `tc` gives
+/// the timecode of a clip frame.
+pub fn timed_words(transcripts: &[qnc_transcript_db::ClipTranscript], piece: &Piece, tc: impl Fn(u64) -> String) -> Vec<TimedWord> {
+    let mut words: Vec<(u64, u64, String, bool)> = Vec::new();
+    for line in transcripts.iter().flat_map(|transcript| &transcript.lines) {
+        for (index, word) in line.words.iter().enumerate() {
+            let middle = (word.from + word.to) / 2;
+            if (piece.from_frame..piece.to_frame).contains(&middle) && !word.text.trim().is_empty() {
+                words.push((word.from, word.to, word.text.trim().to_string(), index == 0));
+            }
+        }
+    }
+    words.sort_by_key(|word| word.0);
+    let mut kept: Vec<TimedWord> = Vec::new();
+    for (from, to, text, line) in words {
+        if kept.last().is_some_and(|last| from < last.to) {
+            continue;
+        }
+        let line = line || kept.is_empty();
+        kept.push(TimedWord { from, to, tc: tc(from), text, line });
+    }
+    kept
 }
 
 impl BlockRow {
@@ -285,7 +325,7 @@ pub fn rows(blocks: &[Block], profile: Option<&ScriptProfile>, words_per_second:
             } else {
                 kind.map_or_else(|| block.kind.to_uppercase(), |kind| kind.short.clone())
             };
-            BlockRow { seconds: block_seconds(block, kind, words_per_second), mark, role: kind.map(|kind| kind.role), recorded: kind.is_some_and(|kind| kind.recorded), cues: kind.is_some_and(|kind| kind.cues), in_story: kind.is_some_and(|kind| kind.counts == Counts::Story), voice: None, block: block.clone() }
+            BlockRow { seconds: block_seconds(block, kind, words_per_second), mark, role: kind.map(|kind| kind.role), recorded: kind.is_some_and(|kind| kind.recorded), cues: kind.is_some_and(|kind| kind.cues), in_story: kind.is_some_and(|kind| kind.counts == Counts::Story), voice: None, words: Vec::new(), block: block.clone() }
         })
         .collect()
 }

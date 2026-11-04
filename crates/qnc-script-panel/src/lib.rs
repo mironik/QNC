@@ -9,7 +9,7 @@
 
 use eframe::egui::{self, RichText, Sense};
 use qnc_action_event::ActionEvent;
-use qnc_script::{seconds_label, FieldEdit, DRAFT, EXPORT, SEND_STORY, OPEN_EXPORT, Role, FIELD_COMMIT, FIELD_SET, FIELD_TEXT, ScriptView, ADD_CLIP, ADD_QUOTE, ADD_TEXT, CLEAR_EDITOR, EDITOR_TEXT, MOVE_DOWN, MOVE_UP, OPEN, PANEL, RECORD, REMOVE, REPLACE_TEXT, SELECT, VOICE_TAKE};
+use qnc_script::{seconds_label, FieldEdit, DRAFT, EXPORT, SEND_STORY, OPEN_EXPORT, Role, FIELD_COMMIT, FIELD_SET, FIELD_TEXT, ScriptView, ADD_CLIP, ADD_QUOTE, ADD_TEXT, CLEAR_EDITOR, EDITOR_TEXT, MOVE_DOWN, MOVE_UP, OPEN, PANEL, RECORD, REMOVE, REPLACE_TEXT, SELECT, VOICE_TAKE, WORD_CUE, WORD_CUT};
 use qnc_text_source_editor::{Answer, Editor, EditorButton};
 use qnc_transcript::TranscriptView;
 
@@ -242,9 +242,42 @@ pub fn paint_block(ui: &mut egui::Ui, row: &qnc_script::BlockRow, view: &ScriptV
         } else {
             vec![(None, block.text.as_str())]
         };
-        for (detail, text) in parts {
+        for (index, (detail, text)) in parts.into_iter().enumerate() {
             if let Some(detail) = detail {
                 ui.label(RichText::new(detail).color(theme.text_muted).size(theme.font_ui));
+            }
+            // The words of the part with their times (user 2026-11-04: the transcript in the
+            // script has its timecodes, to edit by its text): the timecode in front of every line
+            // of speech, a click on a word puts the playhead there, a double click on two words
+            // of the part is its IN and OUT.
+            if let Some(words) = row.words.get(index).filter(|words| !words.is_empty()) {
+                ui.horizontal_wrapped(|ui| {
+                    ui.spacing_mut().item_spacing.x = 4.0;
+                    for word in words {
+                        // Every word with its own timecode above it (user 2026-11-04: "every word,
+                        // a line is not enough"); a new line of speech has a gap before it.
+                        if word.line {
+                            ui.add_space(6.0);
+                        }
+                        let response = ui
+                            .vertical(|ui| {
+                                ui.spacing_mut().item_spacing.y = 0.0;
+                                ui.label(RichText::new(&word.tc).color(theme.text_muted).monospace().size(theme.font_ui - 3.0));
+                                ui.add(egui::Label::new(RichText::new(&word.text).color(theme.text).size(theme.font_ui + 1.0)).sense(Sense::click()))
+                            })
+                            .inner;
+                        if response.double_clicked() {
+                            asked = Some(ActionEvent::key(WORD_CUT).with_target(format!("{id}:{index}:{}:{}", word.from, word.to)).at(PANEL));
+                        } else if response.clicked() {
+                            asked = Some(ActionEvent::key(WORD_CUE).with_target(format!("{id}:{index}:{}", word.from)).at(PANEL));
+                        }
+                        if response.hovered() {
+                            ui.ctx().set_cursor_icon(egui::CursorIcon::PointingHand);
+                            response.on_hover_text(format!("{}  {}", word.tc, qnc_ui_text::text("script.word_hint")));
+                        }
+                    }
+                });
+                continue;
             }
             let shown = if text.is_empty() { qnc_ui_text::text("script.no_words").to_string() } else { text.to_string() };
             let color = if text.is_empty() { theme.text_muted } else { theme.text };

@@ -293,6 +293,10 @@ impl Store {
     /// clip, a range of at least one frame; its pause and join stay.
     fn set_piece(&mut self, id: i64, index: usize, piece: &Piece) -> Result<Data> {
         let mut block = self.read()?.into_iter().find(|block| block.id == id).ok_or_else(|| qnc_ui_text::text("db.script_no_block").to_string())?;
+        // A statement of one range is its own first part (cut by its text, user 2026-11-04).
+        if block.pieces.is_empty() {
+            block.pieces.push(Piece::of(&block));
+        }
         let Some(stored) = block.pieces.get_mut(index) else {
             return Err(qnc_ui_text::text("db.script_no_join").into());
         };

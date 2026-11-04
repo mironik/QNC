@@ -22,6 +22,7 @@ qnc-trim-stills = { workspace = true }
 qnc-wheel-jog = { workspace = true }
 qnc-timeline = { workspace = true }
 qnc-transcript = { workspace = true }
+qnc-transcript-db = { workspace = true }
 qnc-ui-text = { workspace = true }
 qnc-voice-record = { workspace = true }
 qnc-voice-take = { workspace = true }

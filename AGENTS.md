@@ -7730,3 +7730,14 @@ sprema, Esc odustaje (`qnc-script` `JoinSound`, `JoinSide`, `join_key`, `set_val
 radnje). `qnc-trim-overlay`: desni klik na ton trake A1/A2 u svakom zoomu reza dok je rez uzet radi isto sto gumb A1/A2
 (Ctrl+1/Ctrl+2), i u Storyju. `qnc-program-input` `PieceInput.sound_lead/sound_tail`, `qnc-script-draft`. Testovi
 `qnc-script` (pomak tona spoja), `qnc-script-db` (J/L spoja), conformance, release build s libav. Uzivo nije provjereno.
+Dopuna 2026-11-04 (korisnik: "u skriptu transcribirani tekst treba imati vremenske oznake kako bi se moglo montirati po
+tekstu"; "svaka rijec, nedovoljno je svaka recenica"): izjava u scenariju (panel scenarija MA Audio i MA Script) pokazuje
+rijeci svog dijela iz prijepisa klipa u bazi projekta, svaka rijec s izvornim timecodeom iznad sebe, nova recenica s
+razmakom. Klik na rijec otvara izjavu na mjestu source timelinea (kao slozenu izjavu, i izjavu od jednog raspona; u MA
+Scriptu i prozor medija) s playheadom na rijeci; dvoklik na dvije rijeci istog dijela postavlja IN dijela na pocetak ranije i
+OUT na kraj kasnije rijeci (rez po tekstu, upis kroz `SetPiece`; izjava od jednog raspona postaje svoj prvi dio). Prijepisi
+se citaju uz scenarij izvan niti sucelja (`qnc-script` `read.rs`). Nove radnje kataloga bez tipki `script_word_cue`,
+`script_word_cut`. `qnc-script` (`TimedWord`, `timed_words`, `BlockRow.words`, `WORD_CUE`, `WORD_CUT`, `open_as_subsegment`),
+`qnc-script-db` (`set_piece` za izjavu od jednog raspona), `qnc-script-panel`, `qnc-script-writer-panel`, rjecnik. Test
+`a_statement_shows_the_words_of_its_range_with_their_timecodes`, conformance, release build s libav. Uzivo nije provjereno.
+Nije izvedeno (ceka plan): fino prepisivanje odabranog dijela po slovima.

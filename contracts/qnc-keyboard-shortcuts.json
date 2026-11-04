@@ -202,6 +202,12 @@
     "subsegment_select": {
       "label": "Odaberi dio SubSegmenta (klik na traku s duljinom)"
     },
+    "script_word_cue": {
+      "label": "Playhead na rijec izjave u scenariju"
+    },
+    "script_word_cut": {
+      "label": "Rez po tekstu: dvoklik na dvije rijeci postavlja IN i OUT dijela"
+    },
     "subsegment_join_gap": {
       "label": "Razmak prije dijela SubSegmenta (slika vise ili manje)"
     },
