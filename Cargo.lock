@@ -6347,6 +6347,7 @@ dependencies = [
  "qnc-action-event",
  "qnc-channel-picker",
  "qnc-dev-diagnostics",
+ "qnc-edit-verbs",
  "qnc-filmstrip",
  "qnc-lane-choice",
  "qnc-mouse-map",

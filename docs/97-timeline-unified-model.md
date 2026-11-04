@@ -151,8 +151,14 @@ tekstu i prijepis, analiza kadrova, normalizacija glasnoce (EBU R 128), proxy, X
 1. **Rjecnik radnji** (IZVEDENO 2026-11-04): kocka `qnc-edit-verbs` (bez dispatchera, vidi 3.5);
    svaki dogadaj zooma (strana, V, A1/A2, desni klik na ton, J/L klik i povlacenje, rijec, Undo,
    Save, Cancel) gradi se kroz nju na panelu vlasnika zooma (bez hardkodiranog `segments`).
-   Sljedece u ovom koraku: dogadaji `qnc-timeline` (`events.rs`) kroz istu kocku i zlatna
-   tablica gesta -> radnja, ista za timeline i zoom.
+   Zlatna tablica (`qnc-timeline` `events.rs`, test
+   `the_timeline_and_its_zoom_send_the_same_verbs`): klik (Cue), klik dok je nesto uzeto (Keep;
+   `segments_keep_edit` i `source_keep_mark` su Keep), drugi desni klik na sliku uzetog reza
+   (TakePicture = V u zoomu), desni klik na A2 uzetog reza (TakeSound A2 = A2 u zoomu), klik i
+   povlacenje J/L linije (TakeSoundSide / DragSoundSide) - timeline kroz mapu misa salje tocno
+   radnju koju zoom gradi kroz rjecnik, na panelu vlasnika. Ostaje za korak 3: oznaka A1/A2 na
+   timelineu uzima ton komada pod playheadom, u zoomu ton uzetog reza; klik na sliku u zoomu
+   (PickSide) nema jos istu gestu na Wrap retku (klik lijevo/desno od uzetog reza).
 2. **SubSegment na mapu misa**: prestaje rucno mapiranje; dobiva srednji klik, dvoklik, J/L klik i
    povlacenje, izbor kanala na traci.
 3. **Trake u zoomu = trake timelinea**: iste oznake A1/A2, izbor kanala, razina i off, crta ih

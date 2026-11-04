@@ -79,6 +79,9 @@ pub const PICK_SIDE: &str = "zoom_pick_side";
 pub const TAKE_SOUND_SIDE: &str = "timeline_take_cut_edge";
 pub const DRAG_SOUND_SIDE: &str = "timeline_drag_cut_edge";
 pub const WORD: &str = "transcript_cut_word";
+/// A left click on a timeline while something is held there (contracts/input/mouse.json).
+pub const KEEP_ON_SEGMENTS: &str = "segments_keep_edit";
+pub const KEEP_ON_SOURCE: &str = "source_keep_mark";
 
 impl Verb {
     /// The system action of the verb on the panel `at` (the panel of the view's owner).
@@ -108,7 +111,9 @@ impl Verb {
         let frame = || event.value.and_then(|value| u64::try_from(value).ok());
         Some(match event.action_id.as_str() {
             CUE => Verb::Cue(frame()?),
-            KEEP => Verb::Keep,
+            // A left click while something is held keeps it as Enter does (the timeline's own
+            // ids, then it cues: the frame is where it was clicked).
+            KEEP | KEEP_ON_SEGMENTS | KEEP_ON_SOURCE => Verb::Keep,
             DROP => Verb::Drop,
             UNDO => Verb::Undo,
             TAKE_PICTURE => Verb::TakePicture { cut: cut()? },

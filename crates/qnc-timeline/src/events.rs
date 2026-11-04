@@ -107,4 +107,33 @@ mod tests {
         assert_eq!(on(TimelineIntent::ChooseA2Channel(3), "source_timeline"), Some(("source_choose_a2_channel".into(), Some(3), None)));
         assert_eq!(on(TimelineIntent::None, "segments"), None);
     }
+
+    /// AGENTS 0.12 (user 2026-11-04, locked): a timeline and its zoom have the same tools. The
+    /// golden table of the gestures they share: what the timeline sends through the mouse map is
+    /// the very verb the zoom builds (`qnc-edit-verbs`, used by `qnc-trim-overlay`) on the same
+    /// owner's panel. A change of any row needs the user's decision.
+    #[test]
+    fn the_timeline_and_its_zoom_send_the_same_verbs() {
+        use qnc_edit_verbs::{Lane, Verb};
+        let row = |frame: u64| 100 + frame;
+        let cut = || "m1".to_string();
+        let golden: [(TimelineIntent, &str, Verb, &str); 7] = [
+            (TimelineIntent::CueFrame(7), "segments", Verb::Cue(107), "a left click: the playhead (zoom: a click on the axis)"),
+            (TimelineIntent::CueFrame(7), "source_timeline", Verb::Cue(107), "the same on the source timeline"),
+            (TimelineIntent::Keep(Some(7)), "segments", Verb::Keep, "a left click while holding keeps (zoom: Save)"),
+            (TimelineIntent::Keep(Some(7)), "source_timeline", Verb::Keep, "the same on the source timeline"),
+            (TimelineIntent::TakeMarkerPicture { id: cut() }, "segments", Verb::TakePicture { cut: cut() }, "a second right click on the taken cut's picture (zoom: V)"),
+            (TimelineIntent::TakeMarkerSound { id: cut() }, "segments", Verb::TakeSound { cut: cut(), lane: Lane::A2 }, "a right click on the taken cut's A2 (zoom: A2, a right click on its lane)"),
+            (TimelineIntent::TakeCutEdge { id: cut(), frame: 3 }, "segments", Verb::TakeSoundSide { cut: cut(), frame: 103 }, "a click on a J/L line (zoom: the same line)"),
+        ];
+        for (intent, panel, verb, why) in golden {
+            let sent = event(&intent, panel, &row).unwrap_or_else(|| panic!("{why}: nothing sent"));
+            assert_eq!(qnc_edit_verbs::Verb::of(&sent), Some(verb.clone()), "{why}");
+            assert_eq!(sent.at.as_deref(), Some(panel), "{why}: on the owner's panel");
+        }
+        // The drag of a J/L line is the zoom's DragSoundSide (the drag goes through egui memory
+        // on the timeline, so its action is checked against the map directly).
+        let drag = qnc_mouse_map::action("segments", qnc_mouse_map::Pointer::DragCutEdge);
+        assert_eq!(drag.as_deref(), Some(qnc_edit_verbs::DRAG_SOUND_SIDE), "dragging a J/L line");
+    }
 }
