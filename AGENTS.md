@@ -98,6 +98,15 @@ Prije zahvata u bilo kojoj aplikaciji obvezna je provjera iz odjeljka 4.1.
       crtanjem ili istom logikom su greska koja se rjesava kockom.
     - Granice velicine formi i aplikacijskih slojeva (conformance C10) samo padaju; povecanje se
       ne nadoknaduje premjestanjem drugog koda, nego se novi kod stavlja u kocku.
+12. **Timeline i zoom imaju iste alate; razlika je samo graficki prikaz.** (Korisnik 2026-11-04,
+    ZAKLJUCANO.) Zoom je uvecani isjecak timelinea oko playheada, nije zaseban alat. Svaki
+    timeline (source, Wrap redovi Storyja i S-Storyja, slozena izjava, program) i njegov zoom
+    rade istim radnjama: isti klik, desni klik (Ctrl+), dvoklik, povlacenje, kotacic, tipke,
+    J/L, IN/OUT, M marker, slot, rijeci prijepisa i iste sistemske radnje kataloga. Alat se
+    pise jednom, u zajednickoj kocki, i oba prikaza ga zovu; zoom ne smije imati vlastitu
+    radnju koju timeline nema, ni timeline radnju koju zoom nema. Vlasnik prikaza daje samo
+    os (koje slike prozor pokazuje), ne vlastita pravila. Ovo pravilo je zamrznuto: promjena
+    trazi izricitu korisnikovu odluku zapisanu ovdje.
 
 ## 1. Tocne putanje
 
