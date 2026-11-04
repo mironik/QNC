@@ -397,7 +397,7 @@ impl Script {
         // A whole cut taken: the zoom's A1 takes its sound (its label, a right click), and the
         // taken join sound shows its J and L there, red, moved by click and drag (user
         // 2026-11-03: the same zoom as a story's cut).
-        let joined = self.trim.filter(|trim| trim.roll.is_some()).map(|trim| trim.index + 1);
+        let joined = self.trim.map(|trim| if trim.out || trim.roll.is_some() { trim.index + 1 } else { trim.index }).filter(|index| *index > 0 && pieces.get(*index).is_some_and(|piece| piece.gap_before == 0));
         let join_sound = self.join_sound;
         let zoom = zoom.map(|mut zoom| {
             if let (Some(index), Some(sound)) = (joined.or(join_sound.map(|join| join.index)), zoom.zoom_sound.as_mut()) {
@@ -526,6 +526,11 @@ impl Script {
             SUBSEGMENT_SELECT => {
                 let index = target.and_then(|index| index.parse::<usize>().ok()).filter(|index| *index < pieces.len())?;
                 self.chosen = Some(index);
+                // In the zoom (a picture clicked): the slot is chosen, the edge taken stays and the
+                // playhead does not move.
+                if self.trim.is_some() || self.join_sound.is_some() {
+                    return Some(true);
+                }
                 let start = self.view.subsegment.as_ref().and_then(|view| view.parts.get(index)).map_or(0, |part| part.start);
                 self.pieces_request = Some((view::piece_inputs(&block), start));
                 return Some(true);
@@ -725,23 +730,31 @@ impl Script {
     /// Esc gives it up. `None` for a key that is not the join sound's.
     fn join_key(&mut self, action_id: &str, block: &Block, pieces: &[Piece], preview: &SourcePreview) -> Option<bool> {
         let take_sound = matches!(qnc_timeline::LaneKey::of(action_id), Some(qnc_timeline::LaneKey::Take(0)));
+        // With a slot chosen (a picture of the zoom clicked, user 2026-11-04), its sound at the cut
+        // is taken alone: the part before's end (its L), the part after's start (its J).
+        let side_of = |chosen: Option<usize>, index: usize| match chosen {
+            Some(chosen) if chosen + 1 == index => JoinSide::Tail,
+            Some(chosen) if chosen == index => JoinSide::Lead,
+            _ => JoinSide::Both,
+        };
         let mut join = match self.join_sound {
             Some(join) => join,
             None => {
-                let trim = self.trim.filter(|trim| trim.roll.is_some() && take_sound)?;
-                let index = trim.index + 1;
-                let piece = pieces.get(index)?;
-                if pieces.get(trim.index).is_some_and(|before| (before.from_frame, before.to_frame) != (trim.from, trim.to)) {
+                // An edge taken at a join (the whole cut, the OUT before it or the IN after it).
+                let trim = self.trim.filter(|_| take_sound)?;
+                let index = if trim.out || trim.roll.is_some() { trim.index + 1 } else { trim.index };
+                let piece = pieces.get(index).filter(|piece| index > 0 && piece.gap_before == 0)?;
+                if pieces.get(trim.index).is_some_and(|stored| (stored.from_frame, stored.to_frame) != (trim.from, trim.to)) || trim.roll.is_some_and(|from| pieces.get(trim.index + 1).is_some_and(|next| next.from_frame != from)) {
                     self.write_trim(preview, block, pieces, trim);
                 }
                 self.sound = None;
-                self.join_sound = Some(JoinSound { index, lead: piece.a1_lead_frames, tail: piece.a1_tail_frames, side: JoinSide::Both });
+                self.join_sound = Some(JoinSound { index, lead: piece.a1_lead_frames, tail: piece.a1_tail_frames, side: side_of(self.chosen, index) });
                 return Some(true);
             }
         };
         let step = match action_id {
             _ if take_sound => {
-                join.side = JoinSide::Both;
+                join.side = side_of(self.chosen, join.index);
                 0
             }
             "select_mark_in" => {

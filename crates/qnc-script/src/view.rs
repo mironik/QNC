@@ -524,11 +524,13 @@ pub fn subsegment_zoom(
         let after = bounded(EditStill::new(part.start, true, picture(piece, piece.from_frame)), piece).at_cut();
         (part.start, before.labelled(qnc_ui_text::text("story.still.before_in")), after.labelled(qnc_ui_text::text("story.still.in_first")))
     };
-    // A click on the left picture takes the OUT before the cut, on the right one the IN after it.
-    let edge = |index: usize, out: bool| (crate::TAKE_EDGE.to_string(), format!("{index}:{}", if out { "out" } else { "in" }));
-    let (left, right) = if out { (Some((index, true)), (index + 1 < pieces.len()).then_some((index + 1, false))) } else { (index.checked_sub(1).map(|i| (i, true)), Some((index, false))) };
-    let before = EditStill { click: left.map(|(i, out)| edge(i, out)), ..before };
-    let after = EditStill { click: right.map(|(i, out)| edge(i, out)), ..after };
+    // A click on a picture chooses the slot it shows (user 2026-11-04: "a click on the picture
+    // in the zoom selects the slot"): the left one the part before the cut, the right one the
+    // part after it; a right click on the sound then takes that slot's sound at the cut.
+    let slot = |index: usize| (crate::SUBSEGMENT_SELECT.to_string(), index.to_string());
+    let (left, right) = if out { (Some(index), (index + 1 < pieces.len()).then_some(index + 1)) } else { (index.checked_sub(1), Some(index)) };
+    let before = EditStill { click: left.map(slot), ..before };
+    let after = EditStill { click: right.map(slot), ..after };
     let half = rate.max(1);
     let playhead = follow.and_then(|(follow, position)| follow.playhead(cut, position));
     let (from, to) = qnc_program_view::zoom_window(cut, cut, half, view.total_frames, playhead);

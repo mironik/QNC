@@ -7762,3 +7762,12 @@ strane u rupe), `qnc-script-db` (`a1_lead_frames`/`a1_tail_frames` i `SetJoinSou
 (`JoinSound` s predznakom: obje strane zajedno pomicu rez tona ili preklapanje/rupu cijelu, jedna strana sama, svaki ton
 ostaje unutar svog dijela), `qnc-subsegment-panel` i zoom crtaju stranu s obje strane reza. Testovi, conformance, release
 build (app, player, prerender s libav, export). Uzivo nije provjereno.
+Izmjena 2026-11-04 (korisnik: "u zumu klik na sliku treba biti selektiranje slota, a kad je slot selektiran desni klik na
+ton selektira zonski marker"; "treba biti selekcija slota"; log: klik na sliku uzimao je rub `subsegment_take_edge`):
+zamjenjuje pravilo od 29. 10. (lijeva slika OUT, desna IN). Klik na sliku u zoomu slozene izjave bira slot (dio) kojem slika
+pripada (`subsegment_select`; dok je rub ili ton uzet, playhead se ne mice i uzeto ostaje). S izabranim slotom desni klik na
+ton A1 u zoomu (ili gumb A1, Ctrl+1) uzima ton tog slota na rezu: dio prije njegov L (kraj tona), dio poslije njegov J
+(pocetak tona); bez izbora obje strane. Gumbi tona u zoomu postoje za svaki rub uz spoj (OUT prije, IN poslije, cijeli
+rez), ne samo za cijeli rez. Rub se i dalje uzima desnim klikom na timelineu i Ctrl+I/O. `qnc-script` (`subsegment_zoom`
+klikovi, `join_key` `side_of`, zoom `taken_cut`), test zooma promijenjen. Testovi, conformance, release build. Uzivo nije
+provjereno.

@@ -168,9 +168,10 @@ fn the_zoom_of_a_subsegment_edge_shows_the_pictures_either_side_of_its_cut() {
     let sound = zoom.zoom_sound.unwrap();
     assert_eq!((sound.from, sound.to, sound.cut), (0, 100, 50));
     assert_eq!(sound.lanes[0].len(), 3, "every part within a second of the cut is heard on A1");
-    // A click on the left picture takes the OUT of the part before, on the right one this IN.
-    let clicks: Vec<_> = zoom.source_edit_stills.iter().map(|s| s.click.as_ref().map(|(_, target)| target.as_str())).collect();
-    assert_eq!(clicks, vec![Some("0:out"), Some("1:in")]);
+    // A click on a picture chooses its slot (user 2026-11-04): the left one the part before, the
+    // right one the part after.
+    let clicks: Vec<_> = zoom.source_edit_stills.iter().map(|s| s.click.as_ref().map(|(action, target)| (action.as_str(), target.as_str()))).collect();
+    assert_eq!(clicks, vec![Some((crate::SUBSEGMENT_SELECT, "0")), Some((crate::SUBSEGMENT_SELECT, "1"))]);
     // The IN of the third part follows a pause: on the left is still the OUT of the part before.
     let zoom = subsegment_zoom(&shown, &pieces, (2, false), (50, None), |_| Some(1000)).unwrap();
     assert_eq!(zoom.source_edit_stills[0].picture.as_ref().map(|p| (p.clip_id.as_str(), p.source_frame)), Some(("a", 339)));
