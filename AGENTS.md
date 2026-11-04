@@ -7771,3 +7771,9 @@ ton A1 u zoomu (ili gumb A1, Ctrl+1) uzima ton tog slota na rezu: dio prije njeg
 rez), ne samo za cijeli rez. Rub se i dalje uzima desnim klikom na timelineu i Ctrl+I/O. `qnc-script` (`subsegment_zoom`
 klikovi, `join_key` `side_of`, zoom `taken_cut`), test zooma promijenjen. Testovi, conformance, release build. Uzivo nije
 provjereno.
+Popravak 2026-11-04 (korisnik: "klik na sliku ne prebacuje indikaciju fokusa (crveni obrub)"): u zoomu slozene izjave
+crveni okvir (`EditStill.cut`) stoji na slici izabranog slota cim je slot izabran (`qnc-script` `follow_subsegment`). Audit
+zoom kocke `qnc-trim-overlay` (pasivna, puni je vlasnik prikaza: `qnc-program-segments` za Wrap redove, rub segmenta i
+source IN/OUT, `qnc-script` za slozenu izjavu): klik na sliku postoji samo u slozenoj izjavi, okvir fokusa, gumbi V/A1/A2 i
+`taken_cut` puni svaki vlasnik na svoj nacin, Undo u zoomu ne radi za slozenu izjavu, rez dvoklikom na rijec samo u source
+zoomu. Plan ujednacavanja ceka korisnika.

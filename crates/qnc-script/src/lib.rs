@@ -399,7 +399,19 @@ impl Script {
         // 2026-11-03: the same zoom as a story's cut).
         let joined = self.trim.map(|trim| if trim.out || trim.roll.is_some() { trim.index + 1 } else { trim.index }).filter(|index| *index > 0 && pieces.get(*index).is_some_and(|piece| piece.gap_before == 0));
         let join_sound = self.join_sound;
+        let chosen = self.chosen;
         let zoom = zoom.map(|mut zoom| {
+            // The red frame of the zoom is the focus (user 2026-11-04: a click on a picture moves
+            // it): the picture of the chosen slot, once one is chosen.
+            if let Some(chosen) = chosen.map(|index| index.to_string()) {
+                let stills = zoom.source_edit_stills.iter_mut().chain(zoom.edit_stills.iter_mut());
+                let clicked: Vec<_> = stills.collect();
+                if clicked.iter().any(|still| still.click.as_ref().is_some_and(|(_, target)| *target == chosen)) {
+                    for still in clicked {
+                        still.cut = still.click.as_ref().is_some_and(|(_, target)| *target == chosen);
+                    }
+                }
+            }
             if let (Some(index), Some(sound)) = (joined.or(join_sound.map(|join| join.index)), zoom.zoom_sound.as_mut()) {
                 let marker_id = format!("join:{index}");
                 sound.taken_cut = Some(marker_id.clone());
