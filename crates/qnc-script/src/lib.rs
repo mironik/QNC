@@ -368,6 +368,7 @@ impl Script {
             (self.open_subsegment, self.view.subsegment) = (None, None);
             return;
         }
+        let stored = block.clone();
         let block = self.drafted(block);
         let inputs = view::piece_inputs(&block);
         if playing.is_some_and(|playing| playing != inputs.as_slice()) && self.pieces_request.is_none() {
@@ -430,6 +431,35 @@ impl Script {
             }
             zoom
         });
+        // A part's own edge taken (no roll, user 2026-11-04 "ne smije utjecati na susjedni
+        // slot", as a cover's slot edge): only that edge moves on the timeline, the other parts
+        // stay where they are stored until Enter. The player and the zoom play the draft.
+        if let Some(trim) = self.trim.filter(|trim| trim.roll.is_none() && self.slide.is_none()) {
+            let at_rest = view::subsegment_view(&stored, None);
+            if let (Some(rest), Some(drafted)) = (at_rest.parts.get(trim.index).cloned(), shown.parts.get(trim.index).cloned()) {
+                let (length, stored_length) = (drafted.end - drafted.start, rest.end - rest.start);
+                // Where the draft's frames after the edge are shown (the axis the player plays).
+                let shift = stored_length as i64 - length as i64;
+                let from = if trim.out { drafted.end } else { drafted.start };
+                for (index, part) in shown.parts.iter_mut().enumerate() {
+                    if let Some(rest) = at_rest.parts.get(index) {
+                        (part.start, part.end) = match index.cmp(&trim.index) {
+                            std::cmp::Ordering::Less => (part.start, part.end),
+                            std::cmp::Ordering::Equal if trim.out => (rest.start, rest.start + length),
+                            std::cmp::Ordering::Equal => (rest.end.saturating_sub(length), rest.end),
+                            std::cmp::Ordering::Greater => (rest.start, rest.end),
+                        };
+                    }
+                }
+                shown.total_frames = shown.parts.iter().map(|part| part.end).max().unwrap_or(0).max(at_rest.total_frames);
+                shown.playhead = shown.playhead.map(|frame| if frame >= from { (frame as i64 + shift).max(0) as u64 } else { frame });
+                let placements = view::subsegment_placements(&shown, &view::block_pieces(&block));
+                shown.a1 = self.waves.peaks(shown.total_frames, &placements, &[], |clip| names.get(clip).map(|(_, frames, _)| *frames)).a1;
+                let at = view::subsegment_pictures(&shown, &view::block_pieces(&block));
+                shown.pictures = self.filmstrips.pictures(&at, |clip| names.get(clip).map(|(_, frames, _)| *frames), |_| None);
+                shown.trim = shown.parts.get(trim.index).map(|part| (trim.index, trim.out, if trim.out { part.end.saturating_sub(1) } else { part.start }));
+            }
+        }
         shown.zoom = zoom.map(|mut zoom| {
             self.trim_stills.fill(&mut zoom, preview.still_locator(), None);
             Box::new(zoom)
@@ -778,13 +808,32 @@ impl Script {
                 join.side = side_of(self.chosen, join.index);
                 0
             }
-            "select_mark_in" => {
-                join.side = JoinSide::Lead;
-                0
-            }
-            "select_mark_out" => {
-                join.side = JoinSide::Tail;
-                0
+            // With a slot chosen, Ctrl+I is its own J (the join before it) and Ctrl+O its own L
+            // (the join after it): the neighbour's sound never moves (user 2026-11-04).
+            "select_mark_in" | "select_mark_out" => {
+                let lead = action_id == "select_mark_in";
+                let side = if lead { JoinSide::Lead } else { JoinSide::Tail };
+                let Some(chosen) = self.chosen else {
+                    join.side = side;
+                    self.join_sound = Some(join);
+                    return Some(true);
+                };
+                let index = if lead { chosen } else { chosen + 1 };
+                let Some(piece) = pieces.get(index).filter(|piece| index > 0 && piece.gap_before == 0) else {
+                    self.view.message = qnc_ui_text::text("subsegment.no_join_sound").into();
+                    return Some(true);
+                };
+                if index != join.index {
+                    if pieces.get(join.index).is_some_and(|stored| (stored.a1_lead_frames, stored.a1_tail_frames) != (join.lead, join.tail)) {
+                        let (id, at, lead, tail) = (block.id, join.index, join.lead, join.tail);
+                        self.write(preview, move |target| qnc_script_db::set_join_sound(target, id, at, lead, tail).map(|_| None));
+                    }
+                    join = JoinSound { index, lead: piece.a1_lead_frames, tail: piece.a1_tail_frames, side };
+                } else {
+                    join.side = side;
+                }
+                self.join_sound = Some(join);
+                return Some(true);
             }
             "step_back_frame" => -1,
             "step_forward_frame" => 1,
@@ -796,7 +845,12 @@ impl Script {
                 let cut = view::subsegment_view(&self.drafted(block.clone()), None).parts.get(join.index)?.start as i64;
                 let (lead_at, tail_at) = (cut - join.lead, cut + join.tail);
                 if action_id == "timeline_take_cut_edge" {
-                    join.side = if frame.abs_diff(lead_at) <= frame.abs_diff(tail_at) { JoinSide::Lead } else { JoinSide::Tail };
+                    // A chosen slot keeps its own side; otherwise the side nearer the click.
+                    join.side = match side_of(self.chosen, join.index) {
+                        JoinSide::Both if frame.abs_diff(lead_at) <= frame.abs_diff(tail_at) => JoinSide::Lead,
+                        JoinSide::Both => JoinSide::Tail,
+                        side => side,
+                    };
                     self.join_sound = Some(join);
                     return Some(true);
                 }
