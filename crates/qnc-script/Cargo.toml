@@ -36,3 +36,4 @@ qnc-script-files = { workspace = true }
 qnc-dev-diagnostics = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
+qnc-edit-verbs = { workspace = true }

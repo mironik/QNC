@@ -1218,15 +1218,9 @@ pub fn show(ui: &mut egui::Ui, input: TimelineInput<'_>) -> TimelineIntent {
         } else {
             (a1_row.map_or(outer.top(), |other| other.bottom()), row.top())
         };
-        let rect = qnc_channel_picker::column_rect(label.left(), label.width(), room, row.height(), down, choice);
-        let style = qnc_channel_picker::PickerStyle {
-            fill: input.theme.label_background, // the background of the labels, no box of its own
-            border: Color32::TRANSPARENT,
-            text: input.theme.text,
-            accent: input.theme.playhead,
-        };
         let id = ui.make_persistent_id(("qnc_timeline_channel_picker", lane.label()));
-        if let Some(channel) = qnc_channel_picker::show(ui, id, rect, style, choice) {
+        let (picked, rect) = lane_channel_column(ui, id, label, room, down, choice, LaneLook::of(input.theme));
+        if let Some(channel) = picked {
             intent = match lane {
                 AudioLane::A2 => TimelineIntent::ChooseA2Channel(channel),
                 _ => TimelineIntent::ChooseA1Channel(channel),
@@ -1390,45 +1384,75 @@ fn paint_audio_row(
 /// The level a lane is heard at, at the start of its track, when it is not as recorded or
 /// the lane is taken (live 2026-10-16: the user could not see the level); "OFF" when off.
 fn paint_lane_level(ui: &mut egui::Ui, track: Rect, lane: AudioLane, input: &TimelineInput<'_>) {
-    let choice = match lane {
+    paint_lane_heard(ui, track, lane_choice_of(lane, input), LaneLook::of(input.theme));
+}
+
+fn lane_choice_of(lane: AudioLane, input: &TimelineInput<'_>) -> Option<ChannelChoice> {
+    match lane {
         AudioLane::A1 => input.a1_channel,
         AudioLane::A2 => input.a2_channel,
         _ => None,
-    };
-    let Some(choice) = choice.filter(|choice| choice.open || choice.off || choice.heard_db != 0) else {
-        return;
-    };
-    let text = if choice.off { "OFF".to_string() } else { format!("{:+} dB", choice.heard_db) };
-    let font = FontId::proportional((track.height() - 4.0).clamp(9.0, 12.0));
-    let galley = ui.painter().layout_no_wrap(text, font, input.theme.text);
-    let at = egui::pos2(track.left() + 4.0, track.center().y - galley.size().y / 2.0);
-    let back = Rect::from_min_size(at, galley.size()).expand2(Vec2::new(3.0, 1.0));
-    ui.painter().rect_filled(back, 2.0, input.theme.label_background);
-    ui.painter().galley(at, galley, input.theme.text);
+    }
 }
 
 /// A1/A2 are buttons (they take the lane): as bright as the text, in a frame. A lane that
 /// is off is a red button; the lane being changed has a yellow rim (user 2026-10-15).
 fn paint_lane_button(ui: &mut egui::Ui, label_rect: Rect, lane: AudioLane, label: &str, input: &TimelineInput<'_>) {
+    paint_lane_button_of(ui, label_rect, label, lane_choice_of(lane, input), LaneLook::of(input.theme));
+}
+
+/// The colours of a lane's tools (its label button, its level, its channel column): the
+/// timeline's theme, or what a zoom of it gives (AGENTS 0.12: the same tools, drawn larger).
+#[derive(Debug, Clone, Copy)]
+pub struct LaneLook {
+    pub label_background: Color32,
+    pub silent: Color32,
+    pub taken: Color32,
+    pub text: Color32,
+    pub accent: Color32,
+}
+
+impl LaneLook {
+    pub fn of(theme: impl std::borrow::Borrow<TimelineTheme>) -> Self {
+        let theme = theme.borrow();
+        Self { label_background: theme.label_background, silent: theme.lane_silent, taken: theme.lane_taken, text: theme.text, accent: theme.playhead }
+    }
+}
+
+/// The label of a lane as a button (public: every view of a lane draws it, AGENTS 0.12).
+pub fn paint_lane_button_of(ui: &mut egui::Ui, label_rect: Rect, label: &str, choice: Option<ChannelChoice>, look: LaneLook) {
     if label.is_empty() {
         return;
     }
     let button = label_rect.shrink2(Vec2::new(3.0, 1.5));
-    let choice = match lane {
-        AudioLane::A1 => input.a1_channel,
-        AudioLane::A2 => input.a2_channel,
-        _ => None,
-    };
     let silent = choice.is_some_and(|choice| choice.silent());
-    let fill = if silent { input.theme.lane_silent } else { input.theme.label_background };
-    ui.painter().rect_filled(button, 3.0, fill);
-    let rim = if choice.is_some_and(|choice| choice.open) {
-        Stroke::new(2.0, input.theme.lane_taken)
-    } else {
-        Stroke::new(1.0, input.theme.text)
-    };
+    ui.painter().rect_filled(button, 3.0, if silent { look.silent } else { look.label_background });
+    let rim = if choice.is_some_and(|choice| choice.open) { Stroke::new(2.0, look.taken) } else { Stroke::new(1.0, look.text) };
     ui.painter().rect_stroke(button, 3.0, rim, StrokeKind::Inside);
-    ui.painter().text(button.center(), Align2::CENTER_CENTER, label, FontId::proportional(12.0), input.theme.text);
+    ui.painter().text(button.center(), Align2::CENTER_CENTER, label, FontId::proportional(12.0), look.text);
+}
+
+/// The level a lane is heard at, at the start of its track (public, AGENTS 0.12).
+pub fn paint_lane_heard(ui: &mut egui::Ui, track: Rect, choice: Option<ChannelChoice>, look: LaneLook) {
+    let Some(choice) = choice.filter(|choice| choice.open || choice.off || choice.heard_db != 0) else {
+        return;
+    };
+    let text = if choice.off { "OFF".to_string() } else { format!("{:+} dB", choice.heard_db) };
+    let font = FontId::proportional((track.height() - 4.0).clamp(9.0, 12.0));
+    let galley = ui.painter().layout_no_wrap(text, font, look.text);
+    let at = egui::pos2(track.left() + 4.0, track.center().y - galley.size().y / 2.0);
+    let back = Rect::from_min_size(at, galley.size()).expand2(Vec2::new(3.0, 1.0));
+    ui.painter().rect_filled(back, 2.0, look.label_background);
+    ui.painter().galley(at, galley, look.text);
+}
+
+/// The channel column of a taken lane in its label column, from the lane into `room` (down
+/// from A1, up from A2): a click picks a channel (public, AGENTS 0.12). The column's rect, so
+/// a click inside it belongs to it.
+pub fn lane_channel_column(ui: &mut egui::Ui, id: egui::Id, label: Rect, room: (f32, f32), down: bool, choice: ChannelChoice, look: LaneLook) -> (Option<u16>, Rect) {
+    let rect = qnc_channel_picker::column_rect(label.left(), label.width(), room, label.height(), down, choice);
+    let style = qnc_channel_picker::PickerStyle { fill: look.label_background, border: Color32::TRANSPARENT, text: look.text, accent: look.accent };
+    (qnc_channel_picker::show(ui, id, rect, style, choice), rect)
 }
 
 /// A1 or A2 in a dark band of the video row: its button in the label column and its wave

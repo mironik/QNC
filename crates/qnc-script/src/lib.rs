@@ -406,7 +406,15 @@ impl Script {
         let joined = self.trim.map(|trim| if trim.out || trim.roll.is_some() { trim.index + 1 } else { trim.index }).filter(|index| *index > 0 && pieces.get(*index).is_some_and(|piece| piece.gap_before == 0));
         let join_sound = self.join_sound;
         let chosen = self.chosen;
+        // A1 of the trimmed part as its lane shows it (AGENTS 0.12, docs/97 step 3).
+        let sound_open = self.sound.is_some();
+        let a1_lane = self.trim.and_then(|trim| shown.parts.get(trim.index)).and_then(|part| {
+            Some(qnc_program_view::ZoomLane { channel: part.a1_channel.unwrap_or(0), count: part.channels?, open: sound_open, off: part.a1_off, level_db: part.a1_level_db })
+        });
         let zoom = zoom.map(|mut zoom| {
+            if let Some(sound) = zoom.zoom_sound.as_mut() {
+                sound.lane_choices[0] = a1_lane;
+            }
             // The side in focus (user 2026-11-04: the zoom frames it red, the same in every zoom):
             // the side of the join sound that moves alone, else the side of the chosen slot.
             let chosen_side = chosen.map(|index| index.to_string()).and_then(|chosen| {
@@ -510,7 +518,11 @@ impl Script {
     /// and Ctrl+wheel its level a dB, Enter keeps it, Esc gives it up. Every key plays the
     /// draft at once. `None` for a key that is not the sound's.
     fn sound_key(&mut self, action_id: &str, target: Option<&str>, block: &Block, pieces: &[Piece], preview: &SourcePreview) -> Option<bool> {
-        let key = qnc_timeline::LaneKey::of(action_id)?;
+        // A channel clicked in the taken lane's column (the timeline's or its zoom's, AGENTS 0.12).
+        let key = match action_id {
+            qnc_edit_verbs::PICK_A1_CHANNEL => qnc_timeline::LaneKey::Pick(u16::try_from(self.value?).ok()?),
+            _ => qnc_timeline::LaneKey::of(action_id)?,
+        };
         let at = self.view.subsegment.as_ref().and_then(|view| view.playhead).unwrap_or(0);
         match key {
             qnc_timeline::LaneKey::Take(0) => {
@@ -521,12 +533,13 @@ impl Script {
                 self.sound = Some(PartSound { index, channel: piece.a1_channel, level_db: piece.a1_level_db, off: piece.a1_off });
                 return Some(true);
             }
-            qnc_timeline::LaneKey::Take(_) | qnc_timeline::LaneKey::Pick(_) => return None,
+            qnc_timeline::LaneKey::Take(_) => return None,
             _ => {}
         }
         let mut sound = self.sound?;
         let channels = self.waves.channels(&pieces.get(sound.index)?.clip_id).unwrap_or(2).max(1);
         match key {
+            qnc_timeline::LaneKey::Pick(channel) => sound.channel = Some(channel.min(channels - 1)),
             qnc_timeline::LaneKey::Channel(delta) => sound.channel = Some((i64::from(sound.channel.unwrap_or(0)) + delta).clamp(0, i64::from(channels) - 1) as u16),
             qnc_timeline::LaneKey::Off(off) => sound.off = off,
             qnc_timeline::LaneKey::Level(delta) => sound.level_db = (i16::from(sound.level_db) + i16::from(delta)).clamp(-40, 12) as i8,

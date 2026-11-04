@@ -56,6 +56,11 @@ pub enum Verb {
     TakePicture { cut: String },
     /// Take a sound of a cut (A1/A2 label, a right click on its lane, Ctrl+1/Ctrl+2).
     TakeSound { cut: String, lane: Lane },
+    /// Take a lane (its label clicked, no cut taken): on a program's row the sound of what lies
+    /// at `frame` (the playhead), on a source timeline the clip's lane.
+    TakeLane { lane: Lane, frame: Option<u64> },
+    /// A channel picked in a taken lane's column.
+    PickChannel { lane: Lane, channel: u16 },
     /// Pick a side of a taken cut (a click left or right of it; in the zoom, a picture).
     PickSide { cut: String, side: Side },
     /// Take the J or L of a cut's sound nearest a frame (a click near its red line).
@@ -76,6 +81,8 @@ pub const TAKE_PICTURE: &str = "select_mark_in";
 pub const TAKE_A1: &str = "select_audio_a1";
 pub const TAKE_A2: &str = "select_audio_a2";
 pub const PICK_SIDE: &str = "zoom_pick_side";
+pub const PICK_A1_CHANNEL: &str = "source_choose_a1_channel";
+pub const PICK_A2_CHANNEL: &str = "source_choose_a2_channel";
 pub const TAKE_SOUND_SIDE: &str = "timeline_take_cut_edge";
 pub const DRAG_SOUND_SIDE: &str = "timeline_drag_cut_edge";
 pub const WORD: &str = "transcript_cut_word";
@@ -97,6 +104,21 @@ impl Verb {
                 Lane::A2 => TAKE_A2,
             })
             .with_target(cut.clone()),
+            Verb::TakeLane { lane, frame } => {
+                let event = ActionEvent::key(match lane {
+                    Lane::A1 => TAKE_A1,
+                    Lane::A2 => TAKE_A2,
+                });
+                match frame {
+                    Some(frame) => event.with_value(*frame),
+                    None => event,
+                }
+            }
+            Verb::PickChannel { lane, channel } => ActionEvent::key(match lane {
+                Lane::A1 => PICK_A1_CHANNEL,
+                Lane::A2 => PICK_A2_CHANNEL,
+            })
+            .with_value(*channel),
             Verb::PickSide { cut, side } => ActionEvent::key(PICK_SIDE).with_target(cut.clone()).with_value(i64::from(side.after())),
             Verb::TakeSoundSide { cut, frame } => ActionEvent::key(TAKE_SOUND_SIDE).with_target(cut.clone()).with_value(*frame),
             Verb::DragSoundSide { cut, frame } => ActionEvent::key(DRAG_SOUND_SIDE).with_target(cut.clone()).with_value(*frame),
@@ -117,8 +139,15 @@ impl Verb {
             DROP => Verb::Drop,
             UNDO => Verb::Undo,
             TAKE_PICTURE => Verb::TakePicture { cut: cut()? },
-            TAKE_A1 => Verb::TakeSound { cut: cut()?, lane: Lane::A1 },
-            TAKE_A2 => Verb::TakeSound { cut: cut()?, lane: Lane::A2 },
+            TAKE_A1 | TAKE_A2 => {
+                let lane = if event.action_id == TAKE_A1 { Lane::A1 } else { Lane::A2 };
+                match cut() {
+                    Some(cut) => Verb::TakeSound { cut, lane },
+                    None => Verb::TakeLane { lane, frame: frame() },
+                }
+            }
+            PICK_A1_CHANNEL => Verb::PickChannel { lane: Lane::A1, channel: u16::try_from(event.value?).ok()? },
+            PICK_A2_CHANNEL => Verb::PickChannel { lane: Lane::A2, channel: u16::try_from(event.value?).ok()? },
             PICK_SIDE => Verb::PickSide { cut: cut()?, side: Side::of(event.value? != 0) },
             TAKE_SOUND_SIDE => Verb::TakeSoundSide { cut: cut()?, frame: frame()? },
             DRAG_SOUND_SIDE => Verb::DragSoundSide { cut: cut()?, frame: frame()? },
@@ -144,6 +173,9 @@ mod tests {
             Verb::TakePicture { cut: cut.clone() },
             Verb::TakeSound { cut: cut.clone(), lane: Lane::A1 },
             Verb::TakeSound { cut: cut.clone(), lane: Lane::A2 },
+            Verb::TakeLane { lane: Lane::A1, frame: Some(30) },
+            Verb::TakeLane { lane: Lane::A2, frame: None },
+            Verb::PickChannel { lane: Lane::A1, channel: 3 },
             Verb::PickSide { cut: cut.clone(), side: Side::Before },
             Verb::PickSide { cut: cut.clone(), side: Side::After },
             Verb::TakeSoundSide { cut: cut.clone(), frame: 40 },

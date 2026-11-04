@@ -117,7 +117,11 @@ mod tests {
         use qnc_edit_verbs::{Lane, Verb};
         let row = |frame: u64| 100 + frame;
         let cut = || "m1".to_string();
-        let golden: [(TimelineIntent, &str, Verb, &str); 7] = [
+        let golden: [(TimelineIntent, &str, Verb, &str); 11] = [
+            (TimelineIntent::LaneLabel { lane: AudioLane::A1, frame: Some(5) }, "segments", Verb::TakeLane { lane: Lane::A1, frame: Some(105) }, "the A1 label on a program row: the sound at the playhead (zoom: its A1 label)"),
+            (TimelineIntent::LaneLabel { lane: AudioLane::A2, frame: None }, "source_timeline", Verb::TakeLane { lane: Lane::A2, frame: None }, "the A2 label on a source timeline: its lane (zoom: its A2 label)"),
+            (TimelineIntent::ChooseA1Channel(2), "source_timeline", Verb::PickChannel { lane: Lane::A1, channel: 2 }, "a channel of the taken lane's column (zoom: the same column)"),
+            (TimelineIntent::ChooseA2Channel(3), "segments", Verb::PickChannel { lane: Lane::A2, channel: 3 }, "the same on a program row"),
             (TimelineIntent::CueFrame(7), "segments", Verb::Cue(107), "a left click: the playhead (zoom: a click on the axis)"),
             (TimelineIntent::CueFrame(7), "source_timeline", Verb::Cue(107), "the same on the source timeline"),
             (TimelineIntent::Keep(Some(7)), "segments", Verb::Keep, "a left click while holding keeps (zoom: Save)"),

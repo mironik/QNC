@@ -167,8 +167,15 @@ tekstu i prijepis, analiza kadrova, normalizacija glasnoce (EBU R 128), proxy, X
    iz panela u vlasnika. Radnje reda koje SubSegment nema (M marker srednjim klikom, Wrap zoom,
    Edit segmenta) ne idu nikamo (`ROW_ACTIONS`). Jos nema: srednji klik/dvoklik (rez dijela),
    izbor kanala na traci (stupac kanala na timelineu; zasad gumbi u retku dijela) - korak 3.
-3. **Trake u zoomu = trake timelinea**: iste oznake A1/A2, izbor kanala, razina i off, crta ih
-   ista kocka traka iz `qnc-timeline`.
+3. **Trake u zoomu = trake timelinea** (IZVEDENO 2026-11-04): `qnc-timeline` ima javne alate
+   trake (`LaneLook`, `paint_lane_button_of`, `paint_lane_heard`, `lane_channel_column`); i
+   timeline i zoom ih crtaju. Zoom ima uvijek gumb A1/A2 (crven kad je off, zuti rub dok je
+   uzet), razinu (`+N dB`/`OFF`) i, dok je traka uzeta, stupac kanala; klik na oznaku s uzetim
+   rezom uzima ton reza, bez reza traku kao oznaka na timelineu (`TakeLane`), klik na kanal
+   `PickChannel` - isti glagoli kao timeline (zlatna tablica prosirena). Izbor traka daje vlasnik:
+   source timeline (`SourceTimeline::lanes_shown` -> `SourcePick::with_lane_choices` ->
+   `ZoomSound.lane_choices`), prica (uzeti ton segmenta ili pokrivalice, `part_sound`), slozena
+   izjava (A1 uzetog dijela). Klik na kanal u slozenoj izjavi bira kanal uzetog tona dijela.
 4. **Jedan model reza** (J/L slike i tona, strana prije/poslije): `cut_part` i `JoinSound` iza
    `EditOwner`; klik na sliku u zoomu = klik lijevo/desno od reza.
 5. **Jedan model ruba**: `SlotTrim`, `EdgeTrim`, SubSegment `Trim`, source `mark_focus` iza istih

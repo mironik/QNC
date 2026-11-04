@@ -12,6 +12,7 @@
 use eframe::egui::{self, Align2, Color32, FontId, Rect, Sense, Stroke, StrokeKind, Vec2};
 use qnc_action_event::ActionEvent;
 use qnc_edit_verbs::{Lane, Side, Verb};
+use qnc_timeline::ChannelChoice;
 use qnc_program_view::{ClipEdge, EditStill, SegmentsView, ZoomCutSound, ZoomSound};
 
 pub const MODULE_ID: &str = "qnc.module.trim-overlay";
@@ -36,6 +37,10 @@ const CUT_LINE: Color32 = Color32::from_rgb(230, 30, 30);
 /// click within `SIDE_REACH` pixels takes a side.
 const SIDE_LINE: Color32 = Color32::from_rgb(255, 64, 64);
 const SIDE_REACH: f32 = 40.0;
+/// A taken lane's rim, as on the timeline (user 2026-10-15: yellow).
+const LANE_TAKEN: Color32 = Color32::from_rgb(240, 200, 40);
+/// A lane's label button in the zoom.
+const LABEL_SIZE: Vec2 = Vec2::new(30.0, 20.0);
 /// The voice no word was heard for: the cut line's red, faint.
 const UNHEARD_FILL: Color32 = Color32::from_rgba_premultiplied(70, 10, 10, 70);
 /// The row of Undo, Save and Cancel under the pictures, centred on the cut (user 2026-10-30:
@@ -118,7 +123,7 @@ pub fn show(ctx: &egui::Context, segments: &SegmentsView) -> Option<ActionEvent>
             if let Some(sound) = sound {
                 let area = Rect::from_min_size(egui::pos2(top.x, top.y + picture.y + LABEL_HEIGHT + BUTTONS_HEIGHT + LANES_GAP), Vec2::new(row_width, 2.0 * LANE_HEIGHT + GAP / 2.0 + WORDS_HEIGHT));
                 centre = Some(cut_line_x(area, sound));
-                let (word, side) = paint_sound(ui, area, sound, gap_at, top.y, panel, &visuals);
+                let (word, side) = paint_sound(ui, area, sound, gap_at, top.y, (panel, source), lane_choices(sound, segments), &visuals);
                 // A word in every zoom (user 2026-11-04): the taken cut goes to it, else a cut.
                 if let Some((from, to)) = word {
                     turned = Some(Verb::Word { from, to }.event(panel));
@@ -170,7 +175,8 @@ fn cut_line_x(area: Rect, sound: &ZoomSound) -> f32 {
     area.left() + area.width() * (sound.cut.saturating_sub(sound.from)) as f32 / (sound.to - sound.from) as f32
 }
 
-fn paint_sound(ui: &mut egui::Ui, area: Rect, sound: &ZoomSound, gap_at: Option<f32>, pictures_top: f32, panel: &str, visuals: &egui::Visuals) -> (Option<(u64, u64)>, Option<ActionEvent>) {
+#[allow(clippy::too_many_arguments)]
+fn paint_sound(ui: &mut egui::Ui, area: Rect, sound: &ZoomSound, gap_at: Option<f32>, pictures_top: f32, (panel, source): (&str, bool), choices: [Option<ChannelChoice>; 2], visuals: &egui::Visuals) -> (Option<(u64, u64)>, Option<ActionEvent>) {
     let mut word = None;
     let mut side = None;
     let span = (sound.to - sound.from) as f32;
@@ -194,16 +200,16 @@ fn paint_sound(ui: &mut egui::Ui, area: Rect, sound: &ZoomSound, gap_at: Option<
                 ui.painter().line_segment([egui::pos2(x, middle - height), egui::pos2(x, middle + height.max(0.5))], Stroke::new(step.max(1.0), Color32::from_rgb(80, 190, 148)));
             }
         }
-        // The lane's label is a button while a cut is taken (user 2026-10-29: the lanes of J/L
-        // chosen in the zoom too): a click takes the cut's sound on that lane, as Ctrl+1/Ctrl+2.
-        // The label is made after the band's sides so that its click is its own.
+        // The lane's tools are the timeline's (AGENTS 0.12, docs/97 step 3): its label button
+        // (red when off, a yellow rim while taken), its level, and while taken its channel
+        // column. The label is made after the band's sides so that its click is its own.
         let taken_lane = sound.cut_sound.as_ref().filter(|cut| usize::from(cut.lane) == lane).is_some();
         if let Some(cut_sound) = sound.cut_sound.as_ref().filter(|cut| usize::from(cut.lane) == lane) {
             if let Some(event) = paint_cut_sound(ui, band, sound, cut_sound, &x_of, lane == 0, panel) {
                 side = Some(event);
             }
         }
-        if let Some(clicked) = paint_lane_label(ui, band, lane, sound.taken_cut.as_deref(), taken_lane, panel, visuals) {
+        if let Some(clicked) = paint_lane_tools(ui, (area, band), lane, (sound, choices[lane], taken_lane), (panel, source), visuals) {
             side = Some(clicked);
         }
         // A right click on the lane's sound is Ctrl+ (user 2026-11-03: "a right click on the
@@ -233,16 +239,64 @@ fn paint_sound(ui: &mut egui::Ui, area: Rect, sound: &ZoomSound, gap_at: Option<
     (word, side)
 }
 
-/// The label of a lane (A1, A2); with a cut taken it is a button whose click takes the cut's
-/// sound on that lane (`select_audio_a1`/`select_audio_a2` named to the cut, as Ctrl+1/Ctrl+2
-/// on the Wrap row). The lane whose sound is taken has a red frame.
-fn paint_lane_label(ui: &mut egui::Ui, band: Rect, lane: usize, taken_cut: Option<&str>, taken_lane: bool, panel: &str, visuals: &egui::Visuals) -> Option<ActionEvent> {
+/// The tools of a lane, the timeline's own (`qnc-timeline` lane tools, AGENTS 0.12): the
+/// label button, the level heard and, while the lane is taken, the channel column. A click on
+/// the label takes the taken cut's sound on that lane (as Ctrl+1/Ctrl+2 with a cut taken), else
+/// the lane as the timeline's label does (on a program's row the sound under the playhead).
+fn paint_lane_tools(
+    ui: &mut egui::Ui,
+    (area, band): (Rect, Rect),
+    lane: usize,
+    (sound, choice, cut_sound_taken): (&ZoomSound, Option<ChannelChoice>, bool),
+    (panel, source): (&str, bool),
+    visuals: &egui::Visuals,
+) -> Option<ActionEvent> {
     let text = if lane == 0 { "A1" } else { "A2" };
-    let Some(cut) = taken_cut else {
-        ui.painter().text(band.left_top() + Vec2::new(6.0, 4.0), Align2::LEFT_TOP, text, FontId::proportional(12.0), visuals.text_color());
-        return None;
-    };
-    paint_take_button(ui, band.left_top(), text, Verb::TakeSound { cut: cut.to_string(), lane: lane_of(lane) }.event(panel), taken_lane, visuals)
+    let look = qnc_timeline::LaneLook { label_background: visuals.window_fill, silent: CUT_LINE, taken: LANE_TAKEN, text: visuals.text_color(), accent: SIDE_LINE };
+    let label = Rect::from_min_size(band.left_top() + Vec2::new(2.0, 2.0), LABEL_SIZE);
+    // The sound of the taken cut on this lane shows as a taken lane.
+    let shown = choice.or(cut_sound_taken.then_some(ChannelChoice { selected: 0, count: 0, open: true, off: false, level_db: 0, heard_db: 0 }));
+    qnc_timeline::paint_lane_button_of(ui, label, text, shown, look);
+    let track = Rect::from_min_max(egui::pos2(label.right() + 4.0, band.top()), band.max);
+    qnc_timeline::paint_lane_heard(ui, track, choice, look);
+    let mut asked = None;
+    // The channel column while the lane is taken: down from A1, up from A2, inside the sound.
+    if let Some(choice) = choice.filter(|choice| choice.open && choice.count > 0) {
+        let room = if lane == 0 { (band.bottom(), area.bottom()) } else { (area.top(), band.top()) };
+        let column = Rect::from_min_size(egui::pos2(label.left(), if lane == 0 { band.top() } else { band.bottom() - label.height() }), label.size());
+        let id = ui.make_persistent_id(("qnc_trim_zoom_channels", lane));
+        if let (Some(channel), _) = qnc_timeline::lane_channel_column(ui, id, column, room, lane == 0, choice, look) {
+            asked = Some(Verb::PickChannel { lane: lane_of(lane), channel }.event(panel));
+        }
+    }
+    let response = ui.interact(label, ui.id().with(("zoom_lane", lane)), Sense::click());
+    if response.hovered() {
+        ui.ctx().set_cursor_icon(egui::CursorIcon::PointingHand);
+    }
+    if response.clicked() {
+        asked = Some(match sound.taken_cut.as_deref() {
+            Some(cut) => Verb::TakeSound { cut: cut.to_string(), lane: lane_of(lane) },
+            // As the timeline's label: on a program's row the sound at the playhead (else the
+            // cut), on a source timeline the clip's lane.
+            None => Verb::TakeLane { lane: lane_of(lane), frame: (!source).then(|| sound.playhead.unwrap_or(sound.cut)) },
+        }
+        .event(panel));
+    }
+    asked
+}
+
+/// A1 and A2 of the zoom as the timeline's lanes show them: what its owner gives, else on a
+/// program's row the taken segment's or cover's sound (its channel column open).
+fn lane_choices(sound: &ZoomSound, segments: &SegmentsView) -> [Option<ChannelChoice>; 2] {
+    [0usize, 1].map(|lane| {
+        sound
+            .lane_choices[lane]
+            .map(|shown| ChannelChoice { selected: shown.channel, count: shown.count, open: shown.open, off: shown.off, level_db: shown.level_db, heard_db: shown.level_db })
+            .or_else(|| {
+                let part = segments.part_sound.as_ref().filter(|part| usize::from(part.lane) == lane)?;
+                Some(ChannelChoice { selected: part.channel, count: part.channels, open: true, off: part.off, level_db: part.level_db, heard_db: part.level_db })
+            })
+    })
 }
 
 /// The zoom's lane 0 is A1, lane 1 A2.

@@ -94,9 +94,19 @@ pub struct SourcePick {
     /// Whether the player plays the program, its confirmed frame and whether it plays
     /// (user 2026-10-30: the trim zoom follows the play and stays where a pause stops it).
     pub playing: Option<(bool, u64, bool)>,
+    /// A1 and A2 as the source timeline's lanes show them now (AGENTS 0.12, docs/97 step 3):
+    /// its trim zoom shows the same lanes.
+    pub lane_choices: [Option<qnc_program_view::ZoomLane>; 2],
 }
 
 impl SourcePick {
+    /// The lanes as the source timeline shows them (`SourceTimeline::lanes_shown`: the lane
+    /// playing now, its channels and whether it is taken).
+    pub fn with_lane_choices(mut self, shown: [Option<(qnc_lane_choice::Lane, u16, bool)>; 2]) -> Self {
+        self.lane_choices = shown.map(|lane| lane.map(|(now, count, open)| qnc_program_view::ZoomLane { channel: now.channel, count, open, off: now.off, level_db: now.level_db }));
+        self
+    }
+
     pub fn new(
         clip_id: Option<&str>,
         clip_name: Option<&str>,
@@ -115,6 +125,7 @@ impl SourcePick {
             holds_enter: false,
             taken: None,
             playing: None,
+            lane_choices: [None, None],
         }
     }
 

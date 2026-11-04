@@ -160,7 +160,7 @@ impl ProgramSegments {
                 level_db: lane.level_db,
                 off: lane.off,
             };
-            return Some(qnc_program_view::ZoomSound { from, to, cut, lanes: [vec![lane(&self.source.lanes[0])], vec![lane(&self.source.lanes[1])]], playhead, ..Default::default() });
+            return Some(qnc_program_view::ZoomSound { from, to, cut, lanes: [vec![lane(&self.source.lanes[0])], vec![lane(&self.source.lanes[1])]], playhead, lane_choices: self.source.lane_choices, ..Default::default() });
         }
         if let Some(zoom) = self.clip_edge_zoom(view) {
             return Some(zoom);

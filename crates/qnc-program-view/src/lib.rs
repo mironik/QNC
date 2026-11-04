@@ -120,6 +120,20 @@ pub struct ZoomSound {
     /// The frame the player plays, on the zoom's axis, while it plays (user 2026-10-30: the
     /// playhead moves in the zoom and the wave goes with it).
     pub playhead: Option<u64>,
+    /// A1 and A2 as the timeline's lanes show them (AGENTS 0.12, docs/97 step 3): the channel,
+    /// how many there are, off, the level, and whether the lane is taken (its channel column
+    /// open). `None`: the lane shows only its label, as on a timeline without a choice.
+    pub lane_choices: [Option<ZoomLane>; 2],
+}
+
+/// A lane of the zoom as the timeline's lane is: what plays on it now.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub struct ZoomLane {
+    pub channel: u16,
+    pub count: u16,
+    pub open: bool,
+    pub off: bool,
+    pub level_db: i8,
 }
 
 /// Where the trim zoom's playhead is (user 2026-10-30: "when the play pauses the zoom's

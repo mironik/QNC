@@ -158,6 +158,15 @@ impl SourceTimeline {
         [self.kept(0), self.kept(1)]
     }
 
+    /// A1 and A2 as its lanes show them now: the lane playing, its channels and whether it is
+    /// taken (its trim zoom shows the same lanes, AGENTS 0.12).
+    pub fn lanes_shown(&self) -> [Option<(Lane, u16, bool)>; 2] {
+        [0, 1].map(|lane| {
+            let (_, count) = self.lanes.choice(lane)?;
+            Some((self.lanes.lane(lane), count, self.lanes.taken().is_some_and(|(taken, _)| taken == lane)))
+        })
+    }
+
     /// A lane is taken (its keys belong to it).
     pub fn lane_taken(&self) -> bool {
         self.lanes.taken().is_some()
