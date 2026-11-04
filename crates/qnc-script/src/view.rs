@@ -400,8 +400,8 @@ pub struct SubsegmentPart {
     /// How many channels its clip has (from its stored wave), once read.
     pub channels: Option<u16>,
     /// The J and L of the join before it (frames), as drafted.
-    pub a1_lead: u64,
-    pub a1_tail: u64,
+    pub a1_lead: i64,
+    pub a1_tail: i64,
 }
 
 /// The SubSegment open in place of the source timeline (user 2026-10-29): its parts one after

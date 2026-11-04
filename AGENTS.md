@@ -7752,3 +7752,13 @@ i zavrsni marker). (2) Desni klik na A1 uzima ton dijela na kliknutom mjestu (ka
 `slide_range`, `SubsegmentView.slide`), `qnc-subsegment-panel`. Test `a_part_slides_as_a_slot_...`, conformance, release
 build s libav. Uzivo nije provjereno. Nije izvedeno: dvoklik za uvecani prikaz dijela, Undo za slozenu izjavu (baza
 scenarija nema korake undoa).
+Dopuna 2026-11-04 (korisnik: "J i L se mogu raditi na nivou slota tona... dva susjedna slota na istom video rezu... izmedju
+njih rupa, da se uskladi ritam izgovora kad se slazu slozene izjave"; "prvi J drugi L"; "ne treba biti tisina nego nivo 0"):
+J i L spoja slozene izjave mogu biti i negativni: na istom rezu slike ton dijela prije moze zavrsiti prije reza (L < 0), a ton
+dijela poslije poceti poslije njega (J < 0); izmedju njih je rupa u kojoj ton ostaje na mjestu, na razini 0 (ruta A1 ostaje,
+`fade_out`/`fade_in` s prozorom od jedne slike; slika nedirnuta). Pozitivni J/L krizaju se kao prije. `qnc-program-playlist`
+`hole_a1` (test `a_hole_at_a_cut_puts_both_sounds_at_level_zero_and_keeps_the_pictures`), `qnc-program-input` (negativne
+strane u rupe), `qnc-script-db` (`a1_lead_frames`/`a1_tail_frames` i `SetJoinSound` s predznakom), `qnc-script`
+(`JoinSound` s predznakom: obje strane zajedno pomicu rez tona ili preklapanje/rupu cijelu, jedna strana sama, svaki ton
+ostaje unutar svog dijela), `qnc-subsegment-panel` i zoom crtaju stranu s obje strane reza. Testovi, conformance, release
+build (app, player, prerender s libav, export). Uzivo nije provjereno.

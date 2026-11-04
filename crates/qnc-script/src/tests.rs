@@ -115,14 +115,16 @@ fn a_part_slides_as_a_slot_its_neighbours_edges_or_pauses_give_way() {
 fn the_sound_of_a_join_moves_as_a_storys_cut() {
     use crate::{JoinSide, JoinSound};
     let join = |lead, tail, side| JoinSound { index: 1, lead, tail, side };
-    // Both sides with no overlap: the sound cut moves, a J that shrinks becomes an L.
-    assert_eq!(join(2, 0, JoinSide::Both).moved(3), join(0, 1, JoinSide::Both));
-    assert_eq!(join(0, 1, JoinSide::Both).moved(-3), join(2, 0, JoinSide::Both));
-    // With a J and an L the overlap moves whole.
-    assert_eq!(join(4, 6, JoinSide::Both).moved(2), join(2, 8, JoinSide::Both));
-    // One side alone; never below none.
-    assert_eq!(join(4, 6, JoinSide::Lead).moved(-1), join(5, 6, JoinSide::Lead));
-    assert_eq!(join(4, 6, JoinSide::Tail).moved(-10), join(4, 0, JoinSide::Tail));
+    let room = (-40, -40);
+    // Both sides together: the sound cut (or the overlap between them) moves whole.
+    assert_eq!(join(0, 0, JoinSide::Both).moved(3, room), join(-3, 3, JoinSide::Both), "the sound cut 3 frames after the picture cut");
+    assert_eq!(join(4, 6, JoinSide::Both).moved(2, room), join(2, 8, JoinSide::Both));
+    // One side alone, either way of the cut (user 2026-11-04): the first sound ending before the
+    // cut and the second starting after it leave a hole between them.
+    assert_eq!(join(0, 0, JoinSide::Tail).moved(-5, room), join(0, -5, JoinSide::Tail), "the sound before ends 5 early");
+    assert_eq!(join(0, -5, JoinSide::Lead).moved(4, room), join(-4, -5, JoinSide::Lead), "the sound after starts 4 late");
+    // Each stays inside its own part.
+    assert_eq!(join(0, 0, JoinSide::Tail).moved(-100, room), join(0, -40, JoinSide::Tail));
 }
 
 fn part(clip: &str, from: u64, to: u64, gap: u64) -> Piece {

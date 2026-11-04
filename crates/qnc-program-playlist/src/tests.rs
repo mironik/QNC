@@ -703,6 +703,25 @@ fn the_a1_cut_crosses_the_j_after_and_the_l_before() {
     assert_eq!(a1(104).len(), 1, "after the L only the clip after");
 }
 
+/// User 2026-11-04: at one picture cut the first sound ends early and the second starts late, a
+/// hole between them at level 0 ("not silence but level 0"): the sounds stay, their A1 is at
+/// level 0 there; the pictures are not touched.
+#[test]
+fn a_hole_at_a_cut_puts_both_sounds_at_level_zero_and_keeps_the_pictures() {
+    let timebase = tb(50);
+    let parts = vec![segment("s0", "tonovi", "a", (0, 100), (100, 200), timebase), segment("s1", "tonovi", "b", (100, 200), (300, 400), timebase)];
+    let mut playlist = build_flat_program_playlist(&input(200, parts), &mut resolver(&["a", "b"], timebase)).unwrap();
+    crate::hole_a1(&mut playlist.items, 100, 4, 6).unwrap();
+    let at = |frame: i64| playlist.items.iter().find(|item| item.record_range.in_frame <= frame && frame < item.record_range.out_frame).unwrap().clone();
+    let a1 = |frame: i64| at(frame).sources.iter().flat_map(|source| source.audio_routes.clone()).find(|route| route.output_channel == PROGRAM_AUDIO_OUTPUT_A1).unwrap();
+    assert_eq!(a1(93).fade_out, None, "before the hole the sound before is heard");
+    assert_eq!(a1(95).fade_out, Some((94, 94)), "6 frames before the cut it is at level 0, still there");
+    assert_eq!(a1(102).fade_in, Some((104, 104)), "the sound after waits 4 frames at level 0");
+    assert_eq!(a1(104).fade_in, None, "then it is heard");
+    assert!(at(95).sources.iter().any(|source| source.video_layer.is_some()) && at(102).sources.iter().any(|source| source.video_layer.is_some()), "the pictures stay");
+    playlist.validate().unwrap();
+}
+
 /// User 2026-10-29 ("the cut is the OUT of the clip before and the IN of the clip after,
 /// picture and sound each"): the picture L of a Ton goes on over the start of the Off after,
 /// the sound stays; the picture J of an Off is black over the end of the Ton before.

@@ -142,11 +142,13 @@ pub struct Piece {
     /// part's sound starts `a1_lead_frames` before its picture, the part before's sound goes on
     /// `a1_tail_frames` after its OUT; with either the sounds cross over that window instead
     /// of the join's cut or crossfade. Like the pause, they belong to the join (none before the
-    /// first part).
+    /// first part). Either may be negative (user 2026-11-04: a hole between the two sounds at
+    /// one picture cut, to match the rhythm of speech): the part after's sound starts that much
+    /// after its picture, the part before's ends that much before its OUT; silence between.
     #[serde(default)]
-    pub a1_lead_frames: u64,
+    pub a1_lead_frames: i64,
     #[serde(default)]
-    pub a1_tail_frames: u64,
+    pub a1_tail_frames: i64,
 }
 
 impl Piece {
@@ -233,7 +235,7 @@ pub enum Operation {
     /// Part `index` with a new range (its pause and join stay).
     SetPiece { id: i64, index: usize, piece: Piece },
     /// The J and L of the join before part `index` (frames; the first part has no join).
-    SetJoinSound { id: i64, index: usize, lead: u64, tail: u64 },
+    SetJoinSound { id: i64, index: usize, lead: i64, tail: i64 },
     /// Part `index` changes places with the part before it (`earlier`) or after it; the pauses
     /// and joins stay where they are between the parts.
     MovePiece { id: i64, index: usize, earlier: bool },
@@ -410,6 +412,6 @@ pub fn set_piece(target: &ProjectDbTarget, id: i64, index: usize, piece: Piece) 
 }
 
 /// The J (`lead`) and L (`tail`) of the join before part `index` of block `id`.
-pub fn set_join_sound(target: &ProjectDbTarget, id: i64, index: usize, lead: u64, tail: u64) -> Result<()> {
+pub fn set_join_sound(target: &ProjectDbTarget, id: i64, index: usize, lead: i64, tail: i64) -> Result<()> {
     write(target, Operation::SetJoinSound { id, index, lead, tail }).map(drop)
 }

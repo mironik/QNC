@@ -24,7 +24,7 @@ mod overlay;
 mod window;
 
 pub(crate) use build::*;
-pub use a1_joins::{cross_a1, join_a1, A1Join};
+pub use a1_joins::{cross_a1, hole_a1, join_a1, A1Join};
 pub use overlay::*;
 pub use window::*;
 

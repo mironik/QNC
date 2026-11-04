@@ -228,8 +228,10 @@ struct Trim {
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct JoinSound {
     pub index: usize,
-    pub lead: u64,
-    pub tail: u64,
+    /// Frames the part after's sound starts before its picture (negative: after it).
+    pub lead: i64,
+    /// Frames the part before's sound goes on after its OUT (negative: it ends before it).
+    pub tail: i64,
     pub side: JoinSide,
 }
 
@@ -287,22 +289,21 @@ fn slide_range(pieces: &[Piece], index: usize, length: impl Fn(&str) -> u64) -> 
 }
 
 /// The longest J or L of a join (frames); the sources limit it further where it plays.
-const JOIN_SOUND_MAX: u64 = 10_000;
+const JOIN_SOUND_MAX: i64 = 10_000;
 
 impl JoinSound {
-    /// One step later (`step` > 0) or earlier: the sound cut moves (a J that shrinks becomes an
-    /// L that grows); with both a J and an L the overlap moves whole; one side moves alone.
-    fn moved(mut self, step: i64) -> Self {
-        let shift = |value: u64, by: i64| (value as i64 + by).clamp(0, JOIN_SOUND_MAX as i64) as u64;
+    /// One step later (`step` > 0) or earlier. Each side is where one sound meets the picture
+    /// cut, either way of it (user 2026-11-04: the first part's sound may end before the cut and
+    /// the second's start after it, a hole between): J is where the sound after starts, L where
+    /// the sound before ends; both move together (the overlap or the hole between them moves
+    /// whole), or one alone. `lowest` keeps each side inside its own part.
+    fn moved(mut self, step: i64, lowest: (i64, i64)) -> Self {
         match self.side {
-            JoinSide::Lead => self.lead = shift(self.lead, -step),
-            JoinSide::Tail => self.tail = shift(self.tail, step),
-            JoinSide::Both if self.lead > 0 && self.tail > 0 => (self.lead, self.tail) = (shift(self.lead, -step), shift(self.tail, step)),
-            JoinSide::Both => {
-                let offset = self.tail as i64 - self.lead as i64 + step;
-                (self.lead, self.tail) = ((-offset).clamp(0, JOIN_SOUND_MAX as i64) as u64, offset.clamp(0, JOIN_SOUND_MAX as i64) as u64);
-            }
+            JoinSide::Lead => self.lead -= step,
+            JoinSide::Tail => self.tail += step,
+            JoinSide::Both => (self.lead, self.tail) = (self.lead - step, self.tail + step),
         }
+        (self.lead, self.tail) = (self.lead.clamp(lowest.0, JOIN_SOUND_MAX), self.tail.clamp(lowest.1, JOIN_SOUND_MAX));
         self
     }
 }
@@ -403,7 +404,8 @@ impl Script {
                 let marker_id = format!("join:{index}");
                 sound.taken_cut = Some(marker_id.clone());
                 if let Some(join) = join_sound {
-                    let (lead, tail) = (sound.cut.saturating_sub(join.lead), sound.cut + join.tail);
+                    let at = |shift: i64| (sound.cut as i64 + shift).max(0) as u64;
+                    let (lead, tail) = (at(-join.lead), at(join.tail));
                     let moving = match join.side {
                         JoinSide::Both => vec![lead, tail],
                         JoinSide::Lead => vec![lead],
@@ -756,18 +758,17 @@ impl Script {
             // In the zoom (the same system actions as on a story's row): a click near a side takes
             // that side, a drag moves the moving side to the frame.
             "timeline_take_cut_edge" | "timeline_drag_cut_edge" => {
-                let frame = u64::try_from(self.value?).ok()?;
-                let cut = view::subsegment_view(&self.drafted(block.clone()), None).parts.get(join.index)?.start;
-                let (lead_at, tail_at) = (cut.saturating_sub(join.lead), cut + join.tail);
+                let frame = self.value?;
+                let cut = view::subsegment_view(&self.drafted(block.clone()), None).parts.get(join.index)?.start as i64;
+                let (lead_at, tail_at) = (cut - join.lead, cut + join.tail);
                 if action_id == "timeline_take_cut_edge" {
                     join.side = if frame.abs_diff(lead_at) <= frame.abs_diff(tail_at) { JoinSide::Lead } else { JoinSide::Tail };
                     self.join_sound = Some(join);
                     return Some(true);
                 }
-                let to = |from: u64| frame as i64 - from as i64;
                 match join.side {
-                    JoinSide::Lead => to(lead_at),
-                    JoinSide::Tail | JoinSide::Both => to(tail_at),
+                    JoinSide::Lead => frame - lead_at,
+                    JoinSide::Tail | JoinSide::Both => frame - tail_at,
                 }
             }
             "activate_focused_item" => {
@@ -782,7 +783,10 @@ impl Script {
             }
             _ => return None,
         };
-        self.join_sound = Some(join.moved(step));
+        // Each sound stays inside its own part: at least a frame of it is heard.
+        let frames = |piece: Option<&Piece>| piece.map_or(0, |piece| piece.to_frame.saturating_sub(piece.from_frame) as i64);
+        let lowest = (1 - frames(pieces.get(join.index)), 1 - frames(join.index.checked_sub(1).and_then(|before| pieces.get(before))));
+        self.join_sound = Some(join.moved(step, lowest));
         if step != 0 {
             let drafted = self.drafted(block.clone());
             self.pieces_request = Some((view::piece_inputs(&drafted), self.join_hear_from(&drafted, join.index)));

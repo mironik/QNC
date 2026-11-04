@@ -17,8 +17,10 @@ pub struct PieceInput {
     /// starts `sound_lead` before its picture, the part before's goes on `sound_tail` after its
     /// OUT. Either one crosses the two sounds as at a story's cut (`cross_a1`), in place of the
     /// join's crossfade; after a pause there is nothing to cross.
-    pub sound_lead: u64,
-    pub sound_tail: u64,
+    /// Negative: a hole of silence at the join (the sound after starts after the picture cut,
+    /// the sound before ends before it).
+    pub sound_lead: i64,
+    pub sound_tail: i64,
 }
 
 /// The program of a SubSegment: its parts one after another on V1 and A1 (a pause is black
@@ -45,6 +47,8 @@ pub fn load_pieces(
     let (mut segments, mut joins, mut start) = (Vec::new(), Vec::new(), 0i64);
     // The story frames per frame of the part before (its L is counted in its own clip).
     let mut before_scale = (1i64, 1i64);
+    // The holes at joins: the cut, how long the sound after waits, how early the sound before ends.
+    let mut holes: Vec<(i64, i64, i64)> = Vec::new();
     for (index, piece) in pieces.iter().enumerate() {
         // A pause may come before the first part too (a draft story that starts with an OFF
         // not recorded yet, user 2026-10-30).
@@ -70,14 +74,21 @@ pub fn load_pieces(
         let record_range = ProgramFrameRange::new(start + gap, start + gap + frames).map_err(|error| error.message)?;
         // The J and L of the join (only where two parts meet, no pause): the sounds cross as at
         // a story's cut, in place of the join's crossfade.
-        let (lead, tail) = if index > 0 && gap == 0 { (frame(piece.sound_lead)? * num / den, frame(piece.sound_tail)? * before_scale.0 / before_scale.1) } else { (0, 0) };
+        let (lead, tail) = if index > 0 && gap == 0 { (piece.sound_lead * num / den, piece.sound_tail * before_scale.0 / before_scale.1) } else { (0, 0) };
+        // A negative side is a hole (user 2026-11-04): that sound ends before, or starts after,
+        // the picture cut, silence between; a positive side crosses as before.
+        if lead < 0 || tail < 0 {
+            holes.push((start, -lead.min(0), -tail.min(0)));
+        }
+        let (lead, tail) = (lead.max(0), tail.max(0));
         if lead + tail > 0 {
             if let Some(before) = segments.last_mut() {
                 before.a1_tail_frames = tail;
             }
         }
         if index > 0 {
-            joins.push(qnc_program_playlist::A1Join { end: start, start: start + gap, frames: if piece.crossfade && lead + tail == 0 { crossfade } else { 0 } });
+            let shaped = piece.sound_lead != 0 || piece.sound_tail != 0;
+            joins.push(qnc_program_playlist::A1Join { end: start, start: start + gap, frames: if piece.crossfade && !shaped { crossfade } else { 0 } });
         }
         before_scale = (num, den);
         segments.push(ProgramSegmentInput {
@@ -115,6 +126,9 @@ pub fn load_pieces(
     };
     let mut playlist = build_flat_program_playlist(&build, &mut resolver)?;
     qnc_program_playlist::join_a1(&mut playlist.items, &joins)?;
+    for (cut, wait, early) in holes {
+        qnc_program_playlist::hole_a1(&mut playlist.items, cut, wait, early)?;
+    }
     playlist.validate().map_err(|error| error.message)?;
     ProgramInput::new(playlist, resolver.prepared).map_err(|error| error.to_string())
 }

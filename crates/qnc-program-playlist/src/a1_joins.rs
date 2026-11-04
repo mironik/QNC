@@ -111,6 +111,38 @@ pub fn cross_a1(items: &mut Vec<FlatProgramItem>, at: i64, lead: i64, tail: i64)
     Ok(())
 }
 
+/// A hole at the picture cut `at` (user 2026-11-04: two parts at one cut, the sound of the first
+/// ending before it and of the second starting after it, to match the rhythm of speech; "not
+/// silence but level 0"): the sound stays where it is and its A1 is at level 0 for `early`
+/// frames before the cut (the sound before ends there) and for `wait` frames after it (the
+/// sound after starts there). The pictures are not touched; a sound carried over the cut (a
+/// positive J or L) is heard as before.
+pub fn hole_a1(items: &mut Vec<FlatProgramItem>, at: i64, wait: i64, early: i64) -> Result<(), String> {
+    let level_zero = |items: &mut Vec<FlatProgramItem>, (from, to): (i64, i64), carried: &str, before: bool| -> Result<(), String> {
+        if to <= from {
+            return Ok(());
+        }
+        split_at(items, from)?;
+        split_at(items, to)?;
+        for item in items.iter_mut().filter(|item| from <= item.record_range.in_frame && item.record_range.out_frame <= to) {
+            for source in item.sources.iter_mut().filter(|source| !source.source_id.ends_with(carried)) {
+                for route in source.audio_routes.iter_mut().filter(|route| route.output_channel == PROGRAM_AUDIO_OUTPUT_A1) {
+                    // Level 0: the sound before has fallen at `from` (silent after it), the sound
+                    // after rises only at `to` (silent before it).
+                    if before {
+                        route.fade_out = Some((from, from));
+                    } else {
+                        route.fade_in = Some((to, to));
+                    }
+                }
+            }
+        }
+        Ok(())
+    };
+    level_zero(items, (at - early.max(0), at), ":lead", true)?;
+    level_zero(items, (at, at + wait.max(0)), ":tail", false)
+}
+
 /// The part before a pause fades out over its last `half` frames, the part after in over its first.
 fn fade_edges(items: &mut Vec<FlatProgramItem>, join: &A1Join, half: i64, before: bool, after: bool) -> Result<(), String> {
     if before {

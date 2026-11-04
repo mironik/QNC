@@ -99,8 +99,10 @@ pub fn show(ui: &mut egui::Ui, view: &SubsegmentView, theme: TimelineTheme, leng
             // after it, drawn red on A1 as at a story's cut: where the sound before ends and where
             // the sound after starts.
             let part = &view.parts[index];
-            let split = !out && (part.a1_lead > 0 || part.a1_tail > 0);
-            let (a1_lead, a1_tail) = if split { (Some(frame.saturating_sub(part.a1_lead)), Some(frame + part.a1_tail)) } else { (None, None) };
+            // A side either way of the cut: a negative one is a hole (level 0 between the sounds).
+            let split = !out && (part.a1_lead != 0 || part.a1_tail != 0);
+            let at = |shift: i64| (frame as i64 + shift).max(0) as u64;
+            let (a1_lead, a1_tail) = if split { (Some(at(-part.a1_lead)), Some(at(part.a1_tail))) } else { (None, None) };
             let taken_part = match view.join_sound {
                 Some((at, side)) if at == index && !out => match side {
                     qnc_script::JoinSide::Both => TimelineMarkerPart::Sound,

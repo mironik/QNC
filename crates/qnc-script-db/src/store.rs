@@ -308,7 +308,7 @@ impl Store {
     }
 
     /// The J and L of the join before part `index` (user 2026-11-03); the first part has none.
-    fn set_join_sound(&mut self, id: i64, index: usize, lead: u64, tail: u64) -> Result<Data> {
+    fn set_join_sound(&mut self, id: i64, index: usize, lead: i64, tail: i64) -> Result<Data> {
         let mut block = self.read()?.into_iter().find(|block| block.id == id).ok_or_else(|| qnc_ui_text::text("db.script_no_block").to_string())?;
         let Some(piece) = block.pieces.get_mut(index).filter(|_| index > 0) else {
             return Err(qnc_ui_text::text("db.script_no_join").into());
@@ -325,7 +325,7 @@ impl Store {
         let Some(other) = other.filter(|other| index < block.pieces.len() && *other < block.pieces.len()) else {
             return Err(qnc_ui_text::text("db.script_no_join").into());
         };
-        let joins: Vec<(u64, bool, u64, u64)> = block.pieces.iter().map(|piece| (piece.gap_before, piece.cut, piece.a1_lead_frames, piece.a1_tail_frames)).collect();
+        let joins: Vec<(u64, bool, i64, i64)> = block.pieces.iter().map(|piece| (piece.gap_before, piece.cut, piece.a1_lead_frames, piece.a1_tail_frames)).collect();
         block.pieces.swap(index, other);
         for (piece, (gap, cut, lead, tail)) in block.pieces.iter_mut().zip(joins) {
             (piece.gap_before, piece.cut, piece.a1_lead_frames, piece.a1_tail_frames) = (gap, cut, lead, tail);
