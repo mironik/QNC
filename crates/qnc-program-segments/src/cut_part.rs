@@ -21,24 +21,28 @@ use qnc_program_db::Operation;
 
 use crate::ProgramSegments;
 
-/// Which side of the cut's sound moves.
-#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
-pub enum SoundEdge {
-    /// Both: the cut's sound as one (Ctrl+1, Ctrl+2).
-    #[default]
-    Both,
-    /// The J of what comes after: where its sound starts (Ctrl+I).
-    Lead,
-    /// The L of what goes before: where its sound ends (Ctrl+O).
-    Tail,
-}
+/// Which side of the cut's sound moves: the one rule of a cut's sound (`qnc-edit-cut`, docs/97
+/// step 4), the same as a SubSegment's join.
+pub use qnc_edit_cut::SoundSide as SoundEdge;
 
 /// The two sides of a cut's sound, story frames: the L of what is before and the J of what
-/// is after.
+/// is after (as the store keeps them, never negative).
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
 pub struct CutSound {
     pub tail: u32,
     pub lead: u32,
+}
+
+impl CutSound {
+    fn shape(self) -> qnc_edit_cut::CutSound {
+        qnc_edit_cut::CutSound { lead: i64::from(self.lead), tail: i64::from(self.tail) }
+    }
+
+    /// A story's sides within the store's bounds (no holes).
+    fn of(shape: qnc_edit_cut::CutSound) -> Self {
+        let shape = shape.bounded((0, 0), MOST);
+        CutSound { lead: shape.lead as u32, tail: shape.tail as u32 }
+    }
 }
 
 /// What of the taken cut moves.
@@ -215,12 +219,10 @@ impl ProgramSegments {
         let (CutPart::Sound { lane, stored, mut draft, edge }, Some((_, cut))) = (self.cut_part, self.marker_edit.clone()) else {
             return false;
         };
-        let cut = cut as i64;
-        match edge {
-            SoundEdge::Lead => draft.lead = (cut - frame as i64).clamp(0, MOST) as u32,
-            SoundEdge::Tail => draft.tail = (frame as i64 - cut).clamp(0, MOST) as u32,
-            SoundEdge::Both => return false,
+        if edge == SoundEdge::Both {
+            return false;
         }
+        draft = CutSound::of(draft.shape().dragged(edge, cut, frame));
         self.cut_part = CutPart::Sound { lane, stored, draft, edge };
         self.say_cut()
     }
@@ -233,14 +235,7 @@ impl ProgramSegments {
         };
         let (marker_id, cut) = self.marker_edit.as_ref()?;
         let (before, after) = self.cut_sides(lane, marker_id, *cut);
-        let lead = after.then(|| cut.saturating_sub(u64::from(draft.lead)).abs_diff(frame));
-        let tail = before.then(|| cut.saturating_add(u64::from(draft.tail)).abs_diff(frame));
-        match (lead, tail) {
-            (Some(lead), Some(tail)) => Some(lead <= tail),
-            (Some(_), None) => Some(true),
-            (None, Some(_)) => Some(false),
-            (None, None) => None,
-        }
+        draft.shape().nearer(*cut, frame, (after, before)).map(|side| side == SoundEdge::Lead)
     }
 
     /// Ctrl+M on the taken cut: the whole cut moves again, from where it is stored.
@@ -389,19 +384,8 @@ impl ProgramSegments {
             return false;
         };
         let (before, after) = self.cut_sides(lane, &marker_id, cut);
-        let (tail, lead) = (i64::from(draft.tail), i64::from(draft.lead));
-        let (tail, lead) = match edge {
-            SoundEdge::Tail => (tail + frames, lead),
-            SoundEdge::Lead => (tail, lead - frames),
-            // Both sides apart: the overlap moves whole.
-            SoundEdge::Both if tail > 0 && lead > 0 => (tail + frames, lead - frames),
-            // One sound cut: an L when it is after the picture, a J before it.
-            SoundEdge::Both => {
-                let offset = tail - lead + frames;
-                (offset.max(0), (-offset).max(0))
-            }
-        };
-        let moved = CutSound { tail: tail.clamp(0, MOST) as u32, lead: lead.clamp(0, MOST) as u32 };
+        // A story's cut has no holes: one sound cut stays one, an overlap moves whole.
+        let moved = CutSound::of(draft.shape().moved(edge, frames, false));
         if moved == draft || moved.tail > 0 && !before || moved.lead > 0 && !after {
             self.refresh_view(qnc_ui_text::text("story.cut_sound_no_cover").into());
             return true;

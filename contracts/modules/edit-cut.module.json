@@ -1,0 +1,37 @@
+{
+  "module_id": "qnc.module.edit-cut",
+  "module_name": "Edit cut",
+  "module_version": "0.1.0",
+  "module_kind": "library",
+  "capabilities": [
+    "edit.cut_sound"
+  ],
+  "input_contract_version": "0.1.0",
+  "output_contract_version": "0.1.0",
+  "supported_os": [
+    "windows",
+    "linux",
+    "macos"
+  ],
+  "supported_cpu": [
+    "x86_64",
+    "aarch64"
+  ],
+  "transport_protocol_version": "0.1.0",
+  "forbidden_calls": [
+    "ffprobe",
+    "media.decode",
+    "database.write",
+    "business.workflow"
+  ],
+  "forbidden_dependencies": [
+    "qnc.module.media-probe",
+    "qnc.module.content-store"
+  ],
+  "state_policy": "stateless",
+  "database_write_policy": "no_db_writes",
+  "runtime_crate": "qnc-edit-cut",
+  "input": "A cut's sound: the J of the piece after it and the L of the piece before it in frames, which side moves, a step, a clicked or dragged frame, whether the owner allows holes.",
+  "output": "The sides moved, dragged or bounded, where they stand on the axis, the side nearer a click, the frames that move; the side a chosen piece moves and the side the zoom frames.",
+  "specification": "AGENTS 0.12, docs/97 step 4 (user 2026-11-04): one rule of a cut's sound for a story's M marker and cut between two clips and a SubSegment's join. Pure: no state, no database, no drawing."
+}

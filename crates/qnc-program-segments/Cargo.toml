@@ -27,6 +27,7 @@ qnc-source-timecode = { workspace = true }
 qnc-content-store = { workspace = true }
 qnc-source-channels = { workspace = true }
 qnc-prerender-launch = { workspace = true }
+qnc-edit-cut = { workspace = true }
 
 [dev-dependencies]
 rusqlite = { workspace = true }

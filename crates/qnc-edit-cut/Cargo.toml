@@ -1,0 +1,7 @@
+[package]
+name = "qnc-edit-cut"
+version = "0.1.0"
+edition = "2021"
+description = "QNC public block: the one rule of a cut's sound (its J and L, which side moves, how a key, a click and a drag move it) for every owner of a cut"
+
+[dependencies]

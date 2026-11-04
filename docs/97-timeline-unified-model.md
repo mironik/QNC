@@ -176,8 +176,16 @@ tekstu i prijepis, analiza kadrova, normalizacija glasnoce (EBU R 128), proxy, X
    source timeline (`SourceTimeline::lanes_shown` -> `SourcePick::with_lane_choices` ->
    `ZoomSound.lane_choices`), prica (uzeti ton segmenta ili pokrivalice, `part_sound`), slozena
    izjava (A1 uzetog dijela). Klik na kanal u slozenoj izjavi bira kanal uzetog tona dijela.
-4. **Jedan model reza** (J/L slike i tona, strana prije/poslije): `cut_part` i `JoinSound` iza
-   `EditOwner`; klik na sliku u zoomu = klik lijevo/desno od reza.
+4. **Jedan model reza** (IZVEDENO 2026-11-04 za ton): nova cista kocka `qnc-edit-cut`
+   (`SoundSide` Both/Lead/Tail, `CutSound` lead/tail s predznakom: `moved` (s rupama ili bez),
+   `bounded`, `sides_at`, `dragged`, `nearer`, `moving`, `of_piece`, `focus`). Story
+   (`cut_part.rs`: `SoundEdge` je `SoundSide`, pomak, povlacenje i bliza strana kroz kocku, bez
+   rupa) i slozena izjava (`JoinSide` je `SoundSide`, `JoinSound::moved`, izbor strane slota,
+   bliza strana, crvene linije zooma kroz kocku, s rupama) imaju jedno pravilo; ponasanje isto
+   (testovi Storyja 72 i scenarija nepromijenjeni). Slika reza (J/L slike) ostaje kod vlasnika
+   (Story `SetJoinPicture`, slozena izjava je nema). Klik na sliku u zoomu bira stranu reza; na
+   timelineu ta strana se bira desnim klikom na polovicu klipa (S-Story) - geste ostaju kakve
+   jesu (zakljucana mapa misa: lijevi klik dok je nesto uzeto sprema).
 5. **Jedan model ruba**: `SlotTrim`, `EdgeTrim`, SubSegment `Trim`, source `mark_focus` iza istih
    radnji Take/Nudge/DragTo/Mark/Keep/Drop.
 6. **Rijeci**: jedna radnja s istim znacenjem u prijepisu, scenariju i zoomu.

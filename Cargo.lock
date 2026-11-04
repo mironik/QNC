@@ -3648,6 +3648,10 @@ dependencies = [
 ]
 
 [[package]]
+name = "qnc-edit-cut"
+version = "0.1.0"
+
+[[package]]
 name = "qnc-edit-verbs"
 version = "0.1.0"
 dependencies = [
@@ -5342,6 +5346,7 @@ dependencies = [
  "qnc-content-store",
  "qnc-db-broker",
  "qnc-dev-diagnostics",
+ "qnc-edit-cut",
  "qnc-export-choice",
  "qnc-export-launch",
  "qnc-image-assets",
@@ -5661,6 +5666,7 @@ dependencies = [
  "qnc-clip-sound",
  "qnc-db-broker",
  "qnc-dev-diagnostics",
+ "qnc-edit-cut",
  "qnc-edit-verbs",
  "qnc-export-launch",
  "qnc-image-assets",

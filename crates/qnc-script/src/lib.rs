@@ -240,12 +240,9 @@ pub struct JoinSound {
     pub side: JoinSide,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum JoinSide {
-    Both,
-    Lead,
-    Tail,
-}
+/// Which side of a join's sound moves: the one rule of a cut's sound (`qnc-edit-cut`, docs/97
+/// step 4), the same as a story's cut.
+pub use qnc_edit_cut::SoundSide as JoinSide;
 
 /// Part `index` moved `by` frames along the statement as a slot moves with its two markers
 /// (user 2026-11-04: all the slot's functions): it keeps its own picture and sound; the part
@@ -302,14 +299,14 @@ impl JoinSound {
     /// the second's start after it, a hole between): J is where the sound after starts, L where
     /// the sound before ends; both move together (the overlap or the hole between them moves
     /// whole), or one alone. `lowest` keeps each side inside its own part.
-    fn moved(mut self, step: i64, lowest: (i64, i64)) -> Self {
-        match self.side {
-            JoinSide::Lead => self.lead -= step,
-            JoinSide::Tail => self.tail += step,
-            JoinSide::Both => (self.lead, self.tail) = (self.lead - step, self.tail + step),
-        }
-        (self.lead, self.tail) = (self.lead.clamp(lowest.0, JOIN_SOUND_MAX), self.tail.clamp(lowest.1, JOIN_SOUND_MAX));
-        self
+    fn moved(self, step: i64, lowest: (i64, i64)) -> Self {
+        // A join allows holes (user 2026-11-04): the rule of a cut's sound with negative sides.
+        let moved = self.sound().moved(self.side, step, true).bounded(lowest, JOIN_SOUND_MAX);
+        JoinSound { lead: moved.lead, tail: moved.tail, ..self }
+    }
+
+    fn sound(self) -> qnc_edit_cut::CutSound {
+        qnc_edit_cut::CutSound { lead: self.lead, tail: self.tail }
     }
 }
 
@@ -420,11 +417,7 @@ impl Script {
             let chosen_side = chosen.map(|index| index.to_string()).and_then(|chosen| {
                 zoom.source_edit_stills.iter().chain(&zoom.edit_stills).find(|still| still.click.as_ref().is_some_and(|(_, target)| *target == chosen)).map(|still| still.after)
             });
-            let sound_side = match join_sound.map(|join| join.side) {
-                Some(JoinSide::Lead) => Some(true),
-                Some(JoinSide::Tail) => Some(false),
-                _ => None,
-            };
+            let sound_side = join_sound.and_then(|join| join.side.focus());
             if let Some(sound) = zoom.zoom_sound.as_mut() {
                 sound.focus_side = sound_side.or(chosen_side);
             }
@@ -432,13 +425,8 @@ impl Script {
                 let marker_id = format!("join:{index}");
                 sound.taken_cut = Some(marker_id.clone());
                 if let Some(join) = join_sound {
-                    let at = |shift: i64| (sound.cut as i64 + shift).max(0) as u64;
-                    let (lead, tail) = (at(-join.lead), at(join.tail));
-                    let moving = match join.side {
-                        JoinSide::Both => vec![lead, tail],
-                        JoinSide::Lead => vec![lead],
-                        JoinSide::Tail => vec![tail],
-                    };
+                    let (lead, tail) = join.sound().sides_at(sound.cut);
+                    let moving = join.sound().moving(join.side, sound.cut);
                     sound.cut_sound = Some(qnc_program_view::ZoomCutSound { marker_id, lane: 0, lead: Some(lead), tail: Some(tail), moving });
                 }
             }
@@ -811,8 +799,7 @@ impl Script {
         // With a slot chosen (a picture of the zoom clicked, user 2026-11-04), its sound at the cut
         // is taken alone: the part before's end (its L), the part after's start (its J).
         let side_of = |chosen: Option<usize>, index: usize| match chosen {
-            Some(chosen) if chosen + 1 == index => JoinSide::Tail,
-            Some(chosen) if chosen == index => JoinSide::Lead,
+            Some(chosen) if chosen + 1 == index || chosen == index => JoinSide::of_piece(chosen + 1 == index),
             _ => JoinSide::Both,
         };
         let mut join = match self.join_sound {
@@ -868,22 +855,22 @@ impl Script {
             // In the zoom (the same system actions as on a story's row): a click near a side takes
             // that side, a drag moves the moving side to the frame.
             "timeline_take_cut_edge" | "timeline_drag_cut_edge" => {
-                let frame = self.value?;
-                let cut = view::subsegment_view(&self.drafted(block.clone()), None).parts.get(join.index)?.start as i64;
-                let (lead_at, tail_at) = (cut - join.lead, cut + join.tail);
+                let frame = u64::try_from(self.value?).ok()?;
+                let cut = view::subsegment_view(&self.drafted(block.clone()), None).parts.get(join.index)?.start;
                 if action_id == "timeline_take_cut_edge" {
                     // A chosen slot keeps its own side; otherwise the side nearer the click.
                     join.side = match side_of(self.chosen, join.index) {
-                        JoinSide::Both if frame.abs_diff(lead_at) <= frame.abs_diff(tail_at) => JoinSide::Lead,
-                        JoinSide::Both => JoinSide::Tail,
+                        JoinSide::Both => join.sound().nearer(cut, frame, (true, true)).unwrap_or(JoinSide::Both),
                         side => side,
                     };
                     self.join_sound = Some(join);
                     return Some(true);
                 }
+                // The drag puts the moving side where the pointer is (both as one: the L side).
+                let (lead_at, tail_at) = join.sound().sides_at(cut);
                 match join.side {
-                    JoinSide::Lead => frame - lead_at,
-                    JoinSide::Tail | JoinSide::Both => frame - tail_at,
+                    JoinSide::Lead => frame as i64 - lead_at as i64,
+                    JoinSide::Tail | JoinSide::Both => frame as i64 - tail_at as i64,
                 }
             }
             "activate_focused_item" => {
