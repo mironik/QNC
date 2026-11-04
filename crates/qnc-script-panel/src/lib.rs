@@ -251,9 +251,23 @@ pub fn paint_block(ui: &mut egui::Ui, row: &qnc_script::BlockRow, view: &ScriptV
             // of speech, a click on a word puts the playhead there, a double click on two words
             // of the part is its IN and OUT.
             if let Some(words) = row.words.get(index).filter(|words| !words.is_empty()) {
+                // The slot chosen on the open SubSegment's timeline is this part (user
+                // 2026-11-04: the slot and its text go together): its words are marked, the
+                // word under the playhead lit, and the text is brought into sight once.
+                let open = view.subsegment.as_ref().filter(|open| open.block_id == block.id);
+                let part_chosen = open.is_some_and(|open| open.chosen == Some(index));
+                let heard = open.and_then(|open| {
+                    let part = open.parts.get(index)?;
+                    let from = block.pieces.get(index).map_or(block.from_frame, |piece| piece.from_frame);
+                    let at = open.playhead.filter(|at| (part.start..part.end).contains(at))?;
+                    Some(from + (at - part.start))
+                });
+                let seen = egui::Id::new(("qnc_script_chosen_part", block.id));
+                let bring = part_chosen && ui.ctx().data(|data| data.get_temp::<usize>(seen)) != Some(index);
+                ui.ctx().data_mut(|data| if part_chosen { data.insert_temp(seen, index) } else if open.is_some_and(|open| open.chosen.is_none()) { data.remove::<usize>(seen) });
                 ui.horizontal_wrapped(|ui| {
                     ui.spacing_mut().item_spacing.x = 4.0;
-                    for word in words {
+                    for (at, word) in words.iter().enumerate() {
                         // Every word with its own timecode above it (user 2026-11-04: "every word,
                         // a line is not enough"); a new line of speech has a gap before it.
                         if word.line {
@@ -263,9 +277,19 @@ pub fn paint_block(ui: &mut egui::Ui, row: &qnc_script::BlockRow, view: &ScriptV
                             .vertical(|ui| {
                                 ui.spacing_mut().item_spacing.y = 0.0;
                                 ui.label(RichText::new(&word.tc).color(theme.text_muted).monospace().size(theme.font_ui - 3.0));
-                                ui.add(egui::Label::new(RichText::new(&word.text).color(theme.text).size(theme.font_ui + 1.0)).sense(Sense::click()))
+                                let lit = heard.is_some_and(|frame| (word.from..word.to.max(word.from + 1)).contains(&frame));
+                                let mut text = RichText::new(&word.text).color(if lit { theme.bg } else { theme.text }).size(theme.font_ui + 1.0);
+                                if lit {
+                                    text = text.background_color(theme.focus);
+                                } else if part_chosen {
+                                    text = text.background_color(theme.surface_alt).underline();
+                                }
+                                ui.add(egui::Label::new(text).sense(Sense::click()))
                             })
                             .inner;
+                        if bring && at == 0 {
+                            response.scroll_to_me(Some(egui::Align::Center));
+                        }
                         if response.double_clicked() {
                             asked = Some(ActionEvent::key(WORD_CUT).with_target(format!("{id}:{index}:{}:{}", word.from, word.to)).at(PANEL));
                         } else if response.clicked() {
