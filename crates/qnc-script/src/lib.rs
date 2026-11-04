@@ -577,7 +577,14 @@ impl Script {
                 let mut parts = target.unwrap_or_default().split(':');
                 let index = parts.next().and_then(|index| index.parse::<usize>().ok())?;
                 let side = parts.next();
-                let (out, cut) = (side != Some("in"), side == Some("cut"));
+                let (mut index, mut out, mut cut) = (index, side != Some("in"), side == Some("cut"));
+                // A chosen slot at the cut takes its own edge, not the roll (user 2026-11-04):
+                // the slot gets longer or shorter, the other slots keep theirs.
+                match self.chosen {
+                    Some(chosen) if cut && chosen == index => cut = false,
+                    Some(chosen) if cut && chosen == index + 1 => (index, out, cut) = (chosen, false, false),
+                    _ => {}
+                }
                 // The whole cut of a join: this part's OUT with the next part's IN.
                 let take = |index: usize, out: bool| {
                     let trim = take(index, out)?;
