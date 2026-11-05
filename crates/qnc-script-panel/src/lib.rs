@@ -283,25 +283,20 @@ pub fn paint_block(ui: &mut egui::Ui, row: &qnc_script::BlockRow, view: &ScriptV
                 ui.horizontal_wrapped(|ui| {
                     ui.spacing_mut().item_spacing.x = 4.0;
                     for (at, word) in words.iter().enumerate() {
-                        // Every word with its own timecode above it (user 2026-11-04: "every word,
-                        // a line is not enough"); a new line of speech has a gap before it.
+                        // Every word keeps its time, but it is not written over the text (user
+                        // 2026-11-05: "the times only make it hard to read"): it shows under the
+                        // mouse; a new line of speech has a gap before it.
                         if word.line {
                             ui.add_space(6.0);
                         }
-                        let response = ui
-                            .vertical(|ui| {
-                                ui.spacing_mut().item_spacing.y = 0.0;
-                                ui.label(RichText::new(&word.tc).color(theme.text_muted).monospace().size(theme.font_ui - 3.0));
-                                let lit = heard.is_some_and(|frame| (word.from..word.to.max(word.from + 1)).contains(&frame));
-                                let mut text = RichText::new(&word.text).color(if lit { theme.bg } else { theme.text }).size(theme.font_ui + 1.0);
-                                if lit {
-                                    text = text.background_color(theme.focus);
-                                } else if part_chosen {
-                                    text = text.background_color(theme.surface_alt).underline();
-                                }
-                                ui.add(egui::Label::new(text).sense(Sense::click()))
-                            })
-                            .inner;
+                        let lit = heard.is_some_and(|frame| (word.from..word.to.max(word.from + 1)).contains(&frame));
+                        let mut text = RichText::new(&word.text).color(if lit { theme.bg } else { theme.text }).size(theme.font_ui + 1.0);
+                        if lit {
+                            text = text.background_color(theme.focus);
+                        } else if part_chosen {
+                            text = text.background_color(theme.surface_alt).underline();
+                        }
+                        let response = ui.add(egui::Label::new(text).sense(Sense::click()));
                         if bring && at == 0 {
                             response.scroll_to_me(Some(egui::Align::Center));
                         }
