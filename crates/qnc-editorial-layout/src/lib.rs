@@ -488,8 +488,8 @@ mod tests {
         assert_eq!(script.composition().right_panel, "script_writer_panel");
         assert_eq!(blocks(&script.board_layout(|_| false)), ["right-panel"]);
         let overlay = script.media_overlay_layout(|_| false).expect("the media overlay");
-        assert_eq!(blocks(&overlay), ["preview", "pool-head", "transport", "clip-cards", "transcript_panel", "script_clip_bar", "source-dock"]);
-        assert_eq!(script.panel_at("transcript_panel").map(|(kind, _)| kind), Some("transcript_panel"));
+        assert_eq!(blocks(&overlay), ["preview", "pool-head", "transport", "clip-cards", "transcript_search_panel", "script_clip_bar", "source-dock"]);
+        assert_eq!(script.panel_at("transcript_search_panel").map(|(kind, _)| kind), Some("transcript_search_panel"));
         assert_eq!(script.panel_at("script_clip_bar").map(|(kind, _)| kind), Some("script_clip_bar"));
         assert_eq!(script.panel_at("right-panel").map(|(kind, _)| kind), Some("script_writer_panel"));
         assert!(script.panel_at("clip-cards").is_none());

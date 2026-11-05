@@ -12,6 +12,7 @@ qnc-media-overlay = { workspace = true }
 qnc-script = { workspace = true }
 qnc-script-panel = { workspace = true }
 qnc-text-source-editor = { workspace = true }
+qnc-transcript-panel = { workspace = true }
 qnc-ui-kit = { workspace = true }
 qnc-ui-text = { workspace = true }
 

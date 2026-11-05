@@ -264,8 +264,8 @@ pub fn show_clip_bar(ui: &mut Ui, view: &ScriptView, theme: &qnc_desktop_theme::
     let open = open_kind(ui);
     let mut asked = None;
     let mut bar = ui.new_child(UiBuilder::new().max_rect(rect.shrink2(Vec2::new(12.0, 0.0))).layout(Layout::left_to_right(Align::Center)));
-    let say = qnc_ui_text::text(if view.marks { "writer.clip_bar" } else { "writer.clip_bar_no_marks" });
-    bar.label(RichText::new(say).color(if view.marks { theme.text } else { theme.text_muted }).size(theme.font_ui));
+    // The search of the transcript above (user 2026-11-05: "Potraži: and a field").
+    qnc_transcript_panel::search_field(&mut bar, theme);
     bar.with_layout(Layout::right_to_left(Align::Center), |ui| {
         ui.spacing_mut().item_spacing.x = STORY_GAP;
         for kind in view.profile.iter().flat_map(|profile| &profile.kinds).filter(|kind| kind.role == Role::Clip).collect::<Vec<_>>().into_iter().rev() {

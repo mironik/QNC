@@ -7847,3 +7847,15 @@ rupama, kao slozena izjava; promjena: pomak oba ruba tona sada pomice sam rez to
 pocne ranije), ne pravi kratko preklapanje kao prije; povlacenje strane preko reza je rupa. Testovi `qnc-program-db`
 (novi: rupa i prica sa starom provjerom zadrzava retke), `qnc-program-playlist` (novi: rupa A1 i A2), `qnc-program-segments`
 (dva testa promijenjena na novo pravilo), ostale dotaknute kocke, conformance, release build s libav. Uzivo nije provjereno.
+Izmjena 2026-11-05 (korisnik, MA Script prozor medija: "brisu se Izjave Dodaj IN-OUT i redak Jos nema izjava, tekst izjava
+ostaje"; "naslov Prijepis ostaje"; "umjesto Dodaj oznaceni IN-OUT u pricu kao: Potrazi: i polje za upis pojma za
+pretragu"): panel prozora medija grupe g je nova vrsta `transcript_search_panel` (`qnc-side-pieces`, `qnc-right-panel`,
+`contracts/ui/editorial.layout.json`): isti prijepis i naslov, spremljene izjave ostaju, bez retka Izjave / Dodaj IN-OUT /
+Kopiraj i bez poruke kad izjava nema (`qnc-transcript-panel` `show_searched`, `quotes::show(.., header)`). AI Media Assist
+(grupa e) nije mijenjan. Traka iznad source timelinea umjesto natpisa ima "Potrazi:" i polje (`qnc-transcript-panel`
+`search_field`, modul `search.rs`; gumbi + IZJAVA / + STAND-UP / + NETON ostaju): pojam (jedna ili vise uzastopnih rijeci,
+bez obzira na velika slova i interpunkciju) svijetli u prijepisu, trenutni nalaz u boji fokusa i doveden u pogled, uz polje
+"n od m" ili "nema"; Enter (nova akcija kataloga `transcript_search_next`, Enter u opsegu `transcript_search`, QNC preset)
+ide na sljedeci nalaz i stavlja playhead na njega. Pojam je izbor prikaza ovog procesa (egui memorija), nigdje se ne pise.
+Sifre `writer.clip_bar*` uklonjene, nove `transcript.search*`. Test `a_term_of_one_or_more_words_is_found_whatever_the_case_and_punctuation`,
+conformance, release build s libav. Uzivo nije provjereno.

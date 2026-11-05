@@ -24,6 +24,8 @@ pub const SEGMENT_PANEL: &str = "segment_panel";
 /// the same panel, its story the open version (a copy of the Story of its own).
 pub const DRAFT_SEGMENT_PANEL: &str = "draft_segment_panel";
 pub const TRANSCRIPT_PANEL: &str = "transcript_panel";
+/// The transcript to read and search, without the statements (MA Script media overlay).
+pub const TRANSCRIPT_SEARCH_PANEL: &str = "transcript_search_panel";
 /// The Video AI panel: the shots of the clip on the preview.
 pub const VIDEO_AI_PANEL: &str = "video_ai_panel";
 /// The script of the story (Media Assist Audio, user 2026-10-28).
@@ -62,7 +64,7 @@ impl SidePieces {
         let kinds: Vec<&str> = kinds.into_iter().collect();
         let has = |kind: &str| kinds.contains(&kind);
         Self {
-            transcript: (has(TRANSCRIPT_PANEL) || has(SCRIPT_PANEL) || has(SCRIPT_WRITER_PANEL)).then(Transcript::new),
+            transcript: (has(TRANSCRIPT_PANEL) || has(TRANSCRIPT_SEARCH_PANEL) || has(SCRIPT_PANEL) || has(SCRIPT_WRITER_PANEL)).then(Transcript::new),
             shots: has(VIDEO_AI_PANEL).then(ClipShots::default),
             script: (has(SCRIPT_PANEL) || has(SCRIPT_WRITER_PANEL)).then(Script::new),
             versions: has(DRAFT_SEGMENT_PANEL).then(SkeletonVersions::new),

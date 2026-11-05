@@ -9,8 +9,15 @@ use qnc_transcript::{TranscriptView, ADD_QUOTE, DELETE_QUOTE, OPEN_QUOTE, PANEL}
 /// The share of the panel's height the table may take; the transcript gets the rest.
 const TABLE_SHARE: f32 = 0.35;
 
-pub(crate) fn show(ui: &mut egui::Ui, view: &TranscriptView, theme: &qnc_desktop_theme::Theme) -> Option<ActionEvent> {
+pub(crate) fn show(ui: &mut egui::Ui, view: &TranscriptView, theme: &qnc_desktop_theme::Theme, header: bool) -> Option<ActionEvent> {
     let mut asked = None;
+    // Without its header (MA Script media overlay, user 2026-11-05) only the statements kept.
+    if !header {
+        if view.quotes.is_empty() {
+            return None;
+        }
+        return rows(ui, view, theme);
+    }
     let style = qnc_ui_kit::ChromeButtonStyle { text: theme.text, border: theme.border, focus: theme.focus, height: theme.chrome_control_height };
     ui.horizontal(|ui| {
         ui.label(RichText::new(qnc_ui_text::text("transcript.quotes")).color(theme.text_muted).size(theme.font_ui));
@@ -25,6 +32,13 @@ pub(crate) fn show(ui: &mut egui::Ui, view: &TranscriptView, theme: &qnc_desktop
         ui.label(RichText::new(qnc_ui_text::text("transcript.quotes_none")).color(theme.text_muted).size(theme.font_ui));
         return asked;
     }
+    rows(ui, view, theme).or(asked)
+}
+
+/// The statements, one under another.
+fn rows(ui: &mut egui::Ui, view: &TranscriptView, theme: &qnc_desktop_theme::Theme) -> Option<ActionEvent> {
+    let mut asked = None;
+    let style = qnc_ui_kit::ChromeButtonStyle { text: theme.text, border: theme.border, focus: theme.focus, height: theme.chrome_control_height };
     let height = (ui.ctx().screen_rect().height() * TABLE_SHARE).min(ui.available_height() * 0.5);
     egui::ScrollArea::vertical().id_salt("qnc_transcript_quotes").max_height(height).auto_shrink([false, true]).show(ui, |ui| {
         // Each statement (user 2026-10-27): clip, length and Delete on one line, then its start

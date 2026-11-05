@@ -400,6 +400,9 @@
     "form_next_field": {
       "label": "Sljedeće polje obrasca"
     },
+    "transcript_search_next": {
+      "label": "Sljedeći nađeni pojam u prijepisu"
+    },
     "project_open_row": {
       "label": "Otvori projekt iz popisa"
     },
@@ -705,6 +708,9 @@
             "key": "Enter"
           }
         ]
+      },
+      "transcript_search": {
+        "transcript_search_next": [{ "key": "Enter" }]
       },
       "ingest": {
         "select_audio_a1": [{ "code": "Digit1", "ctrl": true, "shift": false }],
