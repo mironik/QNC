@@ -7890,3 +7890,14 @@ rub, nikad roll: otvara se zoom reza, strelice, kotacic i povlacenje produljuju 
 Enter sprema. Isto na traci ispod slike u zoomu (lijeva slika OUT svog slota, desna IN). Lijevi klik dok je rub uzet i dalje
 sprema (zakljucano pravilo misa). `qnc-script` (`pointer.rs`, `TAKE_EDGE`, `subsegment_zoom`). Testovi, conformance, release
 build s libav. Uzivo nije provjereno.
+Popravak 2026-11-05 (korisnik: "nema iznimaka, jedna radnja u svim situacijama radi isto; desni klik = Ctrl+; desni klik na
+traci trajanja, bez obzira je li timeline ili zoom (zoom je uvecani dio timelinea), mora raditi isto"; log: u zoomu je lijevi
+klik na traku birao slot i dok je rub bio uzet, a na timelineu ga je spremao kao Enter; slika zooma je imala vlastite radnje):
+zoom slozene izjave vise nema vlastitih radnji. Svaka slika stoji na frameu osi slozene izjave (lijeva zadnji frame dijela
+prije reza, desna prvi poslije) i svaki klik salje radnju koju mapa misa timelinea daje istoj gesti na tom frameu, s ciljem i
+frameom: lijevi klik na sliku `timeline_cue_frame` (playhead, dok je nesto uzeto sprema kao Enter), desni klik na sliku
+`select_marker` s rubom (marker), lijevi klik na traku trajanja `timeline_select_cover` (slot; dok je uzeto, sprema), desni
+klik na traku `timeline_take_cover` (slot i njegov blizi rub). Odgovor daje isti vlasnik osi (`qnc-script::own_action`) kao za
+timeline. `qnc-program-view` `StillAction` (radnja, cilj, frame) za `click`, `right_click` i traku; `qnc-trim-overlay`
+(`event_of`); `qnc-subsegment-panel` (radnje reda iz zooma na panelu reda). Test: zoom daje iste vlastite radnje kao timeline
+na istom frameu. Conformance, release build s libav. Uzivo nije provjereno. Zoom Storyja nije mijenjan.

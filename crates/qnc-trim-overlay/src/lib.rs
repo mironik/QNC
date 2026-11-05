@@ -94,7 +94,7 @@ pub fn show(ctx: &egui::Context, segments: &SegmentsView) -> Option<ActionEvent>
                 paint_still(ui, pane, still, focus.map_or(still.cut, |side| still.after == side), &visuals);
                 // A click on a picture picks its side of the cut: the owner's own action when it
                 // gives one (a SubSegment's slot), else the one system action of every zoom.
-                let click = still.click.clone().map(|(action, target)| ActionEvent::key(&action).with_target(target)).or_else(|| {
+                let click = still.click.as_ref().map(event_of).or_else(|| {
                     taken_cut.clone().map(|cut| Verb::PickSide { cut, side: Side::of(still.after) }.event(panel))
                 });
                 // The slot's length strip at the bottom of the picture (user 2026-11-05): a left
@@ -106,9 +106,9 @@ pub fn show(ctx: &egui::Context, segments: &SegmentsView) -> Option<ActionEvent>
                 if let (Some(strip), Some(rect)) = (still.strip.as_ref(), strip_rect) {
                     paint_strip(ui, rect, strip, ui.rect_contains_pointer(rect));
                     if on_strip && response.clicked() {
-                        turned = Some(ActionEvent::key(&strip.select.0).with_target(strip.select.1.clone()));
+                        turned = Some(event_of(&strip.select));
                     } else if on_strip && response.secondary_clicked() {
-                        turned = Some(ActionEvent::key(&strip.take.0).with_target(strip.take.1.clone()));
+                        turned = Some(event_of(&strip.take));
                     }
                 }
                 if !on_strip {
@@ -116,8 +116,8 @@ pub fn show(ctx: &egui::Context, segments: &SegmentsView) -> Option<ActionEvent>
                         turned = Some(click);
                     }
                     // A right click on the picture outside its strip: the marker (the cut).
-                    if let Some((action, target)) = still.right_click.as_ref().filter(|_| response.secondary_clicked()) {
-                        turned = Some(ActionEvent::key(action).with_target(target.clone()));
+                    if let Some(action) = still.right_click.as_ref().filter(|_| response.secondary_clicked()) {
+                        turned = Some(event_of(action));
                     }
                 }
                 // The marker lies between the picture before it and the one after it.
@@ -495,4 +495,16 @@ mod tests {
         assert!((shown_height(50) - 0.52).abs() < 0.02, "-26 dBFS about half");
         assert_eq!(shown_height(1), 0.0, "-60 dBFS below the floor");
     }
+}
+
+/// The event of a zoom click: the timeline's action of the same gesture, its target and frame.
+fn event_of(action: &qnc_program_view::StillAction) -> ActionEvent {
+    let mut event = ActionEvent::key(&action.action);
+    if let Some(target) = &action.target {
+        event = event.with_target(target.clone());
+    }
+    if let Some(value) = action.value {
+        event = event.with_value(value);
+    }
+    event
 }

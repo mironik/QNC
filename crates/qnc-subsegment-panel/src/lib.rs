@@ -207,6 +207,9 @@ pub fn show(ui: &mut egui::Ui, view: &SubsegmentView, theme: TimelineTheme, leng
     });
     let zoomed = zoom.as_ref().and_then(|zoom| qnc_trim_overlay::show(ui.ctx(), zoom)).map(|event| match event.action_id.as_str() {
         "transcript_cut_word" => ActionEvent { action_id: qnc_script::ZOOM_WORD.to_string(), ..event },
+        // A picture or its strip: the timeline row's action, on the row's panel (the zoom is the
+        // timeline enlarged).
+        _ if qnc_script::ROW_ACTIONS.contains(&event.action_id.as_str()) && event.at.is_none() => event.at(ROW_PANEL),
         _ => event,
     });
     answer = answer.or(zoomed);

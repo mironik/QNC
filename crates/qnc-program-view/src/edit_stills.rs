@@ -44,10 +44,10 @@ pub struct EditStill {
     /// What a click on the picture does (user 2026-10-29: in a SubSegment's zoom the left
     /// picture takes the OUT before the cut, the right one the IN after it): a catalog action
     /// and its target; `None`: nothing.
-    pub click: Option<(String, String)>,
+    pub click: Option<StillAction>,
     /// What a right click on the picture (outside its strip) does (user 2026-11-05: "a right
     /// click on the filmstrip not covered by the strip is the marker"); `None`: nothing.
-    pub right_click: Option<(String, String)>,
+    pub right_click: Option<StillAction>,
     /// The length strip of the slot the picture shows, as on the timeline (user 2026-11-05: a
     /// left click on it selects the slot, in the timeline and in the zoom); `None`: no strip.
     pub strip: Option<StillStrip>,
@@ -63,9 +63,9 @@ pub struct StillStrip {
     pub fill: Option<[u8; 3]>,
     /// The slot is the chosen one.
     pub chosen: bool,
-    /// A left click selects the slot; a right click takes it whole (catalog action, target).
-    pub select: (String, String),
-    pub take: (String, String),
+    /// A left click on the strip and a right click on it: the same actions as on the timeline.
+    pub select: StillAction,
+    pub take: StillAction,
 }
 
 /// Which end of its clip a picture reached.
@@ -347,4 +347,19 @@ fn clip_covers(view: &SegmentsView, slots: &[Slot]) -> Vec<CoverSpan> {
             })
         })
         .collect()
+}
+
+/// What a click in the zoom sends: the same action the timeline's mouse map gives that gesture
+/// there (AGENTS 0.12: the zoom is the timeline enlarged), with its target and its frame.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct StillAction {
+    pub action: String,
+    pub target: Option<String>,
+    pub value: Option<i64>,
+}
+
+impl StillAction {
+    pub fn new(action: &str, target: Option<String>, value: Option<u64>) -> Self {
+        Self { action: action.to_string(), target, value: value.and_then(|value| i64::try_from(value).ok()) }
+    }
 }

@@ -35,7 +35,7 @@ mod read;
 mod view;
 mod word_pick;
 pub use word_pick::{WordPick, WORD_PICK};
-pub use pointer::{drag_target, nearest_edge, ROW_ACTIONS};
+pub use pointer::{drag_target, nearest_edge, own_action, ROW_ACTIONS};
 
 pub use view::*;
 
@@ -431,8 +431,8 @@ impl Script {
             }
             // The side in focus (user 2026-11-04: the zoom frames it red, the same in every zoom):
             // the side of the join sound that moves alone, else the side of the chosen slot.
-            let chosen_side = chosen.map(|index| index.to_string()).and_then(|chosen| {
-                zoom.source_edit_stills.iter().chain(&zoom.edit_stills).find(|still| still.click.as_ref().is_some_and(|(_, target)| *target == chosen)).map(|still| still.after)
+            let chosen_side = chosen.map(|index| format!("part-{index}")).and_then(|chosen| {
+                zoom.source_edit_stills.iter().chain(&zoom.edit_stills).find(|still| still.strip.as_ref().is_some_and(|strip| strip.select.target.as_deref() == Some(chosen.as_str()))).map(|still| still.after)
             });
             let sound_side = join_sound.and_then(|join| join.side.focus());
             if let Some(sound) = zoom.zoom_sound.as_mut() {

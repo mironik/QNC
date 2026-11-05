@@ -168,19 +168,23 @@ fn the_zoom_of_a_subsegment_edge_shows_the_pictures_either_side_of_its_cut() {
     let sound = zoom.zoom_sound.unwrap();
     assert_eq!((sound.from, sound.to, sound.cut), (0, 100, 50));
     assert_eq!(sound.lanes[0].len(), 3, "every part within a second of the cut is heard on A1");
-    // A click on a picture chooses its slot (user 2026-11-04): the left one the part before, the
-    // right one the part after.
-    let clicks: Vec<_> = zoom.source_edit_stills.iter().map(|s| s.click.as_ref().map(|(action, target)| (action.as_str(), target.as_str()))).collect();
-    assert_eq!(clicks, vec![Some((crate::SUBSEGMENT_SELECT, "0")), Some((crate::SUBSEGMENT_SELECT, "1"))]);
-    // Under each picture its slot's length strip, a left click selects it, a right click takes
-    // it whole; a right click on the picture outside the strip takes the marker of the cut
-    // (user 2026-11-05), here the joined cut of parts 0 and 1.
-    let strips: Vec<_> = zoom.source_edit_stills.iter().map(|s| s.strip.as_ref().map(|strip| (strip.frames, strip.select.1.as_str(), strip.take.0.as_str()))).collect();
-    assert_eq!(strips, vec![Some((50, "0", crate::TAKE_EDGE)), Some((40, "1", crate::TAKE_EDGE))]);
-    let takes: Vec<_> = zoom.source_edit_stills.iter().filter_map(|s| s.strip.as_ref().map(|strip| strip.take.1.clone())).collect();
-    assert_eq!(takes, vec!["0:out:slot".to_string(), "1:in:slot".to_string()], "a right click on a strip: that slot's edge at the cut");
-    let markers: Vec<_> = zoom.source_edit_stills.iter().map(|s| s.right_click.clone()).collect();
-    assert_eq!(markers, vec![Some((crate::TAKE_EDGE.to_string(), "0:cut".to_string())); 2]);
+    // The zoom is the timeline enlarged (AGENTS 0.12, user 2026-11-05): every click on a picture
+    // or its strip sends the timeline's action of the same gesture at the picture's frame, so the
+    // owner answers the same as for the timeline. Left of the cut part 0 (its last frame 49),
+    // right of it part 1 (its first frame 50).
+    let own = |action: &qnc_program_view::StillAction| crate::own_action(&shown, &action.action, action.value, action.target.as_deref(), false);
+    let at = |still: usize| zoom.source_edit_stills[still].clone();
+    let strip = |still: usize| at(still).strip.unwrap();
+    assert_eq!((strip(0).frames, strip(1).frames), (50, 40), "each picture's slot length strip");
+    let some = |action: &str, target: &str| Some((action.to_string(), Some(target.to_string())));
+    assert_eq!(own(&strip(0).select), some(crate::SUBSEGMENT_SELECT, "0"), "a left click on the strip selects the slot");
+    assert_eq!(own(&strip(1).select), some(crate::SUBSEGMENT_SELECT, "1"));
+    assert_eq!(own(&strip(0).take), some(crate::TAKE_EDGE, "0:out:slot"), "a right click on the strip: the slot, its edge at the cut");
+    assert_eq!(own(&strip(1).take), some(crate::TAKE_EDGE, "1:in:slot"));
+    assert_eq!(own(at(0).right_click.as_ref().unwrap()), some(crate::TAKE_EDGE, "0:cut"), "a right click on the picture: the marker there");
+    assert_eq!(own(at(1).right_click.as_ref().unwrap()), some(crate::TAKE_EDGE, "0:cut"));
+    assert_eq!(own(at(1).click.as_ref().unwrap()), some(crate::SUBSEGMENT_CUE, "50"), "a left click on the picture: the playhead there");
+    assert_eq!(crate::own_action(&shown, "timeline_cue_frame", Some(50), None, true), Some(("activate_focused_item".to_string(), None)), "or, while held, keeps");
     // The IN of the third part follows a pause: on the left is still the OUT of the part before.
     let zoom = subsegment_zoom(&shown, &pieces, (2, false), (50, None), |_| Some(1000)).unwrap();
     assert_eq!(zoom.source_edit_stills[0].picture.as_ref().map(|p| (p.clip_id.as_str(), p.source_frame)), Some(("a", 339)));
