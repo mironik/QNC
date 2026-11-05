@@ -1,0 +1,146 @@
+//! Words picked in the text of a statement and cut out of its video (user 2026-11-05: "allow
+//! deleting words in the text and cut that part of the video out of the timeline"; "that way
+//! we take out the fillers"). A click on a word picks it, Shift+click on a word of the same
+//! part picks from the first one to it; Delete cuts the picked words out of the part (what was
+//! before them and what was after them stay, joined by a cut, user: "no crossfade"); Esc lets
+//! them go. The picture and the sound go together: the part is the same clip, only shorter.
+
+use crate::Script;
+use qnc_script_db::Piece;
+use qnc_source_preview::SourcePreview;
+
+/// Shift+click on a word of a statement: the pick grows from the first picked word to it.
+/// `target` is `block:part:from:to`, as for a click.
+pub const WORD_PICK: &str = "script_word_pick";
+
+/// Words picked in one part: clip frames `[from, to)` from the first word's start to the last
+/// one's end.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct WordPick {
+    pub block: i64,
+    pub part: usize,
+    pub from: u64,
+    pub to: u64,
+    /// The word the pick started on (Shift+click picks from it).
+    anchor: (u64, u64),
+}
+
+/// `block:part:from:to` of a word.
+fn parse(target: Option<&str>) -> Option<(i64, usize, u64, u64)> {
+    let mut parts = target?.split(':');
+    let id = parts.next()?.parse().ok()?;
+    let index = parts.next()?.parse().ok()?;
+    let from: u64 = parts.next()?.parse().ok()?;
+    let to = parts.next().and_then(|to| to.parse().ok()).unwrap_or(from + 1);
+    Some((id, index, from, to.max(from + 1)))
+}
+
+impl WordPick {
+    /// One word picked.
+    pub fn word(target: Option<&str>) -> Option<Self> {
+        let (block, part, from, to) = parse(target)?;
+        Some(Self { block, part, from, to, anchor: (from, to) })
+    }
+
+    /// The pick from its first word to the word `target` (a word of another part starts anew).
+    pub fn grown(self, target: Option<&str>) -> Option<Self> {
+        let (block, part, from, to) = parse(target)?;
+        if (block, part) != (self.block, self.part) {
+            return Self::word(target);
+        }
+        let (first, last) = (self.anchor.0.min(from), self.anchor.1.max(to));
+        Some(Self { from: first, to: last, ..self })
+    }
+}
+
+/// What is left of `piece` when `[from, to)` is cut out of it: before and after (clip frames).
+pub fn left_of(piece: &Piece, from: u64, to: u64) -> (Option<(u64, u64)>, Option<(u64, u64)>) {
+    let (from, to) = (from.max(piece.from_frame), to.min(piece.to_frame));
+    if to <= from {
+        return (Some((piece.from_frame, piece.to_frame)), None);
+    }
+    ((from > piece.from_frame).then_some((piece.from_frame, from)), (to < piece.to_frame).then_some((to, piece.to_frame)))
+}
+
+impl Script {
+    /// The pick's keys and clicks: a click picks the word (and goes on to its cue), Shift+click
+    /// grows the pick, Delete cuts it out, Esc lets it go. `None` when the action is not about
+    /// a pick (a click is never fully taken here: it still cues the word).
+    pub(crate) fn pick_key(&mut self, action_id: &str, target: Option<&str>, preview: &SourcePreview) -> Option<bool> {
+        match action_id {
+            crate::WORD_CUE if self.trim.is_none() => {
+                self.word_pick = WordPick::word(target);
+                self.view.picked = self.word_pick;
+                None
+            }
+            WORD_PICK => {
+                self.word_pick = match self.word_pick {
+                    Some(pick) => pick.grown(target),
+                    None => WordPick::word(target),
+                };
+                self.view.picked = self.word_pick;
+                Some(true)
+            }
+            "clear_focus" if self.word_pick.is_some() => {
+                (self.word_pick, self.view.picked) = (None, None);
+                Some(true)
+            }
+            "delete_marker" => {
+                let pick = self.word_pick?;
+                (self.word_pick, self.view.picked) = (None, None);
+                Some(self.cut_out(pick, preview))
+            }
+            _ => None,
+        }
+    }
+
+    /// The picked words cut out of their part: what was before and after them, each with its
+    /// own words, timecodes and length.
+    fn cut_out(&mut self, pick: WordPick, preview: &SourcePreview) -> bool {
+        let Some(block) = self.block(Some(pick.block)).cloned() else { return true };
+        let pieces = crate::view::block_pieces(&block);
+        let Some(piece) = pieces.get(pick.part).cloned() else { return true };
+        let (before, after) = left_of(&piece, pick.from, pick.to);
+        if before == Some((piece.from_frame, piece.to_frame)) {
+            return true; // nothing of the part picked
+        }
+        if before.is_none() && after.is_none() && pieces.len() < 2 {
+            self.view.message = qnc_ui_text::text("db.script_last_piece").into();
+            return true;
+        }
+        let words = self.view.blocks.iter().find(|row| row.block.id == pick.block).and_then(|row| row.words.get(pick.part)).cloned().unwrap_or_default();
+        let said = |from: u64, to: u64| words.iter().filter(|word| (from..to).contains(&((word.from + word.to.max(word.from + 1)) / 2))).map(|word| word.text.as_str()).collect::<Vec<_>>().join(" ");
+        let part = |range: Option<(u64, u64)>| {
+            range.map(|(from, to)| Piece { text: said(from, to), ..self.trimmed_piece(&piece, crate::Trim { index: pick.part, out: true, from, to, roll: None }) })
+        };
+        let (before, after) = (part(before), part(after));
+        let (id, index) = (pick.block, pick.part);
+        (self.trim, self.sound, self.chosen, self.join_sound, self.slide) = (None, None, None, None, None);
+        self.view.message = qnc_ui_text::text("script.words_cut_out").into();
+        self.write(preview, move |target| qnc_script_db::cut_out(target, id, index, before, after).map(|_| None))
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn piece(from: u64, to: u64) -> Piece {
+        Piece { clip_id: "c".into(), clip_name: "c".into(), from_frame: from, to_frame: to, start_tc: String::new(), end_tc: String::new(), length: String::new(), seconds: 0.0, text: String::new(), gap_before: 0, cut: false, a1_channel: None, a1_level_db: 0, a1_off: false, a1_lead_frames: 0, a1_tail_frames: 0, v_lead_frames: 0, v_tail_frames: 0 }
+    }
+
+    #[test]
+    fn a_pick_grows_from_its_first_word_whichever_way_and_cuts_out_its_frames() {
+        let pick = WordPick::word(Some("4:0:7449:7452")).unwrap();
+        let grown = pick.grown(Some("4:0:7441:7449")).unwrap();
+        assert_eq!((grown.from, grown.to), (7441, 7452), "back from the first word");
+        let grown = grown.grown(Some("4:0:7465:7466")).unwrap();
+        assert_eq!((grown.from, grown.to), (7449, 7466), "from the first word, not from the earlier pick");
+        assert_eq!(grown.grown(Some("4:1:10:12")).map(|p| (p.part, p.from)), Some((1, 10)), "another part starts anew");
+        let piece = piece(7400, 7500);
+        assert_eq!(left_of(&piece, 7449, 7466), (Some((7400, 7449)), Some((7466, 7500))));
+        assert_eq!(left_of(&piece, 7390, 7420), (None, Some((7420, 7500))), "at its start");
+        assert_eq!(left_of(&piece, 7480, 7600), (Some((7400, 7480)), None), "at its end");
+        assert_eq!(left_of(&piece, 7400, 7500), (None, None), "all of it");
+    }
+}

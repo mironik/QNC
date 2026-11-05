@@ -250,6 +250,12 @@ pub enum Operation {
     MovePiece { id: i64, index: usize, earlier: bool },
     /// Part `index` leaves its block (the last part stays: the block is removed as a whole).
     RemovePiece { id: i64, index: usize },
+    /// Words cut out of part `index` (user 2026-11-05: deleting words in the text cuts them out
+    /// of the video, e.g. fillers): the part becomes what was before them and what was after
+    /// them (either may be none), the same clip within its range; the first keeps the part's
+    /// join, the new join between the two is a cut with no pause (no crossfade). Neither
+    /// left: the part leaves (not the last one).
+    CutOut { id: i64, index: usize, before: Option<Piece>, after: Option<Piece> },
 }
 
 impl Operation {
@@ -413,6 +419,11 @@ pub fn move_piece(target: &ProjectDbTarget, id: i64, index: usize, earlier: bool
 /// Part `index` of block `id` leaves it.
 pub fn remove_piece(target: &ProjectDbTarget, id: i64, index: usize) -> Result<()> {
     write(target, Operation::RemovePiece { id, index }).map(drop)
+}
+
+/// Words cut out of part `index`: what was before and after them.
+pub fn cut_out(target: &ProjectDbTarget, id: i64, index: usize, before: Option<Piece>, after: Option<Piece>) -> Result<()> {
+    write(target, Operation::CutOut { id, index, before, after }).map(drop)
 }
 
 /// Part `index` of block `id` with a new range (an edge trimmed on the SubSegment timeline).

@@ -220,6 +220,9 @@
     "script_word_cut": {
       "label": "Rez po tekstu: dvoklik na dvije rijeci postavlja IN i OUT dijela"
     },
+    "script_word_pick": {
+      "label": "Shift+klik na rijec izjave: odabir rijeci do nje (Delete ih izreze iz videa)"
+    },
     "subsegment_join_gap": {
       "label": "Razmak prije dijela SubSegmenta (slika vise ili manje)"
     },

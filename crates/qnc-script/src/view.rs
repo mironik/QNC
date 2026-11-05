@@ -187,6 +187,8 @@ pub struct ScriptView {
     pub exporting: bool,
     /// The SubSegment open in place of the source timeline.
     pub subsegment: Option<SubsegmentView>,
+    /// Words picked in the text of a statement (Delete cuts them out of its video).
+    pub picked: Option<crate::WordPick>,
     pub message: String,
 }
 

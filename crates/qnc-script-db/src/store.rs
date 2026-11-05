@@ -57,6 +57,7 @@ impl Store {
             Operation::SetJoinPicture { id, index, lead, tail } => self.set_join_picture(*id, *index, *lead, *tail),
             Operation::MovePiece { id, index, earlier } => self.move_piece(*id, *index, *earlier),
             Operation::RemovePiece { id, index } => self.remove_piece(*id, *index),
+            Operation::CutOut { id, index, before, after } => self.cut_out(*id, *index, before.as_ref(), after.as_ref()),
             Operation::ReadVoices => self.voices().map(Data::Voices),
             Operation::AddVoiceTake { id, name, clip_uri, take } => self.add_voice_take(*id, name, clip_uri, take),
             Operation::SetVoiceChosen { id, take } => self.set_voice_chosen(*id, *take),
@@ -355,6 +356,40 @@ impl Store {
             return Err(qnc_ui_text::text("db.script_last_piece").into());
         }
         block.pieces.remove(index);
+        if let Some(first) = block.pieces.first_mut() {
+            (first.gap_before, first.cut, first.a1_lead_frames, first.a1_tail_frames, first.v_lead_frames, first.v_tail_frames) = (0, false, 0, 0, 0, 0);
+        }
+        self.store_pieces(id, block)
+    }
+
+    /// Words cut out of part `index` (user 2026-11-05): the part becomes the pieces before and
+    /// after them, each the same clip within the part's range; the first keeps the part's join,
+    /// the second joins it with a cut and no pause (user 2026-11-05: no crossfade). Neither: the part leaves.
+    fn cut_out(&mut self, id: i64, index: usize, before: Option<&Piece>, after: Option<&Piece>) -> Result<Data> {
+        let mut block = self.read()?.into_iter().find(|block| block.id == id).ok_or_else(|| qnc_ui_text::text("db.script_no_block").to_string())?;
+        if block.pieces.is_empty() {
+            block.pieces.push(Piece::of(&block));
+        }
+        let Some(stored) = block.pieces.get(index).cloned() else {
+            return Err(qnc_ui_text::text("db.script_no_join").into());
+        };
+        if before.is_none() && after.is_none() {
+            return self.remove_piece(id, index);
+        }
+        let fits = |piece: &Piece| piece.clip_id == stored.clip_id && piece.to_frame > piece.from_frame && piece.from_frame >= stored.from_frame && piece.to_frame <= stored.to_frame;
+        if !before.into_iter().chain(after).all(fits) || before.zip(after).is_some_and(|(before, after)| before.to_frame > after.from_frame) {
+            return Err(qnc_ui_text::fill("db.script_clip_range", &[("kind", &block.kind)]));
+        }
+        let joined = |piece: &Piece| Piece { gap_before: stored.gap_before, cut: stored.cut, a1_lead_frames: stored.a1_lead_frames, a1_tail_frames: stored.a1_tail_frames, v_lead_frames: stored.v_lead_frames, v_tail_frames: stored.v_tail_frames, ..piece.clone() };
+        let fresh = |piece: &Piece| Piece { gap_before: 0, cut: true, a1_lead_frames: 0, a1_tail_frames: 0, v_lead_frames: 0, v_tail_frames: 0, ..piece.clone() };
+        let mut new = Vec::new();
+        if let Some(before) = before {
+            new.push(joined(before));
+        }
+        if let Some(after) = after {
+            new.push(if new.is_empty() { joined(after) } else { fresh(after) });
+        }
+        block.pieces.splice(index..=index, new);
         if let Some(first) = block.pieces.first_mut() {
             (first.gap_before, first.cut, first.a1_lead_frames, first.a1_tail_frames, first.v_lead_frames, first.v_tail_frames) = (0, false, 0, 0, 0, 0);
         }

@@ -7859,3 +7859,17 @@ bez obzira na velika slova i interpunkciju) svijetli u prijepisu, trenutni nalaz
 ide na sljedeci nalaz i stavlja playhead na njega. Pojam je izbor prikaza ovog procesa (egui memorija), nigdje se ne pise.
 Sifre `writer.clip_bar*` uklonjene, nove `transcript.search*`. Test `a_term_of_one_or_more_words_is_found_whatever_the_case_and_punctuation`,
 conformance, release build s libav. Uzivo nije provjereno.
+Izvedeno 2026-11-05 (korisnik: "u tekstu dozvoliti brisanje rijeci i iz timelinea automatski isjeci taj dio videa"; "na taj
+nacin bi izbacili postapalice"; "ne bi koristio pretapanje"): izjava u scenariju (MA Audio, MA Script, tekst u prozoru
+medija) uredjuje se brisanjem rijeci. Klik na rijec (ili slovo, kad su slova poravnata) stavlja playhead na nju i odabire je,
+Shift+klik na rijec istog dijela prosiri odabir od prve odabrane do nje (nova radnja kataloga `script_word_pick`, bez
+tipke), odabrane rijeci su crvene i precrtane; Delete ih izreze iz videa: dio postaje ono prije i ono poslije njih (isti klip,
+slika i ton zajedno), spojeni cistim rezom bez pauze i bez pretapanja; rijeci na pocetku ili kraju dijela samo ga skrate,
+svih rijeci dijela - dio izlazi (zadnji dio ostaje). Esc pusta odabir. Nova kocka unutar `qnc-script` `word_pick.rs`
+(`WordPick`, `left_of`), operacija `qnc-script-db` `CutOut` (prvi ostatak zadrzava spoj dijela, drugi dobiva rez; izjava od
+jednog raspona postaje svoj prvi dio), `qnc-script-panel` (Shift+klik, oznaka). Rjecnik `script.words_cut_out`,
+`script.word_hint`. Nije izvedeno: Undo (baza scenarija nema korake undoa), prijelaz izracunat dodanim slicicama na spoju
+(planirana `qnc-cut-smooth`), odabir i brisanje u panelu prijepisa AI Media Assista. Testovi
+`words_cut_out_of_a_part_leave_what_was_before_and_after_them_joined_by_a_cut`,
+`a_pick_grows_from_its_first_word_whichever_way_and_cuts_out_its_frames`, conformance, release build s libav. Uzivo nije
+provjereno.

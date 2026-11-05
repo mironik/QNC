@@ -325,6 +325,28 @@ fn a_part_moves_past_its_neighbour_and_leaves_the_joins_stay_in_their_places() {
 }
 
 #[test]
+fn words_cut_out_of_a_part_leave_what_was_before_and_after_them_joined_by_a_cut() {
+    let (_dir, target) = written();
+    let id = add(&target, None, sot("2002")).unwrap();
+    add_piece(&target, id, piece("2002", 500, 550, "drugi")).unwrap();
+    set_join(&target, id, 1, 6, false).unwrap();
+    // A filler in the middle of the second part: it becomes two parts, the first keeps the join.
+    cut_out(&target, id, 1, Some(piece("2002", 500, 520, "drugi")), Some(piece("2002", 530, 550, "dio"))).unwrap();
+    let parts: Vec<_> = read(&target).unwrap()[0].pieces.iter().map(|p| (p.from_frame, p.to_frame, p.gap_before, p.cut)).collect();
+    assert_eq!(parts, [(100, 350, 0, false), (500, 520, 6, false), (530, 550, 0, true)], "the new join is a cut, no pause");
+    // Words at the start of a statement of one range: only what was after them stays.
+    let one = add(&target, None, sot("2679")).unwrap();
+    cut_out(&target, one, 0, None, Some(piece("2679", 140, 350, "ostatak"))).unwrap();
+    let block = read(&target).unwrap().into_iter().find(|b| b.id == one).unwrap();
+    assert_eq!((block.pieces.len(), block.from_frame), (1, 140));
+    assert!(cut_out(&target, id, 2, Some(piece("2002", 520, 560, "")), None).is_err(), "outside the part's range");
+    assert!(cut_out(&target, id, 2, Some(piece("2679", 530, 540, "")), None).is_err(), "another clip");
+    cut_out(&target, id, 2, None, None).unwrap();
+    assert_eq!(read(&target).unwrap()[0].pieces.len(), 2, "every word cut: the part leaves");
+    assert!(cut_out(&target, one, 0, None, None).is_err(), "the last part stays: the block is removed instead");
+}
+
+#[test]
 fn a_trimmed_part_keeps_its_clip_pause_and_join() {
     let (_dir, target) = written();
     let id = add(&target, None, sot("2002")).unwrap();

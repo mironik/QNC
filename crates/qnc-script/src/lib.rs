@@ -33,6 +33,8 @@ use qnc_voice_take::{Recorded, Take};
 mod pointer;
 mod read;
 mod view;
+mod word_pick;
+pub use word_pick::{WordPick, WORD_PICK};
 pub use pointer::{drag_target, nearest_edge, ROW_ACTIONS};
 
 pub use view::*;
@@ -186,6 +188,8 @@ pub struct Script {
     letter_times: qnc_letter_times::LetterTimes,
     /// The first word of a cut by text (a double click on a word): its block, part and frames.
     word_cut: qnc_edit_words::WordPair<(i64, usize)>,
+    /// Words picked in the text of a statement, to be cut out of its video with Delete.
+    word_pick: Option<WordPick>,
     /// A part taken whole (Ctrl+S, a right click on its length strip), as a slot is (user
     /// 2026-11-04): its index and how far it is drafted to move (frames; later is positive).
     slide: Option<(usize, i64)>,
@@ -325,7 +329,7 @@ impl JoinSound {
 
 impl Default for Script {
     fn default() -> Self {
-        Self { view: ScriptView::default(), blocks: Vec::new(), project: None, reading: None, read_at: None, writing: None, source_request: None, names: HashMap::new(), words_per_second: Ok(0.0), take: None, taking: None, exporting: None, draft: Default::default(), open_subsegment: None, pieces_request: None, trim: None, chosen: None, join_sound: None, value: None, transcripts: HashMap::new(), letters: HashMap::new(), letter_times: qnc_letter_times::LetterTimes::new(), word_cut: qnc_edit_words::WordPair::new(), slide: None, slip_part: None, waves: qnc_program_waveform::ProgramWaves::new(), filmstrips: qnc_program_filmstrip::ProgramFilmstrips::new(), waves_project: None, trim_stills: qnc_trim_stills::TrimStills::new(), zoom_follow: Default::default(), sound: None, voices: Vec::new(), voice_request: None, voice_after_write: None, message_after_write: None, clear_after_write: false }
+        Self { view: ScriptView::default(), blocks: Vec::new(), project: None, reading: None, read_at: None, writing: None, source_request: None, names: HashMap::new(), words_per_second: Ok(0.0), take: None, taking: None, exporting: None, draft: Default::default(), open_subsegment: None, pieces_request: None, trim: None, chosen: None, join_sound: None, value: None, transcripts: HashMap::new(), letters: HashMap::new(), letter_times: qnc_letter_times::LetterTimes::new(), word_cut: qnc_edit_words::WordPair::new(), word_pick: None, slide: None, slip_part: None, waves: qnc_program_waveform::ProgramWaves::new(), filmstrips: qnc_program_filmstrip::ProgramFilmstrips::new(), waves_project: None, trim_stills: qnc_trim_stills::TrimStills::new(), zoom_follow: Default::default(), sound: None, voices: Vec::new(), voice_request: None, voice_after_write: None, message_after_write: None, clear_after_write: false }
     }
 }
 
@@ -1215,6 +1219,9 @@ impl Script {
             Some((action, own_target)) => (action.as_str(), own_target.as_deref()),
             None => (action_id, target),
         };
+        if let Some(done) = self.pick_key(action_id, target, preview) {
+            return Some(done);
+        }
         if self.open_subsegment.is_some() {
             let done = self.trim_key(action_id, target, preview);
             if qnc_dev_diagnostics::player_diagnostics_enabled() {

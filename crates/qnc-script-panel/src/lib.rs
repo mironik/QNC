@@ -9,7 +9,7 @@
 
 use eframe::egui::{self, RichText, Sense};
 use qnc_action_event::ActionEvent;
-use qnc_script::{seconds_label, FieldEdit, DRAFT, EXPORT, SEND_STORY, OPEN_EXPORT, Role, FIELD_COMMIT, FIELD_SET, FIELD_TEXT, ScriptView, ADD_CLIP, ADD_QUOTE, ADD_TEXT, CLEAR_EDITOR, EDITOR_TEXT, MOVE_DOWN, MOVE_UP, OPEN, PANEL, RECORD, REMOVE, REPLACE_TEXT, SELECT, VOICE_TAKE, WORD_CUE, WORD_CUT};
+use qnc_script::{seconds_label, FieldEdit, DRAFT, EXPORT, SEND_STORY, OPEN_EXPORT, Role, FIELD_COMMIT, FIELD_SET, FIELD_TEXT, ScriptView, ADD_CLIP, ADD_QUOTE, ADD_TEXT, CLEAR_EDITOR, EDITOR_TEXT, MOVE_DOWN, MOVE_UP, OPEN, PANEL, RECORD, REMOVE, REPLACE_TEXT, SELECT, VOICE_TAKE, WORD_CUE, WORD_CUT, WORD_PICK};
 use qnc_text_source_editor::{Answer, Editor, EditorButton};
 use qnc_transcript::TranscriptView;
 
@@ -290,6 +290,8 @@ pub fn paint_block(ui: &mut egui::Ui, row: &qnc_script::BlockRow, view: &ScriptV
                             ui.add_space(6.0);
                         }
                         let lit = heard.is_some_and(|frame| (word.from..word.to.max(word.from + 1)).contains(&frame));
+                        // Picked to be cut out (user 2026-11-05: Delete cuts the words out of the video).
+                        let to_cut = view.picked.is_some_and(|pick| pick.block == block.id && pick.part == index && (pick.from..pick.to).contains(&((word.from + word.to.max(word.from + 1)) / 2)));
                         // With its letters laid, the letter under the playhead is lit, not the whole
                         // word (user 2026-11-05: "the playhead's position should set the selection
                         // on the letters").
@@ -301,6 +303,8 @@ pub fn paint_block(ui: &mut egui::Ui, row: &qnc_script::BlockRow, view: &ScriptV
                                     let mut format = egui::TextFormat { font_id: egui::FontId::proportional(theme.font_ui + 1.0), color: theme.text, ..Default::default() };
                                     if at == lit_at {
                                         (format.color, format.background) = (theme.bg, theme.focus);
+                                    } else if to_cut {
+                                        (format.color, format.background) = (theme.bg, theme.danger);
                                     } else {
                                         format.background = theme.surface_alt;
                                     }
@@ -310,7 +314,9 @@ pub fn paint_block(ui: &mut egui::Ui, row: &qnc_script::BlockRow, view: &ScriptV
                             }
                             None => {
                                 let mut text = RichText::new(&word.text).color(if lit { theme.bg } else { theme.text }).size(theme.font_ui + 1.0);
-                                if lit {
+                                if to_cut {
+                                    text = text.color(theme.bg).background_color(theme.danger).strikethrough();
+                                } else if lit {
                                     text = text.background_color(theme.focus);
                                 } else if part_chosen {
                                     text = text.background_color(theme.surface_alt).underline();
@@ -328,6 +334,9 @@ pub fn paint_block(ui: &mut egui::Ui, row: &qnc_script::BlockRow, view: &ScriptV
                         let (from, to) = letter.map_or((word.from, word.to), |(_, span)| span);
                         if response.double_clicked() {
                             asked = Some(ActionEvent::key(WORD_CUT).with_target(format!("{id}:{index}:{from}:{to}")).at(PANEL));
+                        } else if response.clicked() && ui.input(|input| input.modifiers.shift) {
+                            // Shift+click: the pick grows to this word (Shift+ adds).
+                            asked = Some(ActionEvent::key(WORD_PICK).with_target(format!("{id}:{index}:{from}:{to}")).at(PANEL));
                         } else if response.clicked() {
                             asked = Some(ActionEvent::key(WORD_CUE).with_target(format!("{id}:{index}:{from}:{to}")).at(PANEL));
                         }
