@@ -691,6 +691,40 @@ impl Script {
                 self.pieces_request = Some((view::piece_inputs(&block), self.edge_frame(&block).unwrap_or(0)));
                 return Some(true);
             }
+            // Nothing taken: the arrows and the wheel move the playhead a frame (user 2026-11-05:
+            // "the basic arrow keys and the mouse wheel do not work on the timeline"; AGENTS
+            // 0.12, the same on every timeline).
+            "step_back_frame" | "step_forward_frame" | "wheel_source_back" | "wheel_source_forward" | "wheel_segments_back" | "wheel_segments_forward" => {
+                let forward = match action_id {
+                    "step_forward_frame" => true,
+                    "step_back_frame" => false,
+                    "wheel_segments_forward" => qnc_wheel_jog::source_step_forward("wheel_source_forward")?,
+                    "wheel_segments_back" => qnc_wheel_jog::source_step_forward("wheel_source_back")?,
+                    other => qnc_wheel_jog::source_step_forward(other)?,
+                };
+                let total = self.view.subsegment.as_ref().map_or(0, |view| view.total_frames);
+                let at = self.pieces_request.as_ref().map(|(_, frame)| *frame).or(preview.program_frame()).unwrap_or(0);
+                let to = if forward { (at + 1).min(total.saturating_sub(1)) } else { at.saturating_sub(1) };
+                self.pieces_request = Some((view::piece_inputs(&block), to));
+                return Some(true);
+            }
+            // Home, Alt+arrows and Alt+I as on the source timeline: the start, the edge of the
+            // part before or after the playhead, the IN of the part under it.
+            "playlist_input_start" | "navigate_prev_object" | "navigate_next_object" | "go_to_mark_in" if self.trim.is_none() => {
+                let view = self.view.subsegment.as_ref()?;
+                let at = self.pieces_request.as_ref().map(|(_, frame)| *frame).or(preview.program_frame()).unwrap_or(0);
+                let mut edges: Vec<u64> = view.parts.iter().flat_map(|part| [part.start, part.end.saturating_sub(1)]).collect();
+                edges.sort_unstable();
+                edges.dedup();
+                let to = match action_id {
+                    "playlist_input_start" => 0,
+                    "navigate_prev_object" => edges.iter().rev().find(|&&edge| edge < at).copied().unwrap_or(0),
+                    "navigate_next_object" => edges.iter().find(|&&edge| edge > at).copied().unwrap_or(at),
+                    _ => view.parts.iter().find(|part| (part.start..part.end).contains(&at)).map_or(0, |part| part.start),
+                };
+                self.pieces_request = Some((view::piece_inputs(&block), to));
+                return Some(true);
+            }
             _ => return None,
         };
         let mut trim = self.trim?;

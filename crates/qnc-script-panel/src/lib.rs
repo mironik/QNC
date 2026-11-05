@@ -290,13 +290,34 @@ pub fn paint_block(ui: &mut egui::Ui, row: &qnc_script::BlockRow, view: &ScriptV
                             ui.add_space(6.0);
                         }
                         let lit = heard.is_some_and(|frame| (word.from..word.to.max(word.from + 1)).contains(&frame));
-                        let mut text = RichText::new(&word.text).color(if lit { theme.bg } else { theme.text }).size(theme.font_ui + 1.0);
-                        if lit {
-                            text = text.background_color(theme.focus);
-                        } else if part_chosen {
-                            text = text.background_color(theme.surface_alt).underline();
-                        }
-                        let response = ui.add(egui::Label::new(text).sense(Sense::click()));
+                        // With its letters laid, the letter under the playhead is lit, not the whole
+                        // word (user 2026-11-05: "the playhead's position should set the selection
+                        // on the letters").
+                        let lit_letter = heard.and_then(|frame| word.letters.iter().position(|(_, span)| span.is_some_and(|(from, to)| (from..to).contains(&frame))));
+                        let response = match lit_letter.filter(|_| word.letters.len() == word.text.chars().count()) {
+                            Some(lit_at) => {
+                                let mut job = egui::text::LayoutJob::default();
+                                for (at, letter) in word.text.chars().enumerate() {
+                                    let mut format = egui::TextFormat { font_id: egui::FontId::proportional(theme.font_ui + 1.0), color: theme.text, ..Default::default() };
+                                    if at == lit_at {
+                                        (format.color, format.background) = (theme.bg, theme.focus);
+                                    } else {
+                                        format.background = theme.surface_alt;
+                                    }
+                                    job.append(&letter.to_string(), 0.0, format);
+                                }
+                                ui.add(egui::Label::new(job).sense(Sense::click()))
+                            }
+                            None => {
+                                let mut text = RichText::new(&word.text).color(if lit { theme.bg } else { theme.text }).size(theme.font_ui + 1.0);
+                                if lit {
+                                    text = text.background_color(theme.focus);
+                                } else if part_chosen {
+                                    text = text.background_color(theme.surface_alt).underline();
+                                }
+                                ui.add(egui::Label::new(text).sense(Sense::click()))
+                            }
+                        };
                         if bring && at == 0 {
                             response.scroll_to_me(Some(egui::Align::Center));
                         }
