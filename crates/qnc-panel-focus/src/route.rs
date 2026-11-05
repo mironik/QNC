@@ -285,7 +285,7 @@ impl PanelFocus {
             // The wheel over a panel (user 2026-10-16, piece `qnc-wheel-jog`): that panel takes
             // the keyboard and the wheel is its left/right arrow.
             // Ctrl+wheel is Ctrl+left/right: the level of a taken A1/A2 sound, up louder.
-            wheel if wheel.starts_with("wheel_") && wheel.contains("_ctrl_") => {
+            wheel if qnc_edit_step::ctrl_frames(wheel).is_some() => {
                 self.panel = if wheel.starts_with("wheel_source") { Panel::SourceTimeline } else { Panel::Segments };
                 // On the source timeline with no lane taken, Ctrl+wheel moves the taken IN/OUT or
                 // segment edge, as on the source timeline of every form (audit 2026-10-20: in
@@ -294,31 +294,28 @@ impl PanelFocus {
                     if !(self.taken(timeline) || segments.trimming_edge()) {
                         return Some(false);
                     }
-                    let forward = wheel.ends_with("back") != qnc_wheel_jog::playhead_up_forward();
-                    let arrow = if forward { "step_forward_frame" } else { "step_back_frame" };
+                    let arrow = qnc_edit_step::arrow(qnc_edit_step::ctrl_frames(wheel)?);
                     return self.route_on_panel(arrow, (preview, wrap, segments, timeline));
                 }
-                let level = if wheel.ends_with("back") { "lane_level_down" } else { "lane_level_up" };
+                let level = qnc_edit_step::level_action(qnc_edit_step::level(wheel)?);
                 return self.route_on_panel(level, (preview, wrap, segments, timeline));
             }
             // The wheel alone is the left/right arrow, its direction this computer's choice;
             // where those arrows turn a taken sound off/on, the wheel moves the playhead
             // (user 2026-10-16: the level never goes straight to the wheel, the playhead does).
-            wheel if wheel.starts_with("wheel_") => {
+            wheel if qnc_edit_step::is_wheel(wheel) => {
                 // A segment edge (Ctrl+Shift+I/O) is taken on the source timeline: the wheel
                 // moves it wherever the pointer is (live 2026-10-16: over the segment panel the
                 // wheel did nothing).
                 self.panel = if wheel.starts_with("wheel_source") || segments.trimming_edge() { Panel::SourceTimeline } else { Panel::Segments };
-                let forward = wheel.ends_with("back") != qnc_wheel_jog::playhead_up_forward();
-                let frames = if forward { 1 } else { -1 };
+                let frames = qnc_edit_step::frames(wheel)?;
                 if self.panel == Panel::Segments && segments.part_sound_taken() {
                     return Some(wrap.step(frames));
                 }
                 if self.panel == Panel::SourceTimeline && self.source.lane_taken() {
                     return self.source.route(wheel, preview, timeline); // the playhead moves
                 }
-                let arrow = if forward { "step_forward_frame" } else { "step_back_frame" };
-                return self.route_on_panel(arrow, (preview, wrap, segments, timeline));
+                return self.route_on_panel(qnc_edit_step::arrow(frames), (preview, wrap, segments, timeline));
             }
             _ => {}
         }

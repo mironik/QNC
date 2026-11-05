@@ -200,3 +200,53 @@ tekstu i prijepis, analiza kadrova, normalizacija glasnoce (EBU R 128), proxy, X
    playhead, a dok je rub ili rez uzet donese ga na rijec (prijepis: novo, prije je samo pomicao
    playhead; scenarij; zoom source timelinea, Storyja i slozene izjave); dvoklik na dvije rijeci
    je IN-OUT par (source timeline `cut_word` i scenarij `WORD_CUT` kroz isti `WordPair`).
+
+## 5. Drugi krug: sve opcije istim kockama (korisnik 2026-11-05)
+
+Korisnik 2026-11-05: "treba standardizirati sve timeline i pripadajuci zoom.. sve opcije moraju
+koristiti iste kocke". Audit (grana `libav-decoder`, 7880fc3f): koraci 1-6 objedinili su geste,
+trake, ton reza, rub komada i rijeci; ostalo je da svaki vlasnik sam cita tipke (strelice i
+kotacic na desetak mjesta) i da neke radnje postoje samo na nekim timelineima.
+
+### 5.1. Tablica radnji (S = source, W = Wrap redovi Storyja, SS = S-Story, Sub = slozena izjava, Z = zoom reza)
+
+| Radnja | S | W | SS | Sub | Z | Napomena |
+|---|---|---|---|---|---|---|
+| Strelice, kotacic: playhead ili uzeto | da | da | da | da (5. 11.) | da | od 5. 11. jedna kocka `qnc-edit-step` |
+| Ctrl+kotacic: razina uzete trake / pomak uzete oznake | da | da | da | da | da | `qnc-edit-step` |
+| Home, Alt+I | da | da | da | da (5. 11.) | - | |
+| Alt+strelice | uzima start/IN/OUT | marker, slot, segment | isto W | samo playhead | - | TRI ZNACENJA (odluka korisnika) |
+| I / O | IN/OUT klipa | nema ucinka (rub slota je Ctrl+I/O) | isto W | IN/OUT dijela | - | |
+| Ctrl+I/O uzmi rub | da | rub slota | rub klipa | rub dijela | da | |
+| Gore/dolje: uzeto na kljucnu sliku | da | da | da | NE | kroz vlasnika | |
+| Shift+K dinamicni trim, JKL | da | da | da | da | da | |
+| Slip (Ctrl+Shift+S) | - | da | da | da | - | |
+| Srednji klik / dvoklik: rez | par IN/OUT | M marker | M marker | NE | NE | |
+| F match frame | da | da | da | NE | - | |
+| Backspace undo | - | da | da | NE | kroz vlasnika | baza scenarija nema korake undoa |
+| Delete | - | uzeto | uzeto | izabrani dio | - | |
+| Klik na sliku zooma | - | strana reza | strana reza | bira slot | - | DVA ZNACENJA (odluka korisnika) |
+| Trake A1/A2, J/L, rijeci, snapping | da | da | da | da | da | koraci 3, 4, 6, docs/98 |
+
+### 5.2. Koraci
+
+1. **Jedan korak po tipki** (IZVEDENO 2026-11-05): nova cista kocka `qnc-edit-step` (`frames`:
+   strelice i kotacic svakog timelinea uz smjer kotacica racunala; `ctrl_frames`: Ctrl+kotacic
+   pomice uzetu oznaku; `level`: Ctrl+strelice i Ctrl+kotacic, gore glasnije svugdje; `arrow`,
+   `level_action`, `is_wheel`). Postavka smjera kotacica (`data/mouse-wheel.json`) premjestena je
+   iz `qnc-wheel-jog` (koji je ponovno izvozi). Koriste je `qnc-source-timeline`,
+   `qnc-source-panel`, `qnc-panel-focus`, `qnc-script` (rub, slot, ton spoja, slip, playhead,
+   mis), `qnc-program-segments` (slip, slot, rub slota, marker), `qnc-segments-keys`,
+   `qnc-sync-session`; vlastite pretvorbe uklonjene. Ponasanje isto (zlatne tablice tipki i misa
+   nepromijenjene).
+2. **Kljucna slika i match frame za svakog vlasnika**: vlasnik daje "sliku uzetog" (klip i
+   slika izvora, kao Story `keyframe_reference`); `qnc-keyframe-nav` i `qnc-match-frame` je
+   traze od bilo kojeg vlasnika (slozena izjava dobiva gore/dolje i F).
+3. **Jedan protokol uzetog**: svako uzeto (rub slota, slot, marker, slip, Sync, rub/rez/ton/slot
+   dijela slozene izjave, source oznaka) je ista stvar s istim glagolima (pomak, kljucna slika,
+   povlacenje, Enter, Spremi, Esc); mali usmjerivac bez znanja o vlasnicima, kocka po vrsti
+   uzetog. Uklanja ponovljene grane Enter/Esc/Spremi kod svakog vlasnika.
+4. **Rez srednjim klikom/dvoklikom na slozenoj izjavi i u zoomu** (odluka korisnika: na slozenoj
+   izjavi dijeli dio na dva?).
+5. **Undo slozene izjave** (odluka korisnika: koraci undoa u bazi scenarija, kao `story_undo`).
+6. **Jedno znacenje Alt+strelica i klika na sliku zooma** (odluka korisnika).

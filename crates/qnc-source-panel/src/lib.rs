@@ -88,7 +88,7 @@ impl SourcePanel {
         Some(match action_id {
             "play_pause" => preview.toggle_play(),
             "step_back_frame" | "step_forward_frame" => {
-                let frames = if action_id == "step_back_frame" { -1 } else { 1 };
+                let frames = qnc_edit_step::frames(action_id).unwrap_or(1);
                 if self.mark_taken(timeline) {
                     mark_cue(preview, qnc_source_mark_focus::nudge(timeline, frames))
                 } else {

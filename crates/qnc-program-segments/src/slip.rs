@@ -18,8 +18,7 @@ impl ProgramSegments {
         }
         let (segment_id, frames, source_in) = self.slip.clone()?;
         let step = match action_id {
-            "step_back_frame" => -1,
-            "step_forward_frame" => 1,
+            step if qnc_edit_step::frames(step).is_some() => qnc_edit_step::frames(step)?,
             "activate_focused_item" => return Some(self.commit_slip()),
             "clear_focus" => {
                 self.slip = None;

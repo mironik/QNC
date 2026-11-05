@@ -338,8 +338,9 @@ impl SourceTimeline {
             // The wheel is the left/right arrow; while a lane is taken (where the arrows
             // turn it off/on) it moves the playhead (user 2026-10-16). Ctrl+wheel is
             // Ctrl+left/right: the level of a taken lane, up louder.
-            wheel if wheel.starts_with("wheel_") && wheel.contains("_ctrl_") => {
-                let level = if wheel.ends_with("back") { "lane_level_down" } else { "lane_level_up" };
+            // One step by one key (`qnc-edit-step`, the same on every timeline and its zoom).
+            wheel if qnc_edit_step::ctrl_frames(wheel).is_some() => {
+                let level = qnc_edit_step::level_action(qnc_edit_step::level(wheel)?);
                 if let Some(changed) = self.route_lane(level, preview) {
                     return Some(changed);
                 }
@@ -348,17 +349,14 @@ impl SourceTimeline {
                 if !self.keys.mark_taken(timeline) {
                     return Some(false);
                 }
-                let forward = wheel.ends_with("back") != qnc_wheel_jog::playhead_up_forward();
-                self.keys.route(if forward { "step_forward_frame" } else { "step_back_frame" }, preview, timeline)
+                self.keys.route(qnc_edit_step::arrow(qnc_edit_step::ctrl_frames(wheel)?), preview, timeline)
             }
-            wheel if wheel.starts_with("wheel_") => {
-                let forward = wheel.ends_with("back") != qnc_wheel_jog::playhead_up_forward();
-                let frames = if forward { 1 } else { -1 };
+            wheel if qnc_edit_step::is_wheel(wheel) => {
+                let frames = qnc_edit_step::frames(wheel)?;
                 if self.lane_taken() {
                     return Some(preview.step(frames));
                 }
-                let arrow = if forward { "step_forward_frame" } else { "step_back_frame" };
-                self.keys.route(arrow, preview, timeline)
+                self.keys.route(qnc_edit_step::arrow(frames), preview, timeline)
             }
             // Down with no lane taken closes an open large wave.
             "step_next_part" if self.lanes.wave_zoom() != [0, 0] => {

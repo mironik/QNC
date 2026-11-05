@@ -38,10 +38,7 @@ pub fn own_action(view: &SubsegmentView, action_id: &str, value: Option<i64>, ta
         // A drag of the taken edge (only what is taken moves): the edge follows the pointer.
         "timeline_drag_marker" => own(DRAG_EDGE, Some(drag_target(target?, frame?)?)),
         // The wheel: the arrows, Ctrl+wheel the Ctrl+arrows of the source lane (the part's level).
-        "wheel_segments_back" | "wheel_segments_forward" => {
-            let forward = qnc_wheel_jog::source_step_forward(if action_id == "wheel_segments_forward" { "wheel_source_forward" } else { "wheel_source_back" })?;
-            own(if forward { "step_forward_frame" } else { "step_back_frame" }, None)
-        }
+        "wheel_segments_back" | "wheel_segments_forward" => own(qnc_edit_step::arrow(qnc_edit_step::frames(action_id)?), None),
         "wheel_segments_ctrl_back" => own("wheel_source_ctrl_back", None),
         "wheel_segments_ctrl_forward" => own("wheel_source_ctrl_forward", None),
         _ => None,

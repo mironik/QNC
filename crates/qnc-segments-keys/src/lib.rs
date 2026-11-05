@@ -195,7 +195,7 @@ pub fn marks(
 /// the Wrap playhead, which brings Wrap back (live 2026-10-20: the wheel over the Wrap rows
 /// did nothing after the source timeline had been used).
 pub fn step(action_id: &str, wrap: &mut WrapSession, segments: &mut ProgramSegments) -> bool {
-    let frames = if action_id == "step_back_frame" { -1 } else { 1 };
+    let frames = qnc_edit_step::frames(action_id).unwrap_or(1);
     if segments.handles(action_id) {
         segments.apply_action(action_id)
     } else if wrap.is_active() {

@@ -25,5 +25,6 @@ qnc-timeline = { workspace = true }
 qnc-timeline-assets = { workspace = true }
 qnc-ui-text = { workspace = true }
 qnc-wheel-jog = { workspace = true }
+qnc-edit-step = { workspace = true }
 qnc-clip-sound = { workspace = true }
 qnc-edit-words = { workspace = true }

@@ -19,7 +19,7 @@ qnc-program-waveform = { workspace = true }
 qnc-program-filmstrip = { workspace = true }
 qnc-program-view = { workspace = true }
 qnc-trim-stills = { workspace = true }
-qnc-wheel-jog = { workspace = true }
+qnc-edit-step = { workspace = true }
 qnc-timeline = { workspace = true }
 qnc-transcript = { workspace = true }
 qnc-transcript-db = { workspace = true }

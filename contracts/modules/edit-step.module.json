@@ -1,0 +1,20 @@
+{
+  "module_id": "qnc.module.edit-step",
+  "module_name": "Edit step",
+  "module_version": "0.1.0",
+  "module_kind": "library",
+  "capabilities": ["ui.input.edit_step"],
+  "input_contract_version": "0.1.0",
+  "output_contract_version": "0.1.0",
+  "supported_os": ["windows", "linux", "macos"],
+  "supported_cpu": ["x86_64", "aarch64"],
+  "transport_protocol_version": "0.1.0",
+  "forbidden_calls": ["ffprobe", "media.decode", "database.read", "database.write", "player.command", "business.workflow"],
+  "forbidden_dependencies": ["qnc.module.media-probe", "qnc.module.content-store"],
+  "state_policy": "stateless",
+  "database_write_policy": "no_db_writes",
+  "runtime_crate": "qnc-edit-step",
+  "input": "One catalog action (an arrow, the wheel over a source timeline or the Wrap rows, with or without Ctrl, Ctrl+left/right) and this computer's choice of the wheel's direction (data/mouse-wheel.json).",
+  "output": "The step it is in frames (the playhead or what is taken), the step of a taken mark by Ctrl+wheel, or the step of a level (up louder everywhere); none for any other action.",
+  "specification": "User 2026-11-05: every timeline and its zoom use the same blocks; the arrows and the wheel are read here once, not by each owner (AGENTS 0.12)."
+}

@@ -6,7 +6,7 @@ impl ProgramSegments {
         self.command_for(action_id).is_some()
             || action_id == crate::SLIP
             || ((self.slot_move.is_some() || self.slot_trim.is_some() || self.slip.is_some())
-                && matches!(action_id, "step_back_frame" | "step_forward_frame" | "clear_focus"))
+                && (qnc_edit_step::frames(action_id).is_some() || action_id == "clear_focus"))
     }
 
     /// Applies a keyboard catalog action of the program; false if it is not one.
@@ -34,8 +34,7 @@ impl ProgramSegments {
         }
         if self.marker_edit.is_some() {
             match action_id {
-                "step_back_frame" => return Some(SegmentCommand::NudgeMarker(-1)),
-                "step_forward_frame" => return Some(SegmentCommand::NudgeMarker(1)),
+                step if qnc_edit_step::frames(step).is_some() => return Some(SegmentCommand::NudgeMarker(qnc_edit_step::frames(step)?)),
                 "clear_focus" => return Some(SegmentCommand::CancelMarkerEdit),
                 _ => {}
             }

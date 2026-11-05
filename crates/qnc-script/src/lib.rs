@@ -680,8 +680,7 @@ impl Script {
                 self.trim = new;
                 0
             }
-            "step_back_frame" | "step_forward_frame" if self.trim.is_some() => if action_id == "step_forward_frame" { 1 } else { -1 },
-            "wheel_source_back" | "wheel_source_forward" if self.trim.is_some() => if qnc_wheel_jog::source_step_forward(action_id)? { 1 } else { -1 },
+            step if self.trim.is_some() && qnc_edit_step::frames(step).is_some() => qnc_edit_step::frames(step)?,
             "activate_focused_item" if self.trim.is_some() => {
                 let trim = self.trim.take()?;
                 return Some(self.write_trim(preview, &block, &pieces, trim));
@@ -694,14 +693,8 @@ impl Script {
             // Nothing taken: the arrows and the wheel move the playhead a frame (user 2026-11-05:
             // "the basic arrow keys and the mouse wheel do not work on the timeline"; AGENTS
             // 0.12, the same on every timeline).
-            "step_back_frame" | "step_forward_frame" | "wheel_source_back" | "wheel_source_forward" | "wheel_segments_back" | "wheel_segments_forward" => {
-                let forward = match action_id {
-                    "step_forward_frame" => true,
-                    "step_back_frame" => false,
-                    "wheel_segments_forward" => qnc_wheel_jog::source_step_forward("wheel_source_forward")?,
-                    "wheel_segments_back" => qnc_wheel_jog::source_step_forward("wheel_source_back")?,
-                    other => qnc_wheel_jog::source_step_forward(other)?,
-                };
+            step if qnc_edit_step::frames(step).is_some() => {
+                let forward = qnc_edit_step::frames(step)? > 0;
                 let total = self.view.subsegment.as_ref().map_or(0, |view| view.total_frames);
                 let at = self.pieces_request.as_ref().map(|(_, frame)| *frame).or(preview.program_frame()).unwrap_or(0);
                 let to = if forward { (at + 1).min(total.saturating_sub(1)) } else { at.saturating_sub(1) };
@@ -799,9 +792,8 @@ impl Script {
         }
         let (index, by) = self.slide?;
         let step = match action_id {
-            "step_back_frame" => -1,
-            "step_forward_frame" => 1,
-            "wheel_source_back" | "wheel_source_forward" => if qnc_wheel_jog::source_step_forward(action_id)? { 1 } else { -1 },
+            // The arrows and the wheel: one step (`qnc-edit-step`, the same on every timeline).
+            step if qnc_edit_step::frames(step).is_some() => qnc_edit_step::frames(step)?,
             "activate_focused_item" => {
                 self.slide = None;
                 let mut moved = pieces.to_vec();
@@ -929,9 +921,8 @@ impl Script {
                 self.join_sound = Some(join);
                 return Some(true);
             }
-            "step_back_frame" => -1,
-            "step_forward_frame" => 1,
-            "wheel_source_back" | "wheel_source_forward" => if qnc_wheel_jog::source_step_forward(action_id)? { 1 } else { -1 },
+            // The arrows and the wheel: one step (`qnc-edit-step`, the same on every timeline).
+            step if qnc_edit_step::frames(step).is_some() => qnc_edit_step::frames(step)?,
             // In the zoom (the same system actions as on a story's row): a click near a side takes
             // that side, a drag moves the moving side to the frame.
             "timeline_take_cut_edge" | "timeline_drag_cut_edge" => {
@@ -1076,9 +1067,8 @@ impl Script {
         let (index, by) = self.slip_part?;
         let piece = pieces.get(index)?;
         let step = match action_id {
-            "step_back_frame" => -1,
-            "step_forward_frame" => 1,
-            "wheel_source_back" | "wheel_source_forward" => if qnc_wheel_jog::source_step_forward(action_id)? { 1 } else { -1 },
+            // The arrows and the wheel: one step (`qnc-edit-step`, the same on every timeline).
+            step if qnc_edit_step::frames(step).is_some() => qnc_edit_step::frames(step)?,
             "activate_focused_item" => {
                 self.slip_part = None;
                 return Some(self.write_slip(preview, block, piece, index, by));

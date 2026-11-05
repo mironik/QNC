@@ -5,6 +5,7 @@ edition = "2021"
 description = "QNC public block: every key of Sync/B-roll in one place"
 
 [dependencies]
+qnc-edit-step = { workspace = true }
 qnc-program-segments = { workspace = true }
 qnc-source-preview = { workspace = true }
 qnc-wrap-session = { workspace = true }

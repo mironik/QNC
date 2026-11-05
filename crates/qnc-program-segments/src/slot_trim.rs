@@ -136,8 +136,7 @@ impl ProgramSegments {
     pub(crate) fn trim_key(&mut self, action_id: &str) -> Option<bool> {
         self.slot_trim.as_ref()?;
         match action_id {
-            "step_back_frame" => Some(self.nudge_trim(-1)),
-            "step_forward_frame" => Some(self.nudge_trim(1)),
+            step if qnc_edit_step::frames(step).is_some() => Some(self.nudge_trim(qnc_edit_step::frames(step)?)),
             "activate_focused_item" => Some(self.commit_slot_trim()),
             "clear_focus" => {
                 self.slot_trim = None;

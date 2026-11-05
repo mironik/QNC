@@ -3965,6 +3965,14 @@ name = "qnc-edit-edge"
 version = "0.1.0"
 
 [[package]]
+name = "qnc-edit-step"
+version = "0.1.0"
+dependencies = [
+ "qnc-dev-diagnostics",
+ "serde_json",
+]
+
+[[package]]
 name = "qnc-edit-verbs"
 version = "0.1.0"
 dependencies = [
@@ -5299,6 +5307,7 @@ dependencies = [
  "qnc-db-broker",
  "qnc-dev-diagnostics",
  "qnc-edit-edge",
+ "qnc-edit-step",
  "qnc-edit-verbs",
  "qnc-edit-words",
  "qnc-focus-walk",
@@ -5714,6 +5723,7 @@ dependencies = [
  "qnc-db-broker",
  "qnc-dev-diagnostics",
  "qnc-edit-cut",
+ "qnc-edit-step",
  "qnc-export-choice",
  "qnc-export-launch",
  "qnc-image-assets",
@@ -6035,6 +6045,7 @@ dependencies = [
  "qnc-dev-diagnostics",
  "qnc-edit-cut",
  "qnc-edit-edge",
+ "qnc-edit-step",
  "qnc-edit-verbs",
  "qnc-edit-words",
  "qnc-export-launch",
@@ -6063,7 +6074,6 @@ dependencies = [
  "qnc-voice-catalog",
  "qnc-voice-record",
  "qnc-voice-take",
- "qnc-wheel-jog",
  "serde",
  "serde_json",
 ]
@@ -6194,6 +6204,7 @@ dependencies = [
 name = "qnc-segments-keys"
 version = "0.1.0"
 dependencies = [
+ "qnc-edit-step",
  "qnc-program-segments",
  "qnc-source-preview",
  "qnc-source-timeline",
@@ -6531,6 +6542,7 @@ dependencies = [
 name = "qnc-source-panel"
 version = "0.1.0"
 dependencies = [
+ "qnc-edit-step",
  "qnc-source-mark-focus",
  "qnc-source-preview",
  "qnc-timeline",
@@ -6607,6 +6619,7 @@ dependencies = [
  "qnc-clip-sound",
  "qnc-desktop-theme",
  "qnc-dev-diagnostics",
+ "qnc-edit-step",
  "qnc-edit-words",
  "qnc-key-intents",
  "qnc-lane-choice",
@@ -6700,6 +6713,7 @@ dependencies = [
 name = "qnc-sync-session"
 version = "0.1.0"
 dependencies = [
+ "qnc-edit-step",
  "qnc-program-segments",
  "qnc-source-preview",
  "qnc-wrap-session",
@@ -7150,8 +7164,7 @@ name = "qnc-wheel-jog"
 version = "0.1.0"
 dependencies = [
  "eframe",
- "qnc-dev-diagnostics",
- "serde_json",
+ "qnc-edit-step",
 ]
 
 [[package]]

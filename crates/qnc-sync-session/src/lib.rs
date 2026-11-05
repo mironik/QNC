@@ -29,8 +29,8 @@ pub fn route(
     ControlFlow::Break(Some(match action_id {
         // A Sync (user 2026-10-13): stopped, the arrows move its end; Enter writes the
         // cover, wherever the keyboard is (Escape drops the draft: `qnc-panel-focus`).
-        "step_back_frame" | "step_forward_frame" if segments.sync_drafting() && !preview.player_view().playing() => {
-            let moved = segments.sync_nudge(if action_id == "step_back_frame" { -1 } else { 1 });
+        step if qnc_edit_step::frames(step).is_some() && segments.sync_drafting() && !preview.player_view().playing() => {
+            let moved = segments.sync_nudge(qnc_edit_step::frames(step).unwrap_or(1));
             moved && show_draft_end(preview, segments)
         }
         "activate_focused_item" if segments.sync_drafting() => segments.confirm_source(),

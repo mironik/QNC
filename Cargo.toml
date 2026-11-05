@@ -254,6 +254,7 @@ members = [
     "crates/qnc-mouse-map",
     "crates/qnc-touchpad",
     "crates/qnc-action-event",
+    "crates/qnc-edit-step",
     "crates/qnc-edit-verbs",
     "crates/qnc-edit-cut",
     "crates/qnc-edit-edge",
@@ -551,6 +552,7 @@ qnc-gesture-steps = { path = "crates/qnc-gesture-steps" }
 qnc-mouse-map = { path = "crates/qnc-mouse-map" }
 qnc-touchpad = { path = "crates/qnc-touchpad" }
 qnc-action-event = { path = "crates/qnc-action-event" }
+qnc-edit-step = { path = "crates/qnc-edit-step" }
 qnc-edit-verbs = { path = "crates/qnc-edit-verbs" }
 qnc-edit-cut = { path = "crates/qnc-edit-cut" }
 qnc-edit-edge = { path = "crates/qnc-edit-edge" }
