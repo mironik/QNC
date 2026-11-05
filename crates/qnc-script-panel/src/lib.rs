@@ -9,7 +9,9 @@
 
 use eframe::egui::{self, RichText, Sense};
 use qnc_action_event::ActionEvent;
-use qnc_script::{seconds_label, FieldEdit, DRAFT, EXPORT, SEND_STORY, OPEN_EXPORT, Role, FIELD_COMMIT, FIELD_SET, FIELD_TEXT, ScriptView, ADD_CLIP, ADD_QUOTE, ADD_TEXT, CLEAR_EDITOR, EDITOR_TEXT, MOVE_DOWN, MOVE_UP, OPEN, PANEL, RECORD, REMOVE, REPLACE_TEXT, SELECT, VOICE_TAKE, WORD_CUE, WORD_CUT, WORD_PICK, WORD_TAKE};
+use qnc_script::{seconds_label, FieldEdit, DRAFT, EXPORT, SEND_STORY, OPEN_EXPORT, Role, FIELD_COMMIT, FIELD_SET, FIELD_TEXT, ScriptView, ADD_CLIP, ADD_QUOTE, ADD_TEXT, CLEAR_EDITOR, EDITOR_TEXT, MOVE_DOWN, MOVE_UP, OPEN, PANEL, RECORD, REMOVE, REPLACE_TEXT, SELECT, VOICE_TAKE};
+
+mod text_editor;
 use qnc_text_source_editor::{Answer, Editor, EditorButton};
 use qnc_transcript::TranscriptView;
 
@@ -280,86 +282,13 @@ pub fn paint_block(ui: &mut egui::Ui, row: &qnc_script::BlockRow, view: &ScriptV
                 let seen = egui::Id::new(("qnc_script_chosen_part", block.id));
                 let bring = part_chosen && ui.ctx().data(|data| data.get_temp::<usize>(seen)) != Some(index);
                 ui.ctx().data_mut(|data| if part_chosen { data.insert_temp(seen, index) } else if open.is_some_and(|open| open.chosen.is_none()) { data.remove::<usize>(seen) });
-                ui.horizontal_wrapped(|ui| {
-                    ui.spacing_mut().item_spacing.x = 4.0;
-                    for (at, word) in words.iter().enumerate() {
-                        // Every word keeps its time, but it is not written over the text (user
-                        // 2026-11-05: "the times only make it hard to read"): it shows under the
-                        // mouse; a new line of speech has a gap before it.
-                        if word.line {
-                            ui.add_space(6.0);
-                        }
-                        let lit = heard.is_some_and(|frame| (word.from..word.to.max(word.from + 1)).contains(&frame));
-                        // Picked to be cut out (user 2026-11-05: Delete cuts the words out of the video).
-                        let to_cut = view.picked.is_some_and(|pick| pick.block == block.id && pick.part == index && (pick.from..pick.to).contains(&((word.from + word.to.max(word.from + 1)) / 2)));
-                        // With its letters laid, the letter under the playhead is lit, not the whole
-                        // word (user 2026-11-05: "the playhead's position should set the selection
-                        // on the letters").
-                        let lit_letter = heard.and_then(|frame| word.letters.iter().position(|(_, span)| span.is_some_and(|(from, to)| (from..to).contains(&frame))));
-                        // The letters taken one by one (user 2026-11-05: "the same for the letters"): a
-                        // word whose letters are laid is drawn letter by letter while one is lit or taken.
-                        let picked_here = view.picked.filter(|pick| pick.block == block.id && pick.part == index && pick.from < word.to.max(word.from + 1) && word.from < pick.to);
-                        let letters_laid = word.letters.len() == word.text.chars().count() && word.letters.iter().all(|(_, span)| span.is_some());
-                        let by_letter = letters_laid && (lit_letter.is_some() || picked_here.is_some());
-                        let response = match by_letter.then_some(lit_letter.unwrap_or(usize::MAX)) {
-                            Some(lit_at) => {
-                                let mut job = egui::text::LayoutJob::default();
-                                for (at, letter) in word.text.chars().enumerate() {
-                                    let mut format = egui::TextFormat { font_id: egui::FontId::proportional(theme.font_ui + 1.0), color: theme.text, ..Default::default() };
-                                    let letter_cut = picked_here.zip(word.letters.get(at).and_then(|(_, span)| *span)).is_some_and(|(pick, (from, to))| (pick.from..pick.to).contains(&((from + to.max(from + 1)) / 2)));
-                                    if at == lit_at {
-                                        (format.color, format.background) = (theme.bg, theme.focus);
-                                    } else if letter_cut {
-                                        format.strikethrough = egui::Stroke::new(1.5, theme.bg);
-                                        (format.color, format.background) = (theme.bg, theme.danger);
-                                    } else {
-                                        format.background = theme.surface_alt;
-                                    }
-                                    job.append(&letter.to_string(), 0.0, format);
-                                }
-                                ui.add(egui::Label::new(job).selectable(false).sense(Sense::click()))
-                            }
-                            None => {
-                                let mut text = RichText::new(&word.text).color(if lit { theme.bg } else { theme.text }).size(theme.font_ui + 1.0);
-                                if to_cut {
-                                    text = text.color(theme.bg).background_color(theme.danger).strikethrough();
-                                } else if lit {
-                                    text = text.background_color(theme.focus);
-                                } else if part_chosen {
-                                    text = text.background_color(theme.surface_alt).underline();
-                                }
-                                ui.add(egui::Label::new(text).selectable(false).sense(Sense::click()))
-                            }
-                        };
-                        if bring && at == 0 {
-                            response.scroll_to_me(Some(egui::Align::Center));
-                        }
-                        // With its letters laid (user 2026-11-05: cutting by letters) a click is on
-                        // the letter under the mouse: its frames instead of the word's.
-                        let font = egui::FontId::proportional(theme.font_ui + 1.0);
-                        let letter = response.hover_pos().and_then(|at| letter_at(ui, &font, &word.text, &word.letters, at.x - response.rect.left()));
-                        let (from, to) = letter.map_or((word.from, word.to), |(_, span)| span);
-                        if response.double_clicked() {
-                            asked = Some(ActionEvent::key(WORD_CUT).with_target(format!("{id}:{index}:{from}:{to}")).at(PANEL));
-                        } else if response.secondary_clicked() {
-                            // A right click is Ctrl+ (user 2026-11-05, every action the same): it takes
-                            // the word or the letter under the mouse; Shift+right click takes up to it
-                            // (Shift+ adds). Delete cuts what is taken out of the video.
-                            let action = if ui.input(|input| input.modifiers.shift) { WORD_PICK } else { WORD_TAKE };
-                            asked = Some(ActionEvent::key(action).with_target(format!("{id}:{index}:{from}:{to}")).at(PANEL));
-                        } else if response.clicked() {
-                            asked = Some(ActionEvent::key(WORD_CUE).with_target(format!("{id}:{index}:{from}:{to}")).at(PANEL));
-                        }
-                        if response.hovered() {
-                            ui.ctx().set_cursor_icon(if letter.is_some() { egui::CursorIcon::Text } else { egui::CursorIcon::PointingHand });
-                            let hint = match letter {
-                                Some((at, _)) => format!("{}  '{}'  {}", word.tc, word.text.chars().nth(at).unwrap_or(' '), qnc_ui_text::text("script.letter_hint")),
-                                None => format!("{}  {}", word.tc, qnc_ui_text::text("script.word_hint")),
-                            };
-                            response.on_hover_text(hint);
-                        }
-                    }
-                });
+                // The words are a text edited as in any editor (user 2026-11-06: "a plain classic
+                // text edit: what is deleted in the text is deleted in the sound"): Enter cuts out
+                // what the text no longer says, Esc gives the text back; a click puts the playhead
+                // on the word clicked.
+                if let Some(event) = text_editor::show(ui, theme, (block.id, index), words, heard, (part_chosen, bring)) {
+                    asked = Some(event);
+                }
                 continue;
             }
             let shown = if text.is_empty() { qnc_ui_text::text("script.no_words").to_string() } else { text.to_string() };
@@ -445,19 +374,4 @@ fn paint_editor(ui: &mut egui::Ui, view: &ScriptView, theme: &qnc_desktop_theme:
         Answer::Button(action, Some(kind)) => Some(ActionEvent::key(action).with_target(kind).at(PANEL)),
         Answer::Button(action, None) => Some(ActionEvent::key(action).at(PANEL)),
     }
-}
-
-/// The letter of `text` under `x` (from the word's left edge) when its letters are laid: its
-/// index and frames. The width of every first part of the word says where each letter is.
-fn letter_at(ui: &egui::Ui, font: &egui::FontId, text: &str, letters: &[(char, Option<(u64, u64)>)], x: f32) -> Option<(usize, (u64, u64))> {
-    if letters.len() != text.chars().count() {
-        return None;
-    }
-    let width = |count: usize| -> f32 {
-        let part: String = text.chars().take(count).collect();
-        ui.fonts(|fonts| fonts.layout_no_wrap(part, font.clone(), egui::Color32::WHITE).size().x)
-    };
-    let at = (0..letters.len()).find(|&index| x < width(index + 1)).unwrap_or(letters.len().saturating_sub(1));
-    // A sign without frames (a comma) gives the letter before it.
-    (0..=at).rev().find_map(|index| letters[index].1.map(|span| (index, span)))
 }

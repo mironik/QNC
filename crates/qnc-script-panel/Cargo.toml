@@ -7,6 +7,7 @@ description = "QNC public passive panel: the script of the story (user 2026-10-2
 [dependencies]
 eframe = { workspace = true }
 qnc-action-event = { workspace = true }
+qnc-keyboard-shortcut = { workspace = true }
 qnc-desktop-theme = { workspace = true }
 qnc-script = { workspace = true }
 qnc-settings-form = { workspace = true }

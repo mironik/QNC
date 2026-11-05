@@ -226,6 +226,12 @@
     "script_word_take": {
       "label": "Desni klik (Ctrl+) na rijec ili slovo izjave: uzme ga (Delete ga izreze iz videa)"
     },
+    "script_text_cut": {
+      "label": "Uredeni tekst izjave: ono sto je obrisano u tekstu izreze se iz tona i slike (Enter)"
+    },
+    "script_text_revert": {
+      "label": "Uredeni tekst izjave vraca se kakav je bio (Esc)"
+    },
     "subsegment_join_gap": {
       "label": "Razmak prije dijela SubSegmenta (slika vise ili manje)"
     },
@@ -714,6 +720,10 @@
             "key": "Enter"
           }
         ]
+      },
+      "script_text": {
+        "script_text_cut": [{ "key": "Enter" }],
+        "script_text_revert": [{ "key": "Escape" }]
       },
       "transcript_search": {
         "transcript_search_next": [{ "key": "Enter" }]

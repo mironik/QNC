@@ -16,6 +16,9 @@ pub const WORD_PICK: &str = "script_word_pick";
 /// A right click on a word or a letter of a statement (user 2026-11-05: "a right click is
 /// Ctrl+", the same in every action): takes it; Delete then cuts it out of the video.
 pub const WORD_TAKE: &str = "script_word_take";
+/// The edited text of a statement's part applied (user 2026-11-06: "what is deleted in the
+/// text is deleted in the sound"): `target` is `block:part:text`.
+pub const TEXT_CUT: &str = "script_text_cut";
 
 /// Words picked in one part: clip frames `[from, to)` from the first word's start to the last
 /// one's end.
@@ -104,6 +107,13 @@ impl Script {
                     if done { Ok(None) } else { Err(qnc_ui_text::text(if undo { "script.nothing_to_undo" } else { "script.nothing_to_redo" }).to_string()) }
                 }))
             }
+            TEXT_CUT => {
+                let mut parts = target?.splitn(3, ':');
+                let (id, index) = (parts.next()?.parse::<i64>().ok()?, parts.next()?.parse::<usize>().ok()?);
+                let edited = parts.next().unwrap_or_default().to_string();
+                (self.word_pick, self.view.picked) = (None, None);
+                Some(self.text_cut(id, index, &edited, preview))
+            }
             "delete_marker" => {
                 let pick = self.word_pick?;
                 (self.word_pick, self.view.picked) = (None, None);
@@ -161,5 +171,34 @@ mod tests {
         assert_eq!(left_of(&piece, 7390, 7420), (None, Some((7420, 7500))), "at its start");
         assert_eq!(left_of(&piece, 7480, 7600), (Some((7400, 7480)), None), "at its end");
         assert_eq!(left_of(&piece, 7400, 7500), (None, None), "all of it");
+    }
+}
+
+impl Script {
+    /// Part `index` of block `id` keeps what its edited text still says (`text_edit`).
+    fn text_cut(&mut self, id: i64, index: usize, edited: &str, preview: &SourcePreview) -> bool {
+        let Some(block) = self.block(Some(id)).cloned() else { return true };
+        let pieces = crate::view::block_pieces(&block);
+        let Some(piece) = pieces.get(index).cloned() else { return true };
+        let words = self.view.blocks.iter().find(|row| row.block.id == id).and_then(|row| row.words.get(index)).cloned().unwrap_or_default();
+        if words.is_empty() {
+            return true;
+        }
+        let kept = crate::text_edit::kept_ranges(&words, edited, (piece.from_frame, piece.to_frame));
+        if kept == [(piece.from_frame, piece.to_frame)] {
+            return true; // nothing said is gone
+        }
+        if kept.is_empty() && pieces.len() < 2 {
+            self.view.message = qnc_ui_text::text("db.script_last_piece").into();
+            return true;
+        }
+        let said = |from: u64, to: u64| words.iter().filter(|word| (from..to).contains(&((word.from + word.to.max(word.from + 1)) / 2))).map(|word| word.text.as_str()).collect::<Vec<_>>().join(" ");
+        let kept: Vec<Piece> = kept
+            .into_iter()
+            .map(|(from, to)| Piece { text: said(from, to), ..self.trimmed_piece(&piece, crate::Trim { index, out: true, from, to, roll: None }) })
+            .collect();
+        (self.trim, self.sound, self.chosen, self.join_sound, self.slide) = (None, None, None, None, None);
+        self.message_after_write = Some(qnc_ui_text::text("script.words_cut_out").into());
+        self.write(preview, move |target| qnc_script_db::keep_of(target, id, index, kept).map(|_| None))
     }
 }

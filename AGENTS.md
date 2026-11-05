@@ -7939,3 +7939,16 @@ nikad ne ponistava (ostaje kakva je snimljena); odbijena promjena nije korak. `q
 rjecniku (`script.undone`, `script.nothing_to_undo`...). Promjene napravljene prije ove verzije nemaju korake. Test
 `every_change_of_the_script_is_one_undo_step_and_redo_takes_it_again`, conformance, release build s libav. Primjer
 `qnc-script-db/examples/pieces_raw.rs` (samo citanje kopije baze). Uzivo nije provjereno.
+Izmjena 2026-11-06 (korisnik: "nakon brisanja jedne rijeci selekcija i brisanje vise ne rade; mozda je najbolja opcija
+obicni klasicni edit teksta: sto se obrise u tekstu, brise se i u tonu"; log: brisanje i undo rade, ali dvoklik na istu
+rijec (`script_word_cut`) opet je suzio dio izjave na tu rijec, pa ostatak teksta nije imao vremena): zamjenjuje uzimanje
+rijeci desnim klikom i dvoklik IN/OUT u tekstu izjave (5. i 6. 11.). Tekst svakog dijela izjave (scenarij MA Audio i MA
+Script, tekst otvorene izjave u prozoru medija) je obicno polje za uredivanje teksta: brisu se rijeci ili slova kao u svakom
+editoru (tipkovnica, mis, oznacavanje i undo samog polja); Enter (`script_text_cut`, opseg kataloga `script_text`) izreze iz
+slike i tona dijela ono sto tekst vise ne kaze, Esc (`script_text_revert`) vraca tekst; dok je tekst kakav je izgovoren,
+klik stavlja playhead na kliknutu rijec, a rijec pod playheadom je osvijetljena. Upisan tekst nije izgovoren i ne ostaje.
+Nova kocka unutar `qnc-script` `text_edit.rs` (`text_of`, `kept_ranges`: poravnanje rijeci teksta s izgovorenima,
+skracena rijec zadrzava preostala slova kad su poravnata, inace ostaje cijela; izrezano na pocetku ili kraju dio samo
+skracuje), `qnc-script-db` operacija `KeepOf` (dio postaje rasponi koji ostaju: prvi zadrzava spoj, ostali rez; `CutOut` je
+njezin poseban slucaj; jedan korak undoa), `qnc-script-panel` `text_editor.rs`. Testovi `text_edit` (2), conformance,
+release build s libav. Uzivo nije provjereno.

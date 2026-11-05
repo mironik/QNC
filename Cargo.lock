@@ -6131,6 +6131,7 @@ dependencies = [
  "eframe",
  "qnc-action-event",
  "qnc-desktop-theme",
+ "qnc-keyboard-shortcut",
  "qnc-script",
  "qnc-settings-form",
  "qnc-text-source-editor",

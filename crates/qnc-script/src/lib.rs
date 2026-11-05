@@ -33,8 +33,10 @@ use qnc_voice_take::{Recorded, Take};
 mod pointer;
 mod read;
 mod view;
+mod text_edit;
 mod word_pick;
-pub use word_pick::{WordPick, WORD_PICK, WORD_TAKE};
+pub use word_pick::{WordPick, TEXT_CUT, WORD_PICK, WORD_TAKE};
+pub use text_edit::text_of;
 pub use pointer::{drag_target, nearest_edge, own_action, ROW_ACTIONS};
 
 pub use view::*;

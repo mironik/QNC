@@ -257,6 +257,8 @@ pub enum Operation {
     /// join, the new join between the two is a cut with no pause (no crossfade). Neither
     /// left: the part leaves (not the last one).
     CutOut { id: i64, index: usize, before: Option<Piece>, after: Option<Piece> },
+    /// Part `index` of block `id` becomes `kept` (what its edited text still says, in order).
+    KeepOf { id: i64, index: usize, kept: Vec<Piece> },
     /// The script as it was before its last change (user 2026-11-06: "Backspace undo does not
     /// work"): every change of its blocks is one step; the voice of a block stays as recorded.
     Undo,
@@ -455,4 +457,9 @@ pub fn undo(target: &ProjectDbTarget) -> Result<bool> {
 /// The change the last undo took back; `Ok(false)`: nothing to redo.
 pub fn redo(target: &ProjectDbTarget) -> Result<bool> {
     write(target, Operation::Redo).map(|data| data == Data::Changed)
+}
+
+/// Part `index` of block `id` keeps only `kept` of its range (what its edited text still says).
+pub fn keep_of(target: &ProjectDbTarget, id: i64, index: usize, kept: Vec<Piece>) -> Result<()> {
+    write(target, Operation::KeepOf { id, index, kept }).map(drop)
 }
