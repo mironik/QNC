@@ -250,3 +250,27 @@ kotacic na desetak mjesta) i da neke radnje postoje samo na nekim timelineima.
    izjavi dijeli dio na dva?).
 5. **Undo slozene izjave** (odluka korisnika: koraci undoa u bazi scenarija, kao `story_undo`).
 6. **Jedno znacenje Alt+strelica i klika na sliku zooma** (odluka korisnika).
+
+### 5.3. Odluka korisnika 2026-11-05: slozena izjava je isto sto i pokrivalice, na A1
+
+Korisnik: "slozena izjava je isto sto i pokrivalice, samo je razlika sto pokrivalica koriste A2 a
+slozena izjava A1"; "nigdje ne treba biti rupa slike, samo rupa tona".
+
+- Slozena izjava postaje svoja prica (kao verzija S-Storyja): dijelovi su komadi price redom, svaki
+  dio je slot s M markerima na granicama, zvuk na A1. Sve radnje Storyja (rub slota, pomak slota,
+  roll, J/L tona i slike, slip, zoom, undo, kljucna slika, F, M marker srednjim klikom ili
+  dvoklikom, Alt+strelice, klik na sliku zooma = strana reza) rade istim kockama
+  (`qnc-program-segments`, `qnc-program-db`); razlika je samo da je ton reza A1.
+- Rupe u slici nema nigdje: pauza izmedju dijelova (crno) se ukida. Ritam izgovora daje rupa u
+  tonu na rezu (negativni J/L: ton prije zavrsi prije reza, ton poslije pocne poslije njega, u
+  rupi razina 0, slika nedirnuta).
+- Rupa u tonu postaje opcija price za sve: rez A1 (spoj dvaju klipova, dijelovi slozene izjave) i
+  rez A2 (pokrivalice).
+- Vlastita izvedba alata u `qnc-script` (Trim, Slide, Join, Slip, ton dijela, zoom) se brise;
+  scenarij drzi tekst izjave i vezu na njezinu pricu.
+- Postojece slozene izjave se ne pretvaraju (razvojni zapisi, AGENTS odjeljak 3).
+
+Koraci: (A) rupa u tonu u prici (baza, playlista, `cut_part` s rupama, A1 i A2); (B) slozena
+izjava kao prica s dijelovima kao slotovima na A1, otvaranje i play istim putem kao S-Story;
+(C) nacrt XML, Posalji u S-Story i rijeci scenarija iz te price; (D) brisanje vlastitih alata i
+pauze iz `qnc-script` i `qnc-script-db`.
