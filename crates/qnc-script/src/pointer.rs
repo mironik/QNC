@@ -4,7 +4,7 @@
 //! SubSegment's axis, says what each of those actions does to its parts. No gesture is mapped
 //! by hand in the panel any more.
 
-use crate::{SubsegmentView, DRAG_EDGE, SUBSEGMENT_CUE, SUBSEGMENT_SELECT, SUBSEGMENT_TAKE, TAKE_EDGE};
+use crate::{SubsegmentView, DRAG_EDGE, SUBSEGMENT_CUE, SUBSEGMENT_SELECT, TAKE_EDGE};
 
 /// The SubSegment's own action of a mouse-map action on its row (`value` the frame of the
 /// SubSegment's axis, `target` what the pointer points at). `holding`: an edge, a cut, a part's
@@ -21,10 +21,15 @@ pub fn own_action(view: &SubsegmentView, action_id: &str, value: Option<i64>, ta
         "timeline_cue_frame" => own(SUBSEGMENT_CUE, Some(frame?.to_string())),
         // A click on a part's length strip chooses the part, as a cover's strip chooses its slot.
         "timeline_select_slot" | "timeline_select_cover" => own(SUBSEGMENT_SELECT, Some(part_at(frame?)?.to_string())),
-        // A right click (or Ctrl + click) on the strip takes the part whole, as Ctrl+S.
+        // A right click (or Ctrl + click) on the strip opens the slot's zoom (user 2026-11-05: "a
+        // right click on the selected slot in its strip opens the zoom in slot mode, the cuts are
+        // the slot's, longer or shorter"): the slot is chosen and its IN or OUT nearer the click
+        // is taken, its own edge (never the roll); the other slots keep their lengths.
         "select_current_marker_slot" | "timeline_take_cover" => {
             let index = target.and_then(|id| id.strip_prefix("part-")).and_then(|index| index.parse::<usize>().ok()).or_else(|| frame.and_then(part_at))?;
-            own(SUBSEGMENT_TAKE, Some(index.to_string()))
+            let part = view.parts.get(index)?;
+            let out = frame.is_some_and(|frame| frame.abs_diff(part.end) < frame.abs_diff(part.start));
+            own(TAKE_EDGE, Some(format!("{index}:{}:slot", if out { "out" } else { "in" })))
         }
         // A right click on A1 (or a click on its label): the sound of the part there, as Ctrl+1.
         // (Only a pointer gives a frame: Ctrl+1 has none and stays the part in hand.)
@@ -148,7 +153,8 @@ mod tests {
         assert_eq!(own("timeline_cue_frame", Some(60), None, true), some("activate_focused_item", None), "a click while holding keeps");
         assert_eq!(own("segments_keep_edit", Some(60), None, true), some("activate_focused_item", None));
         assert_eq!(own("timeline_select_cover", Some(60), Some("part-1"), false), some(SUBSEGMENT_SELECT, Some("1")), "a click on the strip chooses the part");
-        assert_eq!(own("select_current_marker_slot", None, Some("part-2"), false), some(SUBSEGMENT_TAKE, Some("2")), "a right click on the strip takes it whole");
+        assert_eq!(own("timeline_take_cover", Some(100), Some("part-2"), false), some(TAKE_EDGE, Some("2:in:slot")), "a right click on the strip: the slot and its nearer IN");
+        assert_eq!(own("timeline_take_cover", Some(140), Some("part-2"), false), some(TAKE_EDGE, Some("2:out:slot")), "or its nearer OUT");
         assert_eq!(own("select_audio_a1", Some(100), None, false), some("select_audio_a1", Some("2")), "a right click on A1: that part's sound");
         assert_eq!(own("select_marker", Some(48), Some("edge-0-out"), false), some(TAKE_EDGE, Some("0:cut")), "a right click near a join: the cut");
         assert_eq!(own("select_marker", Some(140), Some("edge-2-out"), false), some(TAKE_EDGE, Some("2:out")));

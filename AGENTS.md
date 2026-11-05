@@ -7882,3 +7882,11 @@ okvir; desni klik na sliku izvan trake uzima marker tog reza (`subsegment_take_e
 rub dijela). `qnc-program-view` `EditStill.strip` (`StillStrip`) i `right_click`, `qnc-script` (`subsegment_zoom`),
 `qnc-subsegment-panel` (boja trake), `qnc-trim-overlay` (`paint_strip`). Zoom Storyja nije mijenjan. Test zooma prosiren,
 conformance, release build s libav. Uzivo nije provjereno.
+Izmjena 2026-11-05 (korisnik: "lijevi klik na traku trajanja selektira slot, desni klik na selektirani slot u istoj traci
+trajanja otvara zoom u slot modu i rezovi se odnose na slot (produljivanje ili skracivanje)"): zamjenjuje desni klik na traku
+od 4. 11. (uzimao dio cijeli za pomak, Ctrl+S ostaje za to). Desni klik (i Ctrl+klik) na traku trajanja dijela slozene
+izjave bira taj slot i uzima njegov IN ili OUT blizi kliku (`subsegment_take_edge` s ciljem `n:in|out:slot`), uvijek vlastiti
+rub, nikad roll: otvara se zoom reza, strelice, kotacic i povlacenje produljuju ili skracuju slot, ostali zadrzavaju duljinu,
+Enter sprema. Isto na traci ispod slike u zoomu (lijeva slika OUT svog slota, desna IN). Lijevi klik dok je rub uzet i dalje
+sprema (zakljucano pravilo misa). `qnc-script` (`pointer.rs`, `TAKE_EDGE`, `subsegment_zoom`). Testovi, conformance, release
+build s libav. Uzivo nije provjereno.

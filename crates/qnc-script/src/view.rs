@@ -575,7 +575,7 @@ pub fn subsegment_zoom(
             fill: None,
             chosen: view.chosen == Some(index),
             select: slot(index),
-            take: (crate::SUBSEGMENT_TAKE.to_string(), index.to_string()),
+            take: (crate::TAKE_EDGE.to_string(), format!("{index}:{}:slot", if index == left.unwrap_or(usize::MAX) { "out" } else { "in" })),
         })
     };
     let marker = crate::nearest_edge(view, cut).map(|(index, side)| (crate::TAKE_EDGE.to_string(), format!("{index}:{side}")));

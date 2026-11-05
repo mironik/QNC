@@ -176,7 +176,9 @@ fn the_zoom_of_a_subsegment_edge_shows_the_pictures_either_side_of_its_cut() {
     // it whole; a right click on the picture outside the strip takes the marker of the cut
     // (user 2026-11-05), here the joined cut of parts 0 and 1.
     let strips: Vec<_> = zoom.source_edit_stills.iter().map(|s| s.strip.as_ref().map(|strip| (strip.frames, strip.select.1.as_str(), strip.take.0.as_str()))).collect();
-    assert_eq!(strips, vec![Some((50, "0", crate::SUBSEGMENT_TAKE)), Some((40, "1", crate::SUBSEGMENT_TAKE))]);
+    assert_eq!(strips, vec![Some((50, "0", crate::TAKE_EDGE)), Some((40, "1", crate::TAKE_EDGE))]);
+    let takes: Vec<_> = zoom.source_edit_stills.iter().filter_map(|s| s.strip.as_ref().map(|strip| strip.take.1.clone())).collect();
+    assert_eq!(takes, vec!["0:out:slot".to_string(), "1:in:slot".to_string()], "a right click on a strip: that slot's edge at the cut");
     let markers: Vec<_> = zoom.source_edit_stills.iter().map(|s| s.right_click.clone()).collect();
     assert_eq!(markers, vec![Some((crate::TAKE_EDGE.to_string(), "0:cut".to_string())); 2]);
     // The IN of the third part follows a pause: on the left is still the OUT of the part before.

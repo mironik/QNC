@@ -657,6 +657,10 @@ impl Script {
                 let mut parts = target.unwrap_or_default().split(':');
                 let index = parts.next().and_then(|index| index.parse::<usize>().ok())?;
                 let side = parts.next();
+                // From the slot's strip (user 2026-11-05): the slot is chosen, its own edge taken.
+                if parts.next() == Some("slot") && side != Some("cut") && index < pieces.len() {
+                    self.chosen = Some(index);
+                }
                 let (mut index, mut out, mut cut) = (index, side != Some("in"), side == Some("cut"));
                 // A chosen slot at the cut takes its own edge, not the roll (user 2026-11-04):
                 // the slot gets longer or shorter, the other slots keep theirs.
