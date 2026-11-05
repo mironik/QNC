@@ -1,0 +1,23 @@
+{
+  "database_id": "qnc.db.word_letters",
+  "database_owner": "project",
+  "owner_application": "qnc.module.letter-db",
+  "ownership_rule": "The project owns this database; no application owns it or its table. The letters of words reach it only through the one intermediary of the project database (qnc.module.db-broker), whose table module qnc.module.letter-db owns it.",
+  "schema_version": "0.1.0",
+  "qnc_uri": "qnc://local/db/project_db",
+  "tables": [
+    "word_letters"
+  ],
+  "public_read_views": [
+    "public_word_letters"
+  ],
+  "write_owner": "qnc.module.letter-db",
+  "public_read_policy": "public_read_views",
+  "rules": {
+    "made": "In the background, only for the words a script shows, by the letter aligner of the host (qnc-letter-times).",
+    "use": "A click on a letter of a statement in the script cues to it; a double click on two letters cuts at them."
+  },
+  "migration_policy": "owner_application_only",
+  "created_at": "2026-11-05T00:00:00Z",
+  "updated_at": "2026-11-05T00:00:00Z"
+}

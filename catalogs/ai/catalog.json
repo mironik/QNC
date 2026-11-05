@@ -1,5 +1,9 @@
 {
   "version": "1",
+  "letters": {
+    "program": "qnc-align-wav2vec2",
+    "model": "../../data/models/wav2vec2-parlaspeech-hr"
+  },
   "transcribe": {
     "selected": "whisper.large-v3-turbo.vulkan",
     "fast": "parakeet.tdt-0.6b-v3.cpu",

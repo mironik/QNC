@@ -1,0 +1,36 @@
+{
+  "module_id": "qnc.module.letter-db",
+  "module_name": "Letter table",
+  "module_version": "0.1.0",
+  "module_kind": "library",
+  "capabilities": [
+    "db.word_letters"
+  ],
+  "input_contract_version": "0.1.0",
+  "output_contract_version": "0.1.0",
+  "supported_os": [
+    "windows",
+    "linux",
+    "macos"
+  ],
+  "supported_cpu": [
+    "x86_64",
+    "aarch64"
+  ],
+  "transport_protocol_version": "0.1.0",
+  "forbidden_calls": [
+    "ffprobe",
+    "media.decode",
+    "business.workflow"
+  ],
+  "forbidden_dependencies": [
+    "qnc.module.media-probe",
+    "qnc.module.content-store"
+  ],
+  "state_policy": "session_local",
+  "database_write_policy": "public_db_owner_write_adapter_only",
+  "runtime_crate": "qnc-letter-db",
+  "input": "The letters of words of a clip with their clip frames.",
+  "output": "The letters kept for the words of a clip.",
+  "specification": "AGENTS.md 2026-11-05 (user: cutting by letters in the script, pure Rust). Table module of the project database intermediary: word_letters and public_word_letters."
+}

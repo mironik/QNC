@@ -300,14 +300,23 @@ pub fn paint_block(ui: &mut egui::Ui, row: &qnc_script::BlockRow, view: &ScriptV
                         if bring && at == 0 {
                             response.scroll_to_me(Some(egui::Align::Center));
                         }
+                        // With its letters laid (user 2026-11-05: cutting by letters) a click is on
+                        // the letter under the mouse: its frames instead of the word's.
+                        let font = egui::FontId::proportional(theme.font_ui + 1.0);
+                        let letter = response.hover_pos().and_then(|at| letter_at(ui, &font, &word.text, &word.letters, at.x - response.rect.left()));
+                        let (from, to) = letter.map_or((word.from, word.to), |(_, span)| span);
                         if response.double_clicked() {
-                            asked = Some(ActionEvent::key(WORD_CUT).with_target(format!("{id}:{index}:{}:{}", word.from, word.to)).at(PANEL));
+                            asked = Some(ActionEvent::key(WORD_CUT).with_target(format!("{id}:{index}:{from}:{to}")).at(PANEL));
                         } else if response.clicked() {
-                            asked = Some(ActionEvent::key(WORD_CUE).with_target(format!("{id}:{index}:{}:{}", word.from, word.to)).at(PANEL));
+                            asked = Some(ActionEvent::key(WORD_CUE).with_target(format!("{id}:{index}:{from}:{to}")).at(PANEL));
                         }
                         if response.hovered() {
-                            ui.ctx().set_cursor_icon(egui::CursorIcon::PointingHand);
-                            response.on_hover_text(format!("{}  {}", word.tc, qnc_ui_text::text("script.word_hint")));
+                            ui.ctx().set_cursor_icon(if letter.is_some() { egui::CursorIcon::Text } else { egui::CursorIcon::PointingHand });
+                            let hint = match letter {
+                                Some((at, _)) => format!("{}  '{}'  {}", word.tc, word.text.chars().nth(at).unwrap_or(' '), qnc_ui_text::text("script.letter_hint")),
+                                None => format!("{}  {}", word.tc, qnc_ui_text::text("script.word_hint")),
+                            };
+                            response.on_hover_text(hint);
                         }
                     }
                 });
@@ -396,4 +405,19 @@ fn paint_editor(ui: &mut egui::Ui, view: &ScriptView, theme: &qnc_desktop_theme:
         Answer::Button(action, Some(kind)) => Some(ActionEvent::key(action).with_target(kind).at(PANEL)),
         Answer::Button(action, None) => Some(ActionEvent::key(action).at(PANEL)),
     }
+}
+
+/// The letter of `text` under `x` (from the word's left edge) when its letters are laid: its
+/// index and frames. The width of every first part of the word says where each letter is.
+fn letter_at(ui: &egui::Ui, font: &egui::FontId, text: &str, letters: &[(char, Option<(u64, u64)>)], x: f32) -> Option<(usize, (u64, u64))> {
+    if letters.len() != text.chars().count() {
+        return None;
+    }
+    let width = |count: usize| -> f32 {
+        let part: String = text.chars().take(count).collect();
+        ui.fonts(|fonts| fonts.layout_no_wrap(part, font.clone(), egui::Color32::WHITE).size().x)
+    };
+    let at = (0..letters.len()).find(|&index| x < width(index + 1)).unwrap_or(letters.len().saturating_sub(1));
+    // A sign without frames (a comma) gives the letter before it.
+    (0..=at).rev().find_map(|index| letters[index].1.map(|span| (index, span)))
 }

@@ -1,0 +1,15 @@
+[package]
+name = "qnc-align-wav2vec2"
+version = "0.1.0"
+edition = "2021"
+description = "QNC letter-align plug-in: the times of the letters of a known text in its speech with a wav2vec2 CTC model in pure Rust (contract qnc.letter-align 1), as its own program"
+
+[dependencies]
+qnc-dev-diagnostics = { workspace = true }
+qnc-letter-align = { workspace = true }
+qnc-wav2vec2 = { workspace = true }
+qnc-ctc-align = { workspace = true }
+qnc-transcribe-jobs = { workspace = true }
+
+[target.'cfg(windows)'.dependencies]
+windows-sys = { version = "0.59", features = ["Win32_Foundation", "Win32_System_Threading"] }

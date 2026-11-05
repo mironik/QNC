@@ -170,6 +170,8 @@
     "player.player_content_reader_missing": "Nedostaje čitač sadržaja playera.",
     "db.project_prerender_initialised": "Prerender projekta nije inicijaliziran.",
     "db.clip_sound_reply": "Pogrešan odgovor tablice tona klipa.",
+    "db.letters_reply": "Pogrešan odgovor tablice slova.",
+    "db.letters_invalid": "Slova riječi nisu ispravna.",
     "transcript.title": "Prijepis",
     "transcript.empty": "Ovaj klip još nema prijepis: označi klipove u media poolu (ili postavi IN/OUT ovog klipa, bez njih cijeli klip) i pritisni Prijepis.",
     "transcript.no_clip": "Odaberi klip u media poolu.",

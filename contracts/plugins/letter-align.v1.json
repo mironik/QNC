@@ -1,0 +1,18 @@
+{
+  "contract": "qnc.letter-align",
+  "version": 1,
+  "purpose": "The fine times of the letters of a known text in its speech (user 2026-11-05: cutting by letters in the script, in pure Rust), as a plug-in program beside the application. The AI catalog of the host names the program and the model; nothing falls back to another engine.",
+  "transport": "The JSON lines of qnc.module.plugin-process: the application's hello, the plug-in's ready, then one request at a time.",
+  "handshake": {
+    "application": { "contract": "qnc.letter-align", "version": 1 },
+    "plugin": { "contract": "qnc.letter-align", "version": 1, "plugin_id": "a stable id", "plugin_version": "its version", "about": "{ engine }" }
+  },
+  "operations": {
+    "align": {
+      "body": "{ model, wav, words: [text] }",
+      "ok": "{ words: [{ letters: [{ letter, start?, end? }] }] }: times in seconds from the start of wav; a sign the model has not (a comma) has no times"
+    }
+  },
+  "rules": "wav is a 16 kHz mono 16-bit PCM WAV file in an empty temporary folder of the application; the words are the text said in it, in order. The plug-in reads the wav and the model and writes nothing. A text that cannot be laid on the speech is an error, never a guess.",
+  "acceptance": "crates/qnc-wav2vec2/examples/hear.rs (what the model hears) and tools/qnc-align-wav2vec2/examples/align_wav.rs (the letters of a known text in a WAV that is only read)."
+}

@@ -18,6 +18,8 @@ pub(crate) struct Script {
     /// The transcripts of the clips of the clip blocks (user 2026-11-04: the words of a
     /// statement with their times, to edit it by its text).
     pub transcripts: std::collections::HashMap<String, Vec<qnc_transcript_db::ClipTranscript>>,
+    /// The fine times of the letters of those words (user 2026-11-05: cutting by letters).
+    pub letters: std::collections::HashMap<String, Vec<qnc_letter_db::WordLetters>>,
 }
 
 pub(crate) type Read = Result<Script, String>;
@@ -57,14 +59,16 @@ pub(crate) fn read_script(target: &ProjectDbTarget, locator: Option<&StillLocato
         })
         .collect();
     let mut transcripts = std::collections::HashMap::new();
+    let mut letters = std::collections::HashMap::new();
     for block in &blocks {
         for clip in crate::view::block_pieces(block).into_iter().map(|piece| piece.clip_id).filter(|clip| !clip.is_empty()) {
             if !transcripts.contains_key(&clip) {
                 // A clip without a transcript, or one not readable, shows its words as they are.
                 let read = qnc_transcript_db::read_clip(target, &clip).unwrap_or_default();
+                letters.insert(clip.clone(), qnc_letter_db::read_clip(target, &clip).unwrap_or_default());
                 transcripts.insert(clip, read);
             }
         }
     }
-    Ok(Script { blocks, profile, target: length, title, voices, transcripts })
+    Ok(Script { blocks, profile, target: length, title, voices, transcripts, letters })
 }

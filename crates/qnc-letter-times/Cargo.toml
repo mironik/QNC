@@ -1,0 +1,16 @@
+[package]
+name = "qnc-letter-times"
+version = "0.1.0"
+edition = "2021"
+description = "QNC public block: the fine times of the letters of the words a script shows, laid on their speech in the background by the letter aligner of this host and kept in the project database"
+
+[dependencies]
+qnc-ai-catalog = { workspace = true }
+qnc-db-broker = { workspace = true }
+qnc-dev-diagnostics = { workspace = true }
+qnc-letter-align = { workspace = true }
+qnc-letter-db = { workspace = true }
+qnc-plugin-process = { workspace = true }
+qnc-sound-range = { workspace = true }
+qnc-still-locator = { workspace = true }
+qnc-transcribe-jobs = { workspace = true }

@@ -1,0 +1,37 @@
+{
+  "module_id": "qnc.module.ctc-align",
+  "module_name": "CTC align",
+  "module_version": "0.1.0",
+  "module_kind": "library",
+  "capabilities": [
+    "speech.align"
+  ],
+  "input_contract_version": "0.1.0",
+  "output_contract_version": "0.1.0",
+  "supported_os": [
+    "windows",
+    "linux",
+    "macos"
+  ],
+  "supported_cpu": [
+    "x86_64",
+    "aarch64"
+  ],
+  "transport_protocol_version": "0.1.0",
+  "forbidden_calls": [
+    "ffprobe",
+    "media.decode",
+    "database.write",
+    "business.workflow"
+  ],
+  "forbidden_dependencies": [
+    "qnc.module.media-probe",
+    "qnc.module.content-store"
+  ],
+  "state_policy": "session_local",
+  "database_write_policy": "no_db_writes",
+  "runtime_crate": "qnc-ctc-align",
+  "input": "The letter probabilities of speech and the known words said in it.",
+  "output": "The frames of every letter of the words; a sign the model has not gets none.",
+  "specification": "AGENTS.md 2026-11-05 (user: cutting by letters in the script, pure Rust). Pure CTC forced alignment (Viterbi), the word gap optional."
+}

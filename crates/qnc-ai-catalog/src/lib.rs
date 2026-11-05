@@ -18,6 +18,43 @@ pub const BACKENDS: [&str; 2] = ["vulkan", "cpu"];
 struct File {
     version: String,
     transcribe: Job,
+    /// The fine times of the letters of a known text (user 2026-11-05: cutting by letters in
+    /// the script); a host without it has none.
+    #[serde(default)]
+    letters: Option<LettersJob>,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct LettersJob {
+    program: String,
+    model: String,
+}
+
+/// The engine that lays a known text on its speech, letter by letter, on this host.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct LetterAligner {
+    /// The program's name beside the application.
+    pub program: String,
+    /// The model's folder.
+    pub model: PathBuf,
+}
+
+/// The letter aligner of this host's catalog; its model must be there.
+pub fn installed_letter_aligner() -> Result<LetterAligner, String> {
+    letter_aligner(&installed_path()?)
+}
+
+/// The letter aligner of the catalog at `path`.
+pub fn letter_aligner(path: &Path) -> Result<LetterAligner, String> {
+    let text = std::fs::read_to_string(path).map_err(|e| format!("{}: {e}", path.display()))?;
+    let file: File = serde_json::from_str(&text).map_err(|e| format!("{}: {e}", path.display()))?;
+    let job = file.letters.ok_or("the AI catalog of this host has no letter aligner")?;
+    let model = path.parent().ok_or("the AI catalog has no folder")?.join(&job.model);
+    if !model.exists() {
+        return Err(format!("letter aligner: the model {} is not on this host", model.display()));
+    }
+    Ok(LetterAligner { program: job.program, model })
 }
 
 #[derive(Debug, Clone, Deserialize)]

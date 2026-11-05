@@ -1,0 +1,37 @@
+{
+  "module_id": "qnc.module.letter-align",
+  "module_name": "Letter align contract",
+  "module_version": "0.1.0",
+  "module_kind": "library",
+  "capabilities": [
+    "plugin.letter_align"
+  ],
+  "input_contract_version": "0.1.0",
+  "output_contract_version": "0.1.0",
+  "supported_os": [
+    "windows",
+    "linux",
+    "macos"
+  ],
+  "supported_cpu": [
+    "x86_64",
+    "aarch64"
+  ],
+  "transport_protocol_version": "0.1.0",
+  "forbidden_calls": [
+    "ffprobe",
+    "media.decode",
+    "database.write",
+    "business.workflow"
+  ],
+  "forbidden_dependencies": [
+    "qnc.module.media-probe",
+    "qnc.module.content-store"
+  ],
+  "state_policy": "session_local",
+  "database_write_policy": "no_db_writes",
+  "runtime_crate": "qnc-letter-align",
+  "input": "A 16 kHz WAV, the model and the words said in it (contracts/plugins/letter-align.v1.json).",
+  "output": "The seconds of every letter of every word.",
+  "specification": "AGENTS.md 2026-11-05 (user: cutting by letters in the script, pure Rust). The application's side and the program's side of the plug-in contract qnc.letter-align 1."
+}

@@ -180,6 +180,10 @@ pub struct Script {
     value: Option<i64>,
     /// The transcripts of the clips of the clip blocks, as last read.
     transcripts: HashMap<String, Vec<qnc_transcript_db::ClipTranscript>>,
+    /// The fine times of the letters of those words, as last read, and the background work that
+    /// lays the letters of the words shown without them (user 2026-11-05).
+    letters: HashMap<String, Vec<qnc_letter_db::WordLetters>>,
+    letter_times: qnc_letter_times::LetterTimes,
     /// The first word of a cut by text (a double click on a word): its block, part and frames.
     word_cut: qnc_edit_words::WordPair<(i64, usize)>,
     /// A part taken whole (Ctrl+S, a right click on its length strip), as a slot is (user
@@ -321,7 +325,7 @@ impl JoinSound {
 
 impl Default for Script {
     fn default() -> Self {
-        Self { view: ScriptView::default(), blocks: Vec::new(), project: None, reading: None, read_at: None, writing: None, source_request: None, names: HashMap::new(), words_per_second: Ok(0.0), take: None, taking: None, exporting: None, draft: Default::default(), open_subsegment: None, pieces_request: None, trim: None, chosen: None, join_sound: None, value: None, transcripts: HashMap::new(), word_cut: qnc_edit_words::WordPair::new(), slide: None, slip_part: None, waves: qnc_program_waveform::ProgramWaves::new(), filmstrips: qnc_program_filmstrip::ProgramFilmstrips::new(), waves_project: None, trim_stills: qnc_trim_stills::TrimStills::new(), zoom_follow: Default::default(), sound: None, voices: Vec::new(), voice_request: None, voice_after_write: None, message_after_write: None, clear_after_write: false }
+        Self { view: ScriptView::default(), blocks: Vec::new(), project: None, reading: None, read_at: None, writing: None, source_request: None, names: HashMap::new(), words_per_second: Ok(0.0), take: None, taking: None, exporting: None, draft: Default::default(), open_subsegment: None, pieces_request: None, trim: None, chosen: None, join_sound: None, value: None, transcripts: HashMap::new(), letters: HashMap::new(), letter_times: qnc_letter_times::LetterTimes::new(), word_cut: qnc_edit_words::WordPair::new(), slide: None, slip_part: None, waves: qnc_program_waveform::ProgramWaves::new(), filmstrips: qnc_program_filmstrip::ProgramFilmstrips::new(), waves_project: None, trim_stills: qnc_trim_stills::TrimStills::new(), zoom_follow: Default::default(), sound: None, voices: Vec::new(), voice_request: None, voice_after_write: None, message_after_write: None, clear_after_write: false }
     }
 }
 
@@ -1778,9 +1782,19 @@ impl Script {
                         let fps = names.get(&piece.clip_id).filter(|(_, frames, seconds)| *frames > 0 && *seconds > 0.0).map_or(0, |(_, frames, seconds)| (*frames as f64 / seconds).round() as u32);
                         let start = qnc_source_timecode::parse_timecode(&piece.start_tc, fps).filter(|_| fps > 0);
                         let tc = |frame: u64| start.map_or_else(String::new, |start| qnc_source_timecode::format_frames(start + frame.saturating_sub(piece.from_frame), fps));
-                        self.transcripts.get(&piece.clip_id).map_or_else(Vec::new, |transcripts| view::timed_words(transcripts, piece, tc))
+                        let mut words = self.transcripts.get(&piece.clip_id).map_or_else(Vec::new, |transcripts| view::timed_words(transcripts, piece, tc));
+                        view::put_letters(&mut words, self.letters.get(&piece.clip_id).map_or(&[][..], Vec::as_slice));
+                        words
                     })
                     .collect();
+            }
+        }
+        // The letters of the words the script shows are laid in the background while the
+        // player is idle (user 2026-11-05: "only on the text shown in the script").
+        if let Some(locator) = preview.still_locator() {
+            let needs = view::letter_needs(&self.view.blocks, &self.names);
+            if self.letter_times.poll(&locator, &needs, !preview.player_view().playing()) {
+                self.read_at = None; // the letters kept are read now
             }
         }
         let profile = self.view.profile.as_ref();
@@ -1874,7 +1888,8 @@ impl Script {
         if let Some(reading) = &self.reading {
             if let Ok(result) = reading.try_recv() {
                 match result {
-                    Ok(read::Script { blocks, profile, target, title, voices, transcripts }) => {
+                    Ok(read::Script { blocks, profile, target, title, voices, transcripts, letters }) => {
+                        self.letters = letters;
                         self.blocks = blocks;
                         self.transcripts = transcripts;
                         self.view.profile = profile;

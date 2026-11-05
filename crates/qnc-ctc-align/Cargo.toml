@@ -1,0 +1,7 @@
+[package]
+name = "qnc-ctc-align"
+version = "0.1.0"
+edition = "2021"
+description = "QNC public block: CTC forced alignment, the frames of every letter of a known text in the letter probabilities of a speech model"
+
+[dependencies]

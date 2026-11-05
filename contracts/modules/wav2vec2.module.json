@@ -1,0 +1,37 @@
+{
+  "module_id": "qnc.module.wav2vec2",
+  "module_name": "Wav2vec2 model",
+  "module_version": "0.1.0",
+  "module_kind": "library",
+  "capabilities": [
+    "speech.letters"
+  ],
+  "input_contract_version": "0.1.0",
+  "output_contract_version": "0.1.0",
+  "supported_os": [
+    "windows",
+    "linux",
+    "macos"
+  ],
+  "supported_cpu": [
+    "x86_64",
+    "aarch64"
+  ],
+  "transport_protocol_version": "0.1.0",
+  "forbidden_calls": [
+    "ffprobe",
+    "media.decode",
+    "database.write",
+    "business.workflow"
+  ],
+  "forbidden_dependencies": [
+    "qnc.module.media-probe",
+    "qnc.module.content-store"
+  ],
+  "state_policy": "session_local",
+  "database_write_policy": "no_db_writes",
+  "runtime_crate": "qnc-wav2vec2",
+  "input": "16 kHz mono speech and a model folder (config.json, vocab.json, model.safetensors).",
+  "output": "The log probabilities of the model's letters every 20 ms.",
+  "specification": "AGENTS.md 2026-11-05 (user: cutting by letters in the script, pure Rust). A wav2vec2 CTC model (stable layer norm, XLS-R) in pure Rust with candle; the weights are only read."
+}

@@ -74,6 +74,10 @@ pub struct TimedWord {
     pub text: String,
     pub tc: String,
     pub line: bool,
+    /// Its letters with the clip frames `[from, to)` each is said in (user 2026-11-05: cutting
+    /// by letters), once the letter aligner laid them; empty before, `None` for a sign the
+    /// model has not.
+    pub letters: Vec<(char, Option<(u64, u64)>)>,
 }
 
 /// The words said in `[piece.from_frame, piece.to_frame)` of its clip, in order, from every
@@ -96,9 +100,50 @@ pub fn timed_words(transcripts: &[qnc_transcript_db::ClipTranscript], piece: &Pi
             continue;
         }
         let line = line || kept.is_empty();
-        kept.push(TimedWord { from, to, tc: tc(from), text, line });
+        kept.push(TimedWord { from, to, tc: tc(from), text, line, letters: Vec::new() });
     }
     kept
+}
+
+/// Puts on every word the letters kept for it (its start frame and text). The aligner gives
+/// a letter where its sound starts (a short peak); a letter lasts until the next one starts,
+/// the last until the end of its sound.
+pub fn put_letters(words: &mut [TimedWord], kept: &[qnc_letter_db::WordLetters]) {
+    for word in words {
+        let Some(found) = kept.iter().find(|kept| kept.word_from == word.from && kept.text == word.text) else { continue };
+        let starts: Vec<Option<u64>> = found.letters.iter().map(|letter| letter.from.map(|from| from.round() as u64)).collect();
+        let end = found.letters.iter().filter_map(|letter| letter.to).fold(None, |end: Option<f64>, to| Some(end.map_or(to, |end| end.max(to))));
+        word.letters = found
+            .letters
+            .iter()
+            .enumerate()
+            .map(|(index, letter)| {
+                let span = starts[index].map(|from| {
+                    let next = starts[index + 1..].iter().flatten().next().copied();
+                    let to = next.or(end.map(|end| end.ceil() as u64)).unwrap_or(from + 1);
+                    (from, to.max(from + 1))
+                });
+                (letter.letter, span)
+            })
+            .collect();
+    }
+}
+
+/// The words the script shows without letters, clip by clip in the order shown.
+pub fn letter_needs(rows: &[BlockRow], names: &std::collections::HashMap<String, (String, u64, f64)>) -> Vec<qnc_letter_times::Need> {
+    let mut needs = Vec::new();
+    for row in rows.iter().filter(|row| row.is_clip()) {
+        for (piece, words) in block_pieces(&row.block).iter().zip(&row.words) {
+            let missing: Vec<qnc_letter_times::Word> = words.iter().filter(|word| word.letters.is_empty()).map(|word| qnc_letter_times::Word { from: word.from, to: word.to, text: word.text.clone() }).collect();
+            if missing.is_empty() {
+                continue;
+            }
+            // A clip whose length is not known yet waits (its rate says how long a run is).
+            let Some(fps) = names.get(&piece.clip_id).filter(|(_, frames, seconds)| *frames > 0 && *seconds > 0.0).map(|(_, frames, seconds)| *frames as f64 / seconds) else { continue };
+            needs.push(qnc_letter_times::Need { clip_id: piece.clip_id.clone(), fps, words: missing });
+        }
+    }
+    needs
 }
 
 impl BlockRow {

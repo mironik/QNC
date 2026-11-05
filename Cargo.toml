@@ -261,6 +261,12 @@ members = [
     "crates/qnc-snap",
     "crates/qnc-shuttle",
     "crates/qnc-trim-play",
+    "crates/qnc-wav2vec2",
+    "crates/qnc-ctc-align",
+    "crates/qnc-letter-align",
+    "crates/qnc-letter-db",
+    "crates/qnc-letter-times",
+    "tools/qnc-align-wav2vec2",
     "crates/qnc-match-frame",
     "crates/qnc-segments-keys",
     "crates/qnc-sync-session",
@@ -552,6 +558,11 @@ qnc-edit-words = { path = "crates/qnc-edit-words" }
 qnc-snap = { path = "crates/qnc-snap" }
 qnc-shuttle = { path = "crates/qnc-shuttle" }
 qnc-trim-play = { path = "crates/qnc-trim-play" }
+qnc-wav2vec2 = { path = "crates/qnc-wav2vec2" }
+qnc-ctc-align = { path = "crates/qnc-ctc-align" }
+qnc-letter-align = { path = "crates/qnc-letter-align" }
+qnc-letter-db = { path = "crates/qnc-letter-db" }
+qnc-letter-times = { path = "crates/qnc-letter-times" }
 qnc-match-frame = { path = "crates/qnc-match-frame" }
 qnc-segments-keys = { path = "crates/qnc-segments-keys" }
 qnc-sync-session = { path = "crates/qnc-sync-session" }
