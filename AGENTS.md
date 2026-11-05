@@ -7923,3 +7923,7 @@ slovo ispod misa (nova radnja kataloga `script_word_take`, bez tipke); Shift+des
 `qnc-script` (`WORD_TAKE`, `pick_key`), `qnc-script-panel`, katalog, rjecnik. Panel prijepisa klipa (AI Media Assist, prozor
 medija bez otvorene izjave) nije mijenjan: nije odredeno sto Delete brise u sirovom prijepisu klipa. Testovi, conformance,
 release build s libav. Uzivo nije provjereno.
+Popravak 2026-11-06 (korisnik: "ne radi, ili ja ne znam koristiti"; log: u MA Scriptu nijedan `script_word_take` ni Delete,
+samo klikovi i dvoklikovi na rijeci): rijeci i slova u tekstu izjave vise nisu tekst koji se oznacava misem
+(`selectable(false)`), pa desni klik ide samo riječi; uzimanje, prosirenje, Delete i Esc nad rijecima pisu se u player log
+(`script-words`). `qnc-script-panel`, `qnc-script`. Uzivo nije provjereno.

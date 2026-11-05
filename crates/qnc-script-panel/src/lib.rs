@@ -317,7 +317,7 @@ pub fn paint_block(ui: &mut egui::Ui, row: &qnc_script::BlockRow, view: &ScriptV
                                     }
                                     job.append(&letter.to_string(), 0.0, format);
                                 }
-                                ui.add(egui::Label::new(job).sense(Sense::click()))
+                                ui.add(egui::Label::new(job).selectable(false).sense(Sense::click()))
                             }
                             None => {
                                 let mut text = RichText::new(&word.text).color(if lit { theme.bg } else { theme.text }).size(theme.font_ui + 1.0);
@@ -328,7 +328,7 @@ pub fn paint_block(ui: &mut egui::Ui, row: &qnc_script::BlockRow, view: &ScriptV
                                 } else if part_chosen {
                                     text = text.background_color(theme.surface_alt).underline();
                                 }
-                                ui.add(egui::Label::new(text).sense(Sense::click()))
+                                ui.add(egui::Label::new(text).selectable(false).sense(Sense::click()))
                             }
                         };
                         if bring && at == 0 {

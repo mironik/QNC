@@ -71,6 +71,9 @@ impl Script {
     /// click takes up to it, Delete cuts it out, Esc lets it go. A left click only cues (the
     /// playhead). `None` when the action is not about what is taken.
     pub(crate) fn pick_key(&mut self, action_id: &str, target: Option<&str>, preview: &SourcePreview) -> Option<bool> {
+        if matches!(action_id, WORD_TAKE | WORD_PICK | "delete_marker" | "clear_focus") && qnc_dev_diagnostics::player_diagnostics_enabled() {
+            qnc_dev_diagnostics::log_line(qnc_dev_diagnostics::DiagnosticsStream::Player, format!("script-words action={action_id} target={target:?} taken={:?}", self.word_pick.map(|pick| (pick.block, pick.part, pick.from, pick.to))));
+        }
         match action_id {
             WORD_TAKE => {
                 self.word_pick = WordPick::word(target);
