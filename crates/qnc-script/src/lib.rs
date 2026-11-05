@@ -34,7 +34,7 @@ mod pointer;
 mod read;
 mod view;
 mod word_pick;
-pub use word_pick::{WordPick, WORD_PICK};
+pub use word_pick::{WordPick, WORD_PICK, WORD_TAKE};
 pub use pointer::{drag_target, nearest_edge, own_action, ROW_ACTIONS};
 
 pub use view::*;

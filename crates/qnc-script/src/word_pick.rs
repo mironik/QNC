@@ -1,7 +1,8 @@
 //! Words picked in the text of a statement and cut out of its video (user 2026-11-05: "allow
 //! deleting words in the text and cut that part of the video out of the timeline"; "that way
-//! we take out the fillers"). A click on a word picks it, Shift+click on a word of the same
-//! part picks from the first one to it; Delete cuts the picked words out of the part (what was
+//! we take out the fillers"). A right click on a word or a letter takes it (user 2026-11-05: "a
+//! right click is Ctrl+, in every action"), Shift+right click takes from the first one to it;
+//! Delete cuts what is taken out of the part (what was
 //! before them and what was after them stay, joined by a cut, user: "no crossfade"); Esc lets
 //! them go. The picture and the sound go together: the part is the same clip, only shorter.
 
@@ -9,9 +10,12 @@ use crate::Script;
 use qnc_script_db::Piece;
 use qnc_source_preview::SourcePreview;
 
-/// Shift+click on a word of a statement: the pick grows from the first picked word to it.
-/// `target` is `block:part:from:to`, as for a click.
+/// Shift+right click on a word or a letter of a statement: what is taken grows from the first
+/// taken to it. `target` is `block:part:from:to`, as for a click.
 pub const WORD_PICK: &str = "script_word_pick";
+/// A right click on a word or a letter of a statement (user 2026-11-05: "a right click is
+/// Ctrl+", the same in every action): takes it; Delete then cuts it out of the video.
+pub const WORD_TAKE: &str = "script_word_take";
 
 /// Words picked in one part: clip frames `[from, to)` from the first word's start to the last
 /// one's end.
@@ -63,15 +67,15 @@ pub fn left_of(piece: &Piece, from: u64, to: u64) -> (Option<(u64, u64)>, Option
 }
 
 impl Script {
-    /// The pick's keys and clicks: a click picks the word (and goes on to its cue), Shift+click
-    /// grows the pick, Delete cuts it out, Esc lets it go. `None` when the action is not about
-    /// a pick (a click is never fully taken here: it still cues the word).
+    /// What is taken in the text: a right click takes a word or a letter (Ctrl+), Shift+right
+    /// click takes up to it, Delete cuts it out, Esc lets it go. A left click only cues (the
+    /// playhead). `None` when the action is not about what is taken.
     pub(crate) fn pick_key(&mut self, action_id: &str, target: Option<&str>, preview: &SourcePreview) -> Option<bool> {
         match action_id {
-            crate::WORD_CUE if self.trim.is_none() => {
+            WORD_TAKE => {
                 self.word_pick = WordPick::word(target);
                 self.view.picked = self.word_pick;
-                None
+                Some(true)
             }
             WORD_PICK => {
                 self.word_pick = match self.word_pick {

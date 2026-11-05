@@ -9,7 +9,7 @@
 
 use eframe::egui::{self, RichText, Sense};
 use qnc_action_event::ActionEvent;
-use qnc_script::{seconds_label, FieldEdit, DRAFT, EXPORT, SEND_STORY, OPEN_EXPORT, Role, FIELD_COMMIT, FIELD_SET, FIELD_TEXT, ScriptView, ADD_CLIP, ADD_QUOTE, ADD_TEXT, CLEAR_EDITOR, EDITOR_TEXT, MOVE_DOWN, MOVE_UP, OPEN, PANEL, RECORD, REMOVE, REPLACE_TEXT, SELECT, VOICE_TAKE, WORD_CUE, WORD_CUT, WORD_PICK};
+use qnc_script::{seconds_label, FieldEdit, DRAFT, EXPORT, SEND_STORY, OPEN_EXPORT, Role, FIELD_COMMIT, FIELD_SET, FIELD_TEXT, ScriptView, ADD_CLIP, ADD_QUOTE, ADD_TEXT, CLEAR_EDITOR, EDITOR_TEXT, MOVE_DOWN, MOVE_UP, OPEN, PANEL, RECORD, REMOVE, REPLACE_TEXT, SELECT, VOICE_TAKE, WORD_CUE, WORD_CUT, WORD_PICK, WORD_TAKE};
 use qnc_text_source_editor::{Answer, Editor, EditorButton};
 use qnc_transcript::TranscriptView;
 
@@ -296,14 +296,21 @@ pub fn paint_block(ui: &mut egui::Ui, row: &qnc_script::BlockRow, view: &ScriptV
                         // word (user 2026-11-05: "the playhead's position should set the selection
                         // on the letters").
                         let lit_letter = heard.and_then(|frame| word.letters.iter().position(|(_, span)| span.is_some_and(|(from, to)| (from..to).contains(&frame))));
-                        let response = match lit_letter.filter(|_| word.letters.len() == word.text.chars().count()) {
+                        // The letters taken one by one (user 2026-11-05: "the same for the letters"): a
+                        // word whose letters are laid is drawn letter by letter while one is lit or taken.
+                        let picked_here = view.picked.filter(|pick| pick.block == block.id && pick.part == index && pick.from < word.to.max(word.from + 1) && word.from < pick.to);
+                        let letters_laid = word.letters.len() == word.text.chars().count() && word.letters.iter().all(|(_, span)| span.is_some());
+                        let by_letter = letters_laid && (lit_letter.is_some() || picked_here.is_some());
+                        let response = match by_letter.then_some(lit_letter.unwrap_or(usize::MAX)) {
                             Some(lit_at) => {
                                 let mut job = egui::text::LayoutJob::default();
                                 for (at, letter) in word.text.chars().enumerate() {
                                     let mut format = egui::TextFormat { font_id: egui::FontId::proportional(theme.font_ui + 1.0), color: theme.text, ..Default::default() };
+                                    let letter_cut = picked_here.zip(word.letters.get(at).and_then(|(_, span)| *span)).is_some_and(|(pick, (from, to))| (pick.from..pick.to).contains(&((from + to.max(from + 1)) / 2)));
                                     if at == lit_at {
                                         (format.color, format.background) = (theme.bg, theme.focus);
-                                    } else if to_cut {
+                                    } else if letter_cut {
+                                        format.strikethrough = egui::Stroke::new(1.5, theme.bg);
                                         (format.color, format.background) = (theme.bg, theme.danger);
                                     } else {
                                         format.background = theme.surface_alt;
@@ -334,9 +341,12 @@ pub fn paint_block(ui: &mut egui::Ui, row: &qnc_script::BlockRow, view: &ScriptV
                         let (from, to) = letter.map_or((word.from, word.to), |(_, span)| span);
                         if response.double_clicked() {
                             asked = Some(ActionEvent::key(WORD_CUT).with_target(format!("{id}:{index}:{from}:{to}")).at(PANEL));
-                        } else if response.clicked() && ui.input(|input| input.modifiers.shift) {
-                            // Shift+click: the pick grows to this word (Shift+ adds).
-                            asked = Some(ActionEvent::key(WORD_PICK).with_target(format!("{id}:{index}:{from}:{to}")).at(PANEL));
+                        } else if response.secondary_clicked() {
+                            // A right click is Ctrl+ (user 2026-11-05, every action the same): it takes
+                            // the word or the letter under the mouse; Shift+right click takes up to it
+                            // (Shift+ adds). Delete cuts what is taken out of the video.
+                            let action = if ui.input(|input| input.modifiers.shift) { WORD_PICK } else { WORD_TAKE };
+                            asked = Some(ActionEvent::key(action).with_target(format!("{id}:{index}:{from}:{to}")).at(PANEL));
                         } else if response.clicked() {
                             asked = Some(ActionEvent::key(WORD_CUE).with_target(format!("{id}:{index}:{from}:{to}")).at(PANEL));
                         }

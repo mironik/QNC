@@ -7914,3 +7914,12 @@ na jednom mjestu za sve zoomove: `qnc-segment-panel::trim_zoom` (poziv iz `qnc-e
 `qnc-subsegment-panel`). Klikovi zooma nose panel u kojem je zoom (`qnc-trim-overlay` `event_of`). Testovi
 `a_story_zoom_picture_has_its_slots_strip_and_the_markers_right_click` i test zooma slozene izjave, conformance, release
 build s libav. Debug cache obrisan (`cargo clean --profile dev`, 22,2 GiB; disk je imao 93 MB slobodno). Uzivo nije provjereno.
+Izmjena 2026-11-05 (korisnik: "desni klik treba biti dio svih kontrolnih radnji: za rezanje videa preko teksta selektirana
+rijec desni klik i Delete brisu tu rijec, isto vrijedi i za slova; 100% standardizirati, desni klik misem = Ctrl+"):
+zamjenjuje odabir rijeci klikom i Shift+klikom (iz istog dana). U tekstu izjave (scenarij MA Audio i MA Script, tekst
+otvorene izjave u prozoru medija) lijevi klik na rijec ili slovo samo stavlja playhead; desni klik (Ctrl+) uzima rijec ili
+slovo ispod misa (nova radnja kataloga `script_word_take`, bez tipke); Shift+desni klik uzima od prvog uzetog do nje
+(`script_word_pick`); Delete izreze uzeto iz videa, Esc ga pusta. Uzeta slova crtaju se slovo po slovo, crveno i precrtano.
+`qnc-script` (`WORD_TAKE`, `pick_key`), `qnc-script-panel`, katalog, rjecnik. Panel prijepisa klipa (AI Media Assist, prozor
+medija bez otvorene izjave) nije mijenjan: nije odredeno sto Delete brise u sirovom prijepisu klipa. Testovi, conformance,
+release build s libav. Uzivo nije provjereno.
