@@ -45,6 +45,27 @@ pub struct EditStill {
     /// picture takes the OUT before the cut, the right one the IN after it): a catalog action
     /// and its target; `None`: nothing.
     pub click: Option<(String, String)>,
+    /// What a right click on the picture (outside its strip) does (user 2026-11-05: "a right
+    /// click on the filmstrip not covered by the strip is the marker"); `None`: nothing.
+    pub right_click: Option<(String, String)>,
+    /// The length strip of the slot the picture shows, as on the timeline (user 2026-11-05: a
+    /// left click on it selects the slot, in the timeline and in the zoom); `None`: no strip.
+    pub strip: Option<StillStrip>,
+}
+
+/// The length strip under a zoom picture: the slot's length in the colour of its length.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct StillStrip {
+    /// The slot's length as shown (`seconds:frames`) and in frames.
+    pub label: String,
+    pub frames: u64,
+    /// The colour of its length (set by the panel that knows the bands); `None`: the accent.
+    pub fill: Option<[u8; 3]>,
+    /// The slot is the chosen one.
+    pub chosen: bool,
+    /// A left click selects the slot; a right click takes it whole (catalog action, target).
+    pub select: (String, String),
+    pub take: (String, String),
 }
 
 /// Which end of its clip a picture reached.
@@ -149,7 +170,7 @@ impl EditStill {
         let id = picture
             .as_ref()
             .map_or_else(String::new, |p| format!("qnc_edit_still:{}:{}", p.clip_id, p.source_frame));
-        Self { marker_frame, after, picture, image: None, id, label: String::new(), cut: false, clip_edge: None, clip_frames: None, past_end: false, click: None }
+        Self { marker_frame, after, picture, image: None, id, label: String::new(), cut: false, clip_edge: None, clip_frames: None, past_end: false, click: None, right_click: None, strip: None }
     }
 
     /// The same picture with what it is.

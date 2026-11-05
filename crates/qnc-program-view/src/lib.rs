@@ -8,7 +8,7 @@ mod markers;
 mod program;
 pub use program::*;
 
-pub use edit_stills::{edit_stills, mark_clip_edges, program_picture, trim_stills, ClipEdge, EditStill, StillPicture};
+pub use edit_stills::{edit_stills, mark_clip_edges, program_picture, trim_stills, ClipEdge, EditStill, StillPicture, StillStrip};
 
 pub use markers::{
     check_move, first_empty_slot, neighbour_marker, neighbour_segment, neighbour_slot,

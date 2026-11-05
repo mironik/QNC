@@ -97,10 +97,27 @@ pub fn show(ctx: &egui::Context, segments: &SegmentsView) -> Option<ActionEvent>
                 let click = still.click.clone().map(|(action, target)| ActionEvent::key(&action).with_target(target)).or_else(|| {
                     taken_cut.clone().map(|cut| Verb::PickSide { cut, side: Side::of(still.after) }.event(panel))
                 });
-                if let Some(click) = click {
-                    let response = ui.interact(pane, ui.id().with(("still", index)), Sense::click()).on_hover_cursor(egui::CursorIcon::PointingHand);
-                    if response.clicked() {
+                // The slot's length strip at the bottom of the picture (user 2026-11-05): a left
+                // click selects the slot, a right click takes it whole, as on the timeline.
+                let strip_rect = still.strip.as_ref().map(|_| Rect::from_min_max(egui::pos2(pane.left(), pane.bottom() - STRIP_HEIGHT), pane.max));
+                let response = ui.interact(pane, ui.id().with(("still", index)), Sense::click());
+                let at = response.interact_pointer_pos();
+                let on_strip = strip_rect.zip(at).is_some_and(|(strip, at)| strip.contains(at));
+                if let (Some(strip), Some(rect)) = (still.strip.as_ref(), strip_rect) {
+                    paint_strip(ui, rect, strip, ui.rect_contains_pointer(rect));
+                    if on_strip && response.clicked() {
+                        turned = Some(ActionEvent::key(&strip.select.0).with_target(strip.select.1.clone()));
+                    } else if on_strip && response.secondary_clicked() {
+                        turned = Some(ActionEvent::key(&strip.take.0).with_target(strip.take.1.clone()));
+                    }
+                }
+                if !on_strip {
+                    if let Some(click) = click.filter(|_| response.clicked()) {
                         turned = Some(click);
+                    }
+                    // A right click on the picture outside its strip: the marker (the cut).
+                    if let Some((action, target)) = still.right_click.as_ref().filter(|_| response.secondary_clicked()) {
+                        turned = Some(ActionEvent::key(action).with_target(target.clone()));
                     }
                 }
                 // The marker lies between the picture before it and the one after it.
@@ -420,6 +437,21 @@ fn paint_words(ui: &mut egui::Ui, row: Rect, sound: &ZoomSound, x_of: &dyn Fn(u6
         }
     }
     clicked
+}
+
+/// The height of a slot's length strip at the bottom of a zoom picture.
+const STRIP_HEIGHT: f32 = 24.0;
+
+/// A slot's length strip: the colour of its length, its length, brighter when chosen or under
+/// the mouse (as a cover's strip on the timeline).
+fn paint_strip(ui: &egui::Ui, rect: Rect, strip: &qnc_program_view::StillStrip, hovered: bool) {
+    let base = strip.fill.map_or(ui.visuals().selection.bg_fill, |[r, g, b]| Color32::from_rgb(r, g, b));
+    let fill = if strip.chosen || hovered { base.linear_multiply(0.9) } else { base.linear_multiply(0.6) };
+    ui.painter().rect_filled(rect, 1.0, fill);
+    if strip.chosen {
+        ui.painter().rect_stroke(rect, 1.0, Stroke::new(2.0, Color32::WHITE), StrokeKind::Inside);
+    }
+    ui.painter().text(rect.center(), Align2::CENTER_CENTER, &strip.label, FontId::proportional(12.0), Color32::BLACK);
 }
 
 fn paint_still(ui: &mut egui::Ui, pane: Rect, still: &EditStill, framed: bool, visuals: &egui::Visuals) {

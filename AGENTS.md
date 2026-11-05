@@ -7873,3 +7873,12 @@ jednog raspona postaje svoj prvi dio), `qnc-script-panel` (Shift+klik, oznaka). 
 `words_cut_out_of_a_part_leave_what_was_before_and_after_them_joined_by_a_cut`,
 `a_pick_grows_from_its_first_word_whichever_way_and_cuts_out_its_frames`, conformance, release build s libav. Uzivo nije
 provjereno.
+Dopuna 2026-11-05 (korisnik: "klik lijevim misem na traku koja pokazuje trajanje klipa selektira slot i u timelineu i u
+zumu; klik na filmstrip dio koji nije pokriven trakom, desni klik se odnosi na marker"): na timelineu slozene izjave to je
+vec pravilo (traka: lijevi klik bira slot, desni uzima dio cijeli; filmstrip izvan trake: desni klik najblizi rub ili rez).
+Sada isto u zoomu reza: ispod svake slike je traka trajanja njezina slota u boji duljine (`cover_lengths`) s duljinom;
+lijevi klik na traku bira slot (`subsegment_select`), desni ga uzima cijelog (`subsegment_take`), izabrani slot ima bijeli
+okvir; desni klik na sliku izvan trake uzima marker tog reza (`subsegment_take_edge`, spoj bez pauze je cijeli rez, inace
+rub dijela). `qnc-program-view` `EditStill.strip` (`StillStrip`) i `right_click`, `qnc-script` (`subsegment_zoom`),
+`qnc-subsegment-panel` (boja trake), `qnc-trim-overlay` (`paint_strip`). Zoom Storyja nije mijenjan. Test zooma prosiren,
+conformance, release build s libav. Uzivo nije provjereno.

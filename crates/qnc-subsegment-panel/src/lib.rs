@@ -197,7 +197,15 @@ pub fn show(ui: &mut egui::Ui, view: &SubsegmentView, theme: TimelineTheme, leng
     answer = answer.or_else(|| qnc_timeline::event(&intent, ROW_PANEL, &axis).filter(|event| qnc_script::ROW_ACTIONS.contains(&event.action_id.as_str())));
     // The trim zoom of a taken edge, as a cover's: its wheel moves the edge; a click on a word
     // moves the taken edge to it (user 2026-11-04), on the SubSegment's axis.
-    let zoomed = view.zoom.as_deref().and_then(|zoom| qnc_trim_overlay::show(ui.ctx(), zoom)).map(|event| match event.action_id.as_str() {
+    // The strips under its pictures in the colour of their length, as the timeline's.
+    let zoom = view.zoom.as_deref().map(|zoom| {
+        let mut zoom = zoom.clone();
+        for strip in zoom.source_edit_stills.iter_mut().filter_map(|still| still.strip.as_mut()) {
+            strip.fill = cover_fill(strip.frames, view.rate, lengths).map(|fill| [fill.r(), fill.g(), fill.b()]);
+        }
+        zoom
+    });
+    let zoomed = zoom.as_ref().and_then(|zoom| qnc_trim_overlay::show(ui.ctx(), zoom)).map(|event| match event.action_id.as_str() {
         "transcript_cut_word" => ActionEvent { action_id: qnc_script::ZOOM_WORD.to_string(), ..event },
         _ => event,
     });

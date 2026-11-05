@@ -562,8 +562,25 @@ pub fn subsegment_zoom(
     // part after it; a right click on the sound then takes that slot's sound at the cut.
     let slot = |index: usize| (crate::SUBSEGMENT_SELECT.to_string(), index.to_string());
     let (left, right) = if out { (Some(index), (index + 1 < pieces.len()).then_some(index + 1)) } else { (index.checked_sub(1), Some(index)) };
-    let before = EditStill { click: left.map(slot), ..before };
-    let after = EditStill { click: right.map(slot), ..after };
+    // Under each picture its slot's length strip, as on the timeline (user 2026-11-05: a left
+    // click on the strip selects the slot, a right click takes it whole); a right click on the
+    // picture outside the strip takes the marker of this cut, as on the timeline's filmstrip.
+    let strip = |index: usize| {
+        let part = view.parts.get(index)?;
+        let frames = part.end.saturating_sub(part.start);
+        let label = view.rate.map_or_else(|| part.length.clone(), |(num, den)| qnc_program_view::duration_label(frames, num, den));
+        Some(qnc_program_view::StillStrip {
+            label,
+            frames,
+            fill: None,
+            chosen: view.chosen == Some(index),
+            select: slot(index),
+            take: (crate::SUBSEGMENT_TAKE.to_string(), index.to_string()),
+        })
+    };
+    let marker = crate::nearest_edge(view, cut).map(|(index, side)| (crate::TAKE_EDGE.to_string(), format!("{index}:{side}")));
+    let before = EditStill { click: left.map(slot), strip: left.and_then(strip), right_click: marker.clone(), ..before };
+    let after = EditStill { click: right.map(slot), strip: right.and_then(strip), right_click: marker, ..after };
     let half = rate.max(1);
     let playhead = follow.and_then(|(follow, position)| follow.playhead(cut, position));
     let (from, to) = qnc_program_view::zoom_window(cut, cut, half, view.total_frames, playhead);
