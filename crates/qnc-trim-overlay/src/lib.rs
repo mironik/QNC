@@ -91,33 +91,33 @@ pub fn show(ctx: &egui::Context, segments: &SegmentsView) -> Option<ActionEvent>
             for (index, still) in stills.iter().enumerate() {
                 let left = top.x + index as f32 * (picture.x + GAP);
                 let pane = Rect::from_min_size(egui::pos2(left, top.y), picture);
-                paint_still(ui, pane, still, focus.map_or(still.cut, |side| still.after == side), &visuals);
-                // A click on a picture picks its side of the cut: the owner's own action when it
-                // gives one (a SubSegment's slot), else the one system action of every zoom.
-                let click = still.click.as_ref().map(event_of).or_else(|| {
+                let in_focus = focus.map_or(still.cut, |side| still.after == side);
+                paint_still(ui, pane, still, in_focus, &visuals);
+                // A left click on a picture or on its strip picks its side of the cut and never
+                // closes the zoom (user 2026-11-05: "a left click on the picture closed the zoom, it
+                // must mark what is chosen"): the owner's own pick when it gives one (a
+                // SubSegment's slot), else the one system action of every zoom.
+                let pick = still.strip.as_ref().and_then(|strip| strip.select.as_ref()).or(still.click.as_ref()).map(|action| event_of(action, panel)).or_else(|| {
                     taken_cut.clone().map(|cut| Verb::PickSide { cut, side: Side::of(still.after) }.event(panel))
                 });
-                // The slot's length strip at the bottom of the picture (user 2026-11-05): a left
-                // click selects the slot, a right click takes it whole, as on the timeline.
+                // The slot's length strip at the bottom of the picture (user 2026-11-05), as on the
+                // timeline: a right click on it takes the slot, a right click on the picture
+                // outside it the marker of the cut (a right click is Ctrl+, everywhere).
                 let strip_rect = still.strip.as_ref().map(|_| Rect::from_min_max(egui::pos2(pane.left(), pane.bottom() - STRIP_HEIGHT), pane.max));
                 let response = ui.interact(pane, ui.id().with(("still", index)), Sense::click());
                 let at = response.interact_pointer_pos();
                 let on_strip = strip_rect.zip(at).is_some_and(|(strip, at)| strip.contains(at));
                 if let (Some(strip), Some(rect)) = (still.strip.as_ref(), strip_rect) {
-                    paint_strip(ui, rect, strip, ui.rect_contains_pointer(rect));
-                    if on_strip && response.clicked() {
-                        turned = Some(event_of(&strip.select));
-                    } else if on_strip && response.secondary_clicked() {
-                        turned = Some(event_of(&strip.take));
-                    }
+                    paint_strip(ui, rect, strip, in_focus, ui.rect_contains_pointer(rect));
                 }
-                if !on_strip {
-                    if let Some(click) = click.filter(|_| response.clicked()) {
-                        turned = Some(click);
+                if response.clicked() {
+                    if let Some(pick) = pick {
+                        turned = Some(pick);
                     }
-                    // A right click on the picture outside its strip: the marker (the cut).
-                    if let Some(action) = still.right_click.as_ref().filter(|_| response.secondary_clicked()) {
-                        turned = Some(event_of(action));
+                } else if response.secondary_clicked() {
+                    let right = if on_strip { still.strip.as_ref().map(|strip| &strip.take) } else { still.right_click.as_ref() };
+                    if let Some(action) = right {
+                        turned = Some(event_of(action, panel));
                     }
                 }
                 // The marker lies between the picture before it and the one after it.
@@ -137,6 +137,18 @@ pub fn show(ctx: &egui::Context, segments: &SegmentsView) -> Option<ActionEvent>
             }
             if let Some(sound) = sound {
                 let area = Rect::from_min_size(egui::pos2(top.x, top.y + picture.y + LABEL_HEIGHT + BUTTONS_HEIGHT + LANES_GAP), Vec2::new(row_width, 2.0 * LANE_HEIGHT + GAP / 2.0 + WORDS_HEIGHT));
+                // The side the next action is on, plainly (user 2026-11-05: "the A1 of the clip
+                // before or of the next one, so the user sees what the action is on"): its half
+                // of the sound under a faint red, framed red as its pictures.
+                if let Some(after) = focus {
+                    let width = (sound.to - sound.from).max(1) as f32;
+                    let x = area.left() + area.width() * (sound.cut.clamp(sound.from, sound.to) - sound.from) as f32 / width;
+                    let half = if after { Rect::from_min_max(egui::pos2(x, area.top()), area.max) } else { Rect::from_min_max(area.min, egui::pos2(x, area.bottom())) };
+                    if half.width() > 1.0 {
+                        ui.painter().rect_filled(half, 0.0, Color32::from_rgba_unmultiplied(230, 30, 30, 28));
+                        ui.painter().rect_stroke(half, 0.0, Stroke::new(2.0, CUT_LINE), StrokeKind::Inside);
+                    }
+                }
                 let (word, side) = paint_sound(ui, area, sound, gap_at, top.y, (panel, source), lane_choices(sound, segments), &visuals);
                 // A word in every zoom (user 2026-11-04): the taken cut goes to it, else a cut.
                 if let Some((from, to)) = word {
@@ -444,11 +456,14 @@ const STRIP_HEIGHT: f32 = 24.0;
 
 /// A slot's length strip: the colour of its length, its length, brighter when chosen or under
 /// the mouse (as a cover's strip on the timeline).
-fn paint_strip(ui: &egui::Ui, rect: Rect, strip: &qnc_program_view::StillStrip, hovered: bool) {
+fn paint_strip(ui: &egui::Ui, rect: Rect, strip: &qnc_program_view::StillStrip, focused: bool, hovered: bool) {
     let base = strip.fill.map_or(ui.visuals().selection.bg_fill, |[r, g, b]| Color32::from_rgb(r, g, b));
-    let fill = if strip.chosen || hovered { base.linear_multiply(0.9) } else { base.linear_multiply(0.6) };
+    let fill = if focused || strip.chosen || hovered { base.linear_multiply(0.95) } else { base.linear_multiply(0.6) };
     ui.painter().rect_filled(rect, 1.0, fill);
-    if strip.chosen {
+    // The side the next action is on: framed red as its pictures (user 2026-11-05).
+    if focused {
+        ui.painter().rect_stroke(rect, 1.0, Stroke::new(3.0, CUT_LINE), StrokeKind::Inside);
+    } else if strip.chosen {
         ui.painter().rect_stroke(rect, 1.0, Stroke::new(2.0, Color32::WHITE), StrokeKind::Inside);
     }
     ui.painter().text(rect.center(), Align2::CENTER_CENTER, &strip.label, FontId::proportional(12.0), Color32::BLACK);
@@ -498,8 +513,8 @@ mod tests {
 }
 
 /// The event of a zoom click: the timeline's action of the same gesture, its target and frame.
-fn event_of(action: &qnc_program_view::StillAction) -> ActionEvent {
-    let mut event = ActionEvent::key(&action.action);
+fn event_of(action: &qnc_program_view::StillAction, panel: &str) -> ActionEvent {
+    let mut event = ActionEvent::key(&action.action).at(panel);
     if let Some(target) = &action.target {
         event = event.with_target(target.clone());
     }

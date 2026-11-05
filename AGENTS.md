@@ -7901,3 +7901,16 @@ klik na traku `timeline_take_cover` (slot i njegov blizi rub). Odgovor daje isti
 timeline. `qnc-program-view` `StillAction` (radnja, cilj, frame) za `click`, `right_click` i traku; `qnc-trim-overlay`
 (`event_of`); `qnc-subsegment-panel` (radnje reda iz zooma na panelu reda). Test: zoom daje iste vlastite radnje kao timeline
 na istom frameu. Conformance, release build s libav. Uzivo nije provjereno. Zoom Storyja nije mijenjan.
+Izmjena 2026-11-05 (korisnik: "primijeni isto pravilo i na zoom u Storyju i S-Storyju, svugdje gdje koristimo timeline i zoom;
+lijevi klik na sliku u zoomu zatvara zoom, to je greska; treba oznaciti ono sto je selektirano, npr. A1 prethodnog ili
+narednog klipa, da korisnik vidi na sto ce se primijeniti radnja"): u svakom zoomu reza (Story, S-Story, slozena izjava)
+lijevi klik na sliku ili na traku ispod nje bira tu stranu reza i nikad ne sprema niti zatvara zoom (u Storyju i S-Storyju
+`zoom_pick_side` uzetog reza, u slozenoj izjavi `subsegment_select` slota te strane). Strana koja je izabrana je jasno
+oznacena: crveni okvir njezinih slika, crveni okvir njezine trake i crveno uokvirena, blago obojena polovica A1/A2 te
+strane. Desni klik je Ctrl+ kao na timelineu: na traci uzima slot (`select_current_marker_slot` u Storyju, u slozenoj
+izjavi slot i njegov rub), na slici izvan trake marker reza (`select_marker`). Story i S-Story zoom dobili su traku slota
+ispod svake slike (`qnc-program-view` `story_zoom_clicks`, poziva je `qnc-program-segments` refresh). Boja trake po duljini
+na jednom mjestu za sve zoomove: `qnc-segment-panel::trim_zoom` (poziv iz `qnc-editorial-blocks` je isti redak, i iz
+`qnc-subsegment-panel`). Klikovi zooma nose panel u kojem je zoom (`qnc-trim-overlay` `event_of`). Testovi
+`a_story_zoom_picture_has_its_slots_strip_and_the_markers_right_click` i test zooma slozene izjave, conformance, release
+build s libav. Debug cache obrisan (`cargo clean --profile dev`, 22,2 GiB; disk je imao 93 MB slobodno). Uzivo nije provjereno.

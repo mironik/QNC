@@ -63,8 +63,9 @@ pub struct StillStrip {
     pub fill: Option<[u8; 3]>,
     /// The slot is the chosen one.
     pub chosen: bool,
-    /// A left click on the strip and a right click on it: the same actions as on the timeline.
-    pub select: StillAction,
+    /// A left click on the strip picks this side (never keeps or closes; `None`: the zoom's
+    /// one pick of the side); a right click takes it, as on the timeline.
+    pub select: Option<StillAction>,
     pub take: StillAction,
 }
 
@@ -361,5 +362,59 @@ pub struct StillAction {
 impl StillAction {
     pub fn new(action: &str, target: Option<String>, value: Option<u64>) -> Self {
         Self { action: action.to_string(), target, value: value.and_then(|value| i64::try_from(value).ok()) }
+    }
+}
+
+/// The zoom of a story's Wrap rows as the timeline enlarged (AGENTS 0.12, user 2026-11-05: "the
+/// same rule in the Story's and the S-Story's zoom, everywhere a timeline and its zoom are"):
+/// under each picture the length strip of the slot it shows, a right click on the strip takes
+/// that slot (as Ctrl+S, the timeline's right click on a strip), a right click on the picture
+/// the marker of the cut (as on the timeline's filmstrip). A left click picks the side (the
+/// zoom's one pick, never closing it).
+pub fn story_zoom_clicks(stills: &mut [EditStill], view: &crate::SegmentsView) {
+    for still in stills {
+        let frame = if still.after { still.marker_frame } else { still.marker_frame.saturating_sub(1) };
+        if let Some(slot) = crate::slot_at(&view.slots, frame) {
+            let frames = slot.end_frame.saturating_sub(slot.start_frame);
+            let label = view.timebase.map_or_else(String::new, |(num, den)| crate::duration_label(frames, num, den));
+            still.strip = Some(StillStrip {
+                label,
+                frames,
+                fill: None,
+                chosen: slot.selected,
+                select: None,
+                take: StillAction::new("select_current_marker_slot", Some(slot.slot_id.clone()), None),
+            });
+        }
+        // The taken marker (its draft frame may differ from the stored one), else the nearest.
+        let usable = || view.markers.iter().filter(|marker| !marker.locked || view.clips_are_slots);
+        let marker = usable().find(|marker| marker.taken).or_else(|| usable().min_by_key(|marker| marker.frame.abs_diff(still.marker_frame)));
+        still.right_click = marker.map(|marker| StillAction::new("select_marker", Some(marker.marker_id.clone()), Some(frame)));
+    }
+}
+
+#[cfg(test)]
+mod zoom_click_tests {
+    use super::*;
+    use crate::{MarkerPin, SegmentsView, Slot, TakenPart};
+
+    /// The Story's zoom is its Wrap rows enlarged (user 2026-11-05): each picture gets its slot's
+    /// strip, a right click on it is Ctrl+S of that slot, a right click on the picture the taken
+    /// marker; a left click is left to the zoom's one pick of the side (never a keep).
+    #[test]
+    fn a_story_zoom_picture_has_its_slots_strip_and_the_markers_right_click() {
+        let slot = |id: &str, start, end| Slot { slot_id: id.into(), start_frame: start, end_frame: end, has_cover: false, selected: id == "s2" };
+        let marker = |id: &str, frame, taken| MarkerPin { marker_id: id.into(), frame, locked: false, selected: false, taken, taken_part: TakenPart::Whole, origin: None, sound_tail: None, sound_lead: None, join: false, a1_tail: None, a1_lead: None, sound_lane: 0 };
+        let view = SegmentsView { slots: vec![slot("s1", 0, 100), slot("s2", 100, 150)], markers: vec![marker("m1", 100, true), marker("m2", 150, false)], timebase: Some((25, 1)), ..Default::default() };
+        let mut stills = vec![EditStill::new(100, false, None), EditStill::new(100, true, None)];
+        story_zoom_clicks(&mut stills, &view);
+        let strip = |index: usize| stills[index].strip.clone().unwrap();
+        assert_eq!((strip(0).frames, strip(0).take.target.as_deref()), (100, Some("s1")), "the slot before the cut");
+        assert_eq!((strip(1).frames, strip(1).take.target.as_deref(), strip(1).chosen), (50, Some("s2"), true), "the slot after it");
+        assert_eq!(strip(0).take.action, "select_current_marker_slot", "a right click on a strip is the timeline's");
+        assert!(strip(0).select.is_none(), "a left click: the zoom's pick of the side");
+        let right = |index: usize| stills[index].right_click.clone().map(|action| (action.action, action.target, action.value));
+        assert_eq!(right(0), Some(("select_marker".into(), Some("m1".into()), Some(99))), "a right click on the picture: the marker");
+        assert_eq!(right(1), Some(("select_marker".into(), Some("m1".into()), Some(100))));
     }
 }

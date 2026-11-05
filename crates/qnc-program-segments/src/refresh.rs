@@ -138,6 +138,10 @@ impl ProgramSegments {
         view.a1_splits = self.picture_splits();
         qnc_program_view::mark_clip_edges(&mut view.edit_stills, |id| self.clip_frames.get(id).copied());
         self.lane_view(&mut view);
+        // The zoom as the timeline enlarged: each picture's slot strip and right clicks.
+        let mut stills = std::mem::take(&mut view.edit_stills);
+        qnc_program_view::story_zoom_clicks(&mut stills, &view);
+        view.edit_stills = stills;
         view.zoom = self.zoom_window(&view);
         view.zoom_sound = self.zoom_sound(&view);
         self.view = view;

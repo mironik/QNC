@@ -17,7 +17,7 @@ mod header;
 mod program;
 use header::*;
 use program::*;
-pub use cover_length::{cover_fill, CoverLengthBand};
+pub use cover_length::{cover_fill, trim_zoom, CoverLengthBand};
 
 use qnc_action_event::ActionEvent;
 use eframe::egui::{self, Color32, RichText, Vec2};

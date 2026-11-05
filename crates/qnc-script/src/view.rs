@@ -559,11 +559,10 @@ pub fn subsegment_zoom(
     };
     // The zoom is the timeline enlarged (AGENTS 0.12, user 2026-11-05: "one action works the same
     // in every situation, a right click is Ctrl+"): each picture stands on a frame of the
-    // SubSegment's axis and every click on it sends what the timeline's mouse map gives the same
-    // gesture at that frame, so the SubSegment's owner says what it does, as for the timeline.
-    // A left click on the picture is the playhead (or keeps what is held); a right click the
-    // marker there; the strip under it is the slot's length strip: a left click selects the
-    // slot, a right click takes it (its nearer edge, the slot longer or shorter).
+    // SubSegment's axis and a right click on it, or on its slot's length strip under it, sends
+    // what the timeline's mouse map gives the same gesture at that frame (the marker there; the
+    // slot and its nearer edge). A left click on the picture or the strip picks that side's slot
+    // and never closes the zoom (user 2026-11-05: "mark what is chosen").
     let (left, right) = if out { (Some(index), (index + 1 < pieces.len()).then_some(index + 1)) } else { (index.checked_sub(1), Some(index)) };
     let on_axis = |side: Option<usize>, last: bool| {
         side.and_then(|index| view.parts.get(index)).map_or(cut, |part| if last { part.end.saturating_sub(1).max(part.start) } else { part.start })
@@ -579,7 +578,9 @@ pub fn subsegment_zoom(
             frames,
             fill: None,
             chosen: view.chosen == Some(index),
-            select: action("timeline_select_cover", id.clone(), frame),
+            // A left click picks this side's slot (user 2026-11-05: "a click in the zoom must not
+            // close it, it marks what is chosen"), the edge held stays.
+            select: Some(qnc_program_view::StillAction::new(crate::SUBSEGMENT_SELECT, Some(index.to_string()), None)),
             take: action("timeline_take_cover", id, frame),
         })
     };
@@ -587,7 +588,7 @@ pub fn subsegment_zoom(
         let frame = on_axis(side, last);
         let edge = crate::nearest_edge(view, frame).map(|(index, side)| format!("edge-{index}-{}", if side == "in" { "in" } else { "out" }));
         EditStill {
-            click: side.map(|_| action("timeline_cue_frame", None, frame)),
+            click: None,
             strip: side.and_then(|index| strip(index, frame)),
             right_click: edge.map(|edge| action("select_marker", Some(edge), frame)),
             ..still

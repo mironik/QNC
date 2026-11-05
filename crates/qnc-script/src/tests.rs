@@ -177,14 +177,15 @@ fn the_zoom_of_a_subsegment_edge_shows_the_pictures_either_side_of_its_cut() {
     let strip = |still: usize| at(still).strip.unwrap();
     assert_eq!((strip(0).frames, strip(1).frames), (50, 40), "each picture's slot length strip");
     let some = |action: &str, target: &str| Some((action.to_string(), Some(target.to_string())));
-    assert_eq!(own(&strip(0).select), some(crate::SUBSEGMENT_SELECT, "0"), "a left click on the strip selects the slot");
-    assert_eq!(own(&strip(1).select), some(crate::SUBSEGMENT_SELECT, "1"));
+    // A left click on a picture or its strip picks that side's slot, never keeps or closes the
+    // zoom (user 2026-11-05: "it must mark what is chosen").
+    let pick = |still: usize| strip(still).select.map(|select| (select.action, select.target));
+    assert_eq!(pick(0), Some((crate::SUBSEGMENT_SELECT.to_string(), Some("0".to_string()))));
+    assert_eq!(pick(1), Some((crate::SUBSEGMENT_SELECT.to_string(), Some("1".to_string()))));
     assert_eq!(own(&strip(0).take), some(crate::TAKE_EDGE, "0:out:slot"), "a right click on the strip: the slot, its edge at the cut");
     assert_eq!(own(&strip(1).take), some(crate::TAKE_EDGE, "1:in:slot"));
     assert_eq!(own(at(0).right_click.as_ref().unwrap()), some(crate::TAKE_EDGE, "0:cut"), "a right click on the picture: the marker there");
     assert_eq!(own(at(1).right_click.as_ref().unwrap()), some(crate::TAKE_EDGE, "0:cut"));
-    assert_eq!(own(at(1).click.as_ref().unwrap()), some(crate::SUBSEGMENT_CUE, "50"), "a left click on the picture: the playhead there");
-    assert_eq!(crate::own_action(&shown, "timeline_cue_frame", Some(50), None, true), Some(("activate_focused_item".to_string(), None)), "or, while held, keeps");
     // The IN of the third part follows a pause: on the left is still the OUT of the part before.
     let zoom = subsegment_zoom(&shown, &pieces, (2, false), (50, None), |_| Some(1000)).unwrap();
     assert_eq!(zoom.source_edit_stills[0].picture.as_ref().map(|p| (p.clip_id.as_str(), p.source_frame)), Some(("a", 339)));
@@ -194,7 +195,7 @@ fn the_zoom_of_a_subsegment_edge_shows_the_pictures_either_side_of_its_cut() {
     assert_eq!(pictures, vec![(Some(149), true), (Some(300), false)]);
     // The first part's IN has no OUT before it; the last part's OUT no IN after it.
     let first = subsegment_zoom(&shown, &pieces, (0, false), (50, None), |_| Some(1000)).unwrap();
-    assert!(first.source_edit_stills[0].click.is_none());
+    assert!(first.source_edit_stills[0].strip.is_none(), "nothing before the first IN to pick");
     let last = subsegment_zoom(&shown, &pieces, (2, true), (50, None), |_| Some(1000)).unwrap();
-    assert!(last.source_edit_stills[1].click.is_none());
+    assert!(last.source_edit_stills[1].strip.is_none());
 }

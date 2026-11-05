@@ -6195,6 +6195,7 @@ dependencies = [
  "qnc-program-waveform",
  "qnc-theme-styles",
  "qnc-timeline",
+ "qnc-trim-overlay",
  "qnc-ui-kit",
  "qnc-ui-text",
  "qnc-wheel-jog",
