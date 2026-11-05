@@ -74,13 +74,13 @@ pub struct SoundDraft {
     /// Covers with their A2 J and L as drafted on the Wrap row (user 2026-10-21: the sound of an
     /// M marker's cut), or Tons with the A2 J and L they go into an Off with (user 2026-10-30),
     /// story frames; the others keep theirs.
-    pub overlaps: Vec<(String, (u32, u32))>,
+    pub overlaps: Vec<(String, (i32, i32))>,
     /// Clips with the J and L of their picture as drafted at a cut (user 2026-10-29: only the
     /// picture of the cut moves), story frames; the others keep theirs.
     pub pictures: Vec<(String, (u32, u32))>,
     /// Clips with the J and L of their A1 sound as drafted at a cut (user 2026-10-29), story
     /// frames; the others keep theirs.
-    pub joins: Vec<(String, (u32, u32))>,
+    pub joins: Vec<(String, (i32, i32))>,
 }
 
 impl SoundDraft {

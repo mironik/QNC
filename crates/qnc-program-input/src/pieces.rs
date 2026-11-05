@@ -52,8 +52,6 @@ pub fn load_pieces(
     let (mut segments, mut joins, mut start) = (Vec::new(), Vec::new(), 0i64);
     // The story frames per frame of the part before (its L is counted in its own clip).
     let mut before_scale = (1i64, 1i64);
-    // The holes at joins: the cut, how long the sound after waits, how early the sound before ends.
-    let mut holes: Vec<(i64, i64, i64)> = Vec::new();
     for (index, piece) in pieces.iter().enumerate() {
         // A pause may come before the first part too (a draft story that starts with an OFF
         // not recorded yet, user 2026-10-30).
@@ -80,13 +78,9 @@ pub fn load_pieces(
         // The J and L of the join (only where two parts meet, no pause): the sounds cross as at
         // a story's cut, in place of the join's crossfade.
         let (lead, tail) = if index > 0 && gap == 0 { (piece.sound_lead * num / den, piece.sound_tail * before_scale.0 / before_scale.1) } else { (0, 0) };
-        // A negative side is a hole (user 2026-11-04): that sound ends before, or starts after,
-        // the picture cut, silence between; a positive side crosses as before.
-        if lead < 0 || tail < 0 {
-            holes.push((start, -lead.min(0), -tail.min(0)));
-        }
-        let (lead, tail) = (lead.max(0), tail.max(0));
-        if lead + tail > 0 {
+        // A negative side is a hole in the sound (user 2026-11-04), the playlist's as at every
+        // story's cut; a positive side crosses.
+        if lead != 0 || tail != 0 {
             if let Some(before) = segments.last_mut() {
                 before.a1_tail_frames = tail;
             }
@@ -139,9 +133,6 @@ pub fn load_pieces(
     };
     let mut playlist = build_flat_program_playlist(&build, &mut resolver)?;
     qnc_program_playlist::join_a1(&mut playlist.items, &joins)?;
-    for (cut, wait, early) in holes {
-        qnc_program_playlist::hole_a1(&mut playlist.items, cut, wait, early)?;
-    }
     playlist.validate().map_err(|error| error.message)?;
     ProgramInput::new(playlist, resolver.prepared).map_err(|error| error.to_string())
 }

@@ -903,7 +903,9 @@ fn a_taken_marker_moves_whole_or_only_its_sound_or_only_its_picture() {
     segments.apply_action("step_back_frame");
     assert!(segments.view().trim_frames.contains(&13), "the sound 2 frames before the cut: a J");
     let draft = segments.cut_sound_draft().unwrap();
-    assert!(draft.contains(&("c1".to_string(), (2, 0))) && draft.contains(&("c0".to_string(), (0, 0))), "{draft:?}");
+    // The sound cut itself moves (user 2026-11-05, one model with holes): the cover after starts
+    // 2 earlier, the cover before ends 2 earlier.
+    assert!(draft.contains(&("c1".to_string(), (2, 0))) && draft.contains(&("c0".to_string(), (0, -2))), "{draft:?}");
     assert!(segments.apply(SegmentCommand::CutPart { marker_id: "m1".into(), picture: false, lane: 1 }));
     assert_eq!(segments.cut_sound_draft(), Some(draft.clone()), "the sound taken again keeps its draft");
     assert!(segments.take_cut_part(None, false, 0), "the A1 part is answered");
@@ -1014,11 +1016,11 @@ fn the_a1_sound_of_a_cut_between_two_clips_has_a_j_and_an_l() {
     segments.apply_action("step_back_frame");
     segments.apply_action("step_back_frame");
     let draft = segments.join_sound_draft().expect("the A1 draft");
-    assert!(draft.contains(&("b".to_string(), (2, 0))) && draft.contains(&("a".to_string(), (0, 0))), "{draft:?}");
+    assert!(draft.contains(&("b".to_string(), (2, 0))) && draft.contains(&("a".to_string(), (0, -2))), "{draft:?}");
     assert!(segments.take_sound_edge(false), "the L alone");
     segments.apply_action("step_forward_frame");
     let draft = segments.join_sound_draft().unwrap();
-    assert!(draft.contains(&("a".to_string(), (0, 1))), "{draft:?}");
+    assert!(draft.contains(&("a".to_string(), (0, -1))), "{draft:?}");
     if let Some(sound) = &segments.view().zoom_sound {
         assert_eq!(sound.cut_sound.as_ref().map(|cut| cut.lane), Some(0));
         assert_eq!(sound.taken_cut.as_deref(), Some(join.as_str()));

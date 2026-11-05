@@ -42,9 +42,9 @@ pub struct ProgramSegment {
     /// frames before its picture, over the end of the segment before, and goes on
     /// `a1_tail_frames` after it, over the start of the segment after; the two sounds cross.
     #[serde(default)]
-    pub a1_lead_frames: u32,
+    pub a1_lead_frames: i32,
     #[serde(default)]
-    pub a1_tail_frames: u32,
+    pub a1_tail_frames: i32,
     /// The picture L of the segment (user 2026-10-29: a cut is the OUT of the clip before and
     /// the IN of the clip after, picture and sound each): its picture goes on that many story
     /// frames after its sound, over the start of the segment after (black for an Off); 0 none.
@@ -60,9 +60,9 @@ pub struct ProgramSegment {
     #[serde(default)]
     pub a2_off: bool,
     #[serde(default)]
-    pub a2_lead_frames: u32,
+    pub a2_lead_frames: i32,
     #[serde(default)]
-    pub a2_tail_frames: u32,
+    pub a2_tail_frames: i32,
 }
 
 /// An M marker on the program axis (v5 `story_markers`). `system_role` is
@@ -111,9 +111,9 @@ pub struct ProgramCover {
     /// The cover's A2 overlap (user 2026-10-21): frames its sound starts before its picture
     /// (J) and goes on after it (L), story frames; 0 for the project crossfade only.
     #[serde(default)]
-    pub a2_lead_frames: u32,
+    pub a2_lead_frames: i32,
     #[serde(default)]
-    pub a2_tail_frames: u32,
+    pub a2_tail_frames: i32,
 }
 
 /// The stored Story selection (v5 `story_state`).
@@ -263,12 +263,12 @@ pub enum Operation {
     /// Both sides of the A2 sound of an M marker's cut (user 2026-10-29: J and L together, an
     /// overlap): `tail_frames` the L of the cover before, `lead_frames` the J of the cover
     /// after, story frames. A side with no cover takes none. One UNDO step.
-    SetCutSoundEdges { marker_id: String, tail_frames: u32, lead_frames: u32 },
+    SetCutSoundEdges { marker_id: String, tail_frames: i32, lead_frames: i32 },
     /// Both sides of the A1 sound at the join of two segments (user 2026-10-29: "every cut is a
     /// marker", the join is the OUT of the one before and the IN of the one after):
     /// `tail_frames` the L of the segment before, `lead_frames` the J of `segment_id`, the
     /// segment after. One UNDO step.
-    SetJoinSound { segment_id: String, tail_frames: u32, lead_frames: u32 },
+    SetJoinSound { segment_id: String, tail_frames: i32, lead_frames: i32 },
     /// The A2 of a Ton at the join of a Ton and an Off (user 2026-10-30: "only the A2 of the Ton
     /// goes into the Off, as a J or an L"): `tail_frames` the L of the Ton before an Off,
     /// `lead_frames` the J of `segment_id`, a Ton after an Off. One UNDO step.
@@ -333,7 +333,7 @@ pub enum Operation {
     /// The sound of a cover on A2 changed later. An UNDO step.
     SetCoverSound { cover_id: String, channel: u16, level_db: i8, off: bool },
     /// The J and L of a cover's A2 (user 2026-10-21), story frames. An UNDO step.
-    SetCoverOverlap { cover_id: String, lead_frames: u32, tail_frames: u32 },
+    SetCoverOverlap { cover_id: String, lead_frames: i32, tail_frames: i32 },
     /// v5 `delete_cover`; its B-roll virtual shot stays.
     DeleteCover { cover_id: String },
     /// v5 `select_cover`.

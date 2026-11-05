@@ -96,6 +96,28 @@ pub(crate) fn ensure_story_schema(conn: &Connection) -> Result<()> {
             conn.execute("DELETE FROM story_undo", []).map_err(err)?;
         }
     }
+    // The J and L of a sound may be negative, a hole in the sound (user 2026-11-05: "nowhere a
+    // hole in the picture, only a hole in the sound"): a table made with them never below 0 is
+    // built again with the same rows (no conversion: every row is valid as it is).
+    let checked = conn
+        .query_row("SELECT sql FROM sqlite_master WHERE type = 'table' AND name = 'story_items'", [], |row| row.get::<_, String>(0))
+        .optional()
+        .map_err(err)?
+        .is_some_and(|sql| sql.contains("CHECK (a1_lead_frames >= 0)"));
+    if checked {
+        conn.execute_batch(
+            "DROP VIEW IF EXISTS public_story_parts;
+             DROP VIEW IF EXISTS public_story_covers;
+             DROP VIEW IF EXISTS public_story_items;
+             DROP VIEW IF EXISTS public_story_markers;
+             DROP VIEW IF EXISTS public_story_marker_slots;
+             DROP VIEW IF EXISTS public_story_state;
+             DROP INDEX IF EXISTS idx_story_items_role_sort;
+             DROP INDEX IF EXISTS idx_story_items_slot;
+             ALTER TABLE story_items RENAME TO story_items_checked;",
+        )
+        .map_err(err)?;
+    }
     conn.execute_batch(
         "DROP VIEW IF EXISTS public_program_segments;
          DROP VIEW IF EXISTS public_program_markers;
@@ -154,13 +176,13 @@ pub(crate) fn ensure_story_schema(conn: &Connection) -> Result<()> {
             a1_source_channel INTEGER NOT NULL DEFAULT 0 CHECK (a1_source_channel >= 0),
             a1_level_db INTEGER NOT NULL DEFAULT 0,
             a1_off INTEGER NOT NULL DEFAULT 0,
-            a1_lead_frames INTEGER NOT NULL DEFAULT 0 CHECK (a1_lead_frames >= 0),
-            a1_tail_frames INTEGER NOT NULL DEFAULT 0 CHECK (a1_tail_frames >= 0),
+            a1_lead_frames INTEGER NOT NULL DEFAULT 0,
+            a1_tail_frames INTEGER NOT NULL DEFAULT 0,
             a2_source_channel INTEGER NOT NULL DEFAULT 0 CHECK (a2_source_channel >= 0),
             a2_level_db INTEGER NOT NULL DEFAULT 0,
             a2_off INTEGER NOT NULL DEFAULT 0,
-            a2_lead_frames INTEGER NOT NULL DEFAULT 0 CHECK (a2_lead_frames >= 0),
-            a2_tail_frames INTEGER NOT NULL DEFAULT 0 CHECK (a2_tail_frames >= 0),
+            a2_lead_frames INTEGER NOT NULL DEFAULT 0,
+            a2_tail_frames INTEGER NOT NULL DEFAULT 0,
             created_at TEXT NOT NULL,
             updated_at TEXT NOT NULL
          );
@@ -250,6 +272,11 @@ pub(crate) fn ensure_story_schema(conn: &Connection) -> Result<()> {
     if !table_columns(conn, "story_items")?.iter().any(|column| column == "origin") {
         conn.execute_batch("ALTER TABLE story_items ADD COLUMN origin TEXT NOT NULL DEFAULT '';").map_err(err)?;
     }
+    if checked {
+        let now = items_now(conn);
+        let columns = table_columns(conn, "story_items_checked")?.into_iter().filter(|column| now.contains(column)).collect::<Vec<_>>().join(", ");
+        conn.execute_batch(&format!("INSERT INTO story_items ({columns}) SELECT {columns} FROM story_items_checked; DROP TABLE story_items_checked;")).map_err(err)?;
+    }
     // Cover identity is the marker pair. The seconds signature stays a column
     // from v5; this owner does not use it as the slot id.
     conn.execute(
@@ -259,4 +286,9 @@ pub(crate) fn ensure_story_schema(conn: &Connection) -> Result<()> {
     )
     .map_err(err)?;
     Ok(())
+}
+
+/// The columns of `story_items` as it is now.
+fn items_now(conn: &Connection) -> Vec<String> {
+    table_columns(conn, "story_items").unwrap_or_default()
 }

@@ -156,8 +156,15 @@ pub fn build_flat_program_playlist(
     // The A1 cut between two clips: the J of the one after and the L of the one before.
     for pair in input.segments.windows(2) {
         let (before, after) = (&pair[0], &pair[1]);
-        if before.a1_tail_frames > 0 || after.a1_lead_frames > 0 {
-            cross_a1(&mut items, after.record_range.in_frame, after.a1_lead_frames, before.a1_tail_frames)?;
+        let (at, lead, tail) = (after.record_range.in_frame, after.a1_lead_frames, before.a1_tail_frames);
+        if lead.max(0) + tail.max(0) > 0 {
+            cross_a1(&mut items, at, lead.max(0), tail.max(0))?;
+        }
+        // A negative side is a hole in the sound (user 2026-11-05: "nowhere a hole in the picture,
+        // only a hole in the sound"): that sound ends before, or starts after, the picture cut.
+        if lead < 0 || tail < 0 {
+            let (wait, early) = ((-lead.min(0)).min(after.record_range.frame_len()), (-tail.min(0)).min(before.record_range.frame_len()));
+            hole_a1(&mut items, at, wait, early)?;
         }
     }
     let asked: std::collections::HashMap<&str, crossfade::Overlap> = input
@@ -168,6 +175,8 @@ pub fn build_flat_program_playlist(
         .collect();
     let end = items.iter().map(|item| item.record_range.out_frame).max().unwrap_or(0);
     crossfade::crossfade_a2(&mut items, input.a2_crossfade_frames, |id| asked.get(id).copied().unwrap_or_default(), end)?;
+    let holes: Vec<(String, i64, i64)> = asked.iter().map(|(id, overlap)| ((*id).to_string(), overlap.lead, overlap.tail)).collect();
+    crossfade::holes_a2(&mut items, &holes)?;
     // After the covers' own A2: a cover overwrites A2 where it lies.
     ton_a2::ton_a2_into_offs(&mut items, &input.segments, input.a2_crossfade_frames, resolver)?;
     let playlist = FlatProgramPlaylist {

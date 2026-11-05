@@ -69,14 +69,14 @@ impl Store {
                     duration_frames: if duration > 0 { duration } else { out_frame.saturating_sub(in_frame) },
                     v_lead_frames: row.get::<_, i64>(13)?.clamp(0, i64::from(MAX_OVERLAP_FRAMES)) as u32,
                     lead: row.get(14)?,
-                    a1_lead_frames: row.get::<_, i64>(15)?.clamp(0, i64::from(MAX_OVERLAP_FRAMES)) as u32,
-                    a1_tail_frames: row.get::<_, i64>(16)?.clamp(0, i64::from(MAX_OVERLAP_FRAMES)) as u32,
+                    a1_lead_frames: row.get::<_, i64>(15)?.clamp(-i64::from(MAX_OVERLAP_FRAMES), i64::from(MAX_OVERLAP_FRAMES)) as i32,
+                    a1_tail_frames: row.get::<_, i64>(16)?.clamp(-i64::from(MAX_OVERLAP_FRAMES), i64::from(MAX_OVERLAP_FRAMES)) as i32,
                     v_tail_frames: row.get::<_, i64>(17)?.clamp(0, i64::from(MAX_OVERLAP_FRAMES)) as u32,
                     a2_source_channel: channel(row.get(18)?),
                     a2_level_db: level(row.get(19)?),
                     a2_off: row.get::<_, i64>(20)? != 0,
-                    a2_lead_frames: row.get::<_, i64>(21)?.clamp(0, i64::from(MAX_OVERLAP_FRAMES)) as u32,
-                    a2_tail_frames: row.get::<_, i64>(22)?.clamp(0, i64::from(MAX_OVERLAP_FRAMES)) as u32,
+                    a2_lead_frames: row.get::<_, i64>(21)?.clamp(-i64::from(MAX_OVERLAP_FRAMES), i64::from(MAX_OVERLAP_FRAMES)) as i32,
+                    a2_tail_frames: row.get::<_, i64>(22)?.clamp(-i64::from(MAX_OVERLAP_FRAMES), i64::from(MAX_OVERLAP_FRAMES)) as i32,
                 })
             })
             .map_err(err)?
@@ -145,8 +145,8 @@ impl Store {
                     a2_source_channel: channel(row.get(10)?),
                     a2_level_db: level(row.get(11)?),
                     a2_off: row.get::<_, i64>(12)? != 0,
-                    a2_lead_frames: row.get::<_, i64>(13)?.clamp(0, i64::from(MAX_OVERLAP_FRAMES)) as u32,
-                    a2_tail_frames: row.get::<_, i64>(14)?.clamp(0, i64::from(MAX_OVERLAP_FRAMES)) as u32,
+                    a2_lead_frames: row.get::<_, i64>(13)?.clamp(-i64::from(MAX_OVERLAP_FRAMES), i64::from(MAX_OVERLAP_FRAMES)) as i32,
+                    a2_tail_frames: row.get::<_, i64>(14)?.clamp(-i64::from(MAX_OVERLAP_FRAMES), i64::from(MAX_OVERLAP_FRAMES)) as i32,
                 })
             })
             .map_err(err)?

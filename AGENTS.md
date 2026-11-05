@@ -7833,3 +7833,17 @@ svakom timelineu i zoomu (`frames`: strelice i kotacic source timelinea i Wrap r
 uklonjene. Ponasanje isto: zlatne tablice tipki i misa nepromijenjene, testovi dotaknutih kocki, conformance. Ostali
 koraci (kljucna slika i match frame za slozenu izjavu, jedan protokol uzetog, rez i undo slozene izjave, jedno znacenje
 Alt+strelica i klika na sliku zooma) cekaju; 4-6 trebaju odluku korisnika.
+Izvedeno 2026-11-05 (korisnik: "slozena izjava je isto sto i pokrivalice, samo pokrivalice koriste A2 a slozena izjava
+A1"; "nigdje ne treba biti rupa slike, samo rupa tona"; "da, kreni s korakom A"; plan `docs/97` 5.3): korak A, rupa u
+tonu u prici za sve. Negativni J ili L tona je rupa: ton prije zavrsi prije reza ili ton poslije pocne poslije njega, u
+rupi razina 0, slika nedirnuta; J/L slike i dalje nikad ispod 0. `qnc-program-db`: stupci `a1_lead_frames`,
+`a1_tail_frames`, `a2_lead_frames`, `a2_tail_frames` bez provjere >= 0 (prica napravljena s njom gradi se iznova s istim
+retcima, bez pretvaranja), `SetJoinSound`, `SetCutSoundEdges`, `SetCoverOverlap` primaju i negativne (najvise 360000 u
+svakom smjeru), strana bez pokrivalice ne prima ni rupu; pomak samo slike reza zadrzava rupu gdje je bila; A2 Tona u Off
+nema rupu. `qnc-program-playlist`: rupa A1 na spoju dvaju klipova (`hole_a1`, unutar susjednih klipova) i rupa A2
+pokrivalice (`holes_a2`: njezin ton ceka ili zavrsi ranije unutar njezine slike). `qnc-program-input`: slozena izjava
+salje rupe istim putem (vlastita lista rupa uklonjena). `qnc-program-segments`: ton reza (A1 i A2) kroz `qnc-edit-cut` s
+rupama, kao slozena izjava; promjena: pomak oba ruba tona sada pomice sam rez tona (ton prije zavrsi ranije, ton poslije
+pocne ranije), ne pravi kratko preklapanje kao prije; povlacenje strane preko reza je rupa. Testovi `qnc-program-db`
+(novi: rupa i prica sa starom provjerom zadrzava retke), `qnc-program-playlist` (novi: rupa A1 i A2), `qnc-program-segments`
+(dva testa promijenjena na novo pravilo), ostale dotaknute kocke, conformance, release build s libav. Uzivo nije provjereno.

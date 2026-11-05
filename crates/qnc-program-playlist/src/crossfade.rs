@@ -194,3 +194,43 @@ pub(crate) fn crossfade_a2(items: &mut Vec<FlatProgramItem>, crossfade: i64, ask
     }
     Ok(())
 }
+
+/// The holes in the A2 sound of covers (user 2026-11-05: "only a hole in the sound", the same
+/// option as on A1): a negative J makes the cover's own sound wait that many frames after its
+/// picture starts, a negative L makes it end that many frames before its picture ends; in the
+/// hole its A2 is at level 0, the picture is not touched. `holes` gives (cover id, J, L).
+pub(crate) fn holes_a2(items: &mut Vec<FlatProgramItem>, holes: &[(String, i64, i64)]) -> Result<(), String> {
+    for (cover_id, lead, tail) in holes.iter().filter(|(_, lead, tail)| *lead < 0 || *tail < 0) {
+        let own = |source: &FlatProgramSource| is_cover_sound(source) && !is_extension(source) && cover_id_of(source) == *cover_id;
+        let span = items.iter().filter(|item| item.sources.iter().any(own)).fold(None, |span: Option<(i64, i64)>, item| {
+            let (from, to) = (item.record_range.in_frame, item.record_range.out_frame);
+            Some(span.map_or((from, to), |(a, b)| (a.min(from), b.max(to))))
+        });
+        let Some((start, end)) = span else { continue };
+        let wait = (-lead).max(0).min(end - start);
+        let early = (-tail).max(0).min(end - start - wait);
+        let level_zero = |items: &mut Vec<FlatProgramItem>, (from, to): (i64, i64), rising: bool| -> Result<(), String> {
+            if from >= to {
+                return Ok(());
+            }
+            split_at(items, from)?;
+            split_at(items, to)?;
+            for item in items.iter_mut().filter(|item| from <= item.record_range.in_frame && item.record_range.out_frame <= to) {
+                for source in item.sources.iter_mut().filter(|source| own(source)) {
+                    for route in source.audio_routes.iter_mut().filter(|route| route.output_channel == PROGRAM_AUDIO_OUTPUT_A2) {
+                        // Level 0: rising only at `to` (the sound waits), or fallen at `from`.
+                        if rising {
+                            route.fade_in = Some((to, to));
+                        } else {
+                            route.fade_out = Some((from, from));
+                        }
+                    }
+                }
+            }
+            Ok(())
+        };
+        level_zero(items, (start, start + wait), true)?;
+        level_zero(items, (end - early, end), false)?;
+    }
+    Ok(())
+}

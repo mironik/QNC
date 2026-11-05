@@ -166,3 +166,38 @@ fn only_the_a2_of_a_ton_goes_into_an_off_its_a1_does_not() {
     let ton = segments(&mut store).into_iter().find(|row| row.segment_id == users[1]).unwrap();
     assert_eq!((ton.a2_lead_frames, ton.a2_tail_frames), (6, 0), "one Undo step");
 }
+
+/// User 2026-11-05 ("nowhere a hole in the picture, only a hole in the sound"): a negative J or
+/// L of the A1 at a join and of a cover's A2 is stored as a hole; a story made when they could
+/// not be negative is built again with its rows.
+#[test]
+fn a_negative_j_or_l_is_a_hole_in_the_sound_and_an_older_story_keeps_its_rows() {
+    let dir = tempfile::tempdir().unwrap();
+    let path = dir.path().join("db");
+    let mut store = imported_store(&path);
+    for start in [0, 100] {
+        create_segment(&mut store, "tonovi", (start, start + 10), (50, 1)).unwrap();
+    }
+    let users: Vec<String> = segments(&mut store).into_iter().filter(|row| row.lead.is_empty()).map(|row| row.segment_id).collect();
+    run(&mut store, Operation::SetJoinSound { segment_id: users[1].clone(), tail_frames: -3, lead_frames: -2 }).unwrap();
+    let after = segments(&mut store).into_iter().find(|row| row.segment_id == users[1]).unwrap();
+    let before = segments(&mut store).into_iter().find(|row| row.segment_id == users[0]).unwrap();
+    assert_eq!((before.a1_tail_frames, after.a1_lead_frames), (-3, -2));
+    drop(store);
+    // A story of the table with the old checks: built again, the rows stay.
+    let conn = Connection::open(&path).unwrap();
+    let sql: String = conn.query_row("SELECT sql FROM sqlite_master WHERE name = 'story_items'", [], |row| row.get(0)).unwrap();
+    assert!(!sql.contains("a1_lead_frames >= 0"), "no check on a sound's J");
+    let old = sql.replace("a1_lead_frames INTEGER NOT NULL DEFAULT 0,", "a1_lead_frames INTEGER NOT NULL DEFAULT 0 CHECK (a1_lead_frames >= 0),");
+    let count: i64 = conn.query_row("SELECT COUNT(*) FROM story_items", [], |row| row.get(0)).unwrap();
+    conn.execute_batch(&format!(
+        "UPDATE story_items SET a1_lead_frames = 0, a1_tail_frames = 0;
+         DROP VIEW IF EXISTS public_story_parts; DROP VIEW IF EXISTS public_story_covers; DROP VIEW IF EXISTS public_story_items; DROP VIEW IF EXISTS public_story_markers; DROP VIEW IF EXISTS public_story_marker_slots; DROP VIEW IF EXISTS public_story_state;
+         ALTER TABLE story_items RENAME TO story_items_x; {old}; INSERT INTO story_items SELECT * FROM story_items_x; DROP TABLE story_items_x;"
+    ))
+    .unwrap();
+    drop(conn);
+    let mut store = reopen(&path);
+    assert_eq!(segments(&mut store).len() as i64 + covers(&mut store).len() as i64, count, "the rows stay");
+    run(&mut store, Operation::SetJoinSound { segment_id: users[1].clone(), tail_frames: -1, lead_frames: 0 }).unwrap();
+}

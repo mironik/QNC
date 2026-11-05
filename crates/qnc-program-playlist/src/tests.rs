@@ -787,3 +787,29 @@ fn the_a2_of_a_ton_is_heard_only_where_it_goes_into_an_off() {
     assert_eq!(a2(&playlist, 45).len(), 1, "one sound on A2");
     assert_eq!(a2(&playlist, 45)[0].0, "broll", "the cover keeps A2");
 }
+
+/// User 2026-11-05 ("nowhere a hole in the picture, only a hole in the sound", an option of the
+/// story for all): a negative J or L of the A1 at a join and of a cover's A2 is a hole at level
+/// 0; the pictures are not touched.
+#[test]
+fn a_negative_j_or_l_is_a_hole_in_the_sound_on_a1_and_a2() {
+    let timebase = tb(50);
+    let level = |playlist: &FlatProgramPlaylist, frame: i64, output: u16| {
+        let item = playlist.items.iter().find(|item| item.record_range.in_frame <= frame && frame < item.record_range.out_frame).unwrap();
+        item.sources.iter().flat_map(|source| source.audio_routes.clone()).find(|route| route.output_channel == output).map(|route| (route.fade_in, route.fade_out))
+    };
+    let mut before = segment("s0", "tonovi", "a", (0, 100), (100, 200), timebase);
+    before.a1_tail_frames = -6;
+    let mut after = segment("s1", "tonovi", "b", (100, 200), (300, 400), timebase);
+    after.a1_lead_frames = -4;
+    let mut c = cover("c1", "broll", (120, 180), (0, 60), timebase);
+    (c.a2_lead_frames, c.a2_tail_frames) = (-5, -8);
+    after.covers.push(c);
+    let playlist = build_flat_program_playlist(&input(200, vec![before, after]), &mut resolver(&["a", "b", "broll"], timebase)).unwrap();
+    assert_eq!(level(&playlist, 95, PROGRAM_AUDIO_OUTPUT_A1), Some((None, Some((94, 94)))), "A1 before ends 6 frames early");
+    assert_eq!(level(&playlist, 102, PROGRAM_AUDIO_OUTPUT_A1), Some((Some((104, 104)), None)), "A1 after waits 4 frames");
+    assert_eq!(level(&playlist, 122, PROGRAM_AUDIO_OUTPUT_A2).map(|(fade_in, _)| fade_in), Some(Some((125, 125))), "the cover's A2 waits 5 frames");
+    assert_eq!(level(&playlist, 175, PROGRAM_AUDIO_OUTPUT_A2).map(|(_, fade_out)| fade_out), Some(Some((172, 172))), "it ends 8 frames early");
+    assert!(playlist.items.iter().filter(|item| item.record_range.in_frame >= 120 && item.record_range.out_frame <= 180).all(|item| item.sources.iter().any(|source| source.video_layer == Some(ProgramVideoLayer::Cover))), "the cover's picture stays");
+    playlist.validate().unwrap();
+}

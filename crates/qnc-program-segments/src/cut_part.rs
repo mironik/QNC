@@ -26,11 +26,11 @@ use crate::ProgramSegments;
 pub use qnc_edit_cut::SoundSide as SoundEdge;
 
 /// The two sides of a cut's sound, story frames: the L of what is before and the J of what
-/// is after (as the store keeps them, never negative).
+/// is after, as the store keeps them; a negative side is a hole in the sound (user 2026-11-05).
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
 pub struct CutSound {
-    pub tail: u32,
-    pub lead: u32,
+    pub tail: i32,
+    pub lead: i32,
 }
 
 impl CutSound {
@@ -38,10 +38,11 @@ impl CutSound {
         qnc_edit_cut::CutSound { lead: i64::from(self.lead), tail: i64::from(self.tail) }
     }
 
-    /// A story's sides within the store's bounds (no holes).
+    /// A story's sides within the store's bounds; a side may be a hole in the sound (user
+    /// 2026-11-05: "nowhere a hole in the picture, only a hole in the sound").
     fn of(shape: qnc_edit_cut::CutSound) -> Self {
-        let shape = shape.bounded((0, 0), MOST);
-        CutSound { lead: shape.lead as u32, tail: shape.tail as u32 }
+        let shape = shape.bounded((-MOST, -MOST), MOST);
+        CutSound { lead: shape.lead as i32, tail: shape.tail as i32 }
     }
 }
 
@@ -216,13 +217,17 @@ impl ProgramSegments {
             };
             self.take_sound_edge(lead);
         }
-        let (CutPart::Sound { lane, stored, mut draft, edge }, Some((_, cut))) = (self.cut_part, self.marker_edit.clone()) else {
+        let (CutPart::Sound { lane, stored, mut draft, edge }, Some((marker_id, cut))) = (self.cut_part, self.marker_edit.clone()) else {
             return false;
         };
         if edge == SoundEdge::Both {
             return false;
         }
         draft = CutSound::of(draft.shape().dragged(edge, cut, frame));
+        // The A2 of a Ton into an Off has no hole (it is heard only beside the Ton).
+        if lane == 1 && qnc_program_view::join_segment(&marker_id).is_some() {
+            draft = CutSound { tail: draft.tail.max(0), lead: draft.lead.max(0) };
+        }
         self.cut_part = CutPart::Sound { lane, stored, draft, edge };
         self.say_cut()
     }
@@ -384,9 +389,12 @@ impl ProgramSegments {
             return false;
         };
         let (before, after) = self.cut_sides(lane, &marker_id, cut);
-        // A story's cut has no holes: one sound cut stays one, an overlap moves whole.
-        let moved = CutSound::of(draft.shape().moved(edge, frames, false));
-        if moved == draft || moved.tail > 0 && !before || moved.lead > 0 && !after {
+        // A side alone moves into a hole too; both move the sound cut (`qnc-edit-cut`).
+        // The A2 of a Ton into an Off is heard only beside the Ton: it has no hole.
+        let holes = !(lane == 1 && qnc_program_view::join_segment(&marker_id).is_some());
+        let moved = CutSound::of(draft.shape().moved(edge, frames, holes));
+        let moved = if holes { moved } else { CutSound { tail: moved.tail.max(0), lead: moved.lead.max(0) } };
+        if moved == draft || moved.tail != 0 && !before || moved.lead != 0 && !after {
             self.refresh_view(qnc_ui_text::text("story.cut_sound_no_cover").into());
             return true;
         }
@@ -415,7 +423,7 @@ impl ProgramSegments {
                 return self.refresh_view(String::new());
             }
             self.marker_committing = true;
-            return self.write(Operation::SetJoinA2 { segment_id, tail_frames: draft.tail, lead_frames: draft.lead });
+            return self.write(Operation::SetJoinA2 { segment_id, tail_frames: draft.tail.max(0) as u32, lead_frames: draft.lead.max(0) as u32 });
         }
         // A cut between two clips (user 2026-10-29): whole, the OUT before and the IN after move
         // together (a roll); its picture alone, a picture L before or J after.
@@ -450,7 +458,7 @@ impl ProgramSegments {
 
     /// The covers of the taken cut with their J and L as drafted, for the program to play
     /// before Enter; `None` while the A2 sound of the cut is not taken or is as stored.
-    pub fn cut_sound_draft(&self) -> Option<Vec<(String, (u32, u32))>> {
+    pub fn cut_sound_draft(&self) -> Option<Vec<(String, (i32, i32))>> {
         let CutPart::Sound { lane: 1, stored, draft, .. } = self.cut_part else {
             return None;
         };
@@ -480,7 +488,7 @@ impl ProgramSegments {
 
     /// The two clips at the taken cut with their A1 J and L as drafted (segment, (J, L)), for
     /// the program to play before Enter; `None` while the A1 sound is not taken or as stored.
-    pub fn join_sound_draft(&self) -> Option<Vec<(String, (u32, u32))>> {
+    pub fn join_sound_draft(&self) -> Option<Vec<(String, (i32, i32))>> {
         let CutPart::Sound { lane: 0, stored, draft, .. } = self.cut_part else {
             return None;
         };
@@ -507,7 +515,7 @@ impl ProgramSegments {
             CutPart::Sound { lane: taken, draft, .. } if taken == lane && self.marker_edit.as_ref().map(|(id, _)| id.as_str()) == Some(marker_id) => draft,
             _ => self.stored_cut_sound(lane, marker_id, cut),
         };
-        (before.then(|| cut.saturating_add(u64::from(sound.tail))), after.then(|| cut.saturating_sub(u64::from(sound.lead))))
+        (before.then(|| cut.saturating_add_signed(i64::from(sound.tail))), after.then(|| cut.saturating_add_signed(-i64::from(sound.lead))))
     }
 
     /// Where the trim playheads of the cut's sound stand: the moving side or both.

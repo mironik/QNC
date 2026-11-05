@@ -72,7 +72,7 @@ impl Store {
 
     /// The L of the cover before the cut and the J of the cover after it, story frames; `None`
     /// for a side with no cover.
-    pub(crate) fn cut_edges(&self, marker_id: &str) -> Result<(Option<u32>, Option<u32>)> {
+    pub(crate) fn cut_edges(&self, marker_id: &str) -> Result<(Option<i32>, Option<i32>)> {
         let marker_id = marker_id.trim();
         let side = |filter: &str, column: &str| -> Result<Option<i64>> {
             self.conn
@@ -84,20 +84,22 @@ impl Store {
                 .optional()
                 .map_err(err)
         };
-        let bound = |frames: i64| frames.clamp(0, i64::from(MAX_OVERLAP_FRAMES)) as u32;
+        let bound = |frames: i64| frames.clamp(-i64::from(MAX_OVERLAP_FRAMES), i64::from(MAX_OVERLAP_FRAMES)) as i32;
         let tail = side("substr(slot_id, -length(?1) - 1) = '|' || ?1", "a2_tail_frames")?.map(bound);
         let lead = side("substr(slot_id, 1, length(?1) + 1) = ?1 || '|'", "a2_lead_frames")?.map(bound);
         Ok((tail, lead))
     }
 
     /// Both sides of the cut's A2 sound at once (user 2026-10-29): the L of the cover before
-    /// and the J of the cover after; a side with no cover cannot take any.
-    pub(crate) fn set_cut_sound_edges(&mut self, marker_id: &str, tail: u32, lead: u32) -> Result<Data> {
-        if tail > MAX_OVERLAP_FRAMES || lead > MAX_OVERLAP_FRAMES {
+    /// and the J of the cover after; a side with no cover cannot take any. A negative side is a
+    /// hole in the sound (user 2026-11-05): the sound before ends, or the sound after starts, that
+    /// many frames away from the picture cut.
+    pub(crate) fn set_cut_sound_edges(&mut self, marker_id: &str, tail: i32, lead: i32) -> Result<Data> {
+        if tail.unsigned_abs() > MAX_OVERLAP_FRAMES || lead.unsigned_abs() > MAX_OVERLAP_FRAMES {
             return Err(qnc_ui_text::fill("story.overlap_too_long", &[("frames", &MAX_OVERLAP_FRAMES.to_string())]));
         }
         let (before, after, _) = self.cut_covers(marker_id)?;
-        if tail > 0 && before.is_none() || lead > 0 && after.is_none() {
+        if tail != 0 && before.is_none() || lead != 0 && after.is_none() {
             return Err(qnc_ui_text::text("story.cut_sound_no_cover").into());
         }
         let now = story_now();
@@ -125,19 +127,22 @@ impl Store {
             .map_err(err)?;
         let (tail, lead) = self.cut_edges(marker_id)?;
         let (sound_end, sound_start) = (from + i64::from(tail.unwrap_or(0)), from - i64::from(lead.unwrap_or(0)));
+        let (before_hole, after_hole) = (tail.is_some_and(|tail| tail < 0), lead.is_some_and(|lead| lead < 0));
         self.move_marker(marker_id, program_frame)?;
         let (before, after) = self.cut_edges(marker_id)?;
         let to = program_frame as i64;
-        let tail = before.map_or(0, |_| (sound_end - to).max(0));
-        let lead = after.map_or(0, |_| (to - sound_start).max(0));
-        let bound = |frames: i64| frames.min(i64::from(MAX_OVERLAP_FRAMES)) as u32;
+        // A side that was a hole stays one where its sound is; a side that was not keeps
+        // following the picture cut as before.
+        let tail = before.map_or(0, |_| if before_hole { sound_end - to } else { (sound_end - to).max(0) });
+        let lead = after.map_or(0, |_| if after_hole { to - sound_start } else { (to - sound_start).max(0) });
+        let bound = |frames: i64| frames.clamp(-i64::from(MAX_OVERLAP_FRAMES), i64::from(MAX_OVERLAP_FRAMES)) as i32;
         self.set_cut_sound_edges(marker_id, bound(tail), bound(lead))
     }
 
     /// The A1 sound at the join before `segment_id` (user 2026-10-29): the L of the active
     /// segment before it and the J of it. A lead has no join of its own; the segment must have
     /// one before it.
-    pub(crate) fn set_join_sound(&mut self, segment_id: &str, tail: u32, lead: u32) -> Result<Data> {
+    pub(crate) fn set_join_sound(&mut self, segment_id: &str, tail: i32, lead: i32) -> Result<Data> {
         // The A1 of a Ton never goes into an Off (user 2026-10-30): only its A2 does.
         let (before, after) = join_kinds(&self.conn, segment_id)?;
         if tail > 0 && before == "tonovi" && after == "offovi" || lead > 0 && before == "offovi" && after == "tonovi" {
@@ -153,18 +158,18 @@ impl Store {
         if tail > 0 && !(before == "tonovi" && after == "offovi") || lead > 0 && !(before == "offovi" && after == "tonovi") {
             return Err(qnc_ui_text::text("story.ton_a2_only_into_off").into());
         }
-        self.set_join_sides(segment_id, ("a2_tail_frames", tail), ("a2_lead_frames", lead))
+        self.set_join_sides(segment_id, ("a2_tail_frames", i32::try_from(tail).unwrap_or(i32::MAX)), ("a2_lead_frames", i32::try_from(lead).unwrap_or(i32::MAX)))
     }
 
     /// The picture at the join before `segment_id` (user 2026-10-29): the picture L of the
     /// segment before it and the picture J of it; an Off's picture is black.
     pub(crate) fn set_join_picture(&mut self, segment_id: &str, tail: u32, lead: u32) -> Result<Data> {
-        self.set_join_sides(segment_id, ("v_tail_frames", tail), ("v_lead_frames", lead))
+        self.set_join_sides(segment_id, ("v_tail_frames", i32::try_from(tail).unwrap_or(i32::MAX)), ("v_lead_frames", i32::try_from(lead).unwrap_or(i32::MAX)))
     }
 
     /// One side of a join on the segment before `segment_id` (`tail`) and one on it (`lead`).
-    fn set_join_sides(&mut self, segment_id: &str, (tail_column, tail): (&str, u32), (lead_column, lead): (&str, u32)) -> Result<Data> {
-        if tail > MAX_OVERLAP_FRAMES || lead > MAX_OVERLAP_FRAMES {
+    fn set_join_sides(&mut self, segment_id: &str, (tail_column, tail): (&str, i32), (lead_column, lead): (&str, i32)) -> Result<Data> {
+        if tail.unsigned_abs() > MAX_OVERLAP_FRAMES || lead.unsigned_abs() > MAX_OVERLAP_FRAMES {
             return Err(qnc_ui_text::fill("story.overlap_too_long", &[("frames", &MAX_OVERLAP_FRAMES.to_string())]));
         }
         let segment_id = segment_id.trim();
@@ -192,8 +197,8 @@ impl Store {
     }
 
     /// The J and L of a cover's A2, at most `MAX_OVERLAP_FRAMES` each.
-    pub(crate) fn set_cover_overlap(&mut self, cover_id: &str, lead: u32, tail: u32) -> Result<Data> {
-        if lead > MAX_OVERLAP_FRAMES || tail > MAX_OVERLAP_FRAMES {
+    pub(crate) fn set_cover_overlap(&mut self, cover_id: &str, lead: i32, tail: i32) -> Result<Data> {
+        if lead.unsigned_abs() > MAX_OVERLAP_FRAMES || tail.unsigned_abs() > MAX_OVERLAP_FRAMES {
             return Err(qnc_ui_text::fill("story.overlap_too_long", &[("frames", &MAX_OVERLAP_FRAMES.to_string())]));
         }
         let changed = self
