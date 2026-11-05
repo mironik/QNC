@@ -7927,3 +7927,15 @@ Popravak 2026-11-06 (korisnik: "ne radi, ili ja ne znam koristiti"; log: u MA Sc
 samo klikovi i dvoklikovi na rijeci): rijeci i slova u tekstu izjave vise nisu tekst koji se oznacava misem
 (`selectable(false)`), pa desni klik ide samo riječi; uzimanje, prosirenje, Delete i Esc nad rijecima pisu se u player log
 (`script-words`). `qnc-script-panel`, `qnc-script`. Uzivo nije provjereno.
+Izvedeno 2026-11-06 (korisnik: "jednu uspio brisati, vise ne dozvoljava selektiranje; ne radi ni undo preko Backspace"; log
+i kopija baze projekta, samo citanje: brisanje rijeci je radilo, ali su raniji dvoklikovi na istu rijec suzili dijelove
+izjave na jednu rijec (dio 4521..4522 je 1 slicica, 4294..4298 bez rijeci), pa ostale rijeci tih dijelova nisu imale vrijeme
+i nisu se mogle uzeti; baza scenarija nije imala undo): undo i redo scenarija. `qnc-script-db`: tablica `script_undo`
+(modul je vlasnik; korak je cijela tablica blokova kakva je bila prije promjene, kao JSON), svaka promjena blokova (dodaj,
+tekst, pomak, brisanje, polja, dijelovi, spoj, rubovi, J/L, izrezivanje rijeci) zapisuje korak u istoj transakciji kao
+promjena; operacije `Undo` / `Redo` (`undo`, `redo`), nova promjena brise redo, cuva se 200 koraka; snimka glasa bloka se
+nikad ne ponistava (ostaje kakva je snimljena); odbijena promjena nije korak. `qnc-script`: Backspace / Ctrl+Z / Undo
+(`undo_object`) ponistava zadnju promjenu scenarija, Shift+Backspace (`redo_object`) je ponavlja; uzeto se pusta; poruke u
+rjecniku (`script.undone`, `script.nothing_to_undo`...). Promjene napravljene prije ove verzije nemaju korake. Test
+`every_change_of_the_script_is_one_undo_step_and_redo_takes_it_again`, conformance, release build s libav. Primjer
+`qnc-script-db/examples/pieces_raw.rs` (samo citanje kopije baze). Uzivo nije provjereno.

@@ -4,7 +4,7 @@ use crate::*;
 use rusqlite::{params, Connection, OptionalExtension};
 
 /// The tables this module owns; it writes no other.
-const OWNED: [&str; 4] = ["script_blocks", "script_profile", "script_voice", "script_voice_takes"];
+const OWNED: [&str; 5] = ["script_blocks", "script_profile", "script_voice", "script_voice_takes", "script_undo"];
 
 pub(crate) struct Store {
     conn: Connection,
@@ -40,6 +40,42 @@ impl Store {
 
     pub(crate) fn execute(&mut self, operation: &Operation) -> Result<Data> {
         match operation {
+            Operation::Undo | Operation::Redo if !self.ready => Ok(Data::Blocks(Vec::new())),
+            Operation::Undo | Operation::Redo => self.in_one(|store| {
+                let done = crate::undo::step(&store.conn, matches!(operation, Operation::Undo))?;
+                Ok(if done { Data::Changed } else { Data::Blocks(Vec::new()) })
+            }),
+            // A change of the blocks is one step of undo, kept in the same transaction.
+            operation if self.ready && undoable(operation) => self.in_one(|store| {
+                let before = crate::undo::snapshot(&store.conn)?;
+                let done = store.change(operation)?;
+                if crate::undo::snapshot(&store.conn)? != before {
+                    crate::undo::changed(&store.conn, &before)?;
+                }
+                Ok(done)
+            }),
+            operation => self.change(operation),
+        }
+    }
+
+    /// `work` in one transaction: its own, or a savepoint of the one the broker opened.
+    fn in_one(&mut self, work: impl FnOnce(&mut Self) -> Result<Data>) -> Result<Data> {
+        let own = self.conn.is_autocommit();
+        self.conn.execute_batch(if own { "BEGIN IMMEDIATE" } else { "SAVEPOINT script_undo_step" }).map_err(err)?;
+        match work(self) {
+            Ok(data) => {
+                self.conn.execute_batch(if own { "COMMIT" } else { "RELEASE script_undo_step" }).map_err(err)?;
+                Ok(data)
+            }
+            Err(error) => {
+                let _ = self.conn.execute_batch(if own { "ROLLBACK" } else { "ROLLBACK TO script_undo_step; RELEASE script_undo_step" });
+                Err(error)
+            }
+        }
+    }
+
+    fn change(&mut self, operation: &Operation) -> Result<Data> {
+        match operation {
             Operation::Read if !self.ready => Ok(Data::Blocks(Vec::new())),
             Operation::Read => self.read().map(Data::Blocks),
             Operation::ReadProfile => profile(&self.conn).map(Data::Profile),
@@ -58,6 +94,7 @@ impl Store {
             Operation::MovePiece { id, index, earlier } => self.move_piece(*id, *index, *earlier),
             Operation::RemovePiece { id, index } => self.remove_piece(*id, *index),
             Operation::CutOut { id, index, before, after } => self.cut_out(*id, *index, before.as_ref(), after.as_ref()),
+            Operation::Undo | Operation::Redo => Ok(Data::Blocks(Vec::new())),
             Operation::ReadVoices => self.voices().map(Data::Voices),
             Operation::AddVoiceTake { id, name, clip_uri, take } => self.add_voice_take(*id, name, clip_uri, take),
             Operation::SetVoiceChosen { id, take } => self.set_voice_chosen(*id, *take),
@@ -526,6 +563,7 @@ fn ensure_schema(conn: &Connection) -> Result<()> {
             SELECT profile_id, profile_json, updated_at_utc FROM script_profile;"
     ))
     .map_err(err)?;
+    conn.execute_batch(crate::undo::SCHEMA).map_err(err)?;
     crate::voice::ensure_schema(conn)
 }
 
@@ -549,4 +587,24 @@ impl qnc_db_broker::OwnedTables for Store {
     fn connection(&self) -> &Connection {
         Store::connection(self)
     }
+}
+
+/// A change of the script's blocks one undo takes back (a recording is not: it stays).
+fn undoable(operation: &Operation) -> bool {
+    matches!(
+        operation,
+        Operation::Add { .. }
+            | Operation::SetText { .. }
+            | Operation::Move { .. }
+            | Operation::Remove { .. }
+            | Operation::SetFields { .. }
+            | Operation::AddPiece { .. }
+            | Operation::SetJoin { .. }
+            | Operation::SetPiece { .. }
+            | Operation::SetJoinSound { .. }
+            | Operation::SetJoinPicture { .. }
+            | Operation::MovePiece { .. }
+            | Operation::RemovePiece { .. }
+            | Operation::CutOut { .. }
+    )
 }

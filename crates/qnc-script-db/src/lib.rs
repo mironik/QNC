@@ -10,6 +10,7 @@
 //! A table module of the project database intermediary (`qnc-db-broker`): it owns only its
 //! tables, is written only through that intermediary and knows no form or application.
 
+mod undo;
 mod store;
 mod voice;
 
@@ -256,6 +257,11 @@ pub enum Operation {
     /// join, the new join between the two is a cut with no pause (no crossfade). Neither
     /// left: the part leaves (not the last one).
     CutOut { id: i64, index: usize, before: Option<Piece>, after: Option<Piece> },
+    /// The script as it was before its last change (user 2026-11-06: "Backspace undo does not
+    /// work"): every change of its blocks is one step; the voice of a block stays as recorded.
+    Undo,
+    /// The change the last Undo took back.
+    Redo,
 }
 
 impl Operation {
@@ -439,4 +445,14 @@ pub fn set_join_sound(target: &ProjectDbTarget, id: i64, index: usize, lead: i64
 /// The J and L of the picture at the join before part `index` of block `id`.
 pub fn set_join_picture(target: &ProjectDbTarget, id: i64, index: usize, lead: u64, tail: u64) -> Result<()> {
     write(target, Operation::SetJoinPicture { id, index, lead, tail }).map(drop)
+}
+
+/// The script as it was before its last change; `Ok(false)`: nothing to undo.
+pub fn undo(target: &ProjectDbTarget) -> Result<bool> {
+    write(target, Operation::Undo).map(|data| data == Data::Changed)
+}
+
+/// The change the last undo took back; `Ok(false)`: nothing to redo.
+pub fn redo(target: &ProjectDbTarget) -> Result<bool> {
+    write(target, Operation::Redo).map(|data| data == Data::Changed)
 }

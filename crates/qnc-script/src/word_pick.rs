@@ -71,7 +71,7 @@ impl Script {
     /// click takes up to it, Delete cuts it out, Esc lets it go. A left click only cues (the
     /// playhead). `None` when the action is not about what is taken.
     pub(crate) fn pick_key(&mut self, action_id: &str, target: Option<&str>, preview: &SourcePreview) -> Option<bool> {
-        if matches!(action_id, WORD_TAKE | WORD_PICK | "delete_marker" | "clear_focus") && qnc_dev_diagnostics::player_diagnostics_enabled() {
+        if matches!(action_id, WORD_TAKE | WORD_PICK | "delete_marker" | "clear_focus" | "undo_object" | "redo_object") && qnc_dev_diagnostics::player_diagnostics_enabled() {
             qnc_dev_diagnostics::log_line(qnc_dev_diagnostics::DiagnosticsStream::Player, format!("script-words action={action_id} target={target:?} taken={:?}", self.word_pick.map(|pick| (pick.block, pick.part, pick.from, pick.to))));
         }
         match action_id {
@@ -91,6 +91,18 @@ impl Script {
             "clear_focus" if self.word_pick.is_some() => {
                 (self.word_pick, self.view.picked) = (None, None);
                 Some(true)
+            }
+            // Backspace (and Ctrl+Z, the Undo button) takes back the last change of the script,
+            // Shift+Backspace takes it again (user 2026-11-06: "undo with Backspace does not work").
+            "undo_object" | "redo_object" => {
+                let undo = action_id == "undo_object";
+                (self.word_pick, self.view.picked) = (None, None);
+                (self.trim, self.sound, self.chosen, self.join_sound, self.slide) = (None, None, None, None, None);
+                self.message_after_write = Some(qnc_ui_text::text(if undo { "script.undone" } else { "script.redone" }).into());
+                Some(self.write(preview, move |target| {
+                    let done = if undo { qnc_script_db::undo(target)? } else { qnc_script_db::redo(target)? };
+                    if done { Ok(None) } else { Err(qnc_ui_text::text(if undo { "script.nothing_to_undo" } else { "script.nothing_to_redo" }).to_string()) }
+                }))
             }
             "delete_marker" => {
                 let pick = self.word_pick?;
@@ -123,7 +135,7 @@ impl Script {
         let (before, after) = (part(before), part(after));
         let (id, index) = (pick.block, pick.part);
         (self.trim, self.sound, self.chosen, self.join_sound, self.slide) = (None, None, None, None, None);
-        self.view.message = qnc_ui_text::text("script.words_cut_out").into();
+        self.message_after_write = Some(qnc_ui_text::text("script.words_cut_out").into());
         self.write(preview, move |target| qnc_script_db::cut_out(target, id, index, before, after).map(|_| None))
     }
 }

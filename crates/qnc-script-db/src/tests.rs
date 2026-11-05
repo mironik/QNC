@@ -359,3 +359,31 @@ fn a_trimmed_part_keeps_its_clip_pause_and_join() {
     assert!(set_piece(&target, id, 1, piece("2679", 1, 9, "")).is_err(), "a part keeps its clip");
     assert!(set_piece(&target, id, 1, piece("2002", 9, 9, "")).is_err(), "a part keeps at least one frame");
 }
+
+/// Undo and redo of the script (user 2026-11-06: "Backspace undo does not work"): every change
+/// of the blocks is one step back, redo takes it again, a new change forgets redo; a refused
+/// change is no step.
+#[test]
+fn every_change_of_the_script_is_one_undo_step_and_redo_takes_it_again() {
+    let (_dir, target) = written();
+    assert!(!undo(&target).unwrap(), "nothing to undo yet");
+    let id = add(&target, None, sot("2002")).unwrap();
+    add_piece(&target, id, piece("2002", 500, 550, "drugi")).unwrap();
+    let parts = |target: &qnc_db_broker::ProjectDbTarget| read(target).unwrap().first().map_or(0, |block| block.pieces.len());
+    cut_out(&target, id, 1, Some(piece("2002", 500, 520, "drugi")), Some(piece("2002", 530, 550, "dio"))).unwrap();
+    assert_eq!(parts(&target), 3);
+    assert!(cut_out(&target, id, 2, Some(piece("2002", 520, 560, "")), None).is_err());
+    assert!(undo(&target).unwrap(), "the cut back");
+    assert_eq!(parts(&target), 2, "the words are there again");
+    assert!(redo(&target).unwrap());
+    assert_eq!(parts(&target), 3, "and cut again");
+    assert!(undo(&target).unwrap() && undo(&target).unwrap());
+    assert_eq!((read(&target).unwrap().len(), parts(&target)), (1, 0), "the part added is taken back too: one range again");
+    assert!(undo(&target).unwrap());
+    assert!(read(&target).unwrap().is_empty(), "and the block");
+    assert!(!undo(&target).unwrap());
+    assert!(redo(&target).unwrap());
+    assert_eq!(read(&target).unwrap()[0].id, id, "the block comes back with its id");
+    add_piece(&target, id, piece("2002", 600, 650, "treći")).unwrap();
+    assert!(!redo(&target).unwrap(), "a new change forgets redo");
+}
