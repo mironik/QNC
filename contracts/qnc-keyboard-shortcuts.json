@@ -334,6 +334,9 @@
     "shuttle_forward": {
       "label": "Shuttle: naprijed 1x (play), ponovno 2x, 4x, 8x"
     },
+    "trim_play_around": {
+      "label": "Trim: play oko uzetog reza (2 s prije, 2 s poslije, ukrug); K zaustavlja i uzeti rub ide na playhead"
+    },
     "toggle_snapping": {
       "label": "Snapping: povuceni rub ili marker se lijepi za rez, marker i playhead (ukljuci/iskljuci)"
     },
@@ -814,6 +817,7 @@
         "shuttle_back": [{ "code": "KeyJ", "ctrl": false, "shift": false, "alt": false }],
         "shuttle_stop": [{ "code": "KeyK", "ctrl": false, "shift": false, "alt": false }],
         "shuttle_forward": [{ "code": "KeyL", "ctrl": false, "shift": false, "alt": false }],
+        "trim_play_around": [{ "code": "KeyK", "ctrl": false, "shift": true, "alt": false }],
         "toggle_snapping": [{ "code": "KeyS", "ctrl": false, "shift": false, "alt": false }],
         "match_frame": [{ "code": "KeyF", "ctrl": false, "shift": false, "alt": false }],
         "select_slip": [{ "code": "KeyS", "ctrl": true, "shift": true }],
@@ -1064,6 +1068,7 @@
         "shuttle_back": [{ "code": "KeyJ", "ctrl": false, "shift": false, "alt": false }],
         "shuttle_stop": [{ "code": "KeyK", "ctrl": false, "shift": false, "alt": false }],
         "shuttle_forward": [{ "code": "KeyL", "ctrl": false, "shift": false, "alt": false }],
+        "trim_play_around": [{ "code": "KeyK", "ctrl": false, "shift": true, "alt": false }],
         "toggle_snapping": [{ "code": "KeyS", "ctrl": false, "shift": false, "alt": false }],
         "match_frame": [{ "code": "KeyF", "ctrl": false, "shift": false, "alt": false }],
         "select_slip": [{ "code": "KeyS", "ctrl": true, "shift": true }],

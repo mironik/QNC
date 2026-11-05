@@ -1,0 +1,7 @@
+[package]
+name = "qnc-trim-play"
+version = "0.1.0"
+edition = "2021"
+description = "QNC public block: dynamic trim, the play around a taken cut (two seconds before to two after, again and again) and how far a taken edge goes to where the playhead stopped"
+
+[dependencies]

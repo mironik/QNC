@@ -4975,6 +4975,7 @@ dependencies = [
  "qnc-sync-session",
  "qnc-timeline",
  "qnc-transcript",
+ "qnc-trim-play",
  "qnc-ui-kit",
  "qnc-wheel-jog",
  "qnc-wrap-session",
@@ -6584,6 +6585,10 @@ dependencies = [
  "qnc-ui-text",
  "qnc-wheel-jog",
 ]
+
+[[package]]
+name = "qnc-trim-play"
+version = "0.1.0"
 
 [[package]]
 name = "qnc-trim-stills"

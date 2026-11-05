@@ -228,6 +228,8 @@ pub struct SourcePreview {
     touched: Option<std::time::Instant>,
     /// A pause was sent and the player still says it plays: a second pause would play again.
     pausing: bool,
+    /// The JKL shuttle moves the playhead by cues (docs/98 1.4): the trim zoom follows it as a play.
+    scrubbing: bool,
     /// The Sync window whose story A1 the clip session should carry, the one it was launched
     /// with, and whether the bed was started (user 2026-10-20).
     bed_wanted: Option<(u64, u64)>,
@@ -295,6 +297,7 @@ impl Default for SourcePreview {
             play_when_ready: false,
             touched: None,
             pausing: false,
+            scrubbing: false,
             bed_wanted: None,
             bed_launched: None,
             bed_playing: false,
@@ -998,7 +1001,12 @@ impl SourcePreview {
     /// that axis and whether it plays (user 2026-10-30: the trim zoom follows the play and
     /// stays where a pause stops it).
     pub fn playing_at(&self) -> Option<(bool, u64, bool)> {
-        self.player_view.confirmed_source_frame().map(|frame| (self.program, frame, self.player_view.playing()))
+        self.player_view.confirmed_source_frame().map(|frame| (self.program, frame, self.player_view.playing() || self.scrubbing))
+    }
+
+    /// Whether the shuttle moves the playhead by cues (it counts as a play for the trim zoom).
+    pub fn set_scrubbing(&mut self, scrubbing: bool) {
+        self.scrubbing = scrubbing;
     }
 
     /// The program frame the player confirmed, while a program plays.

@@ -19,11 +19,23 @@ impl PanelFocus {
         let panel = self.panel;
         // J, K, L: the shuttle (`qnc-shuttle`, docs/98 1.1), whatever the panel; any other
         // transport (Space, a click on a timeline) ends its own movement.
+        // Dynamic trim (docs/98 1.4): the play around a taken cut, and K brings the taken
+        // edge to where it stopped the playhead (JKL in trim, as in every editor).
+        if action_id == qnc_trim_play::AROUND {
+            return Some(self.trim_around(pieces.0, pieces.2));
+        }
+        if action_id == qnc_shuttle::STOP {
+            self.shuttle_key(action_id, pieces.0);
+            self.trim_to_stop((&mut *pieces.0, &mut *pieces.1, &mut *pieces.2, &mut *pieces.3));
+            return Some(true);
+        }
         if let Some(done) = self.shuttle_key(action_id, pieces.0) {
             return Some(done);
         }
         if matches!(action_id, "play_pause" | "timeline_cue_frame") {
             self.shuttle.stop();
+            self.trim_loop = None;
+            pieces.0.set_scrubbing(false);
         }
         // The one meaning of a word (`qnc-edit-words`, AGENTS 0.12): a click on a word of the
         // transcript while the source IN or OUT is taken brings that mark to the word (as in

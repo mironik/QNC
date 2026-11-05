@@ -35,4 +35,5 @@ qnc-edit-edge = { workspace = true }
 qnc-edit-verbs = { workspace = true }
 qnc-snap = { workspace = true }
 qnc-shuttle = { workspace = true }
+qnc-trim-play = { workspace = true }
 qnc-match-frame = { workspace = true }

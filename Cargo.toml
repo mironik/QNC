@@ -260,6 +260,7 @@ members = [
     "crates/qnc-edit-words",
     "crates/qnc-snap",
     "crates/qnc-shuttle",
+    "crates/qnc-trim-play",
     "crates/qnc-match-frame",
     "crates/qnc-segments-keys",
     "crates/qnc-sync-session",
@@ -550,6 +551,7 @@ qnc-edit-edge = { path = "crates/qnc-edit-edge" }
 qnc-edit-words = { path = "crates/qnc-edit-words" }
 qnc-snap = { path = "crates/qnc-snap" }
 qnc-shuttle = { path = "crates/qnc-shuttle" }
+qnc-trim-play = { path = "crates/qnc-trim-play" }
 qnc-match-frame = { path = "crates/qnc-match-frame" }
 qnc-segments-keys = { path = "crates/qnc-segments-keys" }
 qnc-sync-session = { path = "crates/qnc-sync-session" }
