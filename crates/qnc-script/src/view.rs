@@ -105,27 +105,13 @@ pub fn timed_words(transcripts: &[qnc_transcript_db::ClipTranscript], piece: &Pi
     kept
 }
 
-/// Puts on every word the letters kept for it (its start frame and text). The aligner gives
-/// a letter where its sound starts (a short peak); a letter lasts until the next one starts,
-/// the last until the end of its sound.
+/// Puts on every word the letters kept for it (its start frame and text), as `qnc-letter-db`
+/// says each lasts.
 pub fn put_letters(words: &mut [TimedWord], kept: &[qnc_letter_db::WordLetters]) {
     for word in words {
-        let Some(found) = kept.iter().find(|kept| kept.word_from == word.from && kept.text == word.text) else { continue };
-        let starts: Vec<Option<u64>> = found.letters.iter().map(|letter| letter.from.map(|from| from.round() as u64)).collect();
-        let end = found.letters.iter().filter_map(|letter| letter.to).fold(None, |end: Option<f64>, to| Some(end.map_or(to, |end| end.max(to))));
-        word.letters = found
-            .letters
-            .iter()
-            .enumerate()
-            .map(|(index, letter)| {
-                let span = starts[index].map(|from| {
-                    let next = starts[index + 1..].iter().flatten().next().copied();
-                    let to = next.or(end.map(|end| end.ceil() as u64)).unwrap_or(from + 1);
-                    (from, to.max(from + 1))
-                });
-                (letter.letter, span)
-            })
-            .collect();
+        if let Some(found) = qnc_letter_db::letters_of(kept, word.from, &word.text) {
+            word.letters = found.spans();
+        }
     }
 }
 

@@ -21,7 +21,7 @@ pub const MODULE_ID: &str = "qnc.module.zoom-words";
 /// Seconds transcribed on each side of the part the zoom shows.
 const AROUND_SECONDS: u64 = 5;
 
-type Read = Result<Vec<ClipTranscript>, String>;
+type Read = Result<(Vec<ClipTranscript>, Vec<qnc_letter_db::WordLetters>), String>;
 
 /// A piece of the zoom's A1: clip frames `[first, last)` it plays in the window.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -43,6 +43,10 @@ struct Job {
 pub struct ZoomWords {
     project_id: Option<String>,
     kept: HashMap<String, Vec<ClipTranscript>>,
+    /// The letters of the words of those clips, as read (user 2026-11-05: letters in the zoom).
+    letters: HashMap<String, Vec<qnc_letter_db::WordLetters>>,
+    /// Lays the letters of the words the zoom shows without them.
+    letter_times: qnc_letter_times::LetterTimes,
     reading: Option<(String, mpsc::Receiver<Read>)>,
     job: Option<Job>,
     /// Clips whose transcription failed: not asked again in this run (each arrow step moves
@@ -84,11 +88,34 @@ impl ZoomWords {
         if fine && !sound.words.is_empty() {
             let spans: Vec<qnc_word_align::Span> = sound.words.iter().map(|w| qnc_word_align::Span { from: w.from, to: w.to }).collect();
             let aligned = qnc_word_align::align(sound.from, sound.to, &sound.peaks[0], &spans);
-            for (word, span) in sound.words.iter_mut().zip(aligned.words) {
+            // A word with its letters laid keeps their times: they are finer than the peaks.
+            for (word, span) in sound.words.iter_mut().zip(aligned.words).filter(|(word, _)| word.letters.is_empty()) {
                 (word.from, word.to) = (span.from, span.to);
             }
             sound.unheard = aligned.unheard.into_iter().map(|span| (span.from, span.to)).collect();
         }
+        // The words in the window without letters get them in the background (user
+        // 2026-11-05: letters in the zoom too); read again once kept.
+        let missing: Vec<qnc_letter_times::Need> = needs.iter().filter_map(|need| self.missing_letters(need)).collect();
+        if self.letter_times.poll(locator, &missing, true) {
+            for need in &needs {
+                self.kept.remove(&need.clip_id);
+            }
+        }
+    }
+
+    /// The words of `need`'s part without letters, in its clip's frames.
+    fn missing_letters(&self, need: &Need) -> Option<qnc_letter_times::Need> {
+        let kept = self.kept.get(&need.clip_id)?;
+        let letters = self.letters.get(&need.clip_id).map_or(&[][..], Vec::as_slice);
+        let words: Vec<qnc_letter_times::Word> = kept
+            .iter()
+            .flat_map(|t| t.lines.iter().flat_map(|line| line.words.iter()))
+            .filter(|word| word.from < need.last && need.first < word.to.max(word.from + 1) && !word.text.trim().is_empty())
+            .filter(|word| qnc_letter_db::letters_of(letters, word.from, &word.text).is_none())
+            .map(|word| qnc_letter_times::Word { from: word.from, to: word.to.max(word.from + 1), text: word.text.trim().to_string() })
+            .collect();
+        (!words.is_empty()).then(|| qnc_letter_times::Need::few(need.clip_id.clone(), words))
     }
 
     /// Stops a running transcription (the zoom closed or another project).
@@ -105,7 +132,9 @@ impl ZoomWords {
                     if let Err(error) = &read {
                         log(&format!("zoom-words read {clip}: {error}"));
                     }
-                    self.kept.insert(clip.clone(), read.unwrap_or_default());
+                    let (transcripts, letters) = read.unwrap_or_default();
+                    self.kept.insert(clip.clone(), transcripts);
+                    self.letters.insert(clip.clone(), letters);
                     self.reading = None;
                 }
                 Err(mpsc::TryRecvError::Disconnected) => self.reading = None,
@@ -138,7 +167,7 @@ impl ZoomWords {
         let spawned = std::thread::Builder::new().name("qnc-zoom-words-read".into()).spawn(move || {
             let read = qnc_db_broker::ProjectDbTarget::for_project(locator.reader(), locator.settings())
                 .map_err(|error| error.to_string())
-                .and_then(|target| qnc_transcript_db::read_clip(&target, &clip));
+                .and_then(|target| Ok((qnc_transcript_db::read_clip(&target, &clip)?, qnc_letter_db::read_clip(&target, &clip).unwrap_or_default())));
             let _ = send.send(read);
         });
         if spawned.is_ok() {
@@ -178,11 +207,22 @@ impl ZoomWords {
         };
         let (program_start, program_end, source_in, source_out) = need.piece;
         let axis = |frame: u64| to_axis(program_start, program_end, source_in, source_out, frame).clamp(sound.from, sound.to);
+        let kept_letters = self.letters.get(&need.clip_id).map_or(&[][..], Vec::as_slice);
         covering
             .into_iter()
             .flat_map(|t| t.lines.iter().flat_map(|line| line.words.iter()))
             .filter(|word| word.from < need.last && need.first < word.to.max(word.from + 1))
-            .map(|word| ZoomWord { from: axis(word.from), to: axis(word.to.max(word.from + 1)), text: word.text.clone() })
+            .map(|word| {
+                // The letters laid for the word (`qnc-letter-db`), on the zoom's axis; with them
+                // the word lasts from its first letter to the end of its last.
+                let letters: Vec<(char, Option<(u64, u64)>)> = qnc_letter_db::letters_of(kept_letters, word.from, &word.text)
+                    .map(|found| found.spans().into_iter().map(|(letter, span)| (letter, span.map(|(from, to)| (axis(from), axis(to).max(axis(from) + 1))))).collect())
+                    .unwrap_or_default();
+                let spans = letters.iter().filter_map(|(_, span)| *span);
+                let (from, to) = spans.fold(None, |edge: Option<(u64, u64)>, (from, to)| Some(edge.map_or((from, to), |(a, b)| (a.min(from), b.max(to)))))
+                    .unwrap_or((axis(word.from), axis(word.to.max(word.from + 1))));
+                ZoomWord { from, to, text: word.text.clone(), letters }
+            })
             .collect()
     }
 }

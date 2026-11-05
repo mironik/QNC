@@ -7217,6 +7217,8 @@ version = "0.1.0"
 dependencies = [
  "qnc-db-broker",
  "qnc-dev-diagnostics",
+ "qnc-letter-db",
+ "qnc-letter-times",
  "qnc-program-view",
  "qnc-still-locator",
  "qnc-transcribe-run",

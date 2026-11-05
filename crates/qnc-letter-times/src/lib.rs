@@ -38,6 +38,14 @@ pub struct Need {
     pub words: Vec<Word>,
 }
 
+impl Need {
+    /// The few words of a short window (the trim zoom's seconds): laid as one run, whatever
+    /// the clip's rate.
+    pub fn few(clip_id: String, words: Vec<Word>) -> Self {
+        Self { clip_id, fps: f64::INFINITY, words }
+    }
+}
+
 struct Job {
     clip_id: String,
     words: Vec<Word>,

@@ -390,16 +390,33 @@ fn paint_words(ui: &mut egui::Ui, row: Rect, sound: &ZoomSound, x_of: &dyn Fn(u6
         ui.painter().rect_filled(said, 2.0, visuals.faint_bg_color);
         ui.painter().line_segment([egui::pos2(left, row.top()), egui::pos2(left, row.bottom())], Stroke::new(1.0, visuals.weak_text_color()));
         let cell = Rect::from_min_max(egui::pos2(left + 3.0, row.top()), egui::pos2(right, row.bottom()));
-        ui.painter().with_clip_rect(cell).text(egui::pos2(cell.left(), row.center().y), Align2::LEFT_CENTER, word.text.trim(), font.clone(), visuals.text_color());
+        // With its letters laid (user 2026-11-05: letters in the zoom too) every letter stands
+        // where it is said, with a tick at its start; a click is on the letter under the mouse.
+        let letters: Vec<(char, (f32, f32), (u64, u64))> = word.letters.iter().filter_map(|(letter, span)| span.map(|(from, to)| (*letter, (x_of(from), x_of(to)), (from, to)))).collect();
         let hit = Rect::from_min_max(egui::pos2(left, row.top()), egui::pos2(right.max(left + 4.0), row.bottom()));
         let response = ui.interact(hit, ui.id().with(("qnc_trim_word", index)), Sense::click());
+        let under = response.hover_pos().and_then(|at| letters.iter().find(|(_, (a, b), _)| at.x >= *a && at.x < b.max(a + 1.0)).copied());
+        if letters.is_empty() {
+            ui.painter().with_clip_rect(cell).text(egui::pos2(cell.left(), row.center().y), Align2::LEFT_CENTER, word.text.trim(), font.clone(), visuals.text_color());
+        } else {
+            let painter = ui.painter().with_clip_rect(Rect::from_min_max(egui::pos2(left, row.top()), egui::pos2(right, row.bottom())));
+            for &(letter, (a, b), _) in &letters {
+                let lit = under.is_some_and(|(_, (ua, _), _)| ua == a);
+                if lit {
+                    painter.rect_filled(Rect::from_min_max(egui::pos2(a, row.top() + 2.0), egui::pos2(b.max(a + 2.0), row.bottom() - 2.0)), 1.0, visuals.selection.bg_fill);
+                }
+                painter.line_segment([egui::pos2(a, row.bottom() - 5.0), egui::pos2(a, row.bottom() - 1.0)], Stroke::new(1.0, visuals.weak_text_color()));
+                painter.text(egui::pos2(a + 1.0, row.center().y), Align2::LEFT_CENTER, letter, font.clone(), visuals.text_color());
+            }
+        }
         if response.hovered() {
-            ui.ctx().set_cursor_icon(egui::CursorIcon::PointingHand);
+            ui.ctx().set_cursor_icon(if under.is_some() { egui::CursorIcon::Text } else { egui::CursorIcon::PointingHand });
         }
         // A click is enough (user 2026-11-04: "a click on the text in the zoom puts the wave
-        // exactly at the playhead"): the taken edge goes to the word, the window follows it.
+        // exactly at the playhead"): the taken edge goes to the word (or the letter), the
+        // window follows it.
         if response.clicked() || response.double_clicked() {
-            clicked = Some((word.from, word.to.max(word.from + 1)));
+            clicked = Some(under.map_or((word.from, word.to.max(word.from + 1)), |(_, _, span)| span));
         }
     }
     clicked

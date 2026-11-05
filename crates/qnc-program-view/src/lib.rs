@@ -195,6 +195,9 @@ pub struct ZoomWord {
     pub from: u64,
     pub to: u64,
     pub text: String,
+    /// Its letters with their frames on the zoom's axis (user 2026-11-05: letters in the trim
+    /// zoom too), once the letter aligner laid them; empty before, `None` for a sign without.
+    pub letters: Vec<(char, Option<(u64, u64)>)>,
 }
 
 /// What a form shows: the program in order, its markers and slots, timebase,

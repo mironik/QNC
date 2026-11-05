@@ -39,6 +39,34 @@ pub struct WordLetters {
     pub letters: Vec<Letter>,
 }
 
+impl WordLetters {
+    /// Every letter with the whole clip frames `[from, to)` it lasts: the aligner gives a
+    /// letter where its sound starts (a short peak), so a letter lasts until the next one
+    /// starts and the last until the end of its sound. `None` for a sign without frames.
+    pub fn spans(&self) -> Vec<(char, Option<(u64, u64)>)> {
+        let starts: Vec<Option<u64>> = self.letters.iter().map(|letter| letter.from.map(|from| from.round() as u64)).collect();
+        let end = self.letters.iter().filter_map(|letter| letter.to).fold(None, |end: Option<f64>, to| Some(end.map_or(to, |end| end.max(to))));
+        self.letters
+            .iter()
+            .enumerate()
+            .map(|(index, letter)| {
+                let span = starts[index].map(|from| {
+                    let next = starts[index + 1..].iter().flatten().next().copied();
+                    let to = next.or(end.map(|end| end.ceil() as u64)).unwrap_or(from + 1);
+                    (from, to.max(from + 1))
+                });
+                (letter.letter, span)
+            })
+            .collect()
+    }
+}
+
+/// The letters kept for the word of a clip that starts at `from` with `text`.
+pub fn letters_of<'a>(kept: &'a [WordLetters], from: u64, text: &str) -> Option<&'a WordLetters> {
+    let text = text.trim();
+    kept.iter().find(|kept| kept.word_from == from && kept.text == text)
+}
+
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(tag = "kind", content = "value", rename_all = "snake_case", deny_unknown_fields)]
 pub enum Operation {
