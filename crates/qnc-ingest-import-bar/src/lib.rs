@@ -5,7 +5,7 @@
 //! knows no catalog, no Select and no database.
 
 use eframe::egui::{Align, Color32, Layout, RichText, Ui};
-use qnc_source_timeline::HeaderAction;
+use qnc_source_timeline_view::HeaderAction;
 
 pub const MODULE_ID: &str = "qnc.module.ingest-import-bar";
 
@@ -72,7 +72,7 @@ pub fn show(
                 asked = Some(ImportBarAction::Filter(index == 1));
             }
             let actions = spec.actions.iter().map(|action| HeaderAction { label: action.label, action_id: action.action_id, strong: action.strong });
-            if let Some(action) = qnc_source_timeline::header_actions(ui, theme, actions, &enabled, |_| false, now.focused) {
+            if let Some(action) = qnc_source_timeline_view::header_actions(ui, theme, actions, &enabled, |_| false, now.focused) {
                 asked = Some(ImportBarAction::Action(action.to_string()));
             }
         }

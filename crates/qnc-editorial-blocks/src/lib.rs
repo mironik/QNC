@@ -57,18 +57,18 @@ fn pool_tabs(ui: &mut Ui, rect: Rect, contracts: &EditorialContracts, theme: &Th
 fn source_dock(ui: &mut Ui, contracts: &EditorialContracts, theme: &Theme, view: &EditorialView) -> Option<EditorialIntent> {
     let (rect, mut clicked) = (ui.available_rect_before_wrap(), None);
     let label = view.current_clip_label().unwrap_or(&contracts.editorial.source_dock.clip_label_fallback);
-    let actions = contracts.composition().source_dock.actions_rtl.iter().map(|action| qnc_source_timeline::HeaderAction { label: action.label(), action_id: action.action_id(), strong: false });
+    let actions = contracts.composition().source_dock.actions_rtl.iter().map(|action| qnc_source_timeline_view::HeaderAction { label: action.label(), action_id: action.action_id(), strong: false });
     let header = |ui: &mut Ui| {
         ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
             ui.spacing_mut().item_spacing.x = 8.0;
             let (enabled, on) = (|id: &str| view.action_enabled(id), |id: &str| view.segments.action_selected(id) || view.focus.transcript.selected(id));
-            clicked = qnc_source_timeline::header_actions(ui, theme, actions, enabled, on, view.focus.button.as_deref());
+            clicked = qnc_source_timeline_view::header_actions(ui, theme, actions, enabled, on, view.focus.button.as_deref());
         });
     };
     // The enlarged slot under the header in place of the timeline: the buttons stay (user 2026-10-22).
     let mut zoom = qnc_subsegment_panel::or_body(qnc_segment_panel::zoom_body(&view.segments, qnc_theme_styles::timeline(theme), &contracts.editorial.cover_lengths), view.focus.script.subsegment.as_ref(), qnc_theme_styles::timeline(theme), &contracts.editorial.cover_lengths);
-    let (dock, instead) = ((theme, contracts.editorial.source_dock.header_timeline_gap), zoom.as_mut().map(|zoom| zoom as &mut qnc_source_timeline::Instead));
-    let (intent, zoomed) = qnc_source_timeline::show_with(ui, rect, dock, label, header, (&view.preview.timeline, &view.preview.assets), &view.source_timeline, instead);
+    let (dock, instead) = ((theme, contracts.editorial.source_dock.header_timeline_gap), zoom.as_mut().map(|zoom| zoom as &mut qnc_source_timeline_view::Instead));
+    let (intent, zoomed) = qnc_source_timeline_view::show_with(ui, rect, dock, label, header, (&view.preview.timeline, &view.preview.assets), &view.source_timeline, instead);
     // A click on A1/A2 and the wheel are the source timeline's own catalog actions.
     match intent {
         TimelineIntent::None => zoomed.map(EditorialIntent::Action).or(clicked.map(EditorialIntent::action)),

@@ -6,7 +6,7 @@ use super::*;
 use qnc_dir_browser_panel::{Body, BrowserAction, BrowserAnswer, BrowserInput, BrowserLabels, ConfirmBar, Entry, Nav};
 use qnc_ingest_import_bar::{ImportBarAction, ImportBarNow, ImportBarSpec};
 use qnc_media_card::{CardGridAction, CardMetrics, StatusDotsMode, Ticks};
-use qnc_source_timeline::HeaderAction;
+use qnc_source_timeline_view::HeaderAction;
 
 /// The source tabs in the order of the contract's labels.
 const KINDS: [SourceKind; 3] = [SourceKind::Local, SourceKind::Lan, SourceKind::Internet];
@@ -33,7 +33,7 @@ pub(super) fn browser(ui: &mut Ui, rect: Rect, contracts: &IngestContracts, them
         SourceKind::Internet => &labels.empty_internet,
     };
     let browser = &view.browser;
-    let (focused_entry, opened) = qnc_focus_walk::list_keys(ui, "qnc-ingest-browser", browser.entries.len(), &view.focus, qnc_focus_walk::BROWSER);
+    let (focused_entry, opened) = qnc_list_focus::list_keys(ui, "qnc-ingest-browser", browser.entries.len(), &view.focus, qnc_focus_walk::BROWSER);
     let input = BrowserInput {
         id_salt: "qnc-ingest-browser",
         kinds: &kinds,
@@ -130,7 +130,7 @@ pub(super) fn source_dock(ui: &mut Ui, contracts: &IngestContracts, theme: &Them
     };
     let mut asked = None;
     let header = |ui: &mut Ui| asked = qnc_ingest_import_bar::show(ui, theme, &spec, &now, |id| view.action_enabled(id));
-    let timeline = qnc_source_timeline::show(ui, rect, (theme, dock.header_timeline_gap), label, header, (&view.timeline, &view.timeline_assets), &view.source_timeline);
+    let timeline = qnc_source_timeline_view::show(ui, rect, (theme, dock.header_timeline_gap), label, header, (&view.timeline, &view.timeline_assets), &view.source_timeline);
     match asked {
         Some(ImportBarAction::Filter(all)) => Some(IngestIntent::new(action_ids::INGEST_SET_CLIP_FILTER, IngestPayload::ClipFilter(if all { ClipFilter::All } else { ClipFilter::New }))),
         Some(ImportBarAction::Action(action_id)) => Some(IngestIntent::empty(&action_id)),

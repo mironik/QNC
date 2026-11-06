@@ -5,6 +5,7 @@ edition = "2021"
 description = "QNC public component: the keys of one frame turned into catalog action ids for the scopes of a board"
 
 [dependencies]
+qnc-timeline-model = { workspace = true }
 eframe = { workspace = true }
 qnc-keyboard-shortcut = { workspace = true }
 qnc-key-cheatsheet = { workspace = true }

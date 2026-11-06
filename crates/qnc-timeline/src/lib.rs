@@ -15,7 +15,7 @@ pub use events::take_marker_drag_event;
 mod lanes;
 mod level_lines;
 pub use level_lines::{level_curve_hit, paint_level_curves, TimelineLevelCurve};
-pub use events::event;
+pub use qnc_timeline_model::event;
 pub use lanes::{drafted_choice, lane_choice, lane_key, lane_message, Lane, LaneChoice, LaneKey};
 
 pub const MODULE_ID: &str = "qnc.module.timeline";

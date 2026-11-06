@@ -5,6 +5,8 @@ edition = "2021"
 description = "QNC Ingest blocks on the desktop board: preview, pool head, source browser, clip cards and source dock; they draw the Ingest view and return intents"
 
 [dependencies]
+qnc-list-focus = { workspace = true }
+qnc-source-timeline-view = { workspace = true }
 eframe = { workspace = true }
 qnc-board = { workspace = true }
 qnc-clip-row = { workspace = true }
@@ -17,6 +19,5 @@ qnc-media-card = { workspace = true }
 qnc-media-pool-panel = { workspace = true }
 qnc-monitor-panel = { workspace = true }
 qnc-pool-tabs-panel = { workspace = true }
-qnc-source-timeline = { workspace = true }
 qnc-transport-panel = { workspace = true }
 qnc-ui-kit = { workspace = true }

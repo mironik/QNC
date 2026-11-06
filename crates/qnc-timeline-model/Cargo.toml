@@ -5,4 +5,6 @@ edition = "2021"
 description = "QNC public piece (core): the model of every timeline, its projection (range, playhead, IN/OUT, mark in focus), audio lanes and the intents a timeline reports. No egui: qnc-timeline draws it."
 
 [dependencies]
+qnc-action-event = { workspace = true }
+qnc-mouse-map = { workspace = true }
 qnc-edit-step = { workspace = true }

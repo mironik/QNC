@@ -14,20 +14,18 @@
 
 use std::time::Duration;
 
-use eframe::egui::{Rect, Ui};
 use qnc_lane_choice::{Lane, LaneChoice};
-use qnc_source_dock::SourceTimeline as DockTimeline;
 use qnc_source_panel::SourcePanel;
 use qnc_source_preview::SourcePreview;
-use qnc_timeline::{lane_choice, lane_key, lane_message, AudioLane, TimelineIntent, TimelineProjection, LaneKey};
-use qnc_timeline_assets::SourceTimelineAssets;
+use qnc_lane_choice::{lane_choice, lane_key, lane_message, LaneKey};
+use qnc_timeline_model::{AudioLane, TimelineIntent, TimelineProjection};
 
 pub use qnc_source_channels::ContentTarget;
 pub use qnc_source_timecode::SourceTimecode;
 
 pub const MODULE_ID: &str = "qnc.module.source-timeline";
 /// The catalog scope of the source timeline's keys, the same in every form.
-pub const KEY_SCOPE: &str = qnc_key_intents::SOURCE_TIMELINE_SCOPE;
+pub const KEY_SCOPE: &str = qnc_timeline_model::SOURCE_TIMELINE_SCOPE;
 /// The panel name of the source timeline in the layout contracts (where a click happened).
 pub const PANEL: &str = "source_timeline";
 pub const VERSION: &str = env!("CARGO_PKG_VERSION");
@@ -53,8 +51,8 @@ const SAME_ENTER: Duration = Duration::from_millis(150);
 /// artifacts: the lane pickers, the large wave and the clip's timecode.
 #[derive(Debug, Clone, Default, PartialEq)]
 pub struct SourceTimelineView {
-    pub a1: Option<qnc_timeline::ChannelChoice>,
-    pub a2: Option<qnc_timeline::ChannelChoice>,
+    pub a1: Option<qnc_lane_choice::ChannelChoice>,
+    pub a2: Option<qnc_lane_choice::ChannelChoice>,
     pub wave_over_video: Option<(AudioLane, u8)>,
     pub timecode: Option<SourceTimecode>,
     /// What a taken lane does, for the form's status line (empty: nothing to say).
@@ -68,12 +66,12 @@ pub struct SourceTimelineView {
     pub sound_assist: Option<bool>,
     /// A question about what the source timeline's marks would save (the same statement
     /// already there, user 2026-11-01), shown over everything until answered.
-    pub question: Option<qnc_choice_box::Choice>,
+    pub question: Option<qnc_notice::Choice>,
 }
 
 impl SourceTimelineView {
     /// This view with `question` shown over everything.
-    pub fn with_question(mut self, question: Option<qnc_choice_box::Choice>) -> Self {
+    pub fn with_question(mut self, question: Option<qnc_notice::Choice>) -> Self {
         self.question = question;
         self
     }
@@ -202,7 +200,7 @@ impl SourceTimeline {
     /// the mouse map's (piece `qnc-mouse-map`, contracts/input/mouse.json; user rule
     /// 2026-10-20), the same in every form.
     pub fn event_of(intent: &TimelineIntent) -> Option<qnc_action_event::ActionEvent> {
-        qnc_timeline::event(intent, PANEL, &|frame| frame)
+        qnc_timeline_model::event(intent, PANEL, &|frame| frame)
     }
 
     /// A click on a channel of the column (`action_id` from [`Self::action_of`]), else the
@@ -282,7 +280,7 @@ impl SourceTimeline {
         if !self.mark_taken(timeline) {
             return None;
         }
-        let edge = if timeline.source_mark_focus == qnc_timeline::TimelineSourceMarkFocus::In { qnc_edit_edge::Edge::In } else { qnc_edit_edge::Edge::Out };
+        let edge = if timeline.source_mark_focus == qnc_timeline_model::TimelineSourceMarkFocus::In { qnc_edit_edge::Edge::In } else { qnc_edit_edge::Edge::Out };
         Some(self.drag(edge == qnc_edit_edge::Edge::In, qnc_edit_words::Word::new(from, to).goal(Some(edge), 0), preview, timeline))
     }
 
@@ -328,7 +326,7 @@ impl SourceTimeline {
         // The click on a channel of a taken lane is the timeline's own lane key, the same on
         // every timeline (Wrap rows too; user 2026-10-18: written once, used everywhere).
         let changed = if self.lanes.taken().is_some_and(|(taken, _)| taken == lane) {
-            qnc_timeline::lane_key(&mut self.lanes, qnc_timeline::LaneKey::Pick(channel))
+            qnc_lane_choice::lane_key(&mut self.lanes, qnc_lane_choice::LaneKey::Pick(channel))
         } else {
             self.lanes.choose(lane, channel)
         };
@@ -500,94 +498,6 @@ fn wave_over_video(lanes: &LaneChoice) -> Option<(AudioLane, u8)> {
     taken.into_iter().chain([0, 1]).find(|lane| zoom[*lane] > 0).map(|lane| (names[lane], zoom[lane]))
 }
 
-/// Draws the source dock of any form: its frame, the header row (the clip's `title` and
-/// whatever `header` adds) and the one source timeline under it.
-pub fn show(
-    ui: &mut Ui,
-    rect: Rect,
-    (theme, header_gap): (&qnc_desktop_theme::Theme, f32),
-    title: &str,
-    header: impl FnOnce(&mut Ui),
-    (projection, assets): (&TimelineProjection, &SourceTimelineAssets),
-    view: &SourceTimelineView,
-) -> TimelineIntent {
-    show_with(ui, rect, (theme, header_gap), title, header, (projection, assets), view, None).0
-}
-
-/// What a form draws under the header in place of the timeline, and its answer.
-pub type Instead<'a> = dyn FnMut(&mut Ui) -> Option<qnc_action_event::ActionEvent> + 'a;
-
-/// As `show`, with `instead` drawn under the header in place of the timeline (the enlarged
-/// slot keeps the header and its buttons).
-#[allow(clippy::too_many_arguments)]
-pub fn show_with(
-    ui: &mut Ui,
-    rect: Rect,
-    (theme, header_gap): (&qnc_desktop_theme::Theme, f32),
-    title: &str,
-    header: impl FnOnce(&mut Ui),
-    (projection, assets): (&TimelineProjection, &SourceTimelineAssets),
-    view: &SourceTimelineView,
-    instead: Option<&mut Instead<'_>>,
-) -> (TimelineIntent, Option<qnc_action_event::ActionEvent>) {
-    let style = &qnc_theme_styles::dock(theme, header_gap);
-    let timeline = DockTimeline::from_assets(projection, qnc_theme_styles::timeline(theme), assets)
-        .with_timecode(view.timecode)
-        .with_a1_channel(view.a1)
-        .with_a2_channel(view.a2)
-        .with_wave_over_video(view.wave_over_video);
-    let mut answer = None;
-    let slot = &mut answer;
-    let mut toggled = None;
-    // The level bar block (meter, NORM and AI) in the middle of the bar above the timeline.
-    let header = |ui: &mut Ui| {
-        let row = ui.max_rect();
-        toggled = qnc_level_bar::show(ui, row, view.levels, (view.normalize, view.sound_assist), &qnc_theme_styles::timeline(theme));
-        header(ui);
-    };
-    let mut drawn = instead.map(|instead| move |ui: &mut Ui| *slot = instead(ui));
-    let intent = qnc_source_dock::show_timeline_dock_with(ui, rect, style, title, header, timeline, drawn.as_mut().map(|draw| draw as &mut dyn FnMut(&mut Ui)));
-    drop(drawn);
-    let norm = toggled.map(qnc_action_event::ActionEvent::key);
-    let asked = view.question.as_ref().and_then(|choice| qnc_choice_box::show(ui.ctx(), theme, choice)).map(qnc_action_event::ActionEvent::key);
-    (intent, asked.or(answer).or(norm))
-}
-
-/// One action button of the header, as a form lists them (label, catalog action).
-pub struct HeaderAction<'a> {
-    pub label: &'a str,
-    pub action_id: Option<&'a str>,
-    /// The strong button of the header (the form's main action).
-    pub strong: bool,
-}
-
-/// The header's action buttons, right to left as listed, each with its state from the form
-/// (enabled, on) and the frame of the one the keyboard is on; the clicked action.
-pub fn header_actions<'a>(
-    ui: &mut Ui,
-    theme: &qnc_desktop_theme::Theme,
-    actions: impl IntoIterator<Item = HeaderAction<'a>>,
-    enabled: impl Fn(&str) -> bool,
-    on: impl Fn(&str) -> bool,
-    focused: Option<&str>,
-) -> Option<&'a str> {
-    let mut clicked = None;
-    for action in actions {
-        let id = action.action_id.unwrap_or_default();
-        let (enabled, on) = (action.action_id.is_some_and(&enabled), action.action_id.is_some_and(&on));
-        let response = if action.strong {
-            qnc_ui_kit::strong_button(ui, action.label, enabled, theme.accent, theme.chrome_control_height)
-        } else {
-            qnc_ui_kit::chrome_button(ui, action.label, enabled, on, qnc_theme_styles::button(theme))
-        };
-        qnc_ui_kit::paint_focus(ui, response.rect.expand(2.0), action.action_id.is_some() && focused == Some(id), theme.focus);
-        if response.clicked() {
-            clicked = action.action_id;
-        }
-    }
-    clicked
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -695,7 +605,7 @@ mod tests {
     fn a_click_lets_go_of_a_mark_drawn_taken_that_nobody_holds_and_never_walks_on() {
         let (mut source, mut preview) = (SourceTimeline::new(), SourcePreview::default());
         let mut timeline = TimelineProjection::new(0, 100).with_playhead(10).with_source_in_at_confirmed();
-        timeline.source_mark_focus = qnc_timeline::TimelineSourceMarkFocus::In; // drawn taken, the keys hold nothing
+        timeline.source_mark_focus = qnc_timeline_model::TimelineSourceMarkFocus::In; // drawn taken, the keys hold nothing
         assert_eq!(source.route_input(KEEP_MARK, None, &mut preview, &mut timeline), Some(true), "taken here, not the form's Enter");
         assert!(!qnc_source_mark_focus::is_taken(&timeline));
     }

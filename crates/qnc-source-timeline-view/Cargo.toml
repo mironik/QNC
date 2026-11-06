@@ -1,0 +1,18 @@
+[package]
+name = "qnc-source-timeline-view"
+version = "0.1.0"
+edition = "2021"
+description = "QNC public piece (gui): the source timeline dock of any form as it is drawn; its state is the core piece qnc-source-timeline"
+
+[dependencies]
+eframe = { workspace = true }
+qnc-action-event = { workspace = true }
+qnc-choice-box = { workspace = true }
+qnc-desktop-theme = { workspace = true }
+qnc-level-bar = { workspace = true }
+qnc-source-dock = { workspace = true }
+qnc-source-timeline = { workspace = true }
+qnc-theme-styles = { workspace = true }
+qnc-timeline = { workspace = true }
+qnc-timeline-assets = { workspace = true }
+qnc-ui-kit = { workspace = true }

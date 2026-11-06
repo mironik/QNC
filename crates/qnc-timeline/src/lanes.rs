@@ -7,30 +7,7 @@
 //! on a Wrap row) is the owner's: it takes the lane and writes what Enter kept. The lane state
 //! itself is the piece `qnc-lane-choice`; nothing here plays, reads or writes.
 
-pub use qnc_lane_choice::{lane_key, lane_message, Lane, LaneChoice, LaneKey};
-
-use crate::ChannelChoice;
-
-/// The channel column and button of A1 (lane 0) or A2 as the lane plays now; its wave is
-/// already drawn at `drawn_db` (0 on the source timeline, the stored level on a Wrap row).
-pub fn lane_choice(lanes: &LaneChoice, lane: u8, drawn_db: i8) -> Option<ChannelChoice> {
-    let (_, count) = lanes.choice(lane)?;
-    let open = lanes.taken().is_some_and(|(taken, _)| taken == lane);
-    Some(drafted_choice(lanes.lane(lane), count, open, drawn_db))
-}
-
-/// The channel column and button of a lane playing `now` among `count` channels, `open`
-/// while it is taken; its wave is already drawn at `drawn_db`.
-pub fn drafted_choice(now: Lane, count: u16, open: bool, drawn_db: i8) -> ChannelChoice {
-    ChannelChoice {
-        selected: now.channel,
-        count,
-        open,
-        off: now.off,
-        level_db: now.level_db.saturating_sub(drawn_db),
-        heard_db: now.level_db,
-    }
-}
+pub use qnc_lane_choice::{drafted_choice, lane_choice, lane_key, lane_message, Lane, LaneChoice, LaneKey};
 
 #[cfg(test)]
 mod tests {

@@ -295,3 +295,47 @@ mod tests {
         assert_eq!(lanes.lane(0), Lane::on(0), "a new clip is heard as recorded");
     }
 }
+
+/// The choice to draw: the chosen channel (zero based) of `count` channels.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct ChannelChoice {
+    pub selected: u16,
+    pub count: u16,
+    /// Taken with the keyboard: the row is shown, `selected` is the draft.
+    pub open: bool,
+    /// The lane is off (level 0): its channel is kept, nothing of it is heard (user
+    /// 2026-10-15). Its button is drawn red; the column itself is unchanged.
+    pub off: bool,
+    /// The lane's level in dB (0 as recorded): its wave is drawn at it (user 2026-10-16).
+    pub level_db: i8,
+    /// The level the lane is heard at, written beside its button when it is not 0 or the
+    /// lane is taken (live 2026-10-16: the user did not see the level). It differs from
+    /// `level_db` where the wave is already drawn at a stored level (a Wrap row).
+    pub heard_db: i8,
+}
+
+impl ChannelChoice {
+    /// The lane is off: nothing of its channel is heard.
+    pub fn silent(&self) -> bool {
+        self.off
+    }
+
+    /// The lane's level as a factor of the recorded sound (0 when it is off).
+    pub fn gain(&self) -> f32 {
+        qnc_gain::level_gain(self.level_db, self.off)
+    }
+}
+
+/// The channel column and button of A1 (lane 0) or A2 as the lane plays now; its wave is
+/// already drawn at `drawn_db` (0 on the source timeline, the stored level on a Wrap row).
+pub fn lane_choice(lanes: &LaneChoice, lane: u8, drawn_db: i8) -> Option<ChannelChoice> {
+    let (_, count) = lanes.choice(lane)?;
+    let open = lanes.taken().is_some_and(|(taken, _)| taken == lane);
+    Some(drafted_choice(lanes.lane(lane), count, open, drawn_db))
+}
+
+/// The channel column and button of a lane playing `now` among `count` channels, `open`
+/// while it is taken; its wave is already drawn at `drawn_db`.
+pub fn drafted_choice(now: Lane, count: u16, open: bool, drawn_db: i8) -> ChannelChoice {
+    ChannelChoice { selected: now.channel, count, open, off: now.off, level_db: now.level_db.saturating_sub(drawn_db), heard_db: now.level_db }
+}

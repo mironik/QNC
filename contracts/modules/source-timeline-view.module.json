@@ -1,0 +1,20 @@
+{
+  "module_id": "qnc.module.source-timeline-view",
+  "module_name": "Source timeline view",
+  "module_version": "0.1.0",
+  "module_kind": "library",
+  "capabilities": ["source_timeline.draw"],
+  "input_contract_version": "0.1.0",
+  "output_contract_version": "0.1.0",
+  "supported_os": ["windows", "linux", "macos"],
+  "supported_cpu": ["x86_64", "aarch64"],
+  "transport_protocol_version": "0.1.0",
+  "forbidden_calls": ["ffprobe", "media.decode", "database.read", "database.write", "business.workflow"],
+  "forbidden_dependencies": ["qnc.module.media-probe"],
+  "state_policy": "stateless",
+  "database_write_policy": "no_db_writes",
+  "runtime_crate": "qnc-source-timeline-view",
+  "input": "The core source timeline's view, the clip's projection and artifacts, the form's header and theme.",
+  "output": "The dock drawn with its header, level bar and timeline; the intent of the pointer and the actions clicked.",
+  "specification": "docs/99 step 3: the gui half of a mixed piece; its state and rules are the core piece it draws."
+}

@@ -333,3 +333,9 @@ impl Default for TimelineIntent {
         Self::None
     }
 }
+mod events;
+pub use events::event;
+
+/// The scope of the keyboard catalog that holds the keys of the source timeline, the same in
+/// every form (user 2026-10-17); the scope of the panel in focus is asked first.
+pub const SOURCE_TIMELINE_SCOPE: &str = "source_timeline";

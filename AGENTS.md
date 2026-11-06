@@ -8237,3 +8237,13 @@ Izvedeno 2026-11-07 (korisnik: "da, pushaj i prebaci dijagnosticki alat na gui-k
 (zaglavlje, redak, greska) su `qnc_desktop_theme::log_colours`, iste vrijednosti. C15: 2 -> 0, nijedna kocka koja crta
 nema vlastitog gumba, kvacice, tekstualnog polja ni boje; svaki novi je greska conformancea. docs/99 dopunjen.
 Testovi, `cargo check --workspace --all-targets`, conformance. Uzivo nije provjereno.
+Izvedeno 2026-11-07 (korisnik: "da, pushaj i kreni s korakom 3, odmrzni i rijesi o projekt"; docs/99 korak 3, prvi
+dio): mjesovite kocke podijeljene. `qnc-source-timeline` je core (stanje, tipke, zvuk klipa, A1/A2); crtanje (`show`,
+`show_with`, `Instead`, `HeaderAction`, `header_actions`) je nova kocka `crates/qnc-source-timeline-view` (+ ugovor),
+koju koriste Story/MA ploca, Ingest ploca i traka uvoza. `qnc-focus-walk` je core; citanje egui unosa popisa
+(`list_focus`, `list_keys`) je nova kocka `crates/qnc-list-focus` (+ ugovor), koristi je Ingest ploca. Iz `qnc-timeline`
+u core: `event` (radnja mape misa) u `qnc-timeline-model`, `ChannelChoice`, `lane_choice`, `drafted_choice` u
+`qnc-lane-choice` (`qnc-channel-picker` i `qnc-timeline` ih ponovno izvoze); ime opsega tipki source timelinea je
+`qnc_timeline_model::SOURCE_TIMELINE_SCOPE` (`qnc-key-intents` ga ponovno izvozi). Ponasanje isto. C14 11 -> 4 (ostaje
+`qnc-project-session`). Testovi (96, ukljucujuci zlatnu tablicu tipki), `cargo check --workspace --all-targets`,
+conformance. Uzivo nije provjereno.

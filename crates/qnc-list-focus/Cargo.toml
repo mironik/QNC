@@ -1,0 +1,10 @@
+[package]
+name = "qnc-list-focus"
+version = "0.1.0"
+edition = "2021"
+description = "QNC public piece (gui): the item of a drawn list the keyboard is on and the one Enter opened; the walk is the core piece qnc-focus-walk"
+
+[dependencies]
+eframe = { workspace = true }
+qnc-focus-walk = { workspace = true }
+qnc-key-list = { workspace = true }

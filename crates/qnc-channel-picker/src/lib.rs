@@ -7,35 +7,8 @@
 
 use eframe::egui::{self, Align2, Color32, FontId, Rect, Sense, Stroke, StrokeKind, Vec2};
 
-/// The choice to draw: the chosen channel (zero based) of `count` channels.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct ChannelChoice {
-    pub selected: u16,
-    pub count: u16,
-    /// Taken with the keyboard: the row is shown, `selected` is the draft.
-    pub open: bool,
-    /// The lane is off (level 0): its channel is kept, nothing of it is heard (user
-    /// 2026-10-15). Its button is drawn red; the column itself is unchanged.
-    pub off: bool,
-    /// The lane's level in dB (0 as recorded): its wave is drawn at it (user 2026-10-16).
-    pub level_db: i8,
-    /// The level the lane is heard at, written beside its button when it is not 0 or the
-    /// lane is taken (live 2026-10-16: the user did not see the level). It differs from
-    /// `level_db` where the wave is already drawn at a stored level (a Wrap row).
-    pub heard_db: i8,
-}
+pub use qnc_lane_choice::ChannelChoice;
 
-impl ChannelChoice {
-    /// The lane is off: nothing of its channel is heard.
-    pub fn silent(&self) -> bool {
-        self.off
-    }
-
-    /// The lane's level as a factor of the recorded sound (0 when it is off).
-    pub fn gain(&self) -> f32 {
-        qnc_gain::level_gain(self.level_db, self.off)
-    }
-}
 
 /// Colours of the row.
 #[derive(Debug, Clone, Copy)]

@@ -305,6 +305,8 @@ members = [
     "crates/qnc-wheel-jog",
     "crates/qnc-source-panel",
     "crates/qnc-source-timeline",
+    "crates/qnc-source-timeline-view",
+    "crates/qnc-list-focus",
     "crates/qnc-settings-form",
     "crates/qnc-field-spec",
     "crates/qnc-side-pieces",
@@ -611,6 +613,8 @@ qnc-sound-assist = { path = "crates/qnc-sound-assist" }
 qnc-wheel-jog = { path = "crates/qnc-wheel-jog" }
 qnc-source-panel = { path = "crates/qnc-source-panel" }
 qnc-source-timeline = { path = "crates/qnc-source-timeline" }
+qnc-source-timeline-view = { path = "crates/qnc-source-timeline-view" }
+qnc-list-focus = { path = "crates/qnc-list-focus" }
 qnc-settings-form = { path = "crates/qnc-settings-form" }
 qnc-field-spec = { path = "crates/qnc-field-spec" }
 qnc-side-pieces = { path = "crates/qnc-side-pieces" }

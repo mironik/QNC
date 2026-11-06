@@ -3655,6 +3655,7 @@ version = "0.1.0"
 dependencies = [
  "eframe",
  "qnc-gain",
+ "qnc-lane-choice",
 ]
 
 [[package]]
@@ -4064,6 +4065,7 @@ dependencies = [
  "qnc-right-panel",
  "qnc-segment-panel",
  "qnc-source-timeline",
+ "qnc-source-timeline-view",
  "qnc-subsegment-panel",
  "qnc-theme-styles",
  "qnc-timeline",
@@ -4261,11 +4263,9 @@ dependencies = [
 name = "qnc-focus-walk"
 version = "0.1.0"
 dependencies = [
- "eframe",
- "qnc-key-intents",
  "qnc-key-list",
  "qnc-key-row",
- "qnc-ui-kit",
+ "qnc-timeline-model",
 ]
 
 [[package]]
@@ -4417,11 +4417,12 @@ dependencies = [
  "qnc-ingest-application",
  "qnc-ingest-import-bar",
  "qnc-ingest-layout",
+ "qnc-list-focus",
  "qnc-media-card",
  "qnc-media-pool-panel",
  "qnc-monitor-panel",
  "qnc-pool-tabs-panel",
- "qnc-source-timeline",
+ "qnc-source-timeline-view",
  "qnc-transport-panel",
  "qnc-ui-kit",
 ]
@@ -4493,7 +4494,7 @@ dependencies = [
  "eframe",
  "qnc-choice-box",
  "qnc-desktop-theme",
- "qnc-source-timeline",
+ "qnc-source-timeline-view",
  "qnc-theme-styles",
  "qnc-ui-kit",
 ]
@@ -4757,6 +4758,7 @@ dependencies = [
  "qnc-key-focus",
  "qnc-key-preset",
  "qnc-keyboard-shortcut",
+ "qnc-timeline-model",
 ]
 
 [[package]]
@@ -4895,6 +4897,15 @@ dependencies = [
  "qnc-media-metadata",
  "qnc-media-readahead",
  "qnc-media-stream",
+]
+
+[[package]]
+name = "qnc-list-focus"
+version = "0.1.0"
+dependencies = [
+ "eframe",
+ "qnc-focus-walk",
+ "qnc-key-list",
 ]
 
 [[package]]
@@ -6620,29 +6631,38 @@ dependencies = [
 name = "qnc-source-timeline"
 version = "0.1.0"
 dependencies = [
- "eframe",
  "qnc-action-event",
- "qnc-choice-box",
  "qnc-clip-sound",
- "qnc-desktop-theme",
  "qnc-dev-diagnostics",
  "qnc-edit-edge",
  "qnc-edit-step",
  "qnc-edit-words",
- "qnc-key-intents",
  "qnc-lane-choice",
- "qnc-level-bar",
+ "qnc-notice",
  "qnc-source-channels",
- "qnc-source-dock",
  "qnc-source-mark-focus",
  "qnc-source-panel",
  "qnc-source-preview",
  "qnc-source-timecode",
+ "qnc-timeline-model",
+ "qnc-ui-text",
+]
+
+[[package]]
+name = "qnc-source-timeline-view"
+version = "0.1.0"
+dependencies = [
+ "eframe",
+ "qnc-action-event",
+ "qnc-choice-box",
+ "qnc-desktop-theme",
+ "qnc-level-bar",
+ "qnc-source-dock",
+ "qnc-source-timeline",
  "qnc-theme-styles",
  "qnc-timeline",
  "qnc-timeline-assets",
  "qnc-ui-kit",
- "qnc-ui-text",
 ]
 
 [[package]]
@@ -6819,7 +6839,9 @@ dependencies = [
 name = "qnc-timeline-model"
 version = "0.1.0"
 dependencies = [
+ "qnc-action-event",
  "qnc-edit-step",
+ "qnc-mouse-map",
 ]
 
 [[package]]
