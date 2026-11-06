@@ -98,5 +98,13 @@ pub fn cards(theme: &Theme) -> qnc_media_card::CardStyle {
         text: theme.text,
         muted: theme.text_muted,
         select_red: theme.danger,
+        dot_ready: Color32::from_rgb(0x30, 0xd1, 0x58),
+        dot_original_ready: Color32::from_rgb(0x0a, 0x84, 0xff),
+        dot_pending: Color32::from_rgb(0xff, 0xd6, 0x0a),
+        dot_error: Color32::from_rgb(0xff, 0x45, 0x3a),
+        check_on: Color32::from_rgb(0xff, 0x95, 0x00),
+        check_mark: Color32::from_rgb(0x1a, 0x1a, 0x1a),
+        check_off: Color32::from_rgba_unmultiplied(0, 0, 0, 90),
+        check_off_rim: Color32::from_rgba_unmultiplied(255, 255, 255, 140),
     }
 }

@@ -8203,3 +8203,8 @@ je uklonjen; `qnc-theme-styles` dobio ovisnost `eframe`). `qnc-trim-overlay::sho
 trake iz ugovora kroz `qnc_desktop_theme::rgb`, Ponisti/Spremi/Zatvori kroz novi `qnc_ui_kit::sized_button`. Izgled
 isti (blagi crveni sloj strane u fokusu sada je `cut` s istom prozirnoscu). C15: 20 -> 16 (`qnc-timeline` i
 `qnc-trim-overlay` bez prekrsaja). Testovi, `cargo check --workspace --all-targets`, conformance. Uzivo nije provjereno.
+Izvedeno 2026-11-06 (korisnik: "da, pushaj i kreni s media cardom"; gui-kit C15): `qnc-media-card` vise nema vlastitih
+boja. `CardStyle` je dobio boje tockica stanja (`dot_ready`, `dot_original_ready`, `dot_pending`, `dot_error`) i
+kvacice izbora (`check_on`, `check_mark`, `check_off`, `check_off_rim`), s istim vrijednostima; puni ih gui-kit
+(`qnc_theme_styles::cards`). `paint_clip_status` prima `&CardStyle`. Izgled isti. C15: 16 -> 15. Testovi,
+`cargo check --workspace --all-targets`, conformance. Uzivo nije provjereno.

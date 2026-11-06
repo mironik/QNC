@@ -97,6 +97,17 @@ pub struct CardStyle {
     pub muted: Color32,
     /// Focus ring colour.
     pub select_red: Color32,
+    /// The status dots: ready (one green dot, a ready proxy), a ready original, pending, an error
+    /// (gui-kit C15: they were the card's own).
+    pub dot_ready: Color32,
+    pub dot_original_ready: Color32,
+    pub dot_pending: Color32,
+    pub dot_error: Color32,
+    /// The selection check: its fill and tick when checked, its fill and rim when not.
+    pub check_on: Color32,
+    pub check_mark: Color32,
+    pub check_off: Color32,
+    pub check_off_rim: Color32,
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -204,7 +215,7 @@ pub fn paint_media_card(
     }
 
     if input.features.ticks != Ticks::Off {
-        paint_selection_check(ui, thumb_rect, input.checked);
+        paint_selection_check(ui, thumb_rect, input.checked, style);
     }
     if input.features.top_right_marker {
         if let Some(marker) = input.top_right_marker {
@@ -266,18 +277,18 @@ pub fn paint_media_card(
     match dots {
         StatusDotsLayout::None => {}
         StatusDotsLayout::One => {
-            painter.circle_filled(egui::pos2(dx, text_y), 3.5, DOT_READY_GREEN);
+            painter.circle_filled(egui::pos2(dx, text_y), 3.5, style.dot_ready);
         }
         StatusDotsLayout::Two => {
             painter.circle_filled(
                 egui::pos2(dx, text_y),
                 3.5,
-                proxy_dot_color(input.status_proxy),
+                proxy_dot_color(input.status_proxy, style),
             );
             painter.circle_filled(
                 egui::pos2(dx + 10.0, text_y),
                 3.5,
-                original_dot_color(input.status_original),
+                original_dot_color(input.status_original, style),
             );
         }
     }
@@ -338,20 +349,21 @@ pub fn paint_clip_status(
     mode: StatusDotsMode,
     import_status: &str,
     imported_media_uri: &str,
+    style: &CardStyle,
 ) -> f32 {
     let layout = layout_for(mode, import_status);
     match layout {
         StatusDotsLayout::None => {}
         StatusDotsLayout::One => {
-            painter.circle_filled(left_center, 3.5, DOT_READY_GREEN);
+            painter.circle_filled(left_center, 3.5, style.dot_ready);
         }
         StatusDotsLayout::Two => {
             let (proxy, original) = pipeline_statuses(import_status, imported_media_uri);
-            painter.circle_filled(left_center, 3.5, proxy_dot_color(proxy));
+            painter.circle_filled(left_center, 3.5, proxy_dot_color(proxy, style));
             painter.circle_filled(
                 left_center + egui::vec2(10.0, 0.0),
                 3.5,
-                original_dot_color(original),
+                original_dot_color(original, style),
             );
         }
     }
@@ -382,14 +394,11 @@ fn status_dots_layout(input: &MediaCardInput<'_>) -> StatusDotsLayout {
     layout_for(input.features.status_dots, input.import_status)
 }
 
-// Status colours are semantic (ready / pending / error), not theme colours.
-const DOT_READY_GREEN: Color32 = Color32::from_rgb(0x30, 0xd1, 0x58);
-
-fn paint_selection_check(ui: &egui::Ui, thumb_rect: Rect, checked: bool) {
+fn paint_selection_check(ui: &egui::Ui, thumb_rect: Rect, checked: bool, style: &CardStyle) {
     let check_rect = selection_check_rect(thumb_rect);
     let painter = ui.painter_at(thumb_rect);
     if checked {
-        let fill = Color32::from_rgb(0xff, 0x95, 0x00);
+        let fill = style.check_on;
         painter.rect_filled(check_rect, 3.0, fill);
         painter.rect_stroke(
             check_rect,
@@ -398,7 +407,7 @@ fn paint_selection_check(ui: &egui::Ui, thumb_rect: Rect, checked: bool) {
             egui::StrokeKind::Inside,
         );
         let c = check_rect.center();
-        let dark = Color32::from_rgb(0x1a, 0x1a, 0x1a);
+        let dark = style.check_mark;
         painter.line_segment(
             [egui::pos2(c.x - 3.5, c.y), egui::pos2(c.x - 1.0, c.y + 3.0)],
             egui::Stroke::new(2.0, dark),
@@ -414,12 +423,12 @@ fn paint_selection_check(ui: &egui::Ui, thumb_rect: Rect, checked: bool) {
         painter.rect_filled(
             check_rect,
             3.0,
-            Color32::from_rgba_unmultiplied(0, 0, 0, 90),
+            style.check_off,
         );
         painter.rect_stroke(
             check_rect,
             3.0,
-            egui::Stroke::new(1.5, Color32::from_rgba_unmultiplied(255, 255, 255, 140)),
+            egui::Stroke::new(1.5, style.check_off_rim),
             egui::StrokeKind::Inside,
         );
     }
@@ -439,19 +448,19 @@ fn selection_check_rect(thumb_rect: Rect) -> Rect {
     )
 }
 
-fn proxy_dot_color(status: &str) -> Color32 {
+fn proxy_dot_color(status: &str, style: &CardStyle) -> Color32 {
     match status.trim().to_ascii_lowercase().as_str() {
-        "ready" => DOT_READY_GREEN,
-        "pending" => Color32::from_rgb(0xff, 0xd6, 0x0a),
-        _ => Color32::from_rgb(0xff, 0x45, 0x3a),
+        "ready" => style.dot_ready,
+        "pending" => style.dot_pending,
+        _ => style.dot_error,
     }
 }
 
-fn original_dot_color(status: &str) -> Color32 {
+fn original_dot_color(status: &str, style: &CardStyle) -> Color32 {
     match status.trim().to_ascii_lowercase().as_str() {
-        "ready" => Color32::from_rgb(0x0a, 0x84, 0xff),
-        "pending" => Color32::from_rgb(0xff, 0xd6, 0x0a),
-        _ => Color32::from_rgb(0xff, 0x45, 0x3a),
+        "ready" => style.dot_original_ready,
+        "pending" => style.dot_pending,
+        _ => style.dot_error,
     }
 }
 
