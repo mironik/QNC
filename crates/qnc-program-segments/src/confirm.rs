@@ -173,7 +173,7 @@ impl ProgramSegments {
             return false;
         };
         let text = qnc_ui_text::fill("story.msg.take_refused", &[("held", qnc_ui_text::text(held.name_key()))]);
-        self.alert = Some(qnc_alert::Alert::new(text.clone()));
+        self.alert = Some(qnc_notice::Alert::new(text.clone()));
         self.refresh_view(text);
         true
     }

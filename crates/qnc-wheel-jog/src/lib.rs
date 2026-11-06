@@ -11,6 +11,9 @@ use eframe::egui::{self, Rect, Ui};
 pub const MODULE_ID: &str = "qnc.module.wheel-jog";
 pub const VERSION: &str = env!("CARGO_PKG_VERSION");
 
+/// One wheel step and the actions of a panel's wheel (core: `qnc-edit-step`, docs/99).
+pub use qnc_edit_step::{Wheel, WheelActions};
+
 /// The wheel's direction is this computer's choice, read in the one step block
 /// (`qnc-edit-step`, user 2026-11-05: every timeline the same blocks).
 use qnc_edit_step::playhead_up_forward;
@@ -67,9 +70,6 @@ pub fn wheeled_with_right(ctx: &egui::Context) -> bool {
     ctx.data(|data| data.get_temp::<bool>(right_wheel_key())).unwrap_or(false)
 }
 
-/// The catalog actions of a panel's wheel: back and forward, then with Ctrl held.
-pub type WheelActions<'a> = ((&'a str, &'a str), (&'a str, &'a str));
-
 /// The wheel over a source timeline or its monitor, in every form (user 2026-10-16: the
 /// source timeline behaves the same everywhere).
 pub const SOURCE_ACTIONS: WheelActions<'static> =
@@ -87,25 +87,6 @@ pub fn source_step_forward(action_id: &str) -> Option<bool> {
         id if id == back => Some(!playhead_up_forward()),
         id if id == forward => Some(playhead_up_forward()),
         _ => None,
-    }
-}
-
-/// One wheel step: away from the user (`up`) or toward, with Ctrl (Cmd) held or not.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct Wheel {
-    pub up: bool,
-    pub ctrl: bool,
-}
-
-impl Wheel {
-    /// Its catalog action: forward for up, the Ctrl pair with Ctrl.
-    pub fn action<'a>(self, ((back, forward), (ctrl_back, ctrl_forward)): WheelActions<'a>) -> &'a str {
-        match (self.ctrl, self.up) {
-            (false, false) => back,
-            (false, true) => forward,
-            (true, false) => ctrl_back,
-            (true, true) => ctrl_forward,
-        }
     }
 }
 

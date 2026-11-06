@@ -15,6 +15,6 @@ qnc-player-client = { workspace = true }
 qnc-player-input = { workspace = true }
 qnc-source-bindings = { workspace = true }
 qnc-source-preview = { workspace = true }
-qnc-timeline = { workspace = true }
+qnc-timeline-model = { workspace = true }
 qnc-timeline-assets = { workspace = true }
 qnc-work-settings = { workspace = true }

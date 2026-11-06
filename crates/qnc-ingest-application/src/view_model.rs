@@ -4,7 +4,7 @@ use super::*;
 pub struct IngestViewModel {
     /// Selected clips are in the way of what the project uses: the user chooses (user 2026-10-23).
     #[serde(skip)]
-    pub import_choice: Option<qnc_choice_box::Choice>,
+    pub import_choice: Option<qnc_notice::Choice>,
     /// The panel the keyboard acts on, the dock button and the last card grid step.
     #[serde(skip)]
     pub focus: qnc_focus_walk::WalkView,

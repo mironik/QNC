@@ -6,7 +6,7 @@
 //! opens with that mark taken, so the arrows move it at once. Local UI state only: the
 //! database stays the truth.
 
-use qnc_timeline::{TimelineProjection, TimelineSourceMarkFocus};
+use qnc_timeline_model::{TimelineProjection, TimelineSourceMarkFocus};
 
 /// IN/OUT waiting for their clip, and the mark to take (`Some(true)` IN, `Some(false)` OUT).
 #[derive(Debug, Clone, Default, PartialEq, Eq)]

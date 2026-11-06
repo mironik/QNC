@@ -10,7 +10,7 @@ qnc-clip-transcripts = { workspace = true }
 qnc-db-broker = { workspace = true }
 qnc-source-preview = { workspace = true }
 qnc-source-timecode = { workspace = true }
-qnc-timeline = { workspace = true }
+qnc-timeline-model = { workspace = true }
 qnc-transcribe-queue = { workspace = true }
 qnc-transcript-db = { workspace = true }
 qnc-ui-text = { workspace = true }

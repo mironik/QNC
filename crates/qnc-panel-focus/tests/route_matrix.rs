@@ -5,7 +5,7 @@
 use qnc_panel_focus::{FocusLayout, Panel, PanelFocus};
 use qnc_program_segments::ProgramSegments;
 use qnc_source_preview::SourcePreview;
-use qnc_timeline::TimelineProjection;
+use qnc_timeline_model::TimelineProjection;
 use qnc_wrap_session::WrapSession;
 
 const ACTIONS: &str = include_str!("route_matrix.actions");

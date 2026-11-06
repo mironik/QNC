@@ -6,7 +6,7 @@ description = "QNC public component: Uvezi in Ingest (the selection checked and 
 
 [dependencies]
 qnc-ui-text = { workspace = true }
-qnc-choice-box = { workspace = true }
+qnc-notice = { workspace = true }
 qnc-clip-row = { workspace = true }
 qnc-import-fit = { workspace = true }
 qnc-ingest-import-worker = { workspace = true }

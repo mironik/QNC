@@ -7,7 +7,7 @@ use eframe::egui::{self, Align, Layout, Rect, Ui};
 use qnc_editorial_application::{EditorialIntent, EditorialView, LibraryTab};
 use qnc_editorial_layout::{theme::Theme, EditorialContracts};
 use qnc_media_card::{CardGridAction, CardMetrics, StatusDotsMode, Ticks};
-use qnc_panel_focus::{paint_focus, Panel};
+use {qnc_panel_focus::Panel, qnc_ui_kit::paint_focus};
 use qnc_timeline::TimelineIntent;
 
 /// Media Assist and Story on the one desktop board: preview in the monitor, pool tabs and

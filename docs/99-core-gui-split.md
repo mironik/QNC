@@ -116,3 +116,14 @@ Ako se zeli i fizicka podjela, moze biti direktorij (`crates/core/*`, `crates/gu
 
 Svaki korak: testovi dotaknutih kocki, zlatne tablice tipki i misa nepromijenjene, conformance,
 zapis u AGENTS.md. Koraci 1-3 ne mijenjaju ponasanje.
+
+## 4. Izvedeno
+
+- Korak 1 (2026-11-06): conformance C14 "core piece pulls egui", 36 veza u baselineu.
+- Korak 2 (2026-11-06): nove core kocke `qnc-timeline-model` (projekcija, fokus oznake, trake, namjere
+  timelinea), `qnc-notice` (`Alert`, `Choice`), `qnc-monitor-state` (stanje monitora, Auto/On),
+  `qnc-desktop-entry` (`DesktopApplicationRef`); `Wheel`/`WheelActions` u `qnc-edit-step`; `LaneKey`,
+  `lane_key`, `lane_message` u `qnc-lane-choice`; `Follow` u `qnc-source-preview`; ponovni izvoz
+  `paint_focus` uklonjen iz `qnc-panel-focus`. UI kocke ponovno izvoze premjestene tipove. C14: 36 -> 11.
+  Ostaju veze na `qnc-source-timeline`, `qnc-focus-walk`, `qnc-keyboard-shortcut`, `qnc-newsroom-sheet`
+  i popis ekrana iz `qnc-program-output` (korak 3).

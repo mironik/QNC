@@ -1,0 +1,7 @@
+[package]
+name = "qnc-monitor-state"
+version = "0.1.0"
+edition = "2021"
+description = "QNC public piece (core): what a monitor shows (the confirmed picture of the player, a message) and the Auto/On choice of the application. No egui: qnc-monitor draws it."
+
+[dependencies]

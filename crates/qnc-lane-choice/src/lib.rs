@@ -13,6 +13,9 @@
 
 use std::time::{Duration, Instant};
 
+mod keys;
+pub use keys::{lane_key, lane_message, LaneKey};
+
 /// The lowest and highest level of a lane, in dB (the player takes up to four times).
 pub const MIN_LEVEL_DB: i8 = -40;
 pub const MAX_LEVEL_DB: i8 = 12;

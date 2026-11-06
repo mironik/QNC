@@ -238,7 +238,7 @@ pub struct ProgramSegments {
     /// A taken sound let go by another take (`let_go_edits`), until the panel asks.
     sound_dropped: bool,
     /// The last refused take (`confirm.rs` `refused`), shown by `qnc-alert`.
-    alert: Option<qnc_alert::Alert>,
+    alert: Option<qnc_notice::Alert>,
     /// The slot shown enlarged in the place of the source timeline (`zoom.rs`).
     zoom_slot: Option<zoom::ZoomOn>,
     /// What Talking Head, Voice over and covers take from the source view.

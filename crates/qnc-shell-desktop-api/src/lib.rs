@@ -15,12 +15,8 @@ impl DesktopNavigation {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct DesktopApplicationRef {
-    pub application_id: String,
-    pub tab_id: String,
-    pub priority_group: String,
-}
+/// An application the desktop can host (core: `qnc-desktop-entry`, docs/99).
+pub use qnc_desktop_entry::DesktopApplicationRef;
 
 pub trait ShellDesktopApp {
     fn show_desktop(&mut self, ctx: &egui::Context, ui: &mut egui::Ui);

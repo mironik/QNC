@@ -3396,6 +3396,7 @@ name = "qnc-alert"
 version = "0.1.0"
 dependencies = [
  "eframe",
+ "qnc-notice",
 ]
 
 [[package]]
@@ -3662,6 +3663,7 @@ version = "0.1.0"
 dependencies = [
  "eframe",
  "qnc-desktop-theme",
+ "qnc-notice",
  "qnc-theme-styles",
  "qnc-ui-kit",
 ]
@@ -3900,12 +3902,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "qnc-desktop-entry"
+version = "0.1.0"
+
+[[package]]
 name = "qnc-desktop-tabs"
 version = "0.1.0"
 dependencies = [
  "qnc-active-project-read",
  "qnc-application-sequence",
- "qnc-shell-desktop-api",
+ "qnc-desktop-entry",
 ]
 
 [[package]]
@@ -4308,7 +4314,7 @@ name = "qnc-gesture-steps"
 version = "0.1.0"
 dependencies = [
  "qnc-dev-diagnostics",
- "qnc-wheel-jog",
+ "qnc-edit-step",
  "serde_json",
 ]
 
@@ -4357,7 +4363,6 @@ dependencies = [
  "image",
  "qnc-application-sequence",
  "qnc-camera-adapter",
- "qnc-choice-box",
  "qnc-clip-posters",
  "qnc-clip-row",
  "qnc-content-store",
@@ -4377,14 +4382,15 @@ dependencies = [
  "qnc-ingest-store",
  "qnc-ingest-work-plan",
  "qnc-media-thumbnail",
+ "qnc-notice",
  "qnc-playback-priority",
  "qnc-player-client",
  "qnc-source-browse",
  "qnc-source-panel",
  "qnc-source-reader",
  "qnc-source-timeline",
- "qnc-timeline",
  "qnc-timeline-assets",
+ "qnc-timeline-model",
  "qnc-ui-text",
  "qnc-work-settings",
  "rusqlite",
@@ -4491,12 +4497,12 @@ dependencies = [
 name = "qnc-ingest-import-run"
 version = "0.1.0"
 dependencies = [
- "qnc-choice-box",
  "qnc-clip-row",
  "qnc-content-store",
  "qnc-import-fit",
  "qnc-ingest-import-worker",
  "qnc-ingest-selection-write",
+ "qnc-notice",
  "qnc-ui-text",
  "qnc-work-settings",
 ]
@@ -4566,8 +4572,8 @@ dependencies = [
  "qnc-source-bindings",
  "qnc-source-preview",
  "qnc-source-timeline",
- "qnc-timeline",
  "qnc-timeline-assets",
+ "qnc-timeline-model",
  "qnc-ui-text",
  "qnc-work-settings",
 ]
@@ -4648,10 +4654,10 @@ dependencies = [
 name = "qnc-ingest-selection-write"
 version = "0.1.0"
 dependencies = [
- "qnc-choice-box",
  "qnc-clip-row",
  "qnc-content-store",
  "qnc-import-fit",
+ "qnc-notice",
  "qnc-ui-text",
 ]
 
@@ -4780,7 +4786,7 @@ dependencies = [
  "qnc-source-mark-focus",
  "qnc-source-panel",
  "qnc-source-preview",
- "qnc-timeline",
+ "qnc-timeline-model",
 ]
 
 [[package]]
@@ -4799,6 +4805,7 @@ name = "qnc-lane-choice"
 version = "0.1.0"
 dependencies = [
  "qnc-gain",
+ "qnc-ui-text",
 ]
 
 [[package]]
@@ -5185,6 +5192,7 @@ name = "qnc-monitor"
 version = "0.1.0"
 dependencies = [
  "eframe",
+ "qnc-monitor-state",
  "qnc-ui-kit",
  "qnc-ui-text",
 ]
@@ -5200,6 +5208,10 @@ dependencies = [
  "qnc-program-output",
  "qnc-theme-styles",
 ]
+
+[[package]]
+name = "qnc-monitor-state"
+version = "0.1.0"
 
 [[package]]
 name = "qnc-mouse-map"
@@ -5273,6 +5285,10 @@ dependencies = [
 ]
 
 [[package]]
+name = "qnc-notice"
+version = "0.1.0"
+
+[[package]]
 name = "qnc-paint-pace"
 version = "0.1.0"
 dependencies = [
@@ -5306,9 +5322,8 @@ dependencies = [
  "qnc-source-preview",
  "qnc-source-timeline",
  "qnc-sync-session",
- "qnc-timeline",
+ "qnc-timeline-model",
  "qnc-transcript",
- "qnc-ui-kit",
  "qnc-wrap-session",
 ]
 
@@ -5323,7 +5338,7 @@ dependencies = [
 name = "qnc-pending-marks"
 version = "0.1.0"
 dependencies = [
- "qnc-timeline",
+ "qnc-timeline-model",
 ]
 
 [[package]]
@@ -5481,7 +5496,7 @@ name = "qnc-player-timeline"
 version = "0.1.0"
 dependencies = [
  "qnc-player-contract",
- "qnc-timeline",
+ "qnc-timeline-model",
 ]
 
 [[package]]
@@ -5703,7 +5718,6 @@ dependencies = [
 name = "qnc-program-segments"
 version = "0.1.0"
 dependencies = [
- "qnc-alert",
  "qnc-content-store",
  "qnc-db-broker",
  "qnc-dev-diagnostics",
@@ -5714,6 +5728,7 @@ dependencies = [
  "qnc-image-assets",
  "qnc-lane-choice",
  "qnc-level-curve",
+ "qnc-notice",
  "qnc-part-sound",
  "qnc-prerender-launch",
  "qnc-program-commands",
@@ -5736,10 +5751,10 @@ dependencies = [
 name = "qnc-program-view"
 version = "0.1.0"
 dependencies = [
- "qnc-alert",
  "qnc-export-choice",
  "qnc-image-assets",
  "qnc-level-curve",
+ "qnc-notice",
  "qnc-program-commands",
  "qnc-program-db",
  "qnc-program-filmstrip",
@@ -6046,7 +6061,7 @@ dependencies = [
  "qnc-source-timecode",
  "qnc-status-line",
  "qnc-subsegment-edit",
- "qnc-timeline",
+ "qnc-timeline-model",
  "qnc-transcript",
  "qnc-transcript-db",
  "qnc-ui-text",
@@ -6186,11 +6201,11 @@ version = "0.1.0"
 dependencies = [
  "qnc-edit-step",
  "qnc-edit-words",
+ "qnc-lane-choice",
  "qnc-match-frame",
  "qnc-program-segments",
  "qnc-source-preview",
  "qnc-source-timeline",
- "qnc-timeline",
  "qnc-wrap-session",
 ]
 
@@ -6239,6 +6254,7 @@ version = "0.1.0"
 dependencies = [
  "eframe",
  "qnc-board",
+ "qnc-desktop-entry",
  "qnc-status-line",
  "qnc-ui-text",
 ]
@@ -6256,10 +6272,10 @@ dependencies = [
 name = "qnc-short-save"
 version = "0.1.0"
 dependencies = [
- "qnc-choice-box",
  "qnc-clip-row",
  "qnc-db-broker",
  "qnc-dev-diagnostics",
+ "qnc-notice",
  "qnc-ui-text",
  "qnc-virtual-short-cards",
  "qnc-virtual-shots",
@@ -6346,7 +6362,7 @@ dependencies = [
  "qnc-skeleton-versions",
  "qnc-source-preview",
  "qnc-source-timecode",
- "qnc-timeline",
+ "qnc-timeline-model",
  "qnc-transcript",
 ]
 
@@ -6516,7 +6532,7 @@ name = "qnc-source-mark-focus"
 version = "0.1.0"
 dependencies = [
  "qnc-edit-edge",
- "qnc-timeline",
+ "qnc-timeline-model",
  "qnc-ui-text",
 ]
 
@@ -6527,7 +6543,7 @@ dependencies = [
  "qnc-edit-step",
  "qnc-source-mark-focus",
  "qnc-source-preview",
- "qnc-timeline",
+ "qnc-timeline-model",
 ]
 
 [[package]]
@@ -6540,7 +6556,7 @@ dependencies = [
  "qnc-dev-diagnostics",
  "qnc-filmstrip",
  "qnc-gain",
- "qnc-monitor",
+ "qnc-monitor-state",
  "qnc-playback-activity",
  "qnc-player-client",
  "qnc-player-clip-content",
@@ -6548,12 +6564,11 @@ dependencies = [
  "qnc-player-input",
  "qnc-player-launcher",
  "qnc-player-timeline",
- "qnc-pool-pointer",
  "qnc-program-input",
  "qnc-source-bindings",
  "qnc-still-locator",
- "qnc-timeline",
  "qnc-timeline-assets",
+ "qnc-timeline-model",
  "qnc-ui-text",
  "qnc-wave",
  "qnc-work-settings",
@@ -6677,6 +6692,7 @@ dependencies = [
  "qnc-edit-step",
  "qnc-edit-verbs",
  "qnc-edit-words",
+ "qnc-lane-choice",
  "qnc-program-filmstrip",
  "qnc-program-view",
  "qnc-program-waveform",
@@ -6684,7 +6700,6 @@ dependencies = [
  "qnc-script-draft",
  "qnc-source-preview",
  "qnc-source-timecode",
- "qnc-timeline",
  "qnc-trim-stills",
  "qnc-ui-text",
 ]
@@ -6755,6 +6770,7 @@ dependencies = [
  "qnc-lane-choice",
  "qnc-mouse-map",
  "qnc-snap",
+ "qnc-timeline-model",
  "qnc-touch-gestures",
  "qnc-touchpad",
  "qnc-ui-kit",
@@ -6781,6 +6797,13 @@ dependencies = [
  "qnc-media-records",
  "qnc-ui-text",
  "qnc-wave",
+]
+
+[[package]]
+name = "qnc-timeline-model"
+version = "0.1.0"
+dependencies = [
+ "qnc-edit-step",
 ]
 
 [[package]]
@@ -6881,7 +6904,7 @@ dependencies = [
  "qnc-db-broker",
  "qnc-source-preview",
  "qnc-source-timecode",
- "qnc-timeline",
+ "qnc-timeline-model",
  "qnc-transcribe-queue",
  "qnc-transcript-db",
  "qnc-ui-text",

@@ -4,7 +4,7 @@
 //! arrow), `level` Ctrl+wheel (the level of a taken A1/A2 sound), `none` nothing. The
 //! movement is added up by role, a whole step at a time, one step a frame in order.
 
-use qnc_wheel_jog::Wheel;
+use qnc_edit_step::Wheel;
 
 pub const MODULE_ID: &str = "qnc.module.gesture-steps";
 pub const VERSION: &str = env!("CARGO_PKG_VERSION");

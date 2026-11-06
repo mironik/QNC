@@ -4,7 +4,7 @@
 //! player process, or application workflow.
 
 use qnc_player_contract::{BroadcastPlayerProtocolEvent as PlayerEvent, envelope::EventEnvelope};
-use qnc_timeline::TimelineProjection;
+use qnc_timeline_model::TimelineProjection;
 
 pub const MODULE_ID: &str = "qnc.module.player-timeline";
 pub const VERSION: &str = env!("CARGO_PKG_VERSION");

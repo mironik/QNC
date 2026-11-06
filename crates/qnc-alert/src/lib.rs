@@ -5,13 +5,11 @@
 //! was raised come from the caller; this piece decides and remembers nothing.
 
 use eframe::egui::{self, Align2, Color32, FontId, Sense, Stroke, StrokeKind, Vec2};
-use std::time::{Duration, Instant};
+use std::time::Instant;
 
 pub const MODULE_ID: &str = "qnc.module.alert";
 pub const VERSION: &str = env!("CARGO_PKG_VERSION");
 
-/// How long a warning stays on the screen.
-pub const SHOWN: Duration = Duration::from_millis(3500);
 
 const TEXT_SIZE: f32 = 20.0;
 const PAD: Vec2 = Vec2::new(22.0, 12.0);
@@ -19,23 +17,8 @@ const TOP: f32 = 48.0;
 /// The share of the screen width the band may take.
 const SCREEN_SHARE: f32 = 0.8;
 
-/// A warning: its text and when it was raised.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct Alert {
-    pub text: String,
-    pub raised: Instant,
-}
-
-impl Alert {
-    pub fn new(text: impl Into<String>) -> Self {
-        Self { text: text.into(), raised: Instant::now() }
-    }
-
-    /// Whether it is still on the screen at `now`.
-    pub fn shown_at(&self, now: Instant) -> bool {
-        now.saturating_duration_since(self.raised) < SHOWN
-    }
-}
+/// The warning and how long it is shown (core: `qnc-notice`, docs/99).
+pub use qnc_notice::{Alert, SHOWN};
 
 /// Shows `alert` over everything while it is on the screen, in `fill` with `text` letters;
 /// asks for a repaint when it is to go.
@@ -64,6 +47,7 @@ pub fn show(ctx: &egui::Context, alert: Option<&Alert>, fill: Color32, text: Col
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::time::Duration;
 
     #[test]
     fn a_warning_is_shown_for_a_while_then_goes() {

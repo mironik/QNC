@@ -12,5 +12,5 @@ qnc-script = { workspace = true }
 qnc-skeleton-versions = { workspace = true }
 qnc-source-preview = { workspace = true }
 qnc-source-timecode = { workspace = true }
-qnc-timeline = { workspace = true }
+qnc-timeline-model = { workspace = true }
 qnc-transcript = { workspace = true }

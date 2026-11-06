@@ -8,7 +8,7 @@ use qnc_ingest_select as selection;
 use qnc_ingest_select::selection_config;
 use qnc_ingest_store::IngestStore;
 pub use qnc_ingest_work_plan::{IngestMedia, IngestWorkPlan, PlaybackInput};
-use qnc_timeline::{TimelineIntent, TimelineProjection};
+use qnc_timeline_model::{TimelineIntent, TimelineProjection};
 use qnc_timeline_assets::SourceTimelineAssets;
 use serde::{Deserialize, Serialize};
 

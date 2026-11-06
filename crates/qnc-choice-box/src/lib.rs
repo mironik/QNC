@@ -12,27 +12,8 @@ pub const VERSION: &str = env!("CARGO_PKG_VERSION");
 const WIDTH: f32 = 560.0;
 const ITEMS_HEIGHT: f32 = 160.0;
 
-/// What the box shows.
-#[derive(Debug, Clone, Default, PartialEq, Eq)]
-pub struct Choice {
-    pub title: String,
-    /// What is in the way.
-    pub message: String,
-    /// What it is about (clip names), one per line.
-    pub items: Vec<String>,
-    /// How it can be solved.
-    pub solution: String,
-    pub options: Vec<ChoiceOption>,
-}
-
-/// One option: a catalog action and its label.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct ChoiceOption {
-    pub action_id: String,
-    pub label: String,
-    /// The proposed one.
-    pub strong: bool,
-}
+/// What the box shows and its options (core: `qnc-notice`, docs/99).
+pub use qnc_notice::{Choice, ChoiceOption};
 
 /// Shows `choice` in the middle of the screen over everything; the action of the option the
 /// user clicked.

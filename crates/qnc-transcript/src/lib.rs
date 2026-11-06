@@ -16,7 +16,7 @@ use qnc_clip_row::ClipRow;
 pub use qnc_clip_transcripts::ClipTranscripts;
 use qnc_db_broker::ProjectDbTarget;
 use qnc_source_preview::SourcePreview;
-use qnc_timeline::TimelineProjection;
+use qnc_timeline_model::TimelineProjection;
 use qnc_transcribe_queue::{Heard, Progress, QueueRunner, Queued};
 pub use qnc_transcribe_queue::{QueueQuality, QueueState};
 pub use qnc_transcript_db::{ClipTranscript, Line, Quote, Word};

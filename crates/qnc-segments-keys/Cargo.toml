@@ -11,5 +11,5 @@ qnc-match-frame = { workspace = true }
 qnc-program-segments = { workspace = true }
 qnc-source-preview = { workspace = true }
 qnc-source-timeline = { workspace = true }
-qnc-timeline = { workspace = true }
+qnc-lane-choice = { workspace = true }
 qnc-wrap-session = { workspace = true }

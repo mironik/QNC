@@ -8160,3 +8160,12 @@ preko UI paketa (najvise zbog tipova `qnc-timeline`: `TimelineProjection`, `Lane
 prijepisa, kanal povlacenja markera kroz `ctx`); poll aplikacije tece iz petlje crtanja (`qnc-form-host`). Prijedlog:
 ne dva monolitna paketa (AGENTS 0.11, 12), nego pravilo slojeva core/gui s conformance provjerom i dijeljenje
 mjesovitih kocki na `qnc-x` + `qnc-x-view`; pet koraka od najmanje rizicnog. Kod nije mijenjan.
+Izvedeno 2026-11-06 (korisnik: "da, pushaj i kreni s koracima 1 i 2", docs/99): korak 2, cisti tipovi iz UI kocki u core
+kocke (samo premjestanje, UI kocka ih ponovno izvozi, ponasanje isto). Nove kocke (s ugovorima modula):
+`crates/qnc-timeline-model` (`TimelineProjection`, `TimelineSourceMarkFocus`, `AudioLane`, `TimelineIntent`),
+`crates/qnc-notice` (`Alert`, `Choice`, `ChoiceOption`; crtanje ostaje u `qnc-alert` i `qnc-choice-box`),
+`crates/qnc-monitor-state` (`MonitorFrame`, `MonitorState`, Auto/On), `crates/qnc-desktop-entry`
+(`DesktopApplicationRef`). `Wheel` i `WheelActions` u `qnc-edit-step`; `LaneKey`, `lane_key`, `lane_message` u
+`qnc-lane-choice`; `Follow` u `qnc-source-preview`; `qnc-panel-focus` vise ne izvozi `qnc_ui_kit::paint_focus`.
+Logicke kocke (prica, scenarij, preview, Ingest) koriste core kocke umjesto UI kocki. C14 baseline 36 -> 11 veza.
+Testovi 25 dotaknutih kocki (i zlatna tablica tipki), conformance. Uzivo nije provjereno.

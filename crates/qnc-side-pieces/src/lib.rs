@@ -13,7 +13,7 @@ use qnc_script::{Script, ScriptView};
 use qnc_skeleton_versions::{SkeletonVersions, VersionsView};
 use qnc_source_preview::SourcePreview;
 use qnc_source_timecode::SourceTimecode;
-use qnc_timeline::TimelineProjection;
+use qnc_timeline_model::TimelineProjection;
 use qnc_transcript::{ClipTranscripts, Transcript, TranscriptView};
 
 pub const MODULE_ID: &str = "qnc.module.side-pieces";

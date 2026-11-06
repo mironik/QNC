@@ -1,0 +1,20 @@
+{
+  "module_id": "qnc.module.notice",
+  "module_name": "Notice",
+  "module_version": "0.1.0",
+  "module_kind": "library",
+  "capabilities": ["ui.notice.model"],
+  "input_contract_version": "0.1.0",
+  "output_contract_version": "0.1.0",
+  "supported_os": ["windows", "linux", "macos"],
+  "supported_cpu": ["x86_64", "aarch64"],
+  "transport_protocol_version": "0.1.0",
+  "forbidden_calls": ["ffprobe", "media.decode", "database.read", "database.write", "player.command", "business.workflow"],
+  "forbidden_dependencies": ["qnc.module.media-probe"],
+  "state_policy": "stateless",
+  "database_write_policy": "no_db_writes",
+  "runtime_crate": "qnc-notice",
+  "input": "A warning's text, or a question's title, message, items, solution and options (catalog actions).",
+  "output": "The warning (shown for a while) and the question the gui pieces qnc-alert and qnc-choice-box draw.",
+  "specification": "docs/99 step 2: a core piece without egui, moved out of a gui piece that re-exports it; the logic that uses it builds and is tested without a window."
+}

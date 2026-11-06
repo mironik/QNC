@@ -7,4 +7,4 @@ description = "QNC public block: which applications the desktop launch bar shows
 [dependencies]
 qnc-active-project-read = { workspace = true }
 qnc-application-sequence = { workspace = true }
-qnc-shell-desktop-api = { workspace = true }
+qnc-desktop-entry = { workspace = true }

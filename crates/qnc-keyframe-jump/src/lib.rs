@@ -5,7 +5,7 @@
 
 use qnc_program_segments::ProgramSegments;
 use qnc_source_preview::SourcePreview;
-use qnc_timeline::TimelineProjection;
+use qnc_timeline_model::TimelineProjection;
 
 pub const MODULE_ID: &str = "qnc.module.keyframe-jump";
 pub const VERSION: &str = env!("CARGO_PKG_VERSION");

@@ -11,7 +11,7 @@ use qnc_work_settings::{SettingsReader, WorkSettings};
 #[derive(Debug, Clone, PartialEq)]
 pub struct PreviewView {
     pub playback: qnc_player_client::View,
-    pub timeline: qnc_timeline::TimelineProjection,
+    pub timeline: qnc_timeline_model::TimelineProjection,
     pub assets: SourceTimelineAssets,
     /// What the monitor shows (the monitor panel's input).
     pub monitor: MonitorState,
@@ -22,7 +22,7 @@ pub struct PreviewView {
 pub struct Shown {
     pub playback: qnc_player_client::View,
     pub monitor: MonitorState,
-    pub timeline: qnc_timeline::TimelineProjection,
+    pub timeline: qnc_timeline_model::TimelineProjection,
     pub assets: SourceTimelineAssets,
     pub source_timeline: qnc_source_timeline::SourceTimelineView,
 }
@@ -98,7 +98,7 @@ impl IngestPreviewSource {
     pub fn shown<'a>(
         &mut self,
         clip: Option<&str>,
-        previous: &qnc_timeline::TimelineProjection,
+        previous: &qnc_timeline_model::TimelineProjection,
         posters: impl IntoIterator<Item = (&'a str, Option<&'a qnc_image_assets::RgbaImage>)>,
         catalog: Option<&ContentTarget>,
     ) -> Shown {
@@ -116,20 +116,20 @@ impl IngestPreviewSource {
 
     /// The A1/A2 lanes and marks of the source timeline (Ctrl+1/2, a taken lane, a channel click);
     /// `None`: not the source timeline's action.
-    pub fn route_input(&mut self, action_id: &str, value: Option<i64>, timeline: &mut qnc_timeline::TimelineProjection) -> Option<bool> {
+    pub fn route_input(&mut self, action_id: &str, value: Option<i64>, timeline: &mut qnc_timeline_model::TimelineProjection) -> Option<bool> {
         self.source_timeline.route_input(action_id, value, &mut self.preview, timeline)
     }
 
     /// A key of the source timeline or a click on it (`timeline_cue_frame` with its frame);
     /// `Ok(None)`: nothing to do. Without a player only Escape still lets go of what is taken.
-    pub fn route(&mut self, action_id: &str, frame: Option<i64>, timeline: &mut qnc_timeline::TimelineProjection) -> Result<Option<bool>, String> {
+    pub fn route(&mut self, action_id: &str, frame: Option<i64>, timeline: &mut qnc_timeline_model::TimelineProjection) -> Result<Option<bool>, String> {
         if !self.preview.has_player() && action_id != "clear_focus" {
             return Err(qnc_ui_text::text("player.broadcast_player_connected").into());
         }
         if action_id == "timeline_cue_frame" {
             return match frame {
                 Some(frame) if frame >= 0 => {
-                    let cue = qnc_timeline::TimelineIntent::CueFrame(frame as u64);
+                    let cue = qnc_timeline_model::TimelineIntent::CueFrame(frame as u64);
                     Ok(Some(self.source_timeline.cue(&cue, &mut self.preview)))
                 }
                 _ => Err(qnc_ui_text::text("ingest.msg.invalid_frame").into()),

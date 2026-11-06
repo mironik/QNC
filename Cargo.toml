@@ -50,6 +50,10 @@ members = [
     "crates/qnc-content-store",
     "crates/qnc-timeline-assets",
     "crates/qnc-timeline",
+    "crates/qnc-timeline-model",
+    "crates/qnc-notice",
+    "crates/qnc-monitor-state",
+    "crates/qnc-desktop-entry",
     "crates/qnc-media-stream",
     "crates/qnc-media-card",
     "crates/qnc-media-decode",
@@ -361,6 +365,10 @@ qnc-content-artifacts = { path = "crates/qnc-content-artifacts" }
 qnc-content-store = { path = "crates/qnc-content-store" }
 qnc-timeline-assets = { path = "crates/qnc-timeline-assets" }
 qnc-timeline = { path = "crates/qnc-timeline" }
+qnc-timeline-model = { path = "crates/qnc-timeline-model" }
+qnc-notice = { path = "crates/qnc-notice" }
+qnc-monitor-state = { path = "crates/qnc-monitor-state" }
+qnc-desktop-entry = { path = "crates/qnc-desktop-entry" }
 qnc-media-stream = { path = "crates/qnc-media-stream" }
 qnc-media-card = { path = "crates/qnc-media-card" }
 qnc-media-decode = { path = "crates/qnc-media-decode" }

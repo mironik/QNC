@@ -8,5 +8,5 @@ description = "QNC public component: writes the selected flag of clips through t
 qnc-ui-text = { workspace = true }
 qnc-content-store = { workspace = true }
 qnc-import-fit = { workspace = true }
-qnc-choice-box = { workspace = true }
+qnc-notice = { workspace = true }
 qnc-clip-row = { workspace = true }

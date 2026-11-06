@@ -9,6 +9,7 @@
 
 mod content;
 mod still_media;
+mod pointed;
 pub use qnc_still_locator::{LocatedPicture, StillLocator};
 
 use std::{sync::Arc, time::{Duration, Instant}};
@@ -19,7 +20,7 @@ use qnc_player_input::{InputReader, PlayerContentRead, ProgramInput};
 use qnc_player_launcher::SourceTransportBinding;
 pub use qnc_program_input::{PieceInput, SoundDraft};
 use qnc_source_bindings::{SourceBinding, TransportBindings};
-use qnc_timeline::{TimelineIntent, TimelineProjection};
+use qnc_timeline_model::{TimelineIntent, TimelineProjection};
 use qnc_timeline_assets::{
     SourceTimelineAssets, TimelineArtifactRead, TimelineAssetContext, TimelineAssetReader,
 };
@@ -66,7 +67,7 @@ impl PreviewView {
     }
 }
 
-pub use qnc_monitor::{MonitorFrame, MonitorState, MONITOR_AUTO, MONITOR_ON};
+pub use qnc_monitor_state::{MonitorFrame, MonitorState, MONITOR_AUTO, MONITOR_ON};
 
 impl Default for PreviewView {
     fn default() -> Self {
@@ -222,7 +223,7 @@ pub struct SourcePreview {
     /// still makes them (one read a second; every form the same, user 2026-10-17).
     assets_again_at: Option<Instant>,
     /// The clip the media pool pointed at last (its assets asked once).
-    pointed: qnc_pool_pointer::Follow,
+    pointed: pointed::Follow,
     play_when_ready: bool,
     /// The last frame step, cue or Play of the user: the machine is theirs a while after.
     touched: Option<std::time::Instant>,
@@ -293,7 +294,7 @@ impl Default for SourcePreview {
             player_view: PlayerView::default(),
             timeline_assets: TimelineAssetReader::default(),
             assets_again_at: None,
-            pointed: qnc_pool_pointer::Follow::default(),
+            pointed: pointed::Follow::default(),
             play_when_ready: false,
             touched: None,
             pausing: false,
@@ -330,7 +331,7 @@ impl SourcePreview {
     /// Monitor Auto or On (the switch under the monitor), one choice for every monitor
     /// (`qnc-monitor`); false for any other action.
     pub fn set_monitor_mode(&mut self, action_id: &str) -> bool {
-        qnc_monitor::choose(action_id)
+        qnc_monitor_state::choose(action_id)
     }
 
     pub fn view(&self) -> &PreviewView {

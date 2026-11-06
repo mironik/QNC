@@ -16,7 +16,7 @@ qnc-script-export = { workspace = true }
 qnc-status-line = { workspace = true }
 qnc-source-preview = { workspace = true }
 qnc-source-timecode = { workspace = true }
-qnc-timeline = { workspace = true }
+qnc-timeline-model = { workspace = true }
 qnc-transcript = { workspace = true }
 qnc-transcript-db = { workspace = true }
 qnc-letter-db = { workspace = true }

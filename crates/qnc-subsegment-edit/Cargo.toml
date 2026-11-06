@@ -19,6 +19,6 @@ qnc-script-db = { workspace = true }
 qnc-script-draft = { workspace = true }
 qnc-source-preview = { workspace = true }
 qnc-source-timecode = { workspace = true }
-qnc-timeline = { workspace = true }
+qnc-lane-choice = { workspace = true }
 qnc-trim-stills = { workspace = true }
 qnc-ui-text = { workspace = true }

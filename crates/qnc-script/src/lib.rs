@@ -26,7 +26,7 @@ use qnc_clip_row::ClipRow;
 use qnc_db_broker::ProjectDbTarget;
 use qnc_source_preview::SourcePreview;
 use qnc_source_timecode::SourceTimecode;
-use qnc_timeline::TimelineProjection;
+use qnc_timeline_model::TimelineProjection;
 use qnc_transcript::TranscriptView;
 use qnc_voice_take::{Recorded, Take};
 

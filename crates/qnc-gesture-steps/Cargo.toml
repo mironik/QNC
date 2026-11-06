@@ -6,5 +6,5 @@ description = "QNC public block: the roles of a gesture (jog, level, none) and i
 
 [dependencies]
 qnc-dev-diagnostics = { workspace = true }
-qnc-wheel-jog = { workspace = true }
+qnc-edit-step = { workspace = true }
 serde_json = { workspace = true }

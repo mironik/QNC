@@ -6,7 +6,7 @@
 //! which source frame the player should cue; it plays nothing.
 
 use qnc_edit_edge::{Edge, Range};
-use qnc_timeline::{TimelineProjection, TimelineSourceMarkFocus};
+use qnc_timeline_model::{TimelineProjection, TimelineSourceMarkFocus};
 
 /// What a key did: the source frame to cue, or only a change of the marks.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

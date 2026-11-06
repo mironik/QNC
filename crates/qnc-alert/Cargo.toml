@@ -5,4 +5,5 @@ edition = "2021"
 description = "QNC public piece: a warning the user cannot miss, a red band at the top centre of the screen for a few seconds; passive paint only"
 
 [dependencies]
+qnc-notice = { workspace = true }
 eframe = { workspace = true }

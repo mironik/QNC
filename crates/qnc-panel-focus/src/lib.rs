@@ -13,7 +13,7 @@ use std::ops::ControlFlow;
 use qnc_action_event::ActionEvent;
 use qnc_program_segments::ProgramSegments;
 use qnc_source_preview::SourcePreview;
-use qnc_timeline::{TimelineIntent, TimelineProjection};
+use qnc_timeline_model::{TimelineIntent, TimelineProjection};
 use qnc_wrap_session::WrapSession;
 
 pub const MODULE_ID: &str = "qnc.module.panel-focus";
@@ -239,7 +239,6 @@ const LANE_KEYS: &[&str] = &[
     "clear_focus",
 ];
 
-pub use qnc_ui_kit::paint_focus;
 
 /// The next or previous panel of the walk, round; the first one from outside it.
 pub fn cycle(panel: Panel, forward: bool, order: &[Panel]) -> Panel {

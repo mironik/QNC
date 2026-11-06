@@ -11,7 +11,7 @@
 //! offers a choice (`qnc-choice-box`): import the others, or cancel. The answer is one of
 //! its catalog actions ([`ANSWERS`]).
 
-use qnc_choice_box::Choice;
+use qnc_notice::Choice;
 use qnc_clip_row::{ClipRow, SaveState};
 use qnc_import_fit::{Conflict, Needs};
 use qnc_content_store::ContentTarget;

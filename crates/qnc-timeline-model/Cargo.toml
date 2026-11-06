@@ -1,0 +1,8 @@
+[package]
+name = "qnc-timeline-model"
+version = "0.1.0"
+edition = "2021"
+description = "QNC public piece (core): the model of every timeline, its projection (range, playhead, IN/OUT, mark in focus), audio lanes and the intents a timeline reports. No egui: qnc-timeline draws it."
+
+[dependencies]
+qnc-edit-step = { workspace = true }

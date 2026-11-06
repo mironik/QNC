@@ -7,7 +7,7 @@
 
 use std::path::Path;
 
-use qnc_shell_desktop_api::DesktopApplicationRef;
+use qnc_desktop_entry::DesktopApplicationRef;
 
 pub const MODULE_ID: &str = "qnc.module.desktop-tabs";
 

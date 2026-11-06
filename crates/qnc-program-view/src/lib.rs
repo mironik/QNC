@@ -287,7 +287,7 @@ pub struct SegmentsView {
     pub video_compact: bool,
     /// A refusal the user must notice (user 2026-10-21: something new taken while something
     /// else waits for Enter), drawn by `qnc-alert`.
-    pub alert: Option<qnc_alert::Alert>,
+    pub alert: Option<qnc_notice::Alert>,
     /// The program window `[start, end)` of an enlarged slot: the slot is 70 % of it, the
     /// slots before and after 15 % each (user 2026-10-21); drawn in the place of the source
     /// timeline as the same Wrap row.

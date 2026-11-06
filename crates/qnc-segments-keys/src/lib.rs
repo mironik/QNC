@@ -4,14 +4,14 @@
 //! Ctrl+Shift+I/O on a segment edge. I and O do nothing here (user 2026-10-16).
 //!
 //! What the keys change is the program model's (`qnc-program-segments`); the A1/A2 lane keys
-//! are those of every timeline (`qnc_timeline::LaneKey`); a sound draft is heard in the one
+//! are those of every timeline (`qnc_lane_choice::LaneKey`); a sound draft is heard in the one
 //! preview before Enter. It owns no player, database or form, and knows no application.
 
 use std::ops::ControlFlow;
 
 use qnc_program_segments::{ProgramSegments, SegmentCommand};
 use qnc_source_preview::{SoundDraft, SourcePreview};
-use qnc_timeline::LaneKey;
+use qnc_lane_choice::LaneKey;
 use qnc_wrap_session::WrapSession;
 
 pub const MODULE_ID: &str = "qnc.module.segments-keys";
@@ -112,7 +112,7 @@ pub fn pick(
 
 /// A lane key on the taken sound: drafted, said in the status line and heard in the program.
 fn draft(key: LaneKey, (preview, wrap, segments): (&mut SourcePreview, &mut WrapSession, &mut ProgramSegments)) -> bool {
-    let changed = segments.part_sound_lanes().is_some_and(|lanes| qnc_timeline::lane_key(lanes, key));
+    let changed = segments.part_sound_lanes().is_some_and(|lanes| qnc_lane_choice::lane_key(lanes, key));
     say_part_lane(segments);
     // Only its level or off changed: the player hears that part alone at once, continuous
     // with the wheel (user 2026-10-22); another channel opens the program with the draft.
@@ -278,7 +278,7 @@ pub fn word_steps(segments: &ProgramSegments, from: u64, to: u64) -> Option<(&'s
 
 /// The taken lane of the Wrap row in the status line, in the timeline's words.
 fn say_part_lane(segments: &mut ProgramSegments) {
-    if let Some(message) = segments.part_sound_lanes().map(|lanes| qnc_timeline::lane_message(lanes)) {
+    if let Some(message) = segments.part_sound_lanes().map(|lanes| qnc_lane_choice::lane_message(lanes)) {
         segments.say(message);
     }
 }

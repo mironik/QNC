@@ -13,7 +13,7 @@ qnc-dev-diagnostics = { workspace = true }
 qnc-ingest-preview-source = { workspace = true }
 qnc-application-sequence = { workspace = true }
 qnc-ingest-import-run = { workspace = true }
-qnc-choice-box = { workspace = true }
+qnc-notice = { workspace = true }
 qnc-playback-priority = { workspace = true }
 qnc-source-browse = { workspace = true }
 qnc-ingest-catalog = { workspace = true }
@@ -33,7 +33,7 @@ qnc-media-thumbnail = { workspace = true }
 qnc-work-settings = { workspace = true }
 qnc-player-client = { workspace = true }
 qnc-source-reader = { workspace = true }
-qnc-timeline = { workspace = true }
+qnc-timeline-model = { workspace = true }
 qnc-timeline-assets = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }

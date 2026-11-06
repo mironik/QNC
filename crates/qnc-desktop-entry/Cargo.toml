@@ -1,0 +1,7 @@
+[package]
+name = "qnc-desktop-entry"
+version = "0.1.0"
+edition = "2021"
+description = "QNC public piece (core): an application the desktop can host, its id, tab and priority group. No egui."
+
+[dependencies]

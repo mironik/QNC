@@ -8,7 +8,7 @@
 
 use qnc_source_mark_focus::MarkKey;
 use qnc_source_preview::SourcePreview;
-use qnc_timeline::TimelineProjection;
+use qnc_timeline_model::TimelineProjection;
 
 pub const MODULE_ID: &str = "qnc.module.source-panel";
 pub const VERSION: &str = env!("CARGO_PKG_VERSION");

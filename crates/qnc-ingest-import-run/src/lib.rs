@@ -11,7 +11,7 @@ use qnc_ingest_selection_write::SelectionWriter;
 use qnc_content_store::ContentTarget;
 use qnc_work_settings::WorkSettings;
 
-pub use qnc_choice_box::Choice;
+pub use qnc_notice::Choice;
 pub use qnc_ingest_selection_write::ANSWERS;
 
 pub const MODULE_ID: &str = "qnc.module.ingest-import-run";

@@ -10,4 +10,4 @@ qnc-program-segments = { workspace = true }
 qnc-source-mark-focus = { workspace = true }
 qnc-source-panel = { workspace = true }
 qnc-source-preview = { workspace = true }
-qnc-timeline = { workspace = true }
+qnc-timeline-model = { workspace = true }

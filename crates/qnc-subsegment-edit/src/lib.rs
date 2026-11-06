@@ -402,12 +402,12 @@ impl SubsegmentEdit {
     fn sound_key(&mut self, action_id: &str, target: Option<&str>, block: &Block, pieces: &[Piece], preview: &SourcePreview) -> Option<bool> {
         // A channel clicked in the taken lane's column (the timeline's or its zoom's, AGENTS 0.12).
         let key = match action_id {
-            qnc_edit_verbs::PICK_A1_CHANNEL => qnc_timeline::LaneKey::Pick(u16::try_from(self.value?).ok()?),
-            _ => qnc_timeline::LaneKey::of(action_id)?,
+            qnc_edit_verbs::PICK_A1_CHANNEL => qnc_lane_choice::LaneKey::Pick(u16::try_from(self.value?).ok()?),
+            _ => qnc_lane_choice::LaneKey::of(action_id)?,
         };
         let at = self.view.subsegment.as_ref().and_then(|view| view.playhead).unwrap_or(0);
         match key {
-            qnc_timeline::LaneKey::Take(0) => {
+            qnc_lane_choice::LaneKey::Take(0) => {
                 // A right click on A1 names the part it was on (user 2026-11-04, as a slot's sound).
                 let index = target.and_then(|index| index.parse::<usize>().ok()).filter(|index| *index < pieces.len()).unwrap_or_else(|| self.part_in_hand());
                 let piece = pieces.get(index)?;
@@ -415,24 +415,24 @@ impl SubsegmentEdit {
                 self.sound = Some(PartSound { index, channel: piece.a1_channel, level_db: piece.a1_level_db, off: piece.a1_off });
                 return Some(true);
             }
-            qnc_timeline::LaneKey::Take(_) => return None,
+            qnc_lane_choice::LaneKey::Take(_) => return None,
             _ => {}
         }
         let mut sound = self.sound?;
         let channels = self.waves.channels(&pieces.get(sound.index)?.clip_id).unwrap_or(2).max(1);
         match key {
-            qnc_timeline::LaneKey::Pick(channel) => sound.channel = Some(channel.min(channels - 1)),
-            qnc_timeline::LaneKey::Channel(delta) => sound.channel = Some((i64::from(sound.channel.unwrap_or(0)) + delta).clamp(0, i64::from(channels) - 1) as u16),
-            qnc_timeline::LaneKey::Off(off) => sound.off = off,
-            qnc_timeline::LaneKey::Level(delta) => sound.level_db = (i16::from(sound.level_db) + i16::from(delta)).clamp(-40, 12) as i8,
-            qnc_timeline::LaneKey::Keep => {
+            qnc_lane_choice::LaneKey::Pick(channel) => sound.channel = Some(channel.min(channels - 1)),
+            qnc_lane_choice::LaneKey::Channel(delta) => sound.channel = Some((i64::from(sound.channel.unwrap_or(0)) + delta).clamp(0, i64::from(channels) - 1) as u16),
+            qnc_lane_choice::LaneKey::Off(off) => sound.off = off,
+            qnc_lane_choice::LaneKey::Level(delta) => sound.level_db = (i16::from(sound.level_db) + i16::from(delta)).clamp(-40, 12) as i8,
+            qnc_lane_choice::LaneKey::Keep => {
                 self.sound = None;
                 let mut piece = pieces.get(sound.index)?.clone();
                 (piece.a1_channel, piece.a1_level_db, piece.a1_off) = (sound.channel, sound.level_db, sound.off);
                 let id = block.id;
                 return Some(self.write(preview, move |target| qnc_script_db::set_piece(target, id, sound.index, piece).map(|_| None)));
             }
-            qnc_timeline::LaneKey::Drop => {
+            qnc_lane_choice::LaneKey::Drop => {
                 self.sound = None;
                 self.pieces_request = Some((view::piece_inputs(block), at));
                 return Some(true);
@@ -725,7 +725,7 @@ impl SubsegmentEdit {
     /// and the wheel move it a frame and it is heard at once; Enter (or a left click) keeps it,
     /// Esc gives it up. `None` for a key that is not the join sound's.
     fn join_key(&mut self, action_id: &str, target: Option<&str>, block: &Block, pieces: &[Piece], preview: &SourcePreview) -> Option<bool> {
-        let take_sound = matches!(qnc_timeline::LaneKey::of(action_id), Some(qnc_timeline::LaneKey::Take(0)));
+        let take_sound = matches!(qnc_lane_choice::LaneKey::of(action_id), Some(qnc_lane_choice::LaneKey::Take(0)));
         // The V of the zoom on a taken join (user 2026-11-04): its picture, as at a story's cut.
         let take_picture = action_id == "select_mark_in" && target.is_some_and(|target| target.starts_with("join:"));
         // A part's J and L of sound or of picture, as stored.

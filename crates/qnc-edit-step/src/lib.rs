@@ -147,3 +147,25 @@ mod tests {
         assert!(parse_setting(r#"{"playhead_up": "up"}"#).is_err(), "no guess");
     }
 }
+
+/// The catalog actions of a panel's wheel: back and forward, then with Ctrl held.
+pub type WheelActions<'a> = ((&'a str, &'a str), (&'a str, &'a str));
+
+/// One wheel step: away from the user (`up`) or toward, with Ctrl (Cmd) held or not.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct Wheel {
+    pub up: bool,
+    pub ctrl: bool,
+}
+
+impl Wheel {
+    /// Its catalog action: forward for up, the Ctrl pair with Ctrl.
+    pub fn action<'a>(self, ((back, forward), (ctrl_back, ctrl_forward)): WheelActions<'a>) -> &'a str {
+        match (self.ctrl, self.up) {
+            (false, false) => back,
+            (false, true) => forward,
+            (true, false) => ctrl_back,
+            (true, true) => ctrl_forward,
+        }
+    }
+}
