@@ -8169,3 +8169,10 @@ kocke (samo premjestanje, UI kocka ih ponovno izvozi, ponasanje isto). Nove kock
 `qnc-lane-choice`; `Follow` u `qnc-source-preview`; `qnc-panel-focus` vise ne izvozi `qnc_ui_kit::paint_focus`.
 Logicke kocke (prica, scenarij, preview, Ingest) koriste core kocke umjesto UI kocki. C14 baseline 36 -> 11 veza.
 Testovi 25 dotaknutih kocki (i zlatna tablica tipki), conformance. Uzivo nije provjereno.
+Izvedeno 2026-11-06 (korisnik: "da, pushaj i kreni s gui-kit pravilom"; prije "mozda uvesti i gui-kit"): gui-kit su
+postojeci `qnc-ui-kit`, `qnc-desktop-theme` i `qnc-theme-styles`, bez novog paketa. Conformance C15
+(`tools/qnc-conformance/src/lego.rs` `gui_kit_rules`): kocka koja crta, osim forme (C2) i gui-kita, ne pravi vlastiti
+gumb ili kvacicu ni boju mimo teme; gui-kit ne ovisi ni o jednoj logickoj kocki osim `qnc-dev-diagnostics` i
+`qnc-board`. Danasnjih 25 prekrsaja upisano u `lego-baseline.json` (smiju samo padati). Provjereno: conformance,
+testovi conformancea (26), mutacijska provjera (smanjena brojka obara conformance). Kod kocki nije mijenjan.
+docs/99 dopunjen.

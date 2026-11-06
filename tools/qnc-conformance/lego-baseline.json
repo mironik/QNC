@@ -1,5 +1,5 @@
 {
-  "note": "Known violations of the target picture rules C1-C13 (docs/89-qnc-target-lego-catalog.md), recorded 2026-09-23 at commit 9fd8b07. Counts may only go down; a higher count or a new key fails conformance. Print the current counts with: cargo run -p qnc-conformance -- --print-lego-counts 2026-10-10 (audit): the forms' boards qnc-*-blocks count as forms (C1-C4, C10, C2 private widget); their keys were added with the counts of that day. 2026-11-06 (docs/99): C14 core piece pulls egui, the keys with the counts of that day.",
+  "note": "Known violations of the target picture rules C1-C13 (docs/89-qnc-target-lego-catalog.md), recorded 2026-09-23 at commit 9fd8b07. Counts may only go down; a higher count or a new key fails conformance. Print the current counts with: cargo run -p qnc-conformance -- --print-lego-counts 2026-10-10 (audit): the forms' boards qnc-*-blocks count as forms (C1-C4, C10, C2 private widget); their keys were added with the counts of that day. 2026-11-06 (docs/99): C14 core piece pulls egui, the keys with the counts of that day. 2026-11-06 (docs/99, gui-kit): C15 piece private widget, colour outside theme and gui-kit knows the domain, the keys with the counts of that day.",
   "exceptions": {
     "C1 form paints primitives|crates/qnc-project-blocks/src/list.rs": 6,
     "C1 form paints primitives|crates/qnc-project-blocks/src/settings.rs": 2,
@@ -38,6 +38,31 @@
   "C14 core piece pulls egui|qnc-project-session -> qnc-location-field": 1,
   "C14 core piece pulls egui|qnc-project-session -> qnc-newsroom-sheet": 1,
   "C14 core piece pulls egui|qnc-project-session -> qnc-ui-kit": 1,
-  "C14 core piece pulls egui|qnc-segments-keys -> qnc-source-timeline": 1
+  "C14 core piece pulls egui|qnc-segments-keys -> qnc-source-timeline": 1,
+  "C15 piece colour outside theme|crates/qnc-desktop/src/lib.rs": 1,
+  "C15 piece colour outside theme|crates/qnc-ingest-layout/src/lib.rs": 1,
+  "C15 piece colour outside theme|crates/qnc-level-meter/src/lib.rs": 3,
+  "C15 piece colour outside theme|crates/qnc-media-card/src/lib.rs": 12,
+  "C15 piece colour outside theme|crates/qnc-segment-panel/src/cover_length.rs": 1,
+  "C15 piece colour outside theme|crates/qnc-segment-panel/src/lib.rs": 1,
+  "C15 piece colour outside theme|crates/qnc-shell-footer/src/lib.rs": 16,
+  "C15 piece colour outside theme|crates/qnc-timeline/src/level_lines.rs": 1,
+  "C15 piece colour outside theme|crates/qnc-timeline/src/lib.rs": 18,
+  "C15 piece colour outside theme|crates/qnc-trim-overlay/src/lib.rs": 13,
+  "C15 piece colour outside theme|tools/qnc-dev-diagnostics-app/src/main.rs": 5,
+  "C15 piece private widget|crates/qnc-confirm-dialog/src/lib.rs": 2,
+  "C15 piece private widget|crates/qnc-ingest-import-bar/src/lib.rs": 2,
+  "C15 piece private widget|crates/qnc-media-pool-head/src/lib.rs": 1,
+  "C15 piece private widget|crates/qnc-media-pool-head/src/row.rs": 1,
+  "C15 piece private widget|crates/qnc-newsroom-sheet/src/lib.rs": 1,
+  "C15 piece private widget|crates/qnc-script-profile-editor/src/lib.rs": 3,
+  "C15 piece private widget|crates/qnc-segment-panel/src/bar.rs": 3,
+  "C15 piece private widget|crates/qnc-segment-panel/src/list.rs": 2,
+  "C15 piece private widget|crates/qnc-settings-switches/src/lib.rs": 1,
+  "C15 piece private widget|crates/qnc-shell-footer/src/lib.rs": 1,
+  "C15 piece private widget|crates/qnc-source-dock/src/lib.rs": 1,
+  "C15 piece private widget|crates/qnc-subsegment-panel/src/lib.rs": 3,
+  "C15 piece private widget|crates/qnc-trim-overlay/src/lib.rs": 1,
+  "C15 piece private widget|tools/qnc-dev-diagnostics-app/src/main.rs": 7
   }
 }

@@ -127,3 +127,12 @@ zapis u AGENTS.md. Koraci 1-3 ne mijenjaju ponasanje.
   `paint_focus` uklonjen iz `qnc-panel-focus`. UI kocke ponovno izvoze premjestene tipove. C14: 36 -> 11.
   Ostaju veze na `qnc-source-timeline`, `qnc-focus-walk`, `qnc-keyboard-shortcut`, `qnc-newsroom-sheet`
   i popis ekrana iz `qnc-program-output` (korak 3).
+- Gui-kit (2026-11-06, korisnik "mozda uvesti i gui-kit"): gui-kit su `qnc-ui-kit` (gumbi, okvir fokusa,
+  slika, traka potvrde), `qnc-desktop-theme` (boje i mjere iz ugovora) i `qnc-theme-styles` (izgled svake
+  kocke iz teme); nema novog paketa. Conformance C15: kocka koja crta (osim forme, C2, i samog gui-kita)
+  ne pravi vlastiti gumb ili kvacicu (`Button::new`, `ui.button`, `ui.checkbox`, `Checkbox::new`) ni boju
+  mimo teme (`from_rgb`, `from_rgba`); gui-kit ne ovisi ni o jednoj logickoj kocki osim dijagnostike i
+  ploce. Danas 25 kljuceva u baselineu (najvise boje u `qnc-timeline`, `qnc-shell-footer`,
+  `qnc-trim-overlay`, `qnc-media-card`; gumbi u `qnc-segment-panel`, `qnc-subsegment-panel`,
+  `qnc-script-profile-editor`, dijagnostickom alatu); smiju samo padati. Polja za upis teksta
+  (`TextEdit`) jos nisu u pravilu: gui-kit nema svoje polje.

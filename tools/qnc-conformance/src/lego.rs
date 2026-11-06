@@ -1,4 +1,4 @@
-//! Target picture rules C1-C13 (docs/89-qnc-target-lego-catalog.md) and C14 (docs/99-core-gui-split.md).
+//! Target picture rules C1-C13 (docs/89-qnc-target-lego-catalog.md), C14 and C15 (docs/99-core-gui-split.md).
 //!
 //! A form is only a board of public lego pieces; the pieces are public and
 //! universal. Every rule counts its violations per key. Known violations live in
@@ -70,6 +70,7 @@ pub(crate) fn current_counts(root: &Path) -> BTreeMap<String, u64> {
     fallback_paths(root, &packages, &mut counts);
     project_layout_literals(root, &packages, &mut counts);
     core_pieces_without_egui(&packages, &mut counts);
+    gui_kit_rules(root, &packages, &mut counts);
     counts.retain(|_, count| *count > 0);
     counts
 }
@@ -575,6 +576,32 @@ fn core_pieces_without_egui(packages: &BTreeMap<String, Package>, counts: &mut B
     for package in packages.values().filter(|package| !package.gui && !GUI_BY_ROLE.contains(&package.name.as_str()) && !package.dir.components().any(|part| part.as_os_str() == "apps")) {
         for dep in package.runtime_deps.iter().filter(|dep| packages.get(*dep).is_some_and(|dep| dep.gui)) {
             add(counts, format!("C14 core piece pulls egui|{} -> {dep}", package.name), 1);
+        }
+    }
+}
+
+/// The gui-kit (docs/99 C15): the shared widgets (`qnc-ui-kit`), the theme from the contracts
+/// (`qnc-desktop-theme`) and the look of every piece from that theme (`qnc-theme-styles`).
+const GUI_KIT: [&str; 3] = ["qnc-ui-kit", "qnc-desktop-theme", "qnc-theme-styles"];
+
+/// Core pieces the gui-kit may use: the diagnostics log and the board of places.
+const GUI_KIT_MAY_USE: [&str; 2] = ["qnc-dev-diagnostics", "qnc-board"];
+
+/// C15 (docs/99, user 2026-11-06 "gui-kit"): a piece that draws (not a form, C2 counts those, and
+/// not the gui-kit itself) makes no button or check box of its own and no colour outside the theme;
+/// it takes them from the gui-kit. The gui-kit knows no story, database or player: it depends on no
+/// core piece but the diagnostics and the board.
+fn gui_kit_rules(root: &Path, packages: &BTreeMap<String, Package>, counts: &mut BTreeMap<String, u64>) {
+    for package in packages.values().filter(|package| package.gui && !GUI_KIT.contains(&package.name.as_str()) && !FORM_CRATES.contains(&package.name.as_str())) {
+        for (file, text) in runtime_files(root, package) {
+            add(counts, format!("C15 piece private widget|{file}"), occurrences(&text, &["Button::new", "ui.button(", "ui.checkbox(", "Checkbox::new"]));
+            add(counts, format!("C15 piece colour outside theme|{file}"), occurrences(&text, &["from_rgb", "from_rgba"]));
+        }
+    }
+    for kit in GUI_KIT {
+        let Some(package) = packages.get(kit) else { continue };
+        for dep in package.runtime_deps.iter().filter(|dep| packages.get(*dep).is_some_and(|dep| !dep.gui && !GUI_KIT.contains(&dep.name.as_str())) && !GUI_KIT_MAY_USE.contains(&dep.as_str())) {
+            add(counts, format!("C15 gui-kit knows the domain|{kit} -> {dep}"), 1);
         }
     }
 }
