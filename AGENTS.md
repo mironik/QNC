@@ -7959,3 +7959,10 @@ memoriji kao istinu; ponovno citanje bilo je samo na promjenu klipa ili na kraj 
 prijepis prikazanog klipa cita iz baze ponovno svake sekunde (`kept_at`, `QUEUE_EVERY`), tko god ga je napisao; prikaz se
 slaze iznova samo kad baza kaze nesto drugo. Nema veze medu formama. Testovi, conformance, release build s libav. Uzivo nije
 provjereno.
+Izvedeno 2026-11-06 (korisnik: plan drugog agenta "izvucite stvarnu strukturu alatima... spremi dijagrame u docs/arhitektura.md"):
+novi `docs/arhitektura.md`: velicina (312 paketa, ~157 000 redaka), Mermaid dijagram 35 sredisnjih kocki iz `cargo metadata`,
+put klipa od kartice do exporta s promjenama tipova i mjestima dvostrukog posla, sekvenca jednog ciklusa forme i playera,
+revizija s prioritetom (`qnc-script` 35 ovisnosti, `qnc-panel-focus` 32, dvostruko citanje prijepisa, 40 paketa s
+neiskoristenim ovisnostima po `cargo machete`, traitovi s jednom implementacijom, clippy pedantic 4446 upozorenja) i
+prijedlog redoslijeda pojednostavljenja. Instalirani alati `cargo-machete` 0.9.2 i `cargo-modules` 0.26.0 (0.28 trazi
+rustc 1.98). Kod nije mijenjan.
