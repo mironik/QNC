@@ -8190,3 +8190,8 @@ i boje samo kroz gui-kit. Gumbi trake (akcija, bljesak, ikona) kroz `qnc_ui_kit:
 boje traka pokrivalica iz ugovora kroz `qnc_desktop_theme::rgb` (sada javna, jedina pretvorba), boja ukupnog trajanja
 u zaglavlju je `qnc_desktop_theme::total_text` (ista vrijednost). Cetiri C15 kljuca segment panela uklonjena iz
 baselinea (25 -> 21). Testovi, `cargo check --workspace --all-targets`, conformance. Uzivo nije provjereno.
+Izvedeno 2026-11-06 (korisnik: "da, pushaj i kreni sa subsegment panelom"; gui-kit C15): gumbi retka dijela slozene
+izjave (ranije, kasnije, ukloni) u `qnc-subsegment-panel` crtaju se kroz `qnc_ui_kit::small_button` (nova ovisnost),
+koji dobiva parametar `enabled` (sivo kad se ne moze; segment panel predaje `true`). Izgled isti. C15 kljuc
+subsegment panela uklonjen iz baselinea (21 -> 20). Testovi, `cargo check --workspace --all-targets`, conformance.
+Uzivo nije provjereno.

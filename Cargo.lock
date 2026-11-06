@@ -6716,6 +6716,7 @@ dependencies = [
  "qnc-script",
  "qnc-segment-panel",
  "qnc-timeline",
+ "qnc-ui-kit",
  "qnc-ui-text",
 ]
 

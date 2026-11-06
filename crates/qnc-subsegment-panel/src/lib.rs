@@ -223,13 +223,13 @@ pub fn show(ui: &mut egui::Ui, view: &SubsegmentView, theme: TimelineTheme, leng
             ui.label(if taken { name.color(theme.lane_taken).strong() } else { name.color(theme.text) });
             // Its place among the parts and its leaving (user 2026-10-29).
             let last = index + 1 == view.parts.len();
-            if ui.add_enabled(index > 0, egui::Button::new(qnc_ui_text::text("subsegment.move_earlier")).small()).on_hover_text(qnc_ui_text::text("subsegment.move_hint")).clicked() {
+            if qnc_ui_kit::small_button(ui, qnc_ui_text::text("subsegment.move_earlier"), index > 0, false).on_hover_text(qnc_ui_text::text("subsegment.move_hint")).clicked() {
                 answer = Some(ActionEvent::key(PART_MOVE).with_target(target(Some(-1))));
             }
-            if ui.add_enabled(!last, egui::Button::new(qnc_ui_text::text("subsegment.move_later")).small()).on_hover_text(qnc_ui_text::text("subsegment.move_hint")).clicked() {
+            if qnc_ui_kit::small_button(ui, qnc_ui_text::text("subsegment.move_later"), !last, false).on_hover_text(qnc_ui_text::text("subsegment.move_hint")).clicked() {
                 answer = Some(ActionEvent::key(PART_MOVE).with_target(target(Some(1))));
             }
-            if ui.add_enabled(view.parts.len() > 1, egui::Button::new(qnc_ui_text::text("subsegment.remove")).small()).on_hover_text(qnc_ui_text::text("subsegment.remove_hint")).clicked() {
+            if qnc_ui_kit::small_button(ui, qnc_ui_text::text("subsegment.remove"), view.parts.len() > 1, false).on_hover_text(qnc_ui_text::text("subsegment.remove_hint")).clicked() {
                 answer = Some(ActionEvent::key(PART_REMOVE).with_target(target(None)));
             }
             ui.separator();
