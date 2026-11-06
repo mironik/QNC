@@ -7977,3 +7977,15 @@ pise. Prije su prijepis citala tri mjesta, svako sa svojom memorijom: `qnc-trans
 `Script::transcript_clips`) i daje ga u `Transcript::poll` i `Script::poll`; `qnc-zoom-words` koristi kocku za prijepise,
 a vremena slova (`letter-db`) cita i dalje sam; nakon vlastitog prijepisa ne prepisuje ponovno dok kocka ne procita bazu
 nakon njega. Testovi dotaknutih kocki, conformance, release build s libav. Uzivo nije provjereno.
+Izvedeno 2026-11-06 (korisnik: "da, obrisi debug cache i kreni s drugom tockom" iz `docs/arhitektura.md`, P1-2): slozena izjava
+izdvojena iz `qnc-script` u novu javnu kocku `crates/qnc-subsegment-edit` (+ ugovor
+`contracts/modules/subsegment-edit.module.json`). Kod je premjesten, ne prepisan: stanje uzetog (rub, roll reza, J/L zvuka
+i slike spoja, dio cijeli kao slot, slip, A1 dijela), tipke i mis slozene izjave (`pointer.rs`), crtanje osi i zoom reza
+(`view.rs`), radnje panela (playhead, zatvaranje, A1 dijela, mjesto i izlazak dijela, pauza i spoj) i testovi. Kocka nista ne
+pise: svaki upis predaje vlasniku (`take_writes`), a scenarij ga pise u svoju bazu (`qnc-script-db`) jednim upisom, redom;
+poruku i prikaz slozene izjave scenarij preuzima (`take_edit`). Scenarij joj daje svoje blokove, nazive klipova, projekt i
+je li citanje/upis u tijeku (`sync`). `trimmed_piece` i `seconds_of` su slobodne funkcije kocke (koristi ih i scenarij za rez
+teksta). `qnc-script` ponovno izvozi sve njezine nazive, pa paneli nisu mijenjani. `qnc-script`: `lib.rs` 1946 -> 904 retka,
+nasih ovisnosti 35 -> 28 (uklonjeno 9 koje vise ne koristi). Testovi `qnc-subsegment-edit` (4), `qnc-script`, `qnc-side-pieces`,
+`qnc-panel-focus` (zlatna tablica tipki), `qnc-subsegment-panel`, `qnc-script-panel`, `qnc-editorial-application`, cijeli
+workspace se kompajlira. Uzivo nije provjereno. Debug cache obrisan (`cargo clean --profile dev`, 19,4 GiB).

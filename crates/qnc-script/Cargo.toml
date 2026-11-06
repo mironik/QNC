@@ -7,7 +7,7 @@ description = "QNC public piece: the script of a project's story (user 2026-10-2
 [dependencies]
 qnc-clip-row = { workspace = true }
 qnc-clip-transcripts = { workspace = true }
-qnc-image-assets = { workspace = true }
+qnc-subsegment-edit = { workspace = true }
 qnc-db-broker = { workspace = true }
 qnc-newsroom-sheet-db = { workspace = true }
 qnc-script-db = { workspace = true }
@@ -16,11 +16,6 @@ qnc-script-export = { workspace = true }
 qnc-status-line = { workspace = true }
 qnc-source-preview = { workspace = true }
 qnc-source-timecode = { workspace = true }
-qnc-program-waveform = { workspace = true }
-qnc-program-filmstrip = { workspace = true }
-qnc-program-view = { workspace = true }
-qnc-trim-stills = { workspace = true }
-qnc-edit-step = { workspace = true }
 qnc-timeline = { workspace = true }
 qnc-transcript = { workspace = true }
 qnc-transcript-db = { workspace = true }
@@ -39,7 +34,4 @@ qnc-script-files = { workspace = true }
 qnc-dev-diagnostics = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
-qnc-edit-verbs = { workspace = true }
-qnc-edit-cut = { workspace = true }
-qnc-edit-edge = { workspace = true }
 qnc-edit-words = { workspace = true }

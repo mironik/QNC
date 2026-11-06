@@ -1,0 +1,24 @@
+[package]
+name = "qnc-subsegment-edit"
+version = "0.1.0"
+edition = "2021"
+description = "QNC public piece: the SubSegment (a statement of the script of several parts of clips) opened in place of the source timeline and edited as covers are - its parts' edges, the roll of a join, the J and L of a join's sound and picture, a part slid as a slot, a slip, a part's own A1, the pause and join before a part, the trim zoom and the one mouse map of a program's row; it writes nothing itself, its writes go to its owner"
+
+[dependencies]
+qnc-db-broker = { workspace = true }
+qnc-dev-diagnostics = { workspace = true }
+qnc-edit-cut = { workspace = true }
+qnc-edit-edge = { workspace = true }
+qnc-edit-step = { workspace = true }
+qnc-edit-verbs = { workspace = true }
+qnc-edit-words = { workspace = true }
+qnc-program-filmstrip = { workspace = true }
+qnc-program-view = { workspace = true }
+qnc-program-waveform = { workspace = true }
+qnc-script-db = { workspace = true }
+qnc-script-draft = { workspace = true }
+qnc-source-preview = { workspace = true }
+qnc-source-timecode = { workspace = true }
+qnc-timeline = { workspace = true }
+qnc-trim-stills = { workspace = true }
+qnc-ui-text = { workspace = true }

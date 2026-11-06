@@ -100,7 +100,7 @@ impl Script {
             "undo_object" | "redo_object" => {
                 let undo = action_id == "undo_object";
                 (self.word_pick, self.view.picked) = (None, None);
-                (self.trim, self.sound, self.chosen, self.join_sound, self.slide) = (None, None, None, None, None);
+                self.edit.let_go();
                 self.message_after_write = Some(qnc_ui_text::text(if undo { "script.undone" } else { "script.redone" }).into());
                 Some(self.write(preview, move |target| {
                     let done = if undo { qnc_script_db::undo(target)? } else { qnc_script_db::redo(target)? };
@@ -140,11 +140,11 @@ impl Script {
         let words = self.view.blocks.iter().find(|row| row.block.id == pick.block).and_then(|row| row.words.get(pick.part)).cloned().unwrap_or_default();
         let said = |from: u64, to: u64| words.iter().filter(|word| (from..to).contains(&((word.from + word.to.max(word.from + 1)) / 2))).map(|word| word.text.as_str()).collect::<Vec<_>>().join(" ");
         let part = |range: Option<(u64, u64)>| {
-            range.map(|(from, to)| Piece { text: said(from, to), ..self.trimmed_piece(&piece, crate::Trim { index: pick.part, out: true, from, to, roll: None }) })
+            range.map(|(from, to)| Piece { text: said(from, to), ..qnc_subsegment_edit::trimmed_piece(&self.names, &piece, from, to) })
         };
         let (before, after) = (part(before), part(after));
         let (id, index) = (pick.block, pick.part);
-        (self.trim, self.sound, self.chosen, self.join_sound, self.slide) = (None, None, None, None, None);
+        self.edit.let_go();
         self.message_after_write = Some(qnc_ui_text::text("script.words_cut_out").into());
         self.write(preview, move |target| qnc_script_db::cut_out(target, id, index, before, after).map(|_| None))
     }
@@ -195,9 +195,9 @@ impl Script {
         let said = |from: u64, to: u64| words.iter().filter(|word| (from..to).contains(&((word.from + word.to.max(word.from + 1)) / 2))).map(|word| word.text.as_str()).collect::<Vec<_>>().join(" ");
         let kept: Vec<Piece> = kept
             .into_iter()
-            .map(|(from, to)| Piece { text: said(from, to), ..self.trimmed_piece(&piece, crate::Trim { index, out: true, from, to, roll: None }) })
+            .map(|(from, to)| Piece { text: said(from, to), ..qnc_subsegment_edit::trimmed_piece(&self.names, &piece, from, to) })
             .collect();
-        (self.trim, self.sound, self.chosen, self.join_sound, self.slide) = (None, None, None, None, None);
+        self.edit.let_go();
         self.message_after_write = Some(qnc_ui_text::text("script.words_cut_out").into());
         self.write(preview, move |target| qnc_script_db::keep_of(target, id, index, kept).map(|_| None))
     }

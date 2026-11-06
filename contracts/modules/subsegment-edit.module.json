@@ -1,0 +1,21 @@
+{
+  "module_id": "qnc.module.subsegment-edit",
+  "module_name": "SubSegment edit",
+  "module_version": "0.1.0",
+  "module_kind": "library",
+  "capabilities": ["ui.subsegment.state", "edit.subsegment.parts", "edit.subsegment.joins", "ui.trim_zoom.subsegment"],
+  "input_contract_version": "0.1.0",
+  "output_contract_version": "0.1.0",
+  "transport_protocol_version": "0.1.0",
+  "transport_scope": ["local", "lan", "intranet"],
+  "supported_os": ["windows", "linux", "macos"],
+  "supported_cpu": ["x86_64", "aarch64"],
+  "forbidden_calls": ["ffprobe", "media.probe.full", "playback.clock", "db.write"],
+  "forbidden_dependencies": ["qnc.module.media-probe", "qnc.module.scanner"],
+  "state_policy": "session_local",
+  "database_write_policy": "no_db_writes",
+  "runtime_crate": "qnc-subsegment-edit",
+  "input": "The script's statements as read, the clips of the pool, the preview, the catalog actions of the SubSegment's keys and of the mouse map of a program's row.",
+  "output": "The SubSegment view (its parts on its axis, A1 wave, filmstrip, the taken edge, the trim zoom), the parts the player plays, and the writes of each edit for the owner of the script to write.",
+  "specification": "User 2026-10-29 SubSegment; docs/arhitektura.md P1-2 (taken out of qnc-script), user 2026-11-06 (AGENTS.md)."
+}

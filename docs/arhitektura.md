@@ -256,6 +256,9 @@ Gdje se blokira ili nepotrebno kopira (iz loga i koda):
    slova i export. Pravilo 0.11: jedna kocka, jedna odgovornost. Prirodna podjela je slozena
    izjava (`qnc-subsegment-edit`, vec jednom postojala 31. 10. pa vracena), uredivanje teksta
    izjave i scenarij.
+   **Izvedeno 2026-11-06**: slozena izjava je kocka `qnc-subsegment-edit` (stanje uzetog, rubovi, roll,
+   J/L zvuka i slike, pomak i slip dijela, A1 dijela, pauza i spoj, zoom, mapa misa); ona nista
+   ne pise, njezine upise pise scenarij. `qnc-script` sada 28 nasih ovisnosti (prije 35), `lib.rs` 904 retka.
 3. **`qnc-panel-focus` zna previse** (32 ovisnosti): uz usmjeravanje radnji drzi i pravila
    price, Synca, shuttlea, trima i match framea. Prema 0.11 trebao bi samo predavati radnju kocki
    panela.
@@ -301,7 +304,7 @@ Gdje se blokira ili nepotrebno kopira (iz loga i koda):
 Sto bih pojednostavio prvo (redom):
 
 1. ~~**Jedna kocka citanja prijepisa** (P1-1)~~ - izvedeno 2026-11-06.
-2. **Izdvojiti slozenu izjavu iz `qnc-script`** u svoju kocku (P1-2). Najveci dobitak za
+2. ~~**Izdvojiti slozenu izjavu iz `qnc-script`** u svoju kocku (P1-2)~~ - izvedeno 2026-11-06. Najveci dobitak za
    stabilnost, jer se tu najvise mijenjalo zadnjih dana.
 3. **`qnc-panel-focus` svesti na usmjeravanje** (P1-3): pravila price u `qnc-program-segments`,
    Sync u `qnc-sync-session`, shuttle i trim u svoje kocke (vec postoje), fokus ih samo poziva.

@@ -6052,20 +6052,12 @@ dependencies = [
  "qnc-clip-transcripts",
  "qnc-db-broker",
  "qnc-dev-diagnostics",
- "qnc-edit-cut",
- "qnc-edit-edge",
- "qnc-edit-step",
- "qnc-edit-verbs",
  "qnc-edit-words",
  "qnc-export-launch",
- "qnc-image-assets",
  "qnc-letter-db",
  "qnc-letter-times",
  "qnc-newsroom-sheet-db",
  "qnc-program-db",
- "qnc-program-filmstrip",
- "qnc-program-view",
- "qnc-program-waveform",
  "qnc-script-db",
  "qnc-script-draft",
  "qnc-script-export",
@@ -6075,10 +6067,10 @@ dependencies = [
  "qnc-source-preview",
  "qnc-source-timecode",
  "qnc-status-line",
+ "qnc-subsegment-edit",
  "qnc-timeline",
  "qnc-transcript",
  "qnc-transcript-db",
- "qnc-trim-stills",
  "qnc-ui-text",
  "qnc-voice-catalog",
  "qnc-voice-record",
@@ -6697,6 +6689,29 @@ dependencies = [
  "qnc-editorial-desktop",
  "qnc-shell-desktop-api",
  "qnc-status-line",
+]
+
+[[package]]
+name = "qnc-subsegment-edit"
+version = "0.1.0"
+dependencies = [
+ "qnc-db-broker",
+ "qnc-dev-diagnostics",
+ "qnc-edit-cut",
+ "qnc-edit-edge",
+ "qnc-edit-step",
+ "qnc-edit-verbs",
+ "qnc-edit-words",
+ "qnc-program-filmstrip",
+ "qnc-program-view",
+ "qnc-program-waveform",
+ "qnc-script-db",
+ "qnc-script-draft",
+ "qnc-source-preview",
+ "qnc-source-timecode",
+ "qnc-timeline",
+ "qnc-trim-stills",
+ "qnc-ui-text",
 ]
 
 [[package]]
