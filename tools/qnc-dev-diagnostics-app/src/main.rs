@@ -360,14 +360,14 @@ impl DiagnosticsApp {
                         self.test_selected.push(false);
                     }
                     ui.add_enabled_ui(!running, |ui| {
-                        ui.checkbox(&mut self.test_selected[index], "");
+                        qnc_ui_kit::check_box(ui, &mut self.test_selected[index], "", true);
                     });
                     log_cell(ui, check.title, false);
                     log_cell(ui, check.description, false);
                     if ui
                         .add_enabled(
                             !running,
-                            egui::Button::new("Pokreni").min_size(Vec2::new(86.0, 26.0)),
+                            qnc_ui_kit::sized_button("Pokreni", Vec2::new(86.0, 26.0)),
                         )
                         .clicked()
                     {
@@ -382,7 +382,7 @@ impl DiagnosticsApp {
             if ui
                 .add_enabled(
                     !running,
-                    egui::Button::new("Pokreni odabrane").min_size(Vec2::new(142.0, 28.0)),
+                    qnc_ui_kit::sized_button("Pokreni odabrane", Vec2::new(142.0, 28.0)),
                 )
                 .clicked()
             {
@@ -391,7 +391,7 @@ impl DiagnosticsApp {
             if ui
                 .add_enabled(
                     !running,
-                    egui::Button::new("Pokreni sve").min_size(Vec2::new(110.0, 28.0)),
+                    qnc_ui_kit::sized_button("Pokreni sve", Vec2::new(110.0, 28.0)),
                 )
                 .clicked()
             {
@@ -405,7 +405,7 @@ impl DiagnosticsApp {
             if ui
                 .add_enabled(
                     self.test_result.is_some() && !running,
-                    egui::Button::new("Ocisti rezultat").min_size(Vec2::new(126.0, 28.0)),
+                    qnc_ui_kit::sized_button("Ocisti rezultat", Vec2::new(126.0, 28.0)),
                 )
                 .clicked()
             {
@@ -491,7 +491,7 @@ impl eframe::App for DiagnosticsApp {
                 self.state.wave_env_override,
             ));
             if let Some(error) = &self.state.read_error {
-                ui.label(RichText::new(error).color(egui::Color32::from_rgb(255, 170, 120)));
+                ui.label(RichText::new(error).color(qnc_desktop_theme::log_colours().error));
             }
 
             ui.add_space(10.0);
@@ -565,7 +565,7 @@ impl eframe::App for DiagnosticsApp {
             ui.add_space(8.0);
             ui.horizontal(|ui| {
                 if ui
-                    .add_sized(Vec2::new(96.0, 28.0), egui::Button::new("Ucitaj"))
+                    .add(qnc_ui_kit::sized_button("Ucitaj", Vec2::new(96.0, 28.0)))
                     .clicked()
                 {
                     self.refresh();
@@ -573,7 +573,7 @@ impl eframe::App for DiagnosticsApp {
                 if ui
                     .add_enabled(
                         active_stream.is_some(),
-                        egui::Button::new("Ocisti log").min_size(Vec2::new(120.0, 28.0)),
+                        qnc_ui_kit::sized_button("Ocisti log", Vec2::new(120.0, 28.0)),
                     )
                     .clicked()
                     && active_stream.is_some()
@@ -759,9 +759,9 @@ fn parse_log_row(line: &str) -> LogRow {
 
 fn log_cell(ui: &mut egui::Ui, text: &str, header: bool) {
     let color = if header {
-        egui::Color32::from_rgb(220, 225, 232)
+        qnc_desktop_theme::log_colours().header
     } else {
-        egui::Color32::from_rgb(205, 210, 218)
+        qnc_desktop_theme::log_colours().text
     };
     let size = if header {
         LOG_HEADER_SIZE
@@ -783,7 +783,7 @@ fn content_db_panel(
 ) {
     ui.label(RichText::new("Content DB").strong());
     if let Some(error) = &snapshot.error {
-        ui.label(RichText::new(error).color(egui::Color32::from_rgb(255, 170, 120)));
+        ui.label(RichText::new(error).color(qnc_desktop_theme::log_colours().error));
         return;
     }
     ui.label(format!(
@@ -871,7 +871,7 @@ fn test_result_panel(
                                 RichText::new(&result.output)
                                     .monospace()
                                     .size(LOG_TEXT_SIZE)
-                                    .color(egui::Color32::from_rgb(205, 210, 218)),
+                                    .color(qnc_desktop_theme::log_colours().text),
                             )
                             .wrap_mode(TextWrapMode::Extend),
                         );

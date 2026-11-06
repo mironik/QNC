@@ -213,3 +213,16 @@ pub struct ShellColors {
     pub accent: [u8; 3],
     pub focus: [u8; 3],
 }
+
+/// The colours of a log read on screen (the diagnostics tool): the header row, the lines and an
+/// error under them (gui-kit C15: they were the tool's own).
+#[derive(Debug, Clone, Copy)]
+pub struct LogColours {
+    pub header: Color32,
+    pub text: Color32,
+    pub error: Color32,
+}
+
+pub fn log_colours() -> LogColours {
+    LogColours { header: Color32::from_rgb(220, 225, 232), text: Color32::from_rgb(205, 210, 218), error: Color32::from_rgb(255, 170, 120) }
+}

@@ -3943,9 +3943,11 @@ dependencies = [
  "qnc-artifact-db",
  "qnc-content-store",
  "qnc-db-broker",
+ "qnc-desktop-theme",
  "qnc-dev-diagnostics",
  "qnc-ingest-work-plan",
  "qnc-media-metadata",
+ "qnc-ui-kit",
 ]
 
 [[package]]

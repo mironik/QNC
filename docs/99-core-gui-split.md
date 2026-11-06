@@ -141,3 +141,8 @@ zapis u AGENTS.md. Koraci 1-3 ne mijenjaju ponasanje.
   koriste ga (`qnc-newsroom-sheet`, `qnc-settings-form`, `qnc-settings-rows`, `qnc-script-panel`,
   `qnc-text-source-editor`, `qnc-transcript-panel`); C15 broji i `TextEdit::`, bez novog kljuca. Ostaje
   Project ploca (`qnc-project-blocks`, forma, zamrznuta, C2 ga ne broji) i test kataloga tipki.
+- Gui-kit ociscen (2026-11-07): sve kocke koje crtaju gumbe, kvacice, tekstualna polja i boje uzimaju iz gui-kita
+  (`qnc-ui-kit`: `look_button`, `small_button`, `sized_button`, `framed_button`, `check_box`, `text_field`,
+  `row_field`, `text_area`, `search_field`; `qnc-desktop-theme`: `rgb`, `danger`, `done`, `total_text`,
+  `log_colours`; `qnc-theme-styles`: tema timelinea i trim zooma, kartice, palete ljuske). C15 baseline 25 -> 0.
+  Ostaje Project ploca (zamrznuta forma, C2) i zadatak iz AGENTS 16: palete Soft/High contrast u UI ugovor.

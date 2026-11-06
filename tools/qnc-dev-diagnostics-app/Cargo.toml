@@ -10,6 +10,8 @@ name = "qnc-dev-diagnostics"
 path = "src/main.rs"
 
 [dependencies]
+qnc-desktop-theme = { workspace = true }
+qnc-ui-kit = { workspace = true }
 eframe = { workspace = true }
 qnc-active-project-read = { workspace = true }
 qnc-artifact-db = { workspace = true }

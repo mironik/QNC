@@ -8232,3 +8232,8 @@ Izvedeno 2026-11-06 (korisnik: "da, pushaj i kreni s urednikom profila"; gui-kit
 scenarija (`qnc-script-profile-editor`: Locked, snima se (samo izgovorena vrsta), in/out cue) kroz
 `qnc_ui_kit::check_box`. Izgled isti. C15: 3 -> 2; ostaje samo dijagnosticki alat (`tools/qnc-dev-diagnostics-app`).
 Testovi, `cargo check --workspace --all-targets`, conformance. Uzivo nije provjereno.
+Izvedeno 2026-11-07 (korisnik: "da, pushaj i prebaci dijagnosticki alat na gui-kit"; gui-kit C15): dijagnosticki alat
+(`tools/qnc-dev-diagnostics-app`) gumbe crta kroz `qnc_ui_kit::sized_button`, kvacicu kroz `check_box`, a boje loga
+(zaglavlje, redak, greska) su `qnc_desktop_theme::log_colours`, iste vrijednosti. C15: 2 -> 0, nijedna kocka koja crta
+nema vlastitog gumba, kvacice, tekstualnog polja ni boje; svaki novi je greska conformancea. docs/99 dopunjen.
+Testovi, `cargo check --workspace --all-targets`, conformance. Uzivo nije provjereno.
