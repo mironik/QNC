@@ -139,7 +139,7 @@ impl PreviewContext {
         let (artifacts, notice) = match reader.local_workspace_dir(&settings) {
             Ok(Some(project_dir)) => {
                 let artifacts: Arc<dyn TimelineArtifactRead> = Arc::new(content::ArtifactReader {
-                    content: content.clone(),
+                    content: content,
                     filmstrip_root_uri: settings.product_uri(ProductArea::Filmstrip),
                     filmstrip_dir: settings.product_local_dir(&project_dir, ProductArea::Filmstrip),
                 });
@@ -665,7 +665,7 @@ impl SourcePreview {
         (!header.source_id.starts_with("program:")).then(|| {
             let sequence = (header.output_generation, header.sequence);
             let size = [header.width as usize, header.height as usize];
-            (header.source_id.to_string(), ShownPicture { frame: header.frame, sequence, size, rgba: picture.rgba.clone() })
+            (header.source_id.clone(), ShownPicture { frame: header.frame, sequence, size, rgba: picture.rgba.clone() })
         })
     }
 
@@ -1253,7 +1253,7 @@ impl SourcePreview {
         let waiting = self.waits_for_record() || playback.error.as_deref().is_some_and(qnc_player_input::is_incomplete_media);
         self.view.monitor_message = if waiting { Some(record_wait_text().into()) } else { playback.error.clone() };
         self.view.monitor_frame = playback.picture.as_ref().map(|picture| MonitorFrame {
-            session_id: picture.header.session_id.to_string(),
+            session_id: picture.header.session_id.clone(),
             generation: picture.header.output_generation,
             sequence: picture.header.sequence,
             width: picture.header.width as usize,

@@ -131,7 +131,7 @@ impl ProgramSegments {
         if let Some(sent) = self.send_draft.as_ref().and_then(|receive| receive.try_recv().ok()) {
             self.send_draft = None;
             let message = match sent {
-                Ok(count) => qnc_ui_text::fill("story.msg.sent_draft", &[("n", &count.to_string())]).to_string(),
+                Ok(count) => qnc_ui_text::fill("story.msg.sent_draft", &[("n", &count.to_string())]),
                 Err(error) => error,
             };
             self.refresh_view(message);

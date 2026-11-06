@@ -77,7 +77,7 @@ pub struct Reply {
 /// The public identity of the project database behind this intermediary, from the
 /// workspace URI of the active project settings.
 pub fn project_db_uri(workspace_uri: &str) -> Result<String> {
-    let uri = qnc_contracts::parse_qnc_uri(workspace_uri).map_err(|e| e.to_string())?;
+    let uri = qnc_contracts::parse_qnc_uri(workspace_uri).map_err(|e| e)?;
     if uri.resource_kind != "db" || !uri.resource_id.starts_with("project_workspace/") {
         return Err(qnc_ui_text::text("db.project_database_work_settings_missing").into());
     }
@@ -86,7 +86,7 @@ pub fn project_db_uri(workspace_uri: &str) -> Result<String> {
 
 /// The project id of a project database URI.
 pub fn project_id(uri: &str) -> Result<String> {
-    let parsed = qnc_contracts::parse_qnc_uri(uri).map_err(|e| e.to_string())?;
+    let parsed = qnc_contracts::parse_qnc_uri(uri).map_err(|e| e)?;
     let id = parsed
         .resource_id
         .strip_prefix("project_db/")

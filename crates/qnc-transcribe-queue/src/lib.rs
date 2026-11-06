@@ -100,7 +100,7 @@ impl Drop for QueueRunner {
 
 fn run(locator: &StillLocator, db: &ProjectDbTarget, cancel: &AtomicBool, send: &mpsc::Sender<Heard>) {
     let lease = match qnc_content_store::ContentTarget::for_project(locator.reader(), locator.settings())
-        .map_err(|e| e.to_string())
+        .map_err(|e| e)
         .and_then(|target| qnc_playback_activity::Lease::claim(target, LEASE, qnc_playback_activity::WORKER_FRESH_SECONDS))
     {
         Ok(Some(lease)) => lease,
@@ -170,7 +170,7 @@ fn wake_worker(locator: &StillLocator) {
         return log("transcribe-queue done; no QNC root to wake the worker from");
     };
     let woken = qnc_content_store::ContentTarget::for_project(locator.reader(), locator.settings())
-        .map_err(|e| e.to_string())
+        .map_err(|e| e)
         .and_then(|target| qnc_worker_wake::wake(&root, &target));
     match woken {
         Ok(()) => log("transcribe-queue done; background worker woken"),

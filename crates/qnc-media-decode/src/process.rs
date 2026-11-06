@@ -182,7 +182,7 @@ impl Decoder {
             }
         };
         let request = decoder.request.clone();
-        let captured = stderr_capture.clone();
+        let captured = stderr_capture;
         let data_worker = thread::Builder::new()
             .name("qnc-decode-packets".into())
             .spawn(move || {

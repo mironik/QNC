@@ -156,7 +156,6 @@ fn run_once(root: &Path) -> Result<bool, String> {
         let completion = scope.spawn(|| {
           // The records a round left waiting (its probe failed or was uncertain): only another
           // clip starts a new round (audit 2026-10-25: they started one every second).
-          let mut stuck: std::collections::BTreeSet<String> = Default::default();
           loop {
             let done = qnc_record_completion::complete_active_project(
                 root,
@@ -185,7 +184,7 @@ fn run_once(root: &Path) -> Result<bool, String> {
                 make_posters(root, &config, &lease, &cancel);
             }
             completing.store(false, std::sync::atomic::Ordering::Relaxed);
-            stuck = records_waiting(root).unwrap_or_default().into_iter().collect();
+            let stuck: std::collections::BTreeSet<String> = records_waiting(root).unwrap_or_default().into_iter().collect();
             // Until the artifacts are done, new records are looked for once a second.
             loop {
                 let stop = closed.load(std::sync::atomic::Ordering::Relaxed)

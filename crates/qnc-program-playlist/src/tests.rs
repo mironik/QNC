@@ -768,7 +768,7 @@ fn the_a2_of_a_ton_is_heard_only_where_it_goes_into_an_off() {
     let mut ton = segment("ton", "tonovi", "speaker", (0, 50), (10, 60), timebase);
     ton.a2_tail_frames = 20;
     let off = segment("off", "offovi", "voice", (50, 100), (100, 150), timebase);
-    let playlist = build_flat_program_playlist(&input(100, vec![ton.clone(), off.clone()]), &mut resolver(&["voice", "speaker"], timebase)).unwrap();
+    let playlist = build_flat_program_playlist(&input(100, vec![ton, off]), &mut resolver(&["voice", "speaker"], timebase)).unwrap();
     assert!(a2(&playlist, 40).is_empty(), "silent under the Ton");
     assert_eq!(a2(&playlist, 55), vec![("speaker".to_string(), 60)], "the L: the Ton's A2 from its OUT (its item from 50)");
     assert!(a2(&playlist, 75).is_empty(), "after the L the Off alone");

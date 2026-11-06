@@ -8,11 +8,11 @@ use qnc_content_store::Access;
 
 /// The selected clips that do not serve what the project uses.
 pub(crate) fn in_the_way(request: &Request) -> Result<Vec<InTheWay>, String> {
-    let mut client = request.target.open(Access::ReadOnly).map_err(|e| e.to_string())?;
+    let mut client = request.target.open(Access::ReadOnly).map_err(|e| e)?;
     let mut found = Vec::new();
     let mut after = None;
     loop {
-        let page = client.list(after.clone()).map_err(|e| e.to_string())?;
+        let page = client.list(after.clone()).map_err(|e| e)?;
         let Some(last) = page.last() else { break };
         after = Some(last.clip.id().to_string());
         for stored in &page {

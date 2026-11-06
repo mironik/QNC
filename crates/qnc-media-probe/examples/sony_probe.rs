@@ -181,7 +181,7 @@ fn main() -> TestResult<()> {
                 &index_path,
                 env,
                 LocalSource::new(&source_uri, root)?,
-                Executor::new(probe_config.clone())?,
+                Executor::new(probe_config)?,
             )?;
             let resolver = ResolverConfig::new(PathBuf::new())
                 .with_lan_authority("verification", &host.url)
@@ -266,7 +266,7 @@ fn main() -> TestResult<()> {
     let index_proof = Document {
         document_uri: index_document.document_uri.clone(),
         media_type: DocumentType::Xml,
-        text: index_document.text.clone(),
+        text: index_document.text,
     };
     documents.insert(index_proof.document_uri.clone(), index_proof.clone());
     for (i, (material, source_id)) in index

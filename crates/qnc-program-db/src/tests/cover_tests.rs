@@ -19,13 +19,13 @@ fn a_cover_follows_its_slot_when_markers_move_or_split_it() {
     run(
         &mut store,
         Operation::MoveMarker {
-            marker_id: m25.clone(),
+            marker_id: m25,
             program_frame: 27,
         },
     )
     .unwrap();
     // The same pair moves: the cover takes the new frames.
-    assert_eq!(cover_row(&path, "cover_a"), (slot.clone(), 14, 27));
+    assert_eq!(cover_row(&path, "cover_a"), (slot, 14, 27));
     // A new marker splits the slot: the cover is trimmed to the part that keeps its start.
     let Data::Created(m20) = marker(&mut store, 20).unwrap() else {
         panic!()

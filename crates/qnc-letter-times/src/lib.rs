@@ -167,7 +167,7 @@ fn lay(locator: &StillLocator, aligner: &qnc_letter_align::Aligner, clip_id: &st
             letters: laid.letters.into_iter().map(|letter| Letter { letter: letter.letter, from: letter.start.map(frame), to: letter.end.map(frame) }).collect(),
         })
         .collect();
-    let target = qnc_db_broker::ProjectDbTarget::for_project(locator.reader(), locator.settings()).map_err(|error| error.to_string())?;
+    let target = qnc_db_broker::ProjectDbTarget::for_project(locator.reader(), locator.settings()).map_err(|error| error)?;
     qnc_letter_db::save(&target, clip_id, "wav2vec2-parlaspeech-hr", kept)
 }
 

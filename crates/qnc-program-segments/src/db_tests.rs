@@ -173,7 +173,7 @@ fn ctrl_m_moves_a_marker_by_arrows_or_to_the_playhead_and_enter_confirms_it() {
     // A marker moves only after Ctrl+M: a drag of a marker not taken does nothing.
     let id = segments.view().markers[1].marker_id.clone();
     segments.apply(SegmentCommand::DragMarker {
-        marker_id: id.clone(),
+        marker_id: id,
         frame: 90,
     });
     assert!(!segments.editing_marker());

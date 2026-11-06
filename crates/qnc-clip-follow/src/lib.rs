@@ -147,7 +147,7 @@ mod tests {
         assert_eq!(follow.known("p", "c"), Some(&2), "another writer's change shows");
         db.store(0, Ordering::SeqCst);
         std::thread::sleep(Duration::from_millis(60));
-        assert_eq!(wait(&mut follow, reader(db.clone())), Some(2), "a failed read keeps the last answer");
+        assert_eq!(wait(&mut follow, reader(db)), Some(2), "a failed read keeps the last answer");
         assert_eq!(follow.known("p", "other"), None);
     }
 

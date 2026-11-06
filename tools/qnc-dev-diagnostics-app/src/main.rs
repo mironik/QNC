@@ -905,7 +905,7 @@ fn read_content_db_inner(root: &Path) -> Result<ContentDbSnapshot, String> {
     )?;
     let mut snapshot = ContentDbSnapshot {
         project_name: plan.settings.project_name.clone(),
-        project_id: plan.settings.project_id.clone(),
+        project_id: plan.settings.project_id,
         content_uri,
         ..Default::default()
     };

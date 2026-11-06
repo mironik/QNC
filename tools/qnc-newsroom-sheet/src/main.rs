@@ -76,7 +76,7 @@ fn open(root: &Path) -> (SheetOverlay, Option<Project>) {
         let snapshot = active.read().map_err(|error| error.message)?;
         let target = ProjectDbTarget::for_project(active.settings_reader(), &snapshot.settings)?;
         let kept = qnc_newsroom_sheet_db::read(&target)?;
-        Ok((snapshot.settings.project_name.clone(), target, kept))
+        Ok((snapshot.settings.project_name, target, kept))
     });
     match active {
         Ok((name, target, kept)) => {

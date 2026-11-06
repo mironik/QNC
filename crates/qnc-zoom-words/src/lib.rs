@@ -80,7 +80,7 @@ impl ZoomWords {
         self.take_finished();
         let needs = needs(sound);
         let target = locator.clone();
-        self.transcripts.poll_from(locator.project_id(), move || qnc_db_broker::ProjectDbTarget::for_project(target.reader(), target.settings()).map_err(|error| error.to_string()), needs.iter().map(|need| need.clip_id.clone()));
+        self.transcripts.poll_from(locator.project_id(), move || qnc_db_broker::ProjectDbTarget::for_project(target.reader(), target.settings()).map_err(|error| error), needs.iter().map(|need| need.clip_id.clone()));
         let settled = self.kept_at.is_none_or(|at| self.transcripts.read_since(at));
         for need in &needs {
             if !self.letters.contains_key(&need.clip_id) {
@@ -176,7 +176,7 @@ impl ZoomWords {
         let (locator, clip) = (locator.clone(), clip_id.to_string());
         let spawned = std::thread::Builder::new().name("qnc-zoom-words-read".into()).spawn(move || {
             let read = qnc_db_broker::ProjectDbTarget::for_project(locator.reader(), locator.settings())
-                .map_err(|error| error.to_string())
+                .map_err(|error| error)
                 .map(|target| qnc_letter_db::read_clip(&target, &clip).unwrap_or_default());
             let _ = send.send(read);
         });
@@ -197,7 +197,7 @@ impl ZoomWords {
                 let around = AROUND_SECONDS * u64::from(place.fps.0) / u64::from(place.fps.1.max(1));
                 let ask = qnc_transcribe_run::Ask { clip_id: wanted.clip_id.clone(), from: wanted.first.saturating_sub(around), to: wanted.last + around };
                 let transcript = qnc_transcribe_run::transcribe(&locator, &ask, qnc_transcribe_run::Quality::Fast, qnc_transcribe_run::Pace::Now, &stop, &mut |_| {}, &mut |_| {})?;
-                let target = qnc_db_broker::ProjectDbTarget::for_project(locator.reader(), locator.settings()).map_err(|error| error.to_string())?;
+                let target = qnc_db_broker::ProjectDbTarget::for_project(locator.reader(), locator.settings()).map_err(|error| error)?;
                 qnc_transcript_db::save(&target, transcript)
             });
             let _ = send.send(made);

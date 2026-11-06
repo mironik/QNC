@@ -112,7 +112,7 @@ impl Control {
         let frame = Arc::new(Mutex::new(FrameState::default()));
         let credentials = Arc::new(credentials);
         let accept_frame = frame.clone();
-        let accept_credentials = credentials.clone();
+        let accept_credentials = credentials;
         let io = thread::spawn(move || {
             while !stopping.load(Ordering::Acquire) {
                 match listener.accept() {

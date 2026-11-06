@@ -186,7 +186,7 @@ mod tests {
             Verb::PickSide { cut: cut.clone(), side: Side::Before },
             Verb::PickSide { cut: cut.clone(), side: Side::After },
             Verb::TakeSoundSide { cut: cut.clone(), frame: 40 },
-            Verb::DragSoundSide { cut: cut.clone(), frame: 41 },
+            Verb::DragSoundSide { cut: cut, frame: 41 },
             Verb::Word { from: 100, to: 112 },
         ];
         for verb in verbs {

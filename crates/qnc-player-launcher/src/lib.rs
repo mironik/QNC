@@ -33,7 +33,7 @@ impl SourceTransportBinding {
         token: impl Into<String>,
     ) -> Result<Self, String> {
         let source_uri = source_uri.into();
-        let parsed = qnc_contracts::parse_qnc_uri(&source_uri).map_err(|e| e.to_string())?;
+        let parsed = qnc_contracts::parse_qnc_uri(&source_uri).map_err(|e| e)?;
         Ok(Self::Network {
             source_uri,
             environment: parsed.environment,
@@ -78,7 +78,7 @@ pub fn sibling_executable(name: &str) -> Result<PathBuf, String> {
         .with_file_name(&executable);
     if !path.is_file() {
         let folder = path.parent().map(|parent| parent.display().to_string()).unwrap_or_else(|| ".".into());
-        return Err(qnc_ui_text::fill("player.runner_missing", &[("executable", &executable.to_string()), ("folder", &folder)]));
+        return Err(qnc_ui_text::fill("player.runner_missing", &[("executable", &executable), ("folder", &folder)]));
     }
     Ok(path)
 }

@@ -14,7 +14,7 @@ pub(crate) fn write(mut request: Request) -> Result<Applied, Stop> {
         request.unselected.extend(found.into_iter().map(|(id, _, _)| id));
     }
     let Request { target, selected, unselected, needs, .. } = request;
-    let mut transport = ContentWriteTransport::start(target).map_err(|e| Stop::Failed(e.to_string()))?;
+    let mut transport = ContentWriteTransport::start(target).map_err(|e| Stop::Failed(e))?;
     if !unselected.is_empty() {
         run(&mut transport, "unselect", |t, key| t.select(key, unselected.clone(), false)).map_err(Stop::Failed)?;
     }
@@ -36,7 +36,7 @@ fn run<E: ToString>(
     loop {
         for completion in transport.poll() {
             if completion.key == key {
-                completion.result.map_err(|e| e.to_string())?;
+                completion.result.map_err(|e| e)?;
                 return Ok(());
             }
         }

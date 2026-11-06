@@ -67,7 +67,7 @@ impl MediaOpener for ConfigMediaOpener {
             .ok_or_else(|| qnc_ui_text::text("import.media_source_bound_configuration").to_string())?;
         let stream = if let Some(root) = &source.location.file {
             qnc_dir_browser::verify_local_volume_serial(root, &source.serial_number)
-                .map_err(|e| e.to_string())?;
+                .map_err(|e| e)?;
             let local = LocalSource::new(&source.location.uri, root).map_err(|e| e.to_string())?;
             MediaStream::local(&local, media_uri).map_err(|e| e.to_string())?
         } else {

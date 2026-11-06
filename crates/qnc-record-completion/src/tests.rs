@@ -108,7 +108,7 @@ fn the_wanted_clip_is_completed_first() {
     .unwrap();
     let records = ProjectMediaRecords::new(writer.clone());
     let sources = ProjectSourceIndex::new(writer);
-    let probes = calls.clone();
+    let probes = calls;
     let make_backend = move |_: &str, _: &[SourceReference]| {
         Ok(qnc_ingest_select::test_support::probe_backend(probes.clone()))
     };
@@ -148,7 +148,7 @@ fn run_with_first_failure(first: qnc_media_probe::Error) -> (Completion, usize) 
     let records = ProjectMediaRecords::new(writer.clone());
     let sources = ProjectSourceIndex::new(writer);
     let seen = Arc::new(Mutex::new(std::collections::BTreeSet::new()));
-    let probes = calls.clone();
+    let probes = calls;
     let make_backend = move |_: &str, _: &[SourceReference]| -> Result<Box<dyn ProbeBackend + Send>, String> {
         Ok(Box::new(Shared {
             seen: seen.clone(),

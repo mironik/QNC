@@ -507,7 +507,7 @@ fn ctrl_s_takes_the_slot_under_the_playhead_and_shift_s_the_first_empty_one() {
     };
     segments.set_playhead(Some(first.start_frame));
     segments.apply(SegmentCommand::SelectSlotAtPlayhead);
-    assert_eq!(segments.view().selected_slot().map(|slot| slot.slot_id.clone()), Some(first.slot_id.clone()));
+    assert_eq!(segments.view().selected_slot().map(|slot| slot.slot_id.clone()), Some(first.slot_id));
     segments.apply(SegmentCommand::FocusEmptySlot);
     let empty = segments.view().slots.iter().find(|slot| !slot.has_cover).map(|slot| slot.slot_id.clone());
     assert_eq!(segments.view().selected_slot().map(|slot| slot.slot_id.clone()), empty);
@@ -907,7 +907,7 @@ fn a_taken_marker_moves_whole_or_only_its_sound_or_only_its_picture() {
     // 2 earlier, the cover before ends 2 earlier.
     assert!(draft.contains(&("c1".to_string(), (2, 0))) && draft.contains(&("c0".to_string(), (0, -2))), "{draft:?}");
     assert!(segments.apply(SegmentCommand::CutPart { marker_id: "m1".into(), picture: false, lane: 1 }));
-    assert_eq!(segments.cut_sound_draft(), Some(draft.clone()), "the sound taken again keeps its draft");
+    assert_eq!(segments.cut_sound_draft(), Some(draft), "the sound taken again keeps its draft");
     assert!(segments.take_cut_part(None, false, 0), "the A1 part is answered");
     assert!(segments.cut_sound_taken(), "A1 has no cut at a marker: the sound stays taken");
     assert!(segments.take_cut_part(None, true, 0));
@@ -1175,7 +1175,7 @@ fn the_picture_of_a_join_moves_alone_as_a_j_or_an_l() {
     }
     let draft = segments.join_picture_draft().unwrap();
     assert!(draft.contains(&("a".to_string(), (0, 3))), "the picture L of the clip before: {draft:?}");
-    assert!(segments.take_cut_part(Some(join.clone()), false, 0), "the A1 sound of the same cut");
+    assert!(segments.take_cut_part(Some(join), false, 0), "the A1 sound of the same cut");
     assert!(segments.join_picture_draft().is_none());
 }
 
@@ -1195,7 +1195,7 @@ fn a_picture_cut_is_only_where_the_picture_changes() {
     assert_eq!(segments.no_picture_cut(&join), Some("story.msg.join_under_cover"));
     assert_eq!(segments.no_picture_cut("m3"), Some("story.msg.marker_no_picture_cut"), "two empty slots");
     assert_eq!(segments.no_picture_cut("m2"), None, "the end of the cover");
-    segments.apply(SegmentCommand::TakeMarker(join.clone()));
+    segments.apply(SegmentCommand::TakeMarker(join));
     segments.set_playhead(Some(40));
     segments.apply_action("wrap_zoom");
     assert!(segments.take_cut_part(None, true, 0));

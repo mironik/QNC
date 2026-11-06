@@ -439,7 +439,7 @@ fn the_picture_or_the_sound_of_a_marker_cut_moves_alone() {
     assert_eq!(overlaps(&mut store), vec![(0, 0, 0), (14, 5, 0)], "a J of the cover after");
     run(&mut store, Operation::SetCutSound { marker_id: m14.clone(), offset: 3 }).unwrap();
     assert_eq!(overlaps(&mut store), vec![(0, 0, 3), (14, 0, 0)], "an L of the cover before");
-    run(&mut store, Operation::MoveMarkerPicture { marker_id: m14.clone(), program_frame: 18 }).unwrap();
+    run(&mut store, Operation::MoveMarkerPicture { marker_id: m14, program_frame: 18 }).unwrap();
     // The picture 4 later, the sound where it was (user 2026-10-29): the cover after still
     // starts at 14, a J of 4; the cover before ends at the new cut, it cannot end before it.
     assert_eq!(overlaps(&mut store), vec![(0, 0, 0), (18, 4, 0)]);
@@ -489,7 +489,7 @@ fn a_cut_has_the_j_of_the_cover_after_and_the_l_of_the_cover_before_together() {
     run(&mut store, Operation::SetCutSoundEdges { marker_id: m14.clone(), tail_frames: 3, lead_frames: 5 }).unwrap();
     assert_eq!(overlaps(&mut store), vec![(0, 0, 3), (14, 5, 0)], "the L before and the J after together");
     // Sound from 9 (J) to 17 (L); the picture to 12: J 3, L 5.
-    run(&mut store, Operation::MoveMarkerPicture { marker_id: m14.clone(), program_frame: 12 }).unwrap();
+    run(&mut store, Operation::MoveMarkerPicture { marker_id: m14, program_frame: 12 }).unwrap();
     assert_eq!(overlaps(&mut store), vec![(0, 0, 5), (12, 3, 0)]);
     run(&mut store, Operation::UndoStory).unwrap();
     run(&mut store, Operation::UndoStory).unwrap();
@@ -566,7 +566,7 @@ fn undo_selected_takes_back_the_changes_of_one_object_whenever_they_were() {
     run(&mut store, Operation::MoveMarker { marker_id: m5.clone(), program_frame: 7 }).unwrap();
     run(&mut store, Operation::MoveMarker { marker_id: m25.clone(), program_frame: 22 }).unwrap();
     run(&mut store, Operation::MoveMarker { marker_id: m5.clone(), program_frame: 9 }).unwrap();
-    run(&mut store, Operation::MoveMarker { marker_id: m25.clone(), program_frame: 21 }).unwrap();
+    run(&mut store, Operation::MoveMarker { marker_id: m25, program_frame: 21 }).unwrap();
     let selected = |id: &str| Operation::UndoSelected { object_type: "marker".into(), object_id: id.into() };
     run(&mut store, selected(&m5)).unwrap();
     assert_eq!(markers(&mut store), vec![7, 21], "the newest change of m5 undone, m25 left");

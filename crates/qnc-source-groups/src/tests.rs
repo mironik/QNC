@@ -86,7 +86,7 @@ fn missing_indexed_proxy_blocks_group_without_silently_dropping_it() {
         .find(|f| f.reference == p.proxies[0])
         .unwrap()
         .state = FileState::Missing;
-    let result = assemble(SOURCE, vec![p.clone()], &facts).unwrap();
+    let result = assemble(SOURCE, vec![p], &facts).unwrap();
     assert!(result.groups.is_empty());
     assert_eq!(result.blocked[0].issues, vec![GroupIssue::ProxyUnavailable]);
     assert_eq!(result.blocked[0].proposal.proxies.len(), 1);

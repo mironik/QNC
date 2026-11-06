@@ -147,7 +147,7 @@ fn attaching_again_to_a_project_keeps_its_shots() {
 #[test]
 fn a_b_roll_shot_never_takes_the_id_of_one_that_was_or_is_still_there() {
     let (_dir, target) = project();
-    let writer = VirtualShotsWriter::start(target.clone()).unwrap();
+    let writer = VirtualShotsWriter::start(target).unwrap();
     let call = |operation: Operation| {
         let pending = writer.submit(&operation).unwrap();
         loop {

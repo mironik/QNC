@@ -836,7 +836,7 @@ where
         let source = self.require_source()?.clone();
         let request = EngineFrameRequest::new(&source, frame)?;
         if source.video_format.is_some() && !self.playout.video.contains_key(&frame) {
-            let video_frame = self.video_decode.decode_video_frame(request.clone())?;
+            let video_frame = self.video_decode.decode_video_frame(request)?;
             if video_frame.source_id != source.source_id || video_frame.frame != frame {
                 return Err(contract_error(
                     "decoder returned a different source or frame",

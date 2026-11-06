@@ -99,7 +99,7 @@ fn run() -> Result<()> {
         .filter_map(|binding| binding.file.clone().map(|file| (binding.uri.clone(), file)))
         .collect();
     let project_source = settings.project_media_source_uri().map_err(|e| e.to_string())?;
-    roots.push((project_source.clone(), project_dir.clone()));
+    roots.push((project_source.clone(), project_dir));
     let access = move |media: &MediaRepresentation| qnc_program_render::local_access(&roots, media);
     let decoders = qnc_decoder_catalog::installed_config().map_err(|e| e.to_string())?;
     // The encoder is the ffmpeg of the installed decoder catalog (the player's toolchain).

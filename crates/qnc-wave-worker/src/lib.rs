@@ -101,7 +101,7 @@ impl WaveSourceBinding {
     }
 
     fn resolver(&self) -> Result<ResolverConfig, String> {
-        let parsed = qnc_contracts::parse_qnc_uri(&self.source_uri).map_err(|e| e.to_string())?;
+        let parsed = qnc_contracts::parse_qnc_uri(&self.source_uri).map_err(|e| e)?;
         let resolver = ResolverConfig::new(PathBuf::new());
         match (
             parsed.environment.as_str(),
@@ -127,7 +127,7 @@ impl WaveSourceBinding {
         };
         if let Some(serial) = &self.serial_number {
             qnc_dir_browser::verify_local_volume_serial(root, serial)
-                .map_err(|error| error.to_string())?;
+                .map_err(|error| error)?;
         }
         let reference = SourceReference::from_uri(media_uri).map_err(|error| error.to_string())?;
         if reference.source_uri() != self.source_uri {
@@ -148,7 +148,7 @@ impl WaveSourceBinding {
         if let Some(root) = &self.local_root {
             if let Some(serial) = &self.serial_number {
                 qnc_dir_browser::verify_local_volume_serial(root, serial)
-                    .map_err(|error| error.to_string())?;
+                    .map_err(|error| error)?;
             }
             let local =
                 LocalSource::new(&self.source_uri, root).map_err(|error| error.to_string())?;

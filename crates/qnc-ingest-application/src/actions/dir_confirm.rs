@@ -71,8 +71,8 @@ impl IngestApplication {
                 IngestDispatchResult::accepted(None, true)
             }
             Err(error) => {
-                self.view.message = error.to_string();
-                IngestDispatchResult::rejected(error.to_string())
+                self.view.message = error.clone();
+                IngestDispatchResult::rejected(error)
             }
         }
     }

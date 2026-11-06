@@ -334,8 +334,8 @@ mod tests {
         };
         assert_eq!(first.project_id, "p1");
         let shown = ShownProject {
-            project_id: first.project_id.clone(),
-            catalog_signature: signature.clone(),
+            project_id: first.project_id,
+            catalog_signature: signature,
         };
         assert!(matches!(
             reader.compare(Some(&shown)).unwrap(),

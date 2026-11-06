@@ -36,7 +36,7 @@ impl CatalogClip {
     pub fn validate(&self) -> Result<()> {
         self.snapshot.validate().map_err(|e| e.to_string())?;
         qnc_media_records::validate_db_uri(&self.media_records_uri).map_err(|e| e.to_string())?;
-        let source = qnc_contracts::parse_qnc_uri(&self.source_uri).map_err(|e| e.to_string())?;
+        let source = qnc_contracts::parse_qnc_uri(&self.source_uri).map_err(|e| e)?;
         if source.resource_kind != "source" || self.name.trim().is_empty() || self.name.len() > 1024
         {
             return Err(qnc_ui_text::text("db.invalid_clip_record").into());
@@ -44,14 +44,14 @@ impl CatalogClip {
         for uri in std::iter::once(&self.snapshot.binding.original_uri)
             .chain(self.snapshot.binding.proxy_uri.iter())
         {
-            qnc_contracts::parse_qnc_uri(uri).map_err(|e| e.to_string())?;
+            qnc_contracts::parse_qnc_uri(uri).map_err(|e| e)?;
             if !uri.starts_with(&format!("{}/", self.source_uri.trim_end_matches('/'))) {
                 return Err(qnc_ui_text::text("db.media_does_belong_recorded_source").into());
             }
         }
         if let Some(uri) = &self.thumbnail_uri {
-            qnc_contracts::parse_qnc_uri(uri).map_err(|e| e.to_string())?;
-            let parsed = qnc_contracts::parse_qnc_uri(uri).map_err(|e| e.to_string())?;
+            qnc_contracts::parse_qnc_uri(uri).map_err(|e| e)?;
+            let parsed = qnc_contracts::parse_qnc_uri(uri).map_err(|e| e)?;
             if parsed.resource_kind != "source" && parsed.resource_kind != "project" {
                 return Err(qnc_ui_text::text("db.poster_belongs_neither_source_nor_project").into());
             }
@@ -139,15 +139,15 @@ pub struct CatalogStats {
 impl StoredClipSummary {
     pub fn validate(&self) -> Result<()> {
         qnc_media_records::valid_id(&self.clip_id).map_err(|e| e.to_string())?;
-        let source = qnc_contracts::parse_qnc_uri(&self.source_uri).map_err(|e| e.to_string())?;
+        let source = qnc_contracts::parse_qnc_uri(&self.source_uri).map_err(|e| e)?;
         if source.resource_kind != "source" || self.name.trim().is_empty() {
             return Err(qnc_ui_text::text("db.invalid_clip_summary").into());
         }
         if let Some(uri) = &self.thumbnail_uri {
-            qnc_contracts::parse_qnc_uri(uri).map_err(|e| e.to_string())?;
+            qnc_contracts::parse_qnc_uri(uri).map_err(|e| e)?;
         }
         if let Some(uri) = &self.imported_media_uri {
-            qnc_contracts::parse_qnc_uri(uri).map_err(|e| e.to_string())?;
+            qnc_contracts::parse_qnc_uri(uri).map_err(|e| e)?;
         }
         Ok(())
     }
@@ -321,7 +321,7 @@ pub struct Reply {
 }
 
 pub fn content_uri(workspace_uri: &str) -> Result<String> {
-    let uri = qnc_contracts::parse_qnc_uri(workspace_uri).map_err(|e| e.to_string())?;
+    let uri = qnc_contracts::parse_qnc_uri(workspace_uri).map_err(|e| e)?;
     if uri.resource_kind != "db" || !uri.resource_id.starts_with("project_workspace/") {
         return Err(qnc_ui_text::text("db.project_database_work_settings_missing").into());
     }
@@ -329,7 +329,7 @@ pub fn content_uri(workspace_uri: &str) -> Result<String> {
 }
 
 pub(crate) fn project_id(uri: &str) -> Result<String> {
-    let parsed = qnc_contracts::parse_qnc_uri(uri).map_err(|e| e.to_string())?;
+    let parsed = qnc_contracts::parse_qnc_uri(uri).map_err(|e| e)?;
     if parsed.resource_kind != "db" {
         return Err("Neispravan DB URI.".into());
     }

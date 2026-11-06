@@ -635,7 +635,7 @@ impl Connection {
         })
     }
     fn request(&mut self, request: SessionRequest) -> Result<EventEnvelope> {
-        let reply: SessionReply = self.control.post(&request).map_err(|e| e.to_string())?;
+        let reply: SessionReply = self.control.post(&request).map_err(|e| e)?;
         let reply = reply?;
         reply.validate_for(
             &self.query.session_id,

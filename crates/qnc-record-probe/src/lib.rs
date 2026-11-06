@@ -171,7 +171,7 @@ fn probe_once(
                 .ok_or_else(|| qnc_ui_text::text("record.stored_probe_evidence_missing").into()),
             // The medium was probed before and could not be read: the same answer again.
             Some(AcquisitionOutcome::Failed { code }) => {
-                Err(Error::Unreadable(qnc_ui_text::fill("record.probe_failed", &[("code", &code.to_string())])))
+                Err(Error::Unreadable(qnc_ui_text::fill("record.probe_failed", &[("code", &code)])))
             }
             _ => Err(qnc_ui_text::text("record.probe_already_tried_running_started_again").into()),
         };
@@ -217,7 +217,7 @@ fn probe_once(
                 outcome,
                 document: None,
             })?;
-            let message = qnc_ui_text::fill("record.probe_failed", &[("code", &code.to_string())]);
+            let message = qnc_ui_text::fill("record.probe_failed", &[("code", &code)]);
             Err(if interrupted {
                 Error::Interrupted(message)
             } else if matches!(error, qnc_media_probe::Error::TransportUncertain) {

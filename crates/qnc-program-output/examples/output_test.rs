@@ -64,7 +64,7 @@ fn main() -> Result<(), String> {
             sequence: frame + 1,
             source_id: "test-pattern".into(),
             frame,
-            timebase: Timebase::new(50, 1).map_err(|error| error.to_string())?,
+            timebase: Timebase::new(50, 1).map_err(|error| error)?,
             width: width as u32,
             height: height as u32,
         };

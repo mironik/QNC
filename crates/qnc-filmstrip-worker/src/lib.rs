@@ -111,7 +111,7 @@ impl FilmstripSourceBinding {
     }
 
     fn resolver(&self) -> Result<ResolverConfig, String> {
-        let parsed = qnc_contracts::parse_qnc_uri(&self.source_uri).map_err(|e| e.to_string())?;
+        let parsed = qnc_contracts::parse_qnc_uri(&self.source_uri).map_err(|e| e)?;
         let resolver = ResolverConfig::new(PathBuf::new());
         match (
             parsed.environment.as_str(),
@@ -137,7 +137,7 @@ impl FilmstripSourceBinding {
         };
         if let Some(serial) = &self.serial_number {
             qnc_dir_browser::verify_local_volume_serial(root, serial)
-                .map_err(|error| error.to_string())?;
+                .map_err(|error| error)?;
         }
         let reference = SourceReference::from_uri(media_uri).map_err(|error| error.to_string())?;
         if reference.source_uri() != self.source_uri {
@@ -158,7 +158,7 @@ impl FilmstripSourceBinding {
         if let Some(root) = &self.local_root {
             if let Some(serial) = &self.serial_number {
                 qnc_dir_browser::verify_local_volume_serial(root, serial)
-                    .map_err(|error| error.to_string())?;
+                    .map_err(|error| error)?;
             }
             let local =
                 LocalSource::new(&self.source_uri, root).map_err(|error| error.to_string())?;
@@ -876,7 +876,7 @@ impl DecoderFilmstripGenerator {
         let source = match source.local_media_path(&plan.source_uri) {
             Ok(Some(path)) => path,
             Ok(None) => return None,
-            Err(error) => return Some(Err(error.to_string())),
+            Err(error) => return Some(Err(error)),
         };
         Some(
             extractor.extract_frames_with_cancel(
@@ -969,7 +969,7 @@ impl DecoderFilmstripGenerator {
             .map_err(|error| error.to_string())?;
         if let Some(path) = source
             .local_media_path(&media.media_uri)
-            .map_err(|error| error.to_string())?
+            .map_err(|error| error)?
         {
             let stream = open_media_stream(source, &media.media_uri)?;
             let stamp = stream.info().storage_stamp.clone();

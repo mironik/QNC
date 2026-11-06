@@ -154,7 +154,7 @@ impl Writer {
         let key = format!("runtime-{}", self.sequence);
         self.transport
             .set_runtime(key.clone(), name.into(), value.into())
-            .map_err(|e| e.to_string())?;
+            .map_err(|e| e)?;
         self.wait(&key).map(|_| ())
     }
 
@@ -164,7 +164,7 @@ impl Writer {
         let key = format!("lease-{}", self.sequence);
         self.transport
             .lease(key.clone(), name.into(), owner.into(), act, max_age_seconds)
-            .map_err(|e| e.to_string())?;
+            .map_err(|e| e)?;
         match self.wait(&key)? {
             qnc_content_store::ContentWriteData::Leased(held) => Ok(held),
             _ => Err(qnc_ui_text::text("db.content_writer_returned_result").into()),
@@ -175,7 +175,7 @@ impl Writer {
         loop {
             for completion in self.transport.poll() {
                 if completion.key == key {
-                    return completion.result.map(|result| result.data).map_err(|e| e.to_string());
+                    return completion.result.map(|result| result.data).map_err(|e| e);
                 }
             }
             if !self.transport.has_pending() {
@@ -572,7 +572,7 @@ mod tests {
         let lease = Lease::claim(target.clone(), WORKER, WORKER_FRESH_SECONDS).unwrap().expect("taken");
         assert!(lease.confirm(), "its own in the database");
         // Another owner holds it now (as after this one was not renewed in time).
-        Writer::start(target.clone()).unwrap().set(WORKER, &qnc_content_store::lease_value("other-owner")).unwrap();
+        Writer::start(target).unwrap().set(WORKER, &qnc_content_store::lease_value("other-owner")).unwrap();
         assert!(!lease.confirm(), "nothing may be published under it any more");
         let deadline = Instant::now() + Duration::from_secs(5);
         while !lease.lost().load(Ordering::Relaxed) && Instant::now() < deadline {

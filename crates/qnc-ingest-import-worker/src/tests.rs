@@ -128,7 +128,7 @@ fn fixture_with(queued: bool) -> Fixture {
     }
     let first = client.read(&ids[0]).unwrap().unwrap();
     let original = first.clip.snapshot.binding.original_uri.clone();
-    let proxy = first.clip.snapshot.binding.proxy_uri.clone().unwrap();
+    let proxy = first.clip.snapshot.binding.proxy_uri.unwrap();
     let mut media = BTreeMap::new();
     for id in &ids {
         let clip = client.read(id).unwrap().unwrap();
@@ -575,7 +575,7 @@ fn the_copy_waits_while_the_database_says_a_player_works() {
     let f = fixture();
     let pause = qnc_playback_activity::playback_pause(f.target.clone());
     assert!(!pause());
-    let mut writer = qnc_playback_activity::Writer::start(f.target.clone()).unwrap();
+    let mut writer = qnc_playback_activity::Writer::start(f.target).unwrap();
     writer.set(qnc_playback_activity::PLAYBACK, "on").unwrap();
     std::thread::sleep(std::time::Duration::from_millis(600));
     assert!(pause());
@@ -672,7 +672,7 @@ fn an_optimized_copy_needs_the_original_on_this_computer_and_records_a_failed_im
 fn an_optimized_copy_must_be_the_original_frame_for_frame() {
     let mut f = fixture();
     let clip = f.client.claim_next().unwrap().unwrap();
-    let original = clip.clip.snapshot.metadata.original.clone();
+    let original = clip.clip.snapshot.metadata.original;
     let mut copy = original.clone();
     copy.media_uri = "qnc://local/source/project-p1/file/optimized/c.mov".into();
     crate::optimize::same_frames(&original, &copy).unwrap();

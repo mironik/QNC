@@ -8033,3 +8033,8 @@ funkcije koja pokrece pisca za nit radnika; tvornice u `qnc-content-artifacts` s
 `qnc-edit-step`, `qnc-right-panel` vise ne izvozi konstante `qnc-side-pieces`. Ponasanje isto. Testovi dotaknutih kocki,
 `cargo check --workspace --all-targets`, conformance (baseline spusten: dijagnostika vise ne ovisi o
 `qnc-ingest-store`). Uzivo nije provjereno.
+Izvedeno 2026-11-06 (korisnik: "da, kreni s P3" iz `docs/arhitektura.md`), korak 1: suvisne kopije. `cargo clippy --fix` za
+`redundant_clone` i `implicit_clone` u 52 datoteke (105 redaka; bez Projecta, koji je zamrznut); jedan prijedlog clippyja
+(`qnc-pixel-convert` `preview.rs`) bio je pogresan jer se vrijednost kasnije koristi i nije primijenjen. U
+`tools/qnc-ingest-worker` uklonjena mrtva dodjela (`stuck` se pocetnom vrijednoscu nikad nije citao). Ponasanje isto. Testovi
+42 dotaknuta paketa, gradnja cijelog workspacea.

@@ -191,7 +191,7 @@ fn an_interrupted_attempt_gives_way_to_a_new_one() {
         document_uri: again.document_uri.clone(),
     };
     let document = finish.document.as_mut().unwrap();
-    document.document_uri = again.document_uri.clone();
+    document.document_uri = again.document_uri;
     db.finish_acquisition(finish).unwrap();
     assert!(!db.begin_acquisition(begin()).unwrap().granted);
 }

@@ -80,7 +80,7 @@ impl ProjectFolder {
         let data = std::fs::read(self.dir.join(relative)).map_err(|e| e.to_string())?;
         qnc_image_assets::decode_thumbnail(&data)
             .map(Arc::new)
-            .map_err(|e| e.to_string())
+            .map_err(|e| e)
     }
 }
 
@@ -255,7 +255,7 @@ fn thumbnail(
         .map_err(|e| e.to_string())?;
     qnc_image_assets::decode_thumbnail(&data.bytes)
         .map(Arc::new)
-        .map_err(|e| e.to_string())
+        .map_err(|e| e)
 }
 
 #[cfg(test)]

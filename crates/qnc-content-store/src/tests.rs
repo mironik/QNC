@@ -979,7 +979,7 @@ fn an_optimized_copy_is_kept_with_its_description() {
     let dir = tempfile::tempdir().unwrap();
     let path = dir.path().join("db");
     let mut store = claimed_store(&path);
-    let mut optimized = clip("c1").snapshot.metadata.original.clone();
+    let mut optimized = clip("c1").snapshot.metadata.original;
     optimized.media_uri = "qnc://local/source/project-p1/file/optimized/c1_a.mov".into();
     let card = clip("c1").snapshot.binding.original_uri;
     run(

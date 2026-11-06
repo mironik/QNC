@@ -39,7 +39,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let settings = reader.read()?;
     let content_target = ContentTarget::for_project(&reader, &settings)?;
     let inputs = InputReader::with_content_reader(
-        reader.clone(),
+        reader,
         Arc::new(StorePlayerContentReader {
             target: content_target.clone(),
         }),

@@ -954,7 +954,7 @@ fn a_program_input_names_the_playback_picture_and_the_original_sound_of_its_clip
     let input = prepare(&settings("qnc://local", "proxy"), &stored("qnc://local")).unwrap();
     let clip_id = input.snapshot.metadata.clip_id.clone();
     let picture = input.media().unwrap().media_uri.clone();
-    let clips = std::collections::BTreeMap::from([(clip_id.clone(), input.clone())]);
+    let clips = std::collections::BTreeMap::from([(clip_id, input.clone())]);
 
     let program = ProgramInput::new(program_of(&input, &picture), clips.clone()).unwrap();
     assert_eq!(program.project_audio, input.project_audio);
@@ -967,7 +967,7 @@ fn a_program_input_names_the_playback_picture_and_the_original_sound_of_its_clip
 
     let original = input.audio_media().media_uri.clone();
     assert!(
-        ProgramInput::new(program_of(&input, &original), clips.clone()).is_err(),
+        ProgramInput::new(program_of(&input, &original), clips).is_err(),
         "the picture must be the project playback media (proxy here)"
     );
     assert!(ProgramInput::new(program_of(&input, &picture), Default::default()).is_err());

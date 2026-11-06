@@ -323,7 +323,7 @@ mod tests {
             .entries
             .iter()
             .all(|entry| !entry.qnc_uri.contains('\\')));
-        assert_eq!(browser.selected_private_local_path(uri), Some(root.clone()));
+        assert_eq!(browser.selected_private_local_path(uri), Some(root));
         let child_uri = opened.entries[0].qnc_uri.clone();
         browser.open(&child_uri).unwrap();
         assert_eq!(browser.selected_private_local_path(&child_uri), Some(child));

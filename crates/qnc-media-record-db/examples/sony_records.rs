@@ -180,7 +180,7 @@ fn main() -> TestResult<()> {
     let index_proof = Document {
         document_uri: index_document.document_uri.clone(),
         media_type: DocumentType::Xml,
-        text: index_document.text.clone(),
+        text: index_document.text,
     };
     documents.insert(index_proof.document_uri.clone(), index_proof.clone());
     for (i, (material, source_id)) in index.materials.iter().zip(&source_ids).enumerate() {

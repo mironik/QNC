@@ -20,11 +20,11 @@ pub trait ImportQueue {
 
 impl ImportQueue for ContentClient {
     fn heartbeat(&mut self, clip_id: &str) -> Result<(), String> {
-        ContentClient::heartbeat(self, clip_id.to_string()).map_err(|e| e.to_string())
+        ContentClient::heartbeat(self, clip_id.to_string()).map_err(|e| e)
     }
 
     fn claim_next(&mut self) -> Result<Option<StoredClip>, String> {
-        ContentClient::claim_next(self).map_err(|e| e.to_string())
+        ContentClient::claim_next(self).map_err(|e| e)
     }
 
     fn finish_import(
@@ -37,7 +37,7 @@ impl ImportQueue for ContentClient {
         error: Option<String>,
     ) -> Result<(), String> {
         ContentClient::finish_import(self, clip_id, media_uri, thumbnail_uri, copy_of, optimized, error)
-            .map_err(|e| e.to_string())
+            .map_err(|e| e)
     }
 }
 
@@ -61,7 +61,7 @@ impl TransportQueue {
     ) -> Result<Self, String> {
         Ok(Self {
             transport: qnc_content_store::ContentWriteTransport::start_leased(target, lease)
-                .map_err(|e| e.to_string())?,
+                .map_err(|e| e)?,
             sequence: 0,
         })
     }
@@ -75,7 +75,7 @@ impl TransportQueue {
         loop {
             for completion in self.transport.poll() {
                 if completion.key == key {
-                    return completion.result.map(|r| r.data).map_err(|e| e.to_string());
+                    return completion.result.map(|r| r.data).map_err(|e| e);
                 }
             }
             if !self.transport.has_pending() {
@@ -90,7 +90,7 @@ impl TransportQueue {
         let key = self.next_key("poster");
         self.transport
             .set_poster(key.clone(), clip_id, thumbnail_uri)
-            .map_err(|e| e.to_string())?;
+            .map_err(|e| e)?;
         self.wait(&key).map(|_| ())
     }
 
@@ -99,7 +99,7 @@ impl TransportQueue {
         let key = self.next_key("queue");
         self.transport
             .queue_selected(key.clone(), needs)
-            .map_err(|e| e.to_string())?;
+            .map_err(|e| e)?;
         self.wait(&key).map(|_| ())
     }
 }
@@ -109,7 +109,7 @@ impl ImportQueue for TransportQueue {
         let key = self.next_key("beat");
         self.transport
             .heartbeat(key.clone(), clip_id.to_string())
-            .map_err(|e| e.to_string())?;
+            .map_err(|e| e)?;
         self.wait(&key).map(|_| ())
     }
 
@@ -118,7 +118,7 @@ impl ImportQueue for TransportQueue {
         let key = self.next_key("claim");
         self.transport
             .claim_next(key.clone())
-            .map_err(|e| e.to_string())?;
+            .map_err(|e| e)?;
         match self.wait(&key)? {
             ContentWriteData::Claimed(clip) => Ok(clip.map(|c| *c)),
             _ => Err("Neispravan claim odgovor.".into()),
@@ -137,7 +137,7 @@ impl ImportQueue for TransportQueue {
         let key = self.next_key("finish");
         self.transport
             .finish_import(key.clone(), clip_id, media_uri, thumbnail_uri, copy_of, optimized, error)
-            .map_err(|e| e.to_string())?;
+            .map_err(|e| e)?;
         self.wait(&key).map(|_| ())
     }
 }

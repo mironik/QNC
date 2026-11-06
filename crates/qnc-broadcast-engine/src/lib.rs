@@ -348,7 +348,7 @@ impl Runtime {
         let mut engine = TransportEngine::new(
             Source(source.clone()),
             VideoPath::Clip(Video {
-                back: back.clone(),
+                back: back,
                 plan,
                 decoder: Opening::Ready(video_decoder),
                 input: decode_input,

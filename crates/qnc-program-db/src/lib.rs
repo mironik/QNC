@@ -73,7 +73,7 @@ impl StoryReader {
     /// schema shows (live 2026-10-17: the segment panel stayed empty until a write).
     fn call(&mut self, operation: &Operation) -> Result<Data> {
         match self.client.execute(MODULE_ID, encode(operation)?) {
-            Err(error) if error.to_string().contains(qnc_ui_text::text("story.schema_outdated")) => {
+            Err(error) if error.clone().contains(qnc_ui_text::text("story.schema_outdated")) => {
                 prepare_schema(&self.target)?;
                 decode(self.client.execute(MODULE_ID, encode(operation)?)?)
             }

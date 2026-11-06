@@ -53,7 +53,7 @@ fn deleting_a_marker_deletes_its_slots_with_their_covers() {
     run(
         &mut store,
         Operation::DeleteMarker {
-            marker_id: m14.clone(),
+            marker_id: m14,
         },
     )
     .unwrap();

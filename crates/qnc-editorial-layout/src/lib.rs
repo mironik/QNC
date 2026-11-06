@@ -256,7 +256,7 @@ fn report_to_result(report: qnc_contracts::ValidationReport) -> Result<(), Strin
         Err(report
             .errors
             .iter()
-            .map(|error| error.to_string())
+            .map(|error| error.clone())
             .collect::<Vec<_>>()
             .join("; "))
     }
