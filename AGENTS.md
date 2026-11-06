@@ -7966,3 +7966,14 @@ revizija s prioritetom (`qnc-script` 35 ovisnosti, `qnc-panel-focus` 32, dvostru
 neiskoristenim ovisnostima po `cargo machete`, traitovi s jednom implementacijom, clippy pedantic 4446 upozorenja) i
 prijedlog redoslijeda pojednostavljenja. Instalirani alati `cargo-machete` 0.9.2 i `cargo-modules` 0.26.0 (0.28 trazi
 rustc 1.98). Kod nije mijenjan.
+Izvedeno 2026-11-06 (korisnik: "da, kreni s prvom tockom" iz `docs/arhitektura.md`, P1-1): jedan citac prijepisa. Nova
+javna kocka `crates/qnc-clip-transcripts` (+ ugovor `contracts/modules/clip-transcripts.module.json`): prijepise klipova
+koje kocke pokazuju cita iz baze projekta u pozadinskoj niti, ponovno svake sekunde (tko god ih je napisao), i daje ih
+svima; drzi samo zadnji odgovor baze, promjenu vidi usporedbom (`rev`), neuspjelo citanje zadrzava zadnji odgovor i kaze
+razlog; `poll_from` razrjesava bazu u pozadinskoj niti, `read_since` kaze je li citanje novije od trenutka; nista ne
+pise. Prije su prijepis citala tri mjesta, svako sa svojom memorijom: `qnc-transcript` (panel prijepisa), `qnc-script`
+(rijeci izjava, `read.rs`) i `qnc-zoom-words` (rijeci u zoomu reza; nije ga nasao pregled iz `docs/arhitektura.md`). Sada:
+`qnc-side-pieces` drzi jedan primjerak za panel prijepisa i scenarij (klip na previewu i klipovi izjava,
+`Script::transcript_clips`) i daje ga u `Transcript::poll` i `Script::poll`; `qnc-zoom-words` koristi kocku za prijepise,
+a vremena slova (`letter-db`) cita i dalje sam; nakon vlastitog prijepisa ne prepisuje ponovno dok kocka ne procita bazu
+nakon njega. Testovi dotaknutih kocki, conformance, release build s libav. Uzivo nije provjereno.

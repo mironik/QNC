@@ -136,6 +136,7 @@ members = [
     "crates/qnc-ai-catalog",
     "crates/qnc-sound-range",
     "crates/qnc-transcript-db",
+    "crates/qnc-clip-transcripts",
     "crates/qnc-shot-detect",
     "crates/qnc-shot-db",
     "crates/qnc-shot-analysis",
@@ -440,6 +441,7 @@ qnc-transcribe-jobs = { path = "crates/qnc-transcribe-jobs" }
 qnc-ai-catalog = { path = "crates/qnc-ai-catalog" }
 qnc-sound-range = { path = "crates/qnc-sound-range" }
 qnc-transcript-db = { path = "crates/qnc-transcript-db" }
+qnc-clip-transcripts = { path = "crates/qnc-clip-transcripts" }
 qnc-shot-detect = { path = "crates/qnc-shot-detect" }
 qnc-shot-db = { path = "crates/qnc-shot-db" }
 qnc-shot-analysis = { path = "crates/qnc-shot-analysis" }

@@ -1,0 +1,9 @@
+[package]
+name = "qnc-clip-transcripts"
+version = "0.1.0"
+edition = "2021"
+description = "QNC public piece: the one reader of the kept transcripts of a project's clips - the clips asked for are read from the project database in a background thread, again every second (whoever wrote them), and given to every piece that shows them; nothing is written"
+
+[dependencies]
+qnc-db-broker = { workspace = true }
+qnc-transcript-db = { workspace = true }

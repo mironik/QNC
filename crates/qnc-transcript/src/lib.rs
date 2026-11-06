@@ -13,6 +13,7 @@ use std::{
 };
 
 use qnc_clip_row::ClipRow;
+pub use qnc_clip_transcripts::ClipTranscripts;
 use qnc_db_broker::ProjectDbTarget;
 use qnc_source_preview::SourcePreview;
 use qnc_timeline::TimelineProjection;
@@ -152,7 +153,6 @@ fn said_between(lines: &[Line], from: u64, to: u64) -> String {
     words.join(" ")
 }
 
-type Kept = Result<Vec<ClipTranscript>, String>;
 /// The queue, the statements and the transcribed clips, read together.
 type QueueRead = (Vec<Queued>, Vec<Quote>, Vec<String>);
 
@@ -172,11 +172,6 @@ struct Running {
 
 pub struct Transcript {
     view: TranscriptView,
-    /// The project and clip whose transcripts are shown, as last read from the database (the
-    /// only truth: read again every `QUEUE_EVERY`, whoever wrote it), and when.
-    kept: Option<(String, String, Vec<ClipTranscript>)>,
-    kept_at: Option<Instant>,
-    reading: Option<(String, String, mpsc::Receiver<Kept>)>,
     ticks: BTreeSet<String>,
     quality: QueueQuality,
     runner: QueueRunner,
@@ -193,16 +188,13 @@ pub struct Transcript {
     /// Grows when what the lines are made of changes; the lines are made again only then
     /// (live 2026-10-26: making them at every paint took a fifth of a core).
     rev: u64,
-    built: Option<(u64, Option<String>)>,
+    built: Option<(u64, u64, Option<String>)>,
 }
 
 impl Default for Transcript {
     fn default() -> Self {
         Self {
             view: TranscriptView { fast: true, ..TranscriptView::default() },
-            kept: None,
-            kept_at: None,
-            reading: None,
             ticks: BTreeSet::new(),
             quality: QueueQuality::Fast,
             runner: QueueRunner::new(),
@@ -236,7 +228,7 @@ impl Transcript {
 
     /// Whether a read or an enqueue of this process runs (the form repaints soon).
     pub fn busy(&self) -> bool {
-        self.reading.is_some() || self.asking.is_some()
+        self.asking.is_some()
     }
 
     /// Whether this process transcribes in the background: the form repaints now and then for
@@ -351,8 +343,9 @@ impl Transcript {
 
     /// Ticks the clips on `clips`, takes what the runner heard, reads the queue again now and
     /// then (starting the runner when something waits) and the shown clip's transcripts when
-    /// they changed. Returns whether the view changed.
-    pub fn poll(&mut self, preview: &SourcePreview, timeline: &TimelineProjection, clips: &mut [ClipRow]) -> bool {
+    /// they changed. The shown clip's kept transcripts are those `transcripts` read from the
+    /// database (the one reader, `qnc-clip-transcripts`). Returns whether the view changed.
+    pub fn poll(&mut self, preview: &SourcePreview, timeline: &TimelineProjection, clips: &mut [ClipRow], transcripts: &mut ClipTranscripts) -> bool {
         let before = self.view.clone();
         self.view.all_done = false;
         self.names = clips.iter().map(|clip| (clip.clip_id.clone(), (clip.name.clone(), clip.duration_frames, clip.duration_seconds))).collect();
@@ -362,7 +355,7 @@ impl Transcript {
         }
         let project = preview.project_target().cloned();
         let clip_id = preview.view().clip_id.clone();
-        self.take_heard();
+        self.take_heard(transcripts);
         if let Some(done) = &self.asking {
             if let Ok(result) = done.try_recv() {
                 if let Err(error) = result {
@@ -380,17 +373,19 @@ impl Transcript {
         } else {
             self.runner.stop();
         }
-        self.read_kept(project.as_ref(), clip_id.as_deref());
+        if let Some(error) = transcripts.error() {
+            self.view.message = error.to_string();
+        }
         self.view.clip_id = clip_id.clone();
         self.view.playhead = preview.view().timeline.playhead_frame;
         self.view.fast = self.quality == QueueQuality::Fast;
         self.view.ticked = self.ticks.len();
         self.view.marks = timeline.visible_source_marks();
         self.view.queue = self.queue.iter().map(|q| self.queue_row(q)).collect();
-        let kept = self.kept.as_ref().filter(|(_, clip, _)| Some(clip) == clip_id.as_ref()).map(|(_, _, kept)| kept.as_slice()).unwrap_or_default();
+        let kept = clip_id.as_deref().and_then(|clip| transcripts.of(clip)).map(|kept| kept.as_slice()).unwrap_or_default();
         let running = self.running.as_ref().filter(|run| Some(&run.clip_id) == clip_id.as_ref());
         self.view.running = running.map(|run| run.range);
-        let key = (self.rev, clip_id.clone());
+        let key = (self.rev, transcripts.rev(), clip_id.clone());
         if self.built.as_ref() == Some(&key) {
             return self.view != before;
         }
@@ -439,7 +434,7 @@ impl Transcript {
         self.rev += 1;
     }
 
-    fn take_heard(&mut self) {
+    fn take_heard(&mut self, transcripts: &mut ClipTranscripts) {
         for heard in self.runner.take() {
             self.rev += 1;
             match heard {
@@ -457,16 +452,14 @@ impl Transcript {
                         run.lines.push(line);
                     }
                 }
-                Heard::Finished { clip_id, result } => {
+                Heard::Finished { result, .. } => {
                     if let Err(error) = result {
                         self.view.message = error;
                     }
                     self.running = None;
                     self.queue_at = None;
                     // What was kept is read again from the database.
-                    if self.kept.as_ref().is_some_and(|(_, clip, _)| *clip == clip_id) {
-                        self.kept = None;
-                    }
+                    transcripts.read_now();
                 }
             }
         }
@@ -506,42 +499,6 @@ impl Transcript {
         if std::thread::Builder::new().name("qnc-transcript-queue-read".into()).spawn(move || _ = send.send(qnc_transcript_db::read_queue(&target).and_then(|queue| Ok((queue, qnc_transcript_db::read_quotes(&target)?, qnc_transcript_db::read_transcribed(&target)?))))).is_ok() {
             self.queue_read = Some(done);
             self.queue_at = Some(Instant::now());
-        }
-    }
-
-    fn read_kept(&mut self, project: Option<&ProjectDbTarget>, clip_id: Option<&str>) {
-        let (Some(project), Some(clip_id)) = (project, clip_id) else { return };
-        if let Some((uri, clip, done)) = &self.reading {
-            match done.try_recv() {
-                Ok(kept) => {
-                    let kept = kept.unwrap_or_else(|error| {
-                        self.view.message = error;
-                        Vec::new()
-                    });
-                    // Shown again only when the database says something else than before.
-                    let same = self.kept.as_ref().is_some_and(|(was_uri, was_clip, was)| was_uri == uri && was_clip == clip && *was == kept);
-                    if !same {
-                        self.kept = Some((uri.clone(), clip.clone(), kept));
-                        self.rev += 1;
-                    }
-                    self.kept_at = Some(Instant::now());
-                    self.reading = None;
-                }
-                Err(mpsc::TryRecvError::Disconnected) => self.reading = None,
-                Err(mpsc::TryRecvError::Empty) => {}
-            }
-        }
-        let is = |uri: &str, clip: &str| uri == project.uri() && clip == clip_id;
-        // The shown clip's transcript is read from the database again every `QUEUE_EVERY`: a
-        // transcript another form or process wrote is seen without any link between them.
-        let fresh = self.kept_at.is_some_and(|at| at.elapsed() < QUEUE_EVERY);
-        if (fresh && self.kept.as_ref().is_some_and(|(uri, clip, _)| is(uri, clip))) || self.reading.is_some() {
-            return;
-        }
-        let (send, done) = mpsc::channel();
-        let (target, clip) = (project.clone(), clip_id.to_string());
-        if std::thread::Builder::new().name("qnc-transcript-read".into()).spawn(move || _ = send.send(qnc_transcript_db::read_clip(&target, &clip))).is_ok() {
-            self.reading = Some((project.uri().to_string(), clip_id.to_string(), done));
         }
     }
 }

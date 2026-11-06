@@ -247,9 +247,10 @@ Gdje se blokira ili nepotrebno kopira (iz loga i koda):
 
 ### P1 - krsi pravila iz AGENTS.md ili vec daje greske
 
-1. **Dvostruko citanje iste tablice u dvije kocke** (`qnc-transcript` i `qnc-script` za
-   prijepise). Jedna kocka treba citati prijepise klipa i davati ih obama. Danasnja greska je
-   bila iz ove klase.
+1. ~~**Dvostruko citanje iste tablice u dvije kocke**~~ **Izvedeno 2026-11-06**: prijepise cita
+   samo `qnc-clip-transcripts` (iz baze, ponovno svake sekunde). Cita ih za panel prijepisa i
+   scenarij (jedan primjerak u `qnc-side-pieces`) i za rijeci u zoomu (`qnc-zoom-words`; bio je
+   i treci citac koji ovaj pregled nije nasao).
 2. **`qnc-script` je postao monolit**: 35 ovisnosti, 1946 redaka u `lib.rs`, unutra je
    scenarij, snimanje, slozena izjava (rubovi, rez, J/L, pomak dijela, zoom), uredivanje teksta,
    slova i export. Pravilo 0.11: jedna kocka, jedna odgovornost. Prirodna podjela je slozena
@@ -299,7 +300,7 @@ Gdje se blokira ili nepotrebno kopira (iz loga i koda):
 
 Sto bih pojednostavio prvo (redom):
 
-1. **Jedna kocka citanja prijepisa** (P1-1). Mala, uklanja klasu greske koja se upravo dogodila.
+1. ~~**Jedna kocka citanja prijepisa** (P1-1)~~ - izvedeno 2026-11-06.
 2. **Izdvojiti slozenu izjavu iz `qnc-script`** u svoju kocku (P1-2). Najveci dobitak za
    stabilnost, jer se tu najvise mijenjalo zadnjih dana.
 3. **`qnc-panel-focus` svesti na usmjeravanje** (P1-3): pravila price u `qnc-program-segments`,

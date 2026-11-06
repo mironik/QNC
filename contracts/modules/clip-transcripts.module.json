@@ -1,0 +1,21 @@
+{
+  "module_id": "qnc.module.clip-transcripts",
+  "module_name": "Clip transcripts",
+  "module_version": "0.1.0",
+  "module_kind": "library",
+  "capabilities": ["db.transcripts.read"],
+  "input_contract_version": "0.1.0",
+  "output_contract_version": "0.1.0",
+  "transport_protocol_version": "0.1.0",
+  "transport_scope": ["local", "lan", "intranet"],
+  "supported_os": ["windows", "linux", "macos"],
+  "supported_cpu": ["x86_64", "aarch64"],
+  "forbidden_calls": ["ffprobe", "media.probe.full", "playback.clock", "db.write"],
+  "forbidden_dependencies": ["qnc.module.media-probe", "qnc.module.scanner"],
+  "state_policy": "session_local",
+  "database_write_policy": "no_db_writes",
+  "runtime_crate": "qnc-clip-transcripts",
+  "input": "The project database and the clips whose transcripts a piece shows.",
+  "output": "The kept transcripts of those clips as the database last gave them, read again every second in a background thread, and a revision that grows when they change.",
+  "specification": "User 2026-11-06: the only truth is the database; docs/arhitektura.md P1-1, one reader of transcripts for the transcript panel and the script (AGENTS.md)."
+}

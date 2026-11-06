@@ -182,8 +182,6 @@ pub struct Script {
     join_sound: Option<JoinSound>,
     /// The value of the action being handled (the frame of a click in the trim zoom).
     value: Option<i64>,
-    /// The transcripts of the clips of the clip blocks, as last read.
-    transcripts: HashMap<String, Vec<qnc_transcript_db::ClipTranscript>>,
     /// The fine times of the letters of those words, as last read, and the background work that
     /// lays the letters of the words shown without them (user 2026-11-05).
     letters: HashMap<String, Vec<qnc_letter_db::WordLetters>>,
@@ -331,7 +329,7 @@ impl JoinSound {
 
 impl Default for Script {
     fn default() -> Self {
-        Self { view: ScriptView::default(), blocks: Vec::new(), project: None, reading: None, read_at: None, writing: None, source_request: None, names: HashMap::new(), words_per_second: Ok(0.0), take: None, taking: None, exporting: None, draft: Default::default(), open_subsegment: None, pieces_request: None, trim: None, chosen: None, join_sound: None, value: None, transcripts: HashMap::new(), letters: HashMap::new(), letter_times: qnc_letter_times::LetterTimes::new(), word_cut: qnc_edit_words::WordPair::new(), word_pick: None, slide: None, slip_part: None, waves: qnc_program_waveform::ProgramWaves::new(), filmstrips: qnc_program_filmstrip::ProgramFilmstrips::new(), waves_project: None, trim_stills: qnc_trim_stills::TrimStills::new(), zoom_follow: Default::default(), sound: None, voices: Vec::new(), voice_request: None, voice_after_write: None, message_after_write: None, clear_after_write: false }
+        Self { view: ScriptView::default(), blocks: Vec::new(), project: None, reading: None, read_at: None, writing: None, source_request: None, names: HashMap::new(), words_per_second: Ok(0.0), take: None, taking: None, exporting: None, draft: Default::default(), open_subsegment: None, pieces_request: None, trim: None, chosen: None, join_sound: None, value: None, letters: HashMap::new(), letter_times: qnc_letter_times::LetterTimes::new(), word_cut: qnc_edit_words::WordPair::new(), word_pick: None, slide: None, slip_part: None, waves: qnc_program_waveform::ProgramWaves::new(), filmstrips: qnc_program_filmstrip::ProgramFilmstrips::new(), waves_project: None, trim_stills: qnc_trim_stills::TrimStills::new(), zoom_follow: Default::default(), sound: None, voices: Vec::new(), voice_request: None, voice_after_write: None, message_after_write: None, clear_after_write: false }
     }
 }
 
@@ -1772,9 +1770,19 @@ impl Script {
         self.view.editor_seconds = reading_seconds(&self.view.editor, self.reading_speed());
     }
 
+    /// The clips whose transcripts the script shows (the clips of its statements): the one
+    /// reader of transcripts (`qnc-clip-transcripts`) reads them for it.
+    pub fn transcript_clips(&self) -> Vec<String> {
+        let mut clips: Vec<String> = self.blocks.iter().flat_map(|block| view::block_pieces(block).into_iter().map(|piece| piece.clip_id)).filter(|clip| !clip.is_empty()).collect();
+        clips.sort();
+        clips.dedup();
+        clips
+    }
+
     /// Takes the answers of takes, exports, writes and reads, reads the script again now and
-    /// then. Returns whether the view changed.
-    pub fn poll(&mut self, preview: &SourcePreview, timeline: &TimelineProjection, clips: &[ClipRow]) -> bool {
+    /// then; the words of its statements are the transcripts `transcripts` read from the
+    /// database. Returns whether the view changed.
+    pub fn poll(&mut self, preview: &SourcePreview, timeline: &TimelineProjection, clips: &[ClipRow], transcripts: &qnc_clip_transcripts::ClipTranscripts) -> bool {
         let before = self.view.clone();
         if self.names.len() != clips.len() || clips.iter().any(|clip| !self.names.contains_key(&clip.clip_id)) {
             self.names = clips.iter().map(|clip| (clip.clip_id.clone(), (clip.name.clone(), clip.duration_frames, clip.duration_seconds))).collect();
@@ -1819,7 +1827,7 @@ impl Script {
                         let fps = names.get(&piece.clip_id).filter(|(_, frames, seconds)| *frames > 0 && *seconds > 0.0).map_or(0, |(_, frames, seconds)| (*frames as f64 / seconds).round() as u32);
                         let start = qnc_source_timecode::parse_timecode(&piece.start_tc, fps).filter(|_| fps > 0);
                         let tc = |frame: u64| start.map_or_else(String::new, |start| qnc_source_timecode::format_frames(start + frame.saturating_sub(piece.from_frame), fps));
-                        let mut words = self.transcripts.get(&piece.clip_id).map_or_else(Vec::new, |transcripts| view::timed_words(transcripts, piece, tc));
+                        let mut words = transcripts.of(&piece.clip_id).map_or_else(Vec::new, |transcripts| view::timed_words(transcripts, piece, tc));
                         view::put_letters(&mut words, self.letters.get(&piece.clip_id).map_or(&[][..], Vec::as_slice));
                         words
                     })
@@ -1925,10 +1933,9 @@ impl Script {
         if let Some(reading) = &self.reading {
             if let Ok(result) = reading.try_recv() {
                 match result {
-                    Ok(read::Script { blocks, profile, target, title, voices, transcripts, letters }) => {
+                    Ok(read::Script { blocks, profile, target, title, voices, letters }) => {
                         self.letters = letters;
                         self.blocks = blocks;
-                        self.transcripts = transcripts;
                         self.view.profile = profile;
                         self.view.target_seconds = target;
                         self.view.title = title;

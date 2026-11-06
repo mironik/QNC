@@ -14,7 +14,7 @@ use qnc_skeleton_versions::{SkeletonVersions, VersionsView};
 use qnc_source_preview::SourcePreview;
 use qnc_source_timecode::SourceTimecode;
 use qnc_timeline::TimelineProjection;
-use qnc_transcript::{Transcript, TranscriptView};
+use qnc_transcript::{ClipTranscripts, Transcript, TranscriptView};
 
 pub const MODULE_ID: &str = "qnc.module.side-pieces";
 
@@ -48,6 +48,9 @@ pub struct SideViews {
 /// The pieces of the panels a form has.
 #[derive(Debug, Default)]
 pub struct SidePieces {
+    /// The one reader of the transcripts the pieces show (the transcript panel's clip, the
+    /// script's statements): read from the database, given to both.
+    transcripts: ClipTranscripts,
     transcript: Option<Transcript>,
     shots: Option<ClipShots>,
     script: Option<Script>,
@@ -64,6 +67,7 @@ impl SidePieces {
         let kinds: Vec<&str> = kinds.into_iter().collect();
         let has = |kind: &str| kinds.contains(&kind);
         Self {
+            transcripts: ClipTranscripts::new(),
             transcript: (has(TRANSCRIPT_PANEL) || has(TRANSCRIPT_SEARCH_PANEL) || has(SCRIPT_PANEL) || has(SCRIPT_WRITER_PANEL)).then(Transcript::new),
             shots: has(VIDEO_AI_PANEL).then(ClipShots::default),
             script: (has(SCRIPT_PANEL) || has(SCRIPT_WRITER_PANEL)).then(Script::new),
@@ -93,9 +97,15 @@ impl SidePieces {
 
     /// Polls the pieces; a view is renewed only when its piece changed it.
     pub fn poll(&mut self, preview: &mut SourcePreview, timeline: &TimelineProjection, clips: &mut [ClipRow]) {
+        // The transcripts the pieces show, read once for all of them.
+        if self.transcript.is_some() || self.script.is_some() {
+            let shown = self.transcript.as_ref().and(preview.view().clip_id.clone());
+            let statements = self.script.as_ref().map(Script::transcript_clips).unwrap_or_default();
+            self.transcripts.poll(preview.project_target(), shown.into_iter().chain(statements));
+        }
         // The pool's ticks are the transcript's.
         if let Some(transcript) = &mut self.transcript {
-            if transcript.poll(preview, timeline, clips) {
+            if transcript.poll(preview, timeline, clips, &mut self.transcripts) {
                 self.views.transcript = Arc::new(transcript.view().clone());
             }
         }
@@ -105,7 +115,7 @@ impl SidePieces {
             }
         }
         if let Some(script) = &mut self.script {
-            if script.poll(preview, timeline, clips) {
+            if script.poll(preview, timeline, clips, &self.transcripts) {
                 self.views.script = Arc::new(script.view().clone());
             }
             play_pieces(script, preview);
@@ -174,7 +184,7 @@ impl SidePieces {
 
     /// Whether a read or write of a piece runs (the form repaints soon).
     pub fn busy(&self) -> bool {
-        self.transcript.as_ref().is_some_and(Transcript::busy) || self.script.as_ref().is_some_and(Script::busy) || self.versions.as_ref().is_some_and(SkeletonVersions::busy)
+        self.transcripts.busy() || self.transcript.as_ref().is_some_and(Transcript::busy) || self.script.as_ref().is_some_and(Script::busy) || self.versions.as_ref().is_some_and(SkeletonVersions::busy)
     }
 
     /// Whether a transcription of this process runs in the background.

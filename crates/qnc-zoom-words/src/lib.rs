@@ -21,7 +21,7 @@ pub const MODULE_ID: &str = "qnc.module.zoom-words";
 /// Seconds transcribed on each side of the part the zoom shows.
 const AROUND_SECONDS: u64 = 5;
 
-type Read = Result<(Vec<ClipTranscript>, Vec<qnc_letter_db::WordLetters>), String>;
+type Read = Result<Vec<qnc_letter_db::WordLetters>, String>;
 
 /// A piece of the zoom's A1: clip frames `[first, last)` it plays in the window.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -42,7 +42,12 @@ struct Job {
 #[derive(Default)]
 pub struct ZoomWords {
     project_id: Option<String>,
-    kept: HashMap<String, Vec<ClipTranscript>>,
+    /// The transcripts of the clips in the window, from the one reader of transcripts
+    /// (`qnc-clip-transcripts`: the database, read again every second).
+    transcripts: qnc_clip_transcripts::ClipTranscripts,
+    /// When a transcription of this zoom was kept: no part is transcribed again until the
+    /// transcripts were read after it.
+    kept_at: Option<std::time::Instant>,
     /// The letters of the words of those clips, as read (user 2026-11-05: letters in the zoom).
     letters: HashMap<String, Vec<qnc_letter_db::WordLetters>>,
     /// Lays the letters of the words the zoom shows without them.
@@ -61,7 +66,7 @@ impl ZoomWords {
 
     /// Whether a read or a transcription runs (the form repaints soon).
     pub fn loading(&self) -> bool {
-        self.reading.is_some() || self.job.is_some()
+        self.reading.is_some() || self.job.is_some() || self.transcripts.busy()
     }
 
     /// Puts the words A1 says in the window of `sound` on it.
@@ -74,11 +79,17 @@ impl ZoomWords {
         }
         self.take_finished();
         let needs = needs(sound);
+        let target = locator.clone();
+        self.transcripts.poll_from(locator.project_id(), move || qnc_db_broker::ProjectDbTarget::for_project(target.reader(), target.settings()).map_err(|error| error.to_string()), needs.iter().map(|need| need.clip_id.clone()));
+        let settled = self.kept_at.is_none_or(|at| self.transcripts.read_since(at));
         for need in &needs {
-            match self.kept.get(&need.clip_id) {
-                None => self.read(locator, &need.clip_id),
-                Some(kept) if !covered(kept, need) => self.transcribe(locator, need),
-                Some(_) => {}
+            if !self.letters.contains_key(&need.clip_id) {
+                self.read(locator, &need.clip_id);
+            }
+            if let Some(kept) = self.transcripts.of(&need.clip_id) {
+                if settled && !covered(kept, need) {
+                    self.transcribe(locator, need);
+                }
             }
         }
         sound.words = needs.iter().flat_map(|need| self.words_of(sound, need)).collect();
@@ -99,14 +110,14 @@ impl ZoomWords {
         let missing: Vec<qnc_letter_times::Need> = needs.iter().filter_map(|need| self.missing_letters(need)).collect();
         if self.letter_times.poll(locator, &missing, true) {
             for need in &needs {
-                self.kept.remove(&need.clip_id);
+                self.letters.remove(&need.clip_id);
             }
         }
     }
 
     /// The words of `need`'s part without letters, in its clip's frames.
     fn missing_letters(&self, need: &Need) -> Option<qnc_letter_times::Need> {
-        let kept = self.kept.get(&need.clip_id)?;
+        let kept = self.transcripts.of(&need.clip_id)?;
         let letters = self.letters.get(&need.clip_id).map_or(&[][..], Vec::as_slice);
         let words: Vec<qnc_letter_times::Word> = kept
             .iter()
@@ -132,9 +143,7 @@ impl ZoomWords {
                     if let Err(error) = &read {
                         log(&format!("zoom-words read {clip}: {error}"));
                     }
-                    let (transcripts, letters) = read.unwrap_or_default();
-                    self.kept.insert(clip.clone(), transcripts);
-                    self.letters.insert(clip.clone(), letters);
+                    self.letters.insert(clip.clone(), read.unwrap_or_default());
                     self.reading = None;
                 }
                 Err(mpsc::TryRecvError::Disconnected) => self.reading = None,
@@ -149,7 +158,8 @@ impl ZoomWords {
                         self.failed.insert(job.need.clip_id.clone());
                     }
                     // What was kept is read again from the database.
-                    self.kept.remove(&job.need.clip_id);
+                    self.transcripts.read_now();
+                    self.kept_at = Some(std::time::Instant::now());
                     self.job = None;
                 }
                 Err(mpsc::TryRecvError::Disconnected) => self.job = None,
@@ -167,7 +177,7 @@ impl ZoomWords {
         let spawned = std::thread::Builder::new().name("qnc-zoom-words-read".into()).spawn(move || {
             let read = qnc_db_broker::ProjectDbTarget::for_project(locator.reader(), locator.settings())
                 .map_err(|error| error.to_string())
-                .and_then(|target| Ok((qnc_transcript_db::read_clip(&target, &clip)?, qnc_letter_db::read_clip(&target, &clip).unwrap_or_default())));
+                .map(|target| qnc_letter_db::read_clip(&target, &clip).unwrap_or_default());
             let _ = send.send(read);
         });
         if spawned.is_ok() {
@@ -199,7 +209,7 @@ impl ZoomWords {
 
     /// The words of `need`'s clip in its part, on the zoom's axis.
     fn words_of(&self, sound: &ZoomSound, need: &Need) -> Vec<ZoomWord> {
-        let Some(kept) = self.kept.get(&need.clip_id) else { return Vec::new() };
+        let Some(kept) = self.transcripts.of(&need.clip_id) else { return Vec::new() };
         // The one transcript covering the part, else every one that touches it.
         let covering: Vec<&ClipTranscript> = match kept.iter().find(|t| t.from_frame <= need.first && need.last <= t.to_frame) {
             Some(one) => vec![one],

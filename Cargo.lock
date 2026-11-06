@@ -3711,6 +3711,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "qnc-clip-transcripts"
+version = "0.1.0"
+dependencies = [
+ "qnc-db-broker",
+ "qnc-transcript-db",
+]
+
+[[package]]
 name = "qnc-confirm-dialog"
 version = "0.1.0"
 dependencies = [
@@ -6041,6 +6049,7 @@ version = "0.1.0"
 dependencies = [
  "qnc-clip-row",
  "qnc-clip-sound",
+ "qnc-clip-transcripts",
  "qnc-db-broker",
  "qnc-dev-diagnostics",
  "qnc-edit-cut",
@@ -6880,6 +6889,7 @@ name = "qnc-transcript"
 version = "0.1.0"
 dependencies = [
  "qnc-clip-row",
+ "qnc-clip-transcripts",
  "qnc-db-broker",
  "qnc-source-preview",
  "qnc-source-timecode",
@@ -7232,6 +7242,7 @@ dependencies = [
 name = "qnc-zoom-words"
 version = "0.1.0"
 dependencies = [
+ "qnc-clip-transcripts",
  "qnc-db-broker",
  "qnc-dev-diagnostics",
  "qnc-letter-db",
