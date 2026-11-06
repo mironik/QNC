@@ -5,6 +5,7 @@ edition = "2021"
 description = "QNC public panel: the location browser (sources, Up, Disks, path or disks, folders), drawn the same in every form"
 
 [dependencies]
+qnc-dir-browser = { workspace = true }
 qnc-desktop-theme = { workspace = true }
 qnc-ui-kit = { workspace = true }
 eframe = { workspace = true }

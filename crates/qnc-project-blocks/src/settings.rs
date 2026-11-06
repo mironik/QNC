@@ -305,13 +305,13 @@ impl Blocks<'_> {
         widgets::inline_row(ui, content_w, label, settings, shell, |ui, width| {
             typed = ui.add(egui::TextEdit::singleline(&mut field.text).desired_width(width.max(40.0)).hint_text(&texts.path_hint)).changed();
         }, |ui, _| pick = widgets::primary_btn(ui, &texts.choose, true, shell).clicked());
-        let labels = qnc_location_field::FieldLabels {
+        let labels = qnc_location_field_view::FieldLabels {
             sources: &texts.sources, up: &texts.up, disks: &texts.disks, internet: &texts.internet,
             empty_folder: &texts.empty_folder, empty_disks: &texts.empty_disks, empty_lan: &texts.empty_lan,
             empty_internet: &texts.empty_internet, confirm: &texts.confirm, cancel: &texts.cancel,
         };
         let (id, height) = if projects { ("project_root", 170.0) } else { ("export_dir", 150.0) };
-        let answer = field.open.then(|| qnc_location_field::show_browser(ui, field, id, height, &labels, &self.contracts.theme)).flatten();
+        let answer = field.open.then(|| qnc_location_field_view::show_browser(ui, field, id, height, &labels, &self.contracts.theme)).flatten();
         if typed {
             self.session.location_typed(target);
             self.session.status = texts.settings_changed.clone();

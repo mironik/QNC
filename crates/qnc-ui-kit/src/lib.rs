@@ -69,15 +69,6 @@ pub struct FormActionBarResponse {
     pub cancel_rect: Option<egui::Rect>,
 }
 
-pub fn toggle_exclusive_panel(current_open: &mut bool, other_open: &mut bool) -> bool {
-    let opened = !*current_open;
-    *current_open = opened;
-    if opened {
-        *other_open = false;
-    }
-    opened
-}
-
 pub fn show_form_action_bar(
     ui: &mut egui::Ui,
     style: &FormActionBarStyle,
@@ -154,27 +145,4 @@ mod tests {
         assert_eq!(style.gap, STANDARD_ACTION_BUTTON_GAP);
     }
 
-    #[test]
-    fn opening_one_panel_closes_the_other() {
-        let mut current_open = false;
-        let mut other_open = true;
-
-        let opened = toggle_exclusive_panel(&mut current_open, &mut other_open);
-
-        assert!(opened);
-        assert!(current_open);
-        assert!(!other_open);
-    }
-
-    #[test]
-    fn closing_current_panel_does_not_open_the_other() {
-        let mut current_open = true;
-        let mut other_open = false;
-
-        let opened = toggle_exclusive_panel(&mut current_open, &mut other_open);
-
-        assert!(!opened);
-        assert!(!current_open);
-        assert!(!other_open);
-    }
 }

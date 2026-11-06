@@ -6,16 +6,13 @@
 //! unless it is locked. It writes the sheets of this computer; the values go back to its
 //! owner, which keeps them in the project database (`qnc-newsroom-sheet-db`).
 
-mod sheets;
 
-use std::path::Path;
 
 use eframe::egui::{self, Align2, RichText, Stroke, Vec2};
 use qnc_desktop_theme::Theme;
 use qnc_settings_form::{FieldKind, GridStyle};
-use serde_json::Value;
 
-pub use sheets::{code_of, new_field, new_field_in, valid_code, Origin, SheetSpec, Sheets};
+pub use qnc_newsroom_sheet_model::{code_of, new_field, new_field_in, today, valid_code, Answer, Origin, SheetOverlay, SheetSpec, Sheets};
 
 pub const MODULE_ID: &str = "qnc.module.newsroom-sheet";
 
@@ -25,72 +22,8 @@ pub const LABEL_WIDTH: f32 = 200.0;
 pub const ROW_HEIGHT: f32 = 32.0;
 pub const ROW_GAP: f32 = 12.0;
 
-/// What the user did with the overlay.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum Answer {
-    /// Create (a new project) or Save (an open one): the owner takes name and values.
-    Confirm,
-    Cancel,
-}
-
-/// The overlay of one story: its sheet, project name and values.
-pub struct SheetOverlay {
-    pub sheets: Sheets,
-    pub name: String,
-    /// The name is typed only for a new project; an open one shows its name.
-    pub name_editable: bool,
-    /// The value of each field, by code.
-    pub values: Value,
-    pub confirm_label: String,
-    /// The sheet being changed, while the editor is open.
-    editing: Option<SheetSpec>,
-    new_label: String,
-    pub message: String,
-}
-
-impl SheetOverlay {
-    /// A new overlay over the sheets of the QNC root; `kept` is the sheet a project already
-    /// has (it is shown as it was kept, before the sheets of this computer).
-    pub fn new(root: &Path, name: String, name_editable: bool, values: Value, kept: Option<SheetSpec>, confirm_label: String) -> Self {
-        let (mut sheets, errors) = Sheets::load(root);
-        if let Some(kept) = kept {
-            match sheets.list.iter().position(|(sheet, _)| sheet.sheet_id == kept.sheet_id) {
-                Some(index) => {
-                    sheets.list[index].0 = kept;
-                    sheets.chosen = index;
-                }
-                None => {
-                    sheets.list.insert(0, (kept, Origin::Own));
-                    sheets.chosen = 0;
-                }
-            }
-        }
-        let values = if values.is_object() { values } else { Value::Object(Default::default()) };
-        let message = errors.join("\n");
-        // A new project starts with today's date (user 2026-10-28: y/m/d is easy to read).
-        let name = if name_editable && name.trim().is_empty() { today() } else { name };
-        Self { sheets, name, name_editable, values, confirm_label, editing: None, new_label: String::new(), message }
-    }
-
-    /// The sheet filled and its values, for the owner to keep.
-    pub fn filled(&self) -> Option<(SheetSpec, Value)> {
-        let sheet = self.sheets.current()?.clone();
-        let mut values = serde_json::Map::new();
-        for field in &sheet.fields {
-            if let Some(value) = self.values.get(&field.path) {
-                values.insert(field.path.clone(), value.clone());
-            }
-        }
-        Some((sheet, Value::Object(values)))
-    }
-}
-
 const MARGIN: f32 = 24.0;
 
-/// Today on this computer as `yyyy/mm/dd `, the start of a new project name.
-pub fn today() -> String {
-    chrono::Local::now().format("%Y/%m/%d ").to_string()
-}
 
 /// Draws the overlay in the middle of the screen, whole on it: a title bar as a window has,
 /// the sheet (it scrolls when it is taller than the screen), the buttons on the right at the
@@ -347,5 +280,3 @@ fn choices_row(ui: &mut egui::Ui, field: &mut qnc_settings_form::FieldSpec, opti
     });
 }
 
-#[cfg(test)]
-mod tests;

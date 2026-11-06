@@ -695,3 +695,20 @@ mod tests {
         ))
     }
 }
+
+/// What the user asked of a browser: a source tab, a folder to open, up or the disks.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum BrowserAction {
+    Kind(usize),
+    Open(String),
+    Parent,
+    Roots,
+}
+
+/// What the user asked of the browser with its confirm bar.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum BrowserAnswer {
+    Browser(BrowserAction),
+    Confirm,
+    Cancel,
+}

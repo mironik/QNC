@@ -5,7 +5,7 @@
 use std::fs;
 use std::path::{Path, PathBuf};
 
-use qnc_settings_form::{FieldSpec, OptionSets};
+use qnc_field_spec::{FieldSpec, OptionSets};
 use serde::{Deserialize, Serialize};
 
 /// One sheet: its fields in order, their choices, and whether it may be changed.

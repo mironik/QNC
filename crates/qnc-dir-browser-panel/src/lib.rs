@@ -93,22 +93,8 @@ pub struct BrowserInput<'a> {
     pub focused_entry: Option<usize>,
 }
 
-/// What the user asked.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub enum BrowserAction {
-    Kind(usize),
-    Open(String),
-    Parent,
-    Roots,
-}
-
-/// What the user asked of the browser with its confirm bar.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub enum BrowserAnswer {
-    Browser(BrowserAction),
-    Confirm,
-    Cancel,
-}
+/// What the user asked (the core browser session's answers, docs/99 step 3).
+pub use qnc_dir_browser::{BrowserAction, BrowserAnswer};
 
 impl BrowserStyle {
     /// The browser in the look of the one desktop theme.

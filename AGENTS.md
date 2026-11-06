@@ -8247,3 +8247,14 @@ u core: `event` (radnja mape misa) u `qnc-timeline-model`, `ChannelChoice`, `lan
 `qnc_timeline_model::SOURCE_TIMELINE_SCOPE` (`qnc-key-intents` ga ponovno izvozi). Ponasanje isto. C14 11 -> 4 (ostaje
 `qnc-project-session`). Testovi (96, ukljucujuci zlatnu tablicu tipki), `cargo check --workspace --all-targets`,
 conformance. Uzivo nije provjereno.
+Otkljucano i izvedeno 2026-11-07 (isti zahtjev, "odmrzni i rijesi o projekt"; docs/99 korak 3, drugi dio): Project
+otkljucan samo za odvajanje logike od crtanja. `qnc-project-session` vise ne ovisi ni o jednoj kocki koja crta:
+obrazac priloga kao podatak je nova core kocka `crates/qnc-newsroom-sheet-model` (+ ugovor; listovi racunala i
+pripremljeni, `SheetOverlay`, `Answer`, `today`; testovi listova premjesteni), `qnc-newsroom-sheet` ga crta i
+ponovno izvozi; `qnc-location-field` je core, crtanje preglednika polja je nova `crates/qnc-location-field-view`
+(+ ugovor), koju koristi Project ploca; `BrowserAction` i `BrowserAnswer` su u `qnc-dir-browser`
+(`qnc-dir-browser-panel` ih ponovno izvozi); iskljucivo otvaranje jednog od dva polja (`toggle_exclusive_panel`, jedini
+korisnik) premjesteno iz gui-kita u `qnc-location-field`, s testovima. Conformance "shared UI patterns" to trazi u
+`qnc-location-field`, a pravilo preglednika Project ploce trazi `qnc_location_field_view::show_browser`. Ponasanje isto.
+C14 4 -> 0. Testovi, `cargo check --workspace --all-targets`, conformance. Uzivo nije provjereno. Project je ponovno
+zamrznut.

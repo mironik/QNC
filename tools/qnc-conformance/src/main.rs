@@ -2237,8 +2237,9 @@ fn scan_project_app_boundary(root: &Path) -> CheckResult {
             has_project_component = true;
         }
         // Audit 2026-10-27: the location fields of the Project form are the public piece
-        // `qnc-location-field` (its browser with Computer/LAN/Internet and Select/Cancel).
-        if relative == "crates/qnc-project-blocks/src/settings.rs" && contents.contains("qnc_location_field::show_browser") {
+        // `qnc-location-field` (its browser with Computer/LAN/Internet and Select/Cancel, drawn by
+        // `qnc-location-field-view`, docs/99 step 3).
+        if relative == "crates/qnc-project-blocks/src/settings.rs" && contents.contains("qnc_location_field_view::show_browser") {
             has_project_location_browser = true;
         }
         if relative == "crates/qnc-location-field/src/lib.rs"
@@ -2367,7 +2368,6 @@ fn scan_shared_ui_patterns(root: &Path) -> CheckResult {
                 "FormActionBarStyle",
                 "FormActionBarResponse",
                 "STANDARD_ACTION_BUTTON_WIDTH",
-                "toggle_exclusive_panel",
             ] {
                 if !contents.contains(required) {
                     report.error(format!(
@@ -2381,6 +2381,12 @@ fn scan_shared_ui_patterns(root: &Path) -> CheckResult {
             "{}: cannot read shared UI kit: {error}",
             display_relative(root, &ui_kit)
         )),
+    }
+    // One browser open at a time (AGENTS 9): the core piece of the location fields opens one
+    // and closes the other (docs/99 step 3: the core cannot take it from the gui-kit).
+    let fields = root.join("crates").join("qnc-location-field").join("src").join("lib.rs");
+    if !fs::read_to_string(&fields).is_ok_and(|contents| contents.contains("fn toggle_exclusive_panel")) {
+        report.error(format!("{}: missing the exclusive opening of the location fields", display_relative(root, &fields)));
     }
 
     for crate_name in ["qnc-project-blocks", "qnc-ingest-blocks"] {

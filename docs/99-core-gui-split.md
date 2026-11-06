@@ -146,3 +146,9 @@ zapis u AGENTS.md. Koraci 1-3 ne mijenjaju ponasanje.
   `row_field`, `text_area`, `search_field`; `qnc-desktop-theme`: `rgb`, `danger`, `done`, `total_text`,
   `log_colours`; `qnc-theme-styles`: tema timelinea i trim zooma, kartice, palete ljuske). C15 baseline 25 -> 0.
   Ostaje Project ploca (zamrznuta forma, C2) i zadatak iz AGENTS 16: palete Soft/High contrast u UI ugovor.
+- Korak 3 (2026-11-07): `qnc-source-timeline` core + `qnc-source-timeline-view`; `qnc-focus-walk` core +
+  `qnc-list-focus`; `qnc-newsroom-sheet-model` (core) + `qnc-newsroom-sheet` (crtanje); `qnc-location-field` core +
+  `qnc-location-field-view`; odgovori preglednika (`BrowserAction`, `BrowserAnswer`) u `qnc-dir-browser`;
+  `event`, `ChannelChoice` i opseg tipki source timelinea u core kockama. C14: 11 -> 0, nijedna logicka kocka ne
+  povlaci egui. Ostaje `qnc-keyboard-shortcut` (katalog i pretvorba egui dogadaja u istoj kocki; nijedna logicka
+  kocka ga danas ne treba) i korak 4.

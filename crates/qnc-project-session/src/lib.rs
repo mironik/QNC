@@ -11,8 +11,8 @@ use qnc_project_application::{
     ProjectComponent, ProjectRow, ProjectTemplateRow, ProjectsState, Reply,
     Request, StorySheet, TemplatesState,
 };
-use qnc_newsroom_sheet::{SheetOverlay, SheetSpec};
-pub use qnc_newsroom_sheet::Answer as SheetAnswer;
+use qnc_newsroom_sheet_model::{SheetOverlay, SheetSpec};
+pub use qnc_newsroom_sheet_model::Answer as SheetAnswer;
 use serde_json::Value;
 
 pub use qnc_location_field::{Answer as LocationAnswer, FieldStep, LocationField, SourceKind as LocationSourceKind};
@@ -117,7 +117,7 @@ impl ProjectIntent {
             Self::ConfirmDeleteTemplate => "project_template_delete_confirm",
             Self::PickLocation { target } => location_action(*target, "pick"),
             Self::AnswerLocation { target, answer } => location_action(*target, match answer {
-                LocationAnswer::Browser(qnc_dir_browser_panel::BrowserAction::Kind(_)) => "browser_select_source",
+                LocationAnswer::Browser(qnc_dir_browser::BrowserAction::Kind(_)) => "browser_select_source",
                 LocationAnswer::Browser(_) => "browser_open_path",
                 LocationAnswer::Confirm => "browser_confirm",
                 LocationAnswer::Cancel => "browser_cancel",

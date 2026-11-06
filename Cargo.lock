@@ -3976,6 +3976,7 @@ version = "0.1.0"
 dependencies = [
  "eframe",
  "qnc-desktop-theme",
+ "qnc-dir-browser",
  "qnc-media-pool-head",
  "qnc-ui-kit",
 ]
@@ -4912,11 +4913,19 @@ dependencies = [
 name = "qnc-location-field"
 version = "0.1.0"
 dependencies = [
- "eframe",
- "qnc-desktop-theme",
  "qnc-dir-browse-jobs",
  "qnc-dir-browser",
+ "qnc-ui-text",
+]
+
+[[package]]
+name = "qnc-location-field-view"
+version = "0.1.0"
+dependencies = [
+ "eframe",
+ "qnc-desktop-theme",
  "qnc-dir-browser-panel",
+ "qnc-location-field",
  "qnc-ui-kit",
  "qnc-ui-text",
 ]
@@ -5257,11 +5266,11 @@ dependencies = [
 name = "qnc-newsroom-sheet"
 version = "0.1.0"
 dependencies = [
- "chrono",
  "eframe",
  "qnc-desktop-theme",
  "qnc-dev-diagnostics",
  "qnc-field-spec",
+ "qnc-newsroom-sheet-model",
  "qnc-settings-form",
  "qnc-theme-styles",
  "qnc-ui-kit",
@@ -5278,6 +5287,19 @@ dependencies = [
  "qnc-db-broker",
  "qnc-ui-text",
  "rusqlite",
+ "serde",
+ "serde_json",
+ "tempfile",
+]
+
+[[package]]
+name = "qnc-newsroom-sheet-model"
+version = "0.1.0"
+dependencies = [
+ "chrono",
+ "qnc-dev-diagnostics",
+ "qnc-field-spec",
+ "qnc-ui-text",
  "serde",
  "serde_json",
  "tempfile",
@@ -5831,6 +5853,7 @@ dependencies = [
  "qnc-keyboard-shortcut",
  "qnc-language-choice",
  "qnc-location-field",
+ "qnc-location-field-view",
  "qnc-newsroom-sheet",
  "qnc-project-application",
  "qnc-project-session",
@@ -5897,12 +5920,10 @@ name = "qnc-project-session"
 version = "0.1.0"
 dependencies = [
  "qnc-dir-browser",
- "qnc-dir-browser-panel",
  "qnc-location-field",
- "qnc-newsroom-sheet",
+ "qnc-newsroom-sheet-model",
  "qnc-project-application",
  "qnc-settings-path",
- "qnc-ui-kit",
  "qnc-ui-text",
  "serde_json",
 ]
