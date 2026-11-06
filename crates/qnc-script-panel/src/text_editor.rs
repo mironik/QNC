@@ -72,7 +72,7 @@ pub(crate) fn show(
     let has_focus = ui.ctx().memory(|memory| memory.has_focus(editor_id));
     let pressed = |action: &str| has_focus && catalog().is_some_and(|catalog| qnc_keyboard_shortcut::pressed_while_typing(ui.ctx(), catalog, SCOPE, action));
     let (apply, revert) = (pressed(APPLY), pressed(REVERT));
-    let output = egui::TextEdit::multiline(&mut draft.edited)
+    let output = qnc_ui_kit::text_area(&mut draft.edited)
         .id(editor_id)
         .desired_width(f32::INFINITY)
         .desired_rows(1)

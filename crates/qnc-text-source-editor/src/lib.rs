@@ -82,7 +82,7 @@ pub fn show(ui: &mut egui::Ui, editor: &Editor<'_>, theme: &qnc_desktop_theme::T
     let height = (ui.available_height() - info_height).max(48.0);
     let mut text = editor.text.to_string();
     egui::ScrollArea::vertical().id_salt((editor.id, "scroll")).max_height(height).auto_shrink([false, false]).show(ui, |ui| {
-        let edit = egui::TextEdit::multiline(&mut text)
+        let edit = qnc_ui_kit::text_area(&mut text)
             .id_salt(editor.id)
             .hint_text(editor.hint)
             .font(egui::FontId::proportional(theme.font_ui + 1.0))

@@ -588,13 +588,13 @@ const GUI_KIT: [&str; 3] = ["qnc-ui-kit", "qnc-desktop-theme", "qnc-theme-styles
 const GUI_KIT_MAY_USE: [&str; 2] = ["qnc-dev-diagnostics", "qnc-board"];
 
 /// C15 (docs/99, user 2026-11-06 "gui-kit"): a piece that draws (not a form, C2 counts those, and
-/// not the gui-kit itself) makes no button or check box of its own and no colour outside the theme;
+/// not the gui-kit itself) makes no button, check box or text field of its own and no colour outside the theme;
 /// it takes them from the gui-kit. The gui-kit knows no story, database or player: it depends on no
 /// core piece but the diagnostics and the board.
 fn gui_kit_rules(root: &Path, packages: &BTreeMap<String, Package>, counts: &mut BTreeMap<String, u64>) {
     for package in packages.values().filter(|package| package.gui && !GUI_KIT.contains(&package.name.as_str()) && !FORM_CRATES.contains(&package.name.as_str())) {
         for (file, text) in runtime_files(root, package) {
-            add(counts, format!("C15 piece private widget|{file}"), occurrences(&text, &["Button::new", "ui.button(", "ui.checkbox(", "Checkbox::new"]));
+            add(counts, format!("C15 piece private widget|{file}"), occurrences(&text, &["Button::new", "ui.button(", "ui.checkbox(", "Checkbox::new", "TextEdit::"]));
             add(counts, format!("C15 piece colour outside theme|{file}"), occurrences(&text, &["from_rgb", "from_rgba"]));
         }
     }

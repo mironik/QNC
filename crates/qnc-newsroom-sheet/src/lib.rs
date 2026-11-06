@@ -162,7 +162,7 @@ fn style(theme: &Theme) -> GridStyle {
 
 /// A text box as tall as a row, its text in the middle.
 pub fn row_box(text: &mut String, width: f32) -> egui::TextEdit<'_> {
-    egui::TextEdit::singleline(text).desired_width(width).min_size(Vec2::new(0.0, ROW_HEIGHT)).vertical_align(egui::Align::Center)
+    qnc_ui_kit::row_field(text, width, ROW_HEIGHT)
 }
 
 /// A row's label on the left, as wide as the labels of the fields and as tall as the row.
@@ -206,11 +206,7 @@ fn fill(ui: &mut egui::Ui, overlay: &mut SheetOverlay, theme: &Theme, next_field
     let from_name = next_field && ui.memory(|memory| memory.has_focus(name_id));
     ui.horizontal(|ui| {
         label(ui, theme, qnc_ui_text::text("project.project_name"));
-        let edit = egui::TextEdit::singleline(&mut overlay.name)
-            .id(name_id)
-            .desired_width(field_w)
-            .min_size(Vec2::new(0.0, ROW_HEIGHT))
-            .vertical_align(egui::Align::Center);
+        let edit = qnc_ui_kit::row_field(&mut overlay.name, field_w, ROW_HEIGHT).id(name_id);
         ui.add_enabled(overlay.name_editable, edit.hint_text(qnc_ui_text::text("project.name_new_project")));
     });
     ui.add_space(ROW_GAP / 2.0);

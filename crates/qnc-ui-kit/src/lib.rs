@@ -3,12 +3,14 @@ use eframe::egui::{self, Button, Color32, CornerRadius, RichText, Stroke, Vec2};
 mod chrome_button;
 mod option_columns;
 mod raster;
+mod text_field;
 mod two_way_switch;
 pub use chrome_button::{chrome_button, fill_block, look_button, strong_button, ButtonLook, ChromeButtonStyle};
 pub use option_columns::*;
 pub use raster::{paint_rgba_image, paint_rgba_image_filled};
 pub use raster::paint_stream_frame;
 pub use two_way_switch::show_two_way_switch;
+pub use text_field::{row_field, search_field, text_area, text_field};
 
 /// The thin frame of what the keyboard is on (a panel, a button, a tab), the same in every
 /// form (user 2026-10-20: three pieces drew their own copy).

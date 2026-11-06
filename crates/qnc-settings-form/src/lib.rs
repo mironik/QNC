@@ -252,11 +252,7 @@ fn text_cell(ui: &mut egui::Ui, width: f32, field: &FieldSpec, before: &str, sty
 /// A field's text box; beside its label it is as tall as the row, its text in the middle.
 fn text_box<'t>(text: &'t mut String, field: &FieldSpec, width: f32, style: &GridStyle) -> egui::TextEdit<'t> {
     let row = style.label_beside.map_or(0.0, |(_, height)| height);
-    egui::TextEdit::singleline(text)
-        .id(text_id(field))
-        .desired_width(width)
-        .min_size(Vec2::new(0.0, row))
-        .vertical_align(egui::Align::Center)
+    qnc_ui_kit::row_field(text, width, row).id(text_id(field))
 }
 
 fn settings_seconds(settings: &Value, path: &str) -> i64 {

@@ -336,7 +336,7 @@ fn paint_fields(ui: &mut egui::Ui, row: &qnc_script::BlockRow, view: &ScriptView
                 }
                 None => {
                     let mut text = stored;
-                    let edit = ui.add(egui::TextEdit::singleline(&mut text).hint_text(&field.hint).desired_width(ui.available_width()));
+                    let edit = ui.add(qnc_ui_kit::text_field(&mut text).hint_text(&field.hint).desired_width(ui.available_width()));
                     if edit.changed() {
                         asked = Some(ActionEvent::key(FIELD_TEXT).with_target(FieldEdit::target(id, &field.path, &text)).at(PANEL));
                     } else if edit.lost_focus() {

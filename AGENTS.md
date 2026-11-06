@@ -8176,3 +8176,11 @@ gumb ili kvacicu ni boju mimo teme; gui-kit ne ovisi ni o jednoj logickoj kocki 
 `qnc-board`. Danasnjih 25 prekrsaja upisano u `lego-baseline.json` (smiju samo padati). Provjereno: conformance,
 testovi conformancea (26), mutacijska provjera (smanjena brojka obara conformance). Kod kocki nije mijenjan.
 docs/99 dopunjen.
+Izvedeno 2026-11-06 (korisnik: "da, pushaj i kreni s tekstualnim poljem u gui-kitu"): `qnc-ui-kit` (`text_field.rs`)
+daje tekstualna polja: `text_field` (jedan redak), `row_field` (uz oznaku, visine reda, tekst u sredini; prije dvije
+kopije u `qnc-newsroom-sheet` i `qnc-settings-form`), `text_area` (vise redaka), `search_field`. Prebaceni bez
+promjene izgleda: `qnc-newsroom-sheet`, `qnc-settings-form` (nova ovisnost `qnc-ui-kit`), `qnc-settings-rows`,
+`qnc-script-panel` (polja bloka i tekst izjave), `qnc-text-source-editor`, `qnc-transcript-panel` (pretraga). C15
+broji i `TextEdit::` u kockama koje crtaju; danas nijedan, pa baseline nema novog kljuca. Project ploca (zamrznuta
+forma) zadrzava svoja polja. Testovi dotaknutih kocki, `cargo check --workspace --all-targets`, conformance. Uzivo
+nije provjereno.

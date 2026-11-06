@@ -47,10 +47,7 @@ pub fn search_field(ui: &mut egui::Ui, theme: &qnc_desktop_theme::Theme) {
     let ctx = ui.ctx().clone();
     let mut asked = ctx.data(|data| data.get_temp::<Asked>(asked_id())).unwrap_or_default();
     ui.label(RichText::new(qnc_ui_text::text("transcript.search")).color(theme.text).size(theme.font_ui));
-    let field = egui::TextEdit::singleline(&mut asked.term)
-        .hint_text(qnc_ui_text::text("transcript.search_hint"))
-        .desired_width(260.0)
-        .font(egui::FontId::proportional(theme.font_ui));
+    let field = qnc_ui_kit::search_field(&mut asked.term, 260.0, qnc_ui_text::text("transcript.search_hint"), egui::FontId::proportional(theme.font_ui));
     // Asked while the field still has the keyboard (it lets it go on Enter).
     let next = catalog().is_some_and(|catalog| qnc_keyboard_shortcut::pressed_while_typing(&ctx, catalog, SCOPE, NEXT));
     let response = ui.add(field);

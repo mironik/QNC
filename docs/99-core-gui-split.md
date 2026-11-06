@@ -136,3 +136,8 @@ zapis u AGENTS.md. Koraci 1-3 ne mijenjaju ponasanje.
   `qnc-trim-overlay`, `qnc-media-card`; gumbi u `qnc-segment-panel`, `qnc-subsegment-panel`,
   `qnc-script-profile-editor`, dijagnostickom alatu); smiju samo padati. Polja za upis teksta
   (`TextEdit`) jos nisu u pravilu: gui-kit nema svoje polje.
+- Tekstualno polje gui-kita (2026-11-06): `qnc-ui-kit` `text_field`, `row_field` (uz oznaku, visine reda,
+  tekst u sredini), `text_area`, `search_field`. Sve kocke koje su pisale vlastiti `egui::TextEdit`
+  koriste ga (`qnc-newsroom-sheet`, `qnc-settings-form`, `qnc-settings-rows`, `qnc-script-panel`,
+  `qnc-text-source-editor`, `qnc-transcript-panel`); C15 broji i `TextEdit::`, bez novog kljuca. Ostaje
+  Project ploca (`qnc-project-blocks`, forma, zamrznuta, C2 ga ne broji) i test kataloga tipki.

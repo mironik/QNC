@@ -57,7 +57,7 @@ pub fn title_with_search(ui: &mut egui::Ui, title: egui::RichText, text: &mut St
     ui.label(title);
     let hint = qnc_ui_text::text("rows.search");
     ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-        ui.add(egui::TextEdit::singleline(text).desired_width(width.max(120.0)).hint_text(hint))
+        ui.add(qnc_ui_kit::text_field(text).desired_width(width.max(120.0)).hint_text(hint))
     })
     .inner
 }

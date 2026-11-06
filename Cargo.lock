@@ -6216,6 +6216,7 @@ dependencies = [
  "eframe",
  "qnc-field-spec",
  "qnc-settings-path",
+ "qnc-ui-kit",
  "serde",
  "serde_json",
 ]
