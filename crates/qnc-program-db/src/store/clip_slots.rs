@@ -131,8 +131,9 @@ impl Store {
             .query_row("SELECT timeline_frame FROM story_markers WHERE marker_id = ?1", [marker_id], |row| row.get(0))
             .ok()?;
         let after = segment_at_border(&self.conn, old, true).ok()??;
-        let shift = program_frame as i64 - old;
-        let (tail, lead) = if shift > 0 { (shift as u32, 0) } else { (0, (-shift) as u32) };
+        let shift = i64::try_from(program_frame).unwrap_or(i64::MAX) - old;
+        let frames = u32::try_from(shift.unsigned_abs()).unwrap_or(u32::MAX);
+        let (tail, lead) = if shift > 0 { (frames, 0) } else { (0, frames) };
         Some(self.set_join_picture(&after, tail, lead))
     }
 
@@ -153,7 +154,7 @@ impl Store {
         let segment = segment_at_border(&self.conn, if start { slot_start } else { slot_end }, start)?
             .ok_or_else(|| format!("slot is not one clip: {slot_id}"))?;
         let (in_frame, out_frame, source) = source_range(&self.conn, &segment, frames)?;
-        let range = if start { (source_frame(in_frame - source)?, out_frame as u64) } else { (in_frame as u64, source_frame(out_frame + source)?) };
+        let range = if start { (source_frame(in_frame - source)?, source_frame(out_frame)?) } else { (source_frame(in_frame)?, source_frame(out_frame + source)?) };
         self.trim_segment(&segment, range)
     }
 
@@ -168,7 +169,7 @@ impl Store {
 
     fn move_clip_slot_now(&mut self, slot_id: &str, start_frame: u64) -> Result<Data> {
         let (slot_start, slot_end) = slot_frames(&self.conn, slot_id)?;
-        let shift = start_frame as i64 - slot_start;
+        let shift = i64::try_from(start_frame).unwrap_or(i64::MAX) - slot_start;
         if shift == 0 {
             return Ok(Data::Changed);
         }
@@ -177,8 +178,8 @@ impl Store {
         };
         let (before_in, before_out, before_shift) = source_range(&self.conn, &before, shift)?;
         let (after_in, after_out, after_shift) = source_range(&self.conn, &after, shift)?;
-        self.trim_segment(&before, (before_in as u64, source_frame(before_out + before_shift)?))?;
-        self.trim_segment(&after, (source_frame(after_in + after_shift)?, after_out as u64))
+        self.trim_segment(&before, (source_frame(before_in)?, source_frame(before_out + before_shift)?))?;
+        self.trim_segment(&after, (source_frame(after_in + after_shift)?, source_frame(after_out)?))
     }
 }
 

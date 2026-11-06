@@ -174,7 +174,7 @@ impl Store {
         let frames = statement
             .query_map([clip_id], |row| {
                 Ok(FilmstripFrameRecord {
-                    index: row.get::<_, i64>(0)? as usize,
+                    index: usize::try_from(row.get::<_, i64>(0)?).unwrap_or(0),
                     seek_sec: format!("{:.2}", row.get::<_, f64>(1)?),
                     artifact_uri: row.get(2)?,
                 })

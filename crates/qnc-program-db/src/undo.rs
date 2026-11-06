@@ -114,7 +114,7 @@ pub(crate) fn depth(conn: &Connection) -> Result<(u64, u64)> {
             [stack],
             |row| row.get::<_, i64>(0),
         )
-        .map(|n| n as u64)
+        .map(|n| u64::try_from(n).unwrap_or(0))
         .map_err(err)
     };
     Ok((count("undo")?, count("redo")?))

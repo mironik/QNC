@@ -228,11 +228,11 @@ impl ContentReader {
             [],
             |row| {
                 Ok(CatalogSignature {
-                    clip_count: row.get::<_, i64>(0)? as u64,
-                    name_bytes: row.get::<_, i64>(1)? as u64,
+                    clip_count: u64::try_from(row.get::<_, i64>(0)?).unwrap_or(0),
+                    name_bytes: u64::try_from(row.get::<_, i64>(1)?).unwrap_or(0),
                     frame_sum: row.get(2)?,
                     latest_created: row.get(3)?,
-                    imported_count: row.get::<_, i64>(4)? as u64,
+                    imported_count: u64::try_from(row.get::<_, i64>(4)?).unwrap_or(0),
                 })
             },
         )
@@ -255,7 +255,7 @@ impl ContentReader {
                     name: row.get(0)?,
                     imported_media_uri: row.get(1)?,
                     record_db_uri: row.get(2)?,
-                    record_revision: row.get::<_, i64>(3)? as u32,
+                    record_revision: u32::try_from(row.get::<_, i64>(3)?).unwrap_or(0),
                 })
             },
         )
@@ -293,7 +293,7 @@ impl ContentReader {
         let frames = statement
             .query_map([clip_id], |row| {
                 Ok(FilmstripFrameRecord {
-                    index: row.get::<_, i64>(0)? as usize,
+                    index: usize::try_from(row.get::<_, i64>(0)?).unwrap_or(0),
                     seek_sec: format!("{:.2}", row.get::<_, f64>(1)?),
                     artifact_uri: row.get(2)?,
                 })
@@ -358,7 +358,7 @@ pub fn duration_frames_on(conn: &Connection, clip_id: &str) -> Result<Option<u64
         .query_row("SELECT duration_frames FROM public_clips WHERE clip_id = ?1", [clip_id], |row| row.get(0))
         .optional()
         .map_err(|error| error.to_string())?;
-    Ok(frames.flatten().filter(|frames| *frames > 0).map(|frames| frames as u64))
+    Ok(frames.flatten().filter(|frames| *frames > 0).and_then(|frames| u64::try_from(frames).ok()))
 }
 
 /// The stored length in frames and frame rate of clip `clip_id` of the catalog, on a
@@ -375,7 +375,7 @@ pub fn clip_timing_on(conn: &Connection, clip_id: &str) -> Result<Option<(u64, (
         .map_err(|error| error.to_string())?;
     Ok(row.and_then(|(frames, num, den)| {
         let (frames, num, den) = (frames.filter(|v| *v > 0)?, num.filter(|v| *v > 0)?, den.filter(|v| *v > 0)?);
-        Some((frames as u64, (u32::try_from(num).ok()?, u32::try_from(den).ok()?)))
+        Some((u64::try_from(frames).ok()?, (u32::try_from(num).ok()?, u32::try_from(den).ok()?)))
     }))
 }
 

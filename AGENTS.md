@@ -8038,3 +8038,13 @@ Izvedeno 2026-11-06 (korisnik: "da, kreni s P3" iz `docs/arhitektura.md`), korak
 (`qnc-pixel-convert` `preview.rs`) bio je pogresan jer se vrijednost kasnije koristi i nije primijenjen. U
 `tools/qnc-ingest-worker` uklonjena mrtva dodjela (`stuck` se pocetnom vrijednoscu nikad nije citao). Ponasanje isto. Testovi
 42 dotaknuta paketa, gradnja cijelog workspacea.
+Izvedeno 2026-11-06 (P3, korak 2: pretvorbe brojeva). Pregled `clippy` (oko 860 upozorenja pretvorbi) pokazao je da pretvorbe
+iz decimalnog broja u cijeli broj u Rustu nisu opasne (definirano zasicuju, NaN je 0), a `u64 -> i64` puca tek iznad 2^63
+slika. Stvarna opasnost je negativan `i64` pretvoren u neoznaceni broj (tiho postane golem); od 117 takvih mjesta vecina je
+zasticena (`.max(0)`, `clamp`, provjera prije, omjer price 1:1/2:1/1:2). Nezasticena mjesta s vremenom (slike, rasponi,
+brojevi iz baze) sada idu kroz provjerenu pretvorbu (`try_from`): `qnc-program-db` (rub i pomak slota u S-Storyju kroz
+postojeci `source_frame`, pomak klipa unutar izvora vraca gresku kraja klipa umjesto prelijevanja, broj koraka undoa),
+`qnc-content-read` (potpis kataloga, revizija zapisa, redni broj slicice filmstripa, duljina klipa), `qnc-artifact-db`
+(redni broj slicice), `qnc-transcript-db` (raspon reda prijepisa i prijepisa), `qnc-program-view` (slika pokrivalice u zoomu
+reza). Ponasanje za ispravne podatke isto; negativna vrijednost iz baze daje 0 ili gresku umjesto golemog broja. Testovi
+dotaknutih kocki.

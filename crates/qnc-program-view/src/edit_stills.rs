@@ -225,7 +225,7 @@ fn cover_picture(cover: &CoverSpan, slots: &[Slot], moved: &dyn Fn(u64) -> u64, 
     // As far as its source allows: a cover never starts before its first picture.
     let source_in = (cover.source_in_frame as i64 + roll * source / length).max(0);
     let source_frame = source_in + (frame - start) as i64 * source / length;
-    Some(StillPicture { clip_id: cover.clip_id.clone(), source_frame: source_frame as u64 })
+    Some(StillPicture { clip_id: cover.clip_id.clone(), source_frame: u64::try_from(source_frame).unwrap_or(0) })
 }
 
 #[cfg(test)]

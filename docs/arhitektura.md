@@ -289,7 +289,8 @@ Gdje se blokira ili nepotrebno kopira (iz loga i koda):
 
 ### P3 - kvaliteta koda (clippy pedantic, 4446 upozorenja)
 
-9. Pretvorbe brojeva bez provjere: ~900 (`u64 as f64`, `as u32`, `as i64`). Za frameove i
+9. ~~Pretvorbe brojeva bez provjere~~ (izvedeno 2026-11-06: opasna su samo negativna u neoznacena; nezasticena
+   mjesta s vremenom sada kroz `try_from`; ostala su zasticena ili decimalna, koja Rust zasicuje): ~900 (`u64 as f64`, `as u32`, `as i64`). Za frameove i
    uzorke to je stvarni rizik na dugim klipovima i satnim snimkama; vrijedi kocka s
    provjerenim pretvorbama za vrijeme (frame, uzorak, sekunda).
 10. Funkcije dulje od 100 redaka: 61.

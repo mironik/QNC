@@ -126,8 +126,8 @@ impl Store {
             let ((clip_id, from, to), (quality, state, error, took_ms)) = row.map_err(err)?;
             queue.push(Queued {
                 clip_id,
-                from_frame: from as u64,
-                to_frame: to as u64,
+                from_frame: u64::try_from(from).unwrap_or(0),
+                to_frame: u64::try_from(to).unwrap_or(0),
                 quality: if quality == "best" { QueueQuality::Best } else { QueueQuality::Fast },
                 state: match state.as_str() {
                     "running" => QueueState::Running,
@@ -184,7 +184,7 @@ impl Store {
             rows.collect::<std::result::Result<_, _>>().map_err(err)?
         };
         for (from, to, lines_json) in older {
-            if transcript.from_frame <= from as u64 && to as u64 <= transcript.to_frame {
+            if transcript.from_frame <= u64::try_from(from).unwrap_or(0) && u64::try_from(to).unwrap_or(0) <= transcript.to_frame {
                 tx.execute("DELETE FROM clip_transcripts WHERE clip_id = ?1 AND from_frame = ?2 AND to_frame = ?3", params![transcript.clip_id, from, to])
                     .map_err(err)?;
                 continue;
@@ -266,7 +266,7 @@ impl Store {
         for row in rows {
             let (clip_id, from, to, language, engine, lines) = row.map_err(err)?;
             let lines = serde_json::from_str(&lines).map_err(err)?;
-            transcripts.push(ClipTranscript { clip_id, from_frame: from as u64, to_frame: to as u64, language, engine, lines });
+            transcripts.push(ClipTranscript { clip_id, from_frame: u64::try_from(from).unwrap_or(0), to_frame: u64::try_from(to).unwrap_or(0), language, engine, lines });
         }
         Ok(Data::Transcripts(transcripts))
     }

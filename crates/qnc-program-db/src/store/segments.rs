@@ -434,7 +434,8 @@ impl Store {
         if in_frame < 0 {
             return Err(qnc_ui_text::text("story.msg.clip_at_end").into());
         }
-        self.retrim_segment(segment_id, (in_frame as u64, out_frame as u64), true)
+        let frame = |value: i64| u64::try_from(value).map_err(|_| qnc_ui_text::text("story.msg.clip_at_end").to_string());
+        self.retrim_segment(segment_id, (frame(in_frame)?, frame(out_frame)?), true)
     }
 
     fn retrim_segment(&mut self, segment_id: &str, (in_frame, out_frame): (u64, u64), markers_stay: bool) -> Result<Data> {
