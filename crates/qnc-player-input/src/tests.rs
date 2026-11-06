@@ -942,6 +942,7 @@ fn program_of(
                         level_db: 0,
                         fade_in: None,
                         fade_out: None,
+                        level_ramp: None,
                     }],
                 ),
             ],

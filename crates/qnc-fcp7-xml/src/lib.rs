@@ -272,7 +272,7 @@ mod tests {
     }
 
     fn route(source_channel: u16, output_channel: u16, level_db: i8) -> ProgramAudioRoute {
-        ProgramAudioRoute { source_channel, output_channel, level_db, fade_in: None, fade_out: None }
+        ProgramAudioRoute { source_channel, output_channel, level_db, fade_in: None, fade_out: None, level_ramp: None }
     }
 
     #[test]

@@ -181,6 +181,58 @@ pub struct ProgramAudioRoute {
     /// The lane falls to silence over program frames `[in, out)`; silent after `out`.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub fade_out: Option<(i64, i64)>,
+    /// The level curve over this route (docs/98 2.1), added to `level_db`; none for a flat level.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub level_ramp: Option<LevelRamp>,
+}
+
+/// One point of a level curve (docs/98 2.1): a source frame of the segment or cover (at the
+/// story rate, as its `source_range`) and the level there in tenths of a dB.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub struct LevelPoint {
+    pub source_frame: i64,
+    pub db10: i16,
+}
+
+impl LevelPoint {
+    /// The level at source frame `frame` (fractional) of points sorted by frame, tenths of a
+    /// dB: a line of dB between two, theirs before the first and after the last; 0 without.
+    pub fn level_at(points: &[LevelPoint], frame: f64) -> f64 {
+        let (Some(first), Some(last)) = (points.first(), points.last()) else { return 0.0 };
+        if frame <= first.source_frame as f64 {
+            return f64::from(first.db10);
+        }
+        if frame >= last.source_frame as f64 {
+            return f64::from(last.db10);
+        }
+        let after = points.iter().position(|point| point.source_frame as f64 > frame).unwrap_or(points.len() - 1);
+        let (a, b) = (points[after - 1], points[after]);
+        let t = (frame - a.source_frame as f64) / (b.source_frame - a.source_frame).max(1) as f64;
+        f64::from(a.db10) + (f64::from(b.db10) - f64::from(a.db10)) * t
+    }
+}
+
+/// The level of a route over program frames `[from, to)`: a line of dB from `db10_from` to
+/// `db10_to` (tenths), theirs before and after.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub struct LevelRamp {
+    pub from: i64,
+    pub to: i64,
+    pub db10_from: i16,
+    pub db10_to: i16,
+}
+
+impl LevelRamp {
+    /// The level at program position `frame` (fractional), tenths of a dB.
+    pub fn db10_at(&self, frame: f64) -> f64 {
+        let t = ((frame - self.from as f64) / (self.to - self.from).max(1) as f64).clamp(0.0, 1.0);
+        f64::from(self.db10_from) + (f64::from(self.db10_to) - f64::from(self.db10_from)) * t
+    }
+
+    /// The factor at program position `frame`.
+    pub fn gain_at(&self, frame: f64) -> f32 {
+        10f64.powf(self.db10_at(frame) / 200.0) as f32
+    }
 }
 
 impl ProgramAudioRoute {

@@ -87,6 +87,7 @@ fn segment(
         a2_off: false,
         a2_lead_frames: 0,
         a2_tail_frames: 0,
+        a1_points: Vec::new(),
     }
 }
 
@@ -109,6 +110,7 @@ fn cover(
         active: true,
         a2_lead_frames: 0,
         a2_tail_frames: 0,
+        a2_points: Vec::new(),
     }
 }
 
@@ -217,6 +219,7 @@ fn the_segment_chooses_which_source_channel_is_heard_on_a1() {
             level_db: 0,
             fade_in: None,
             fade_out: None,
+            level_ramp: None,
         }]
     );
 
@@ -328,6 +331,7 @@ fn transient_overlay_replaces_video_and_a2_but_keeps_a1() {
                 level_db: 0,
                 fade_in: None,
                 fade_out: None,
+                level_ramp: None,
             }],
             source_audio_channels: 2,
             source_audio_format: new_cover.audio_format,
@@ -812,4 +816,34 @@ fn a_negative_j_or_l_is_a_hole_in_the_sound_on_a1_and_a2() {
     assert_eq!(level(&playlist, 175, PROGRAM_AUDIO_OUTPUT_A2).map(|(_, fade_out)| fade_out), Some(Some((172, 172))), "it ends 8 frames early");
     assert!(playlist.items.iter().filter(|item| item.record_range.in_frame >= 120 && item.record_range.out_frame <= 180).all(|item| item.sources.iter().any(|source| source.video_layer == Some(ProgramVideoLayer::Cover))), "the cover's picture stays");
     playlist.validate().unwrap();
+}
+
+/// docs/98 2.1: the points of a segment's A1 and of a cover's A2 split the items they lie in,
+/// and over each item the level of the route is one line of dB.
+#[test]
+fn a_level_curve_splits_its_items_and_gives_each_route_its_line() {
+    let timebase = tb(50);
+    let mut base = segment("segment-1", "tonovi", "base", (0, 100), (100, 200), timebase);
+    base.a1_points = vec![LevelPoint { source_frame: 110, db10: 0 }, LevelPoint { source_frame: 150, db10: -200 }];
+    let mut broll = cover("cover-1", "cover", (60, 90), (300, 330), timebase);
+    broll.a2_points = vec![LevelPoint { source_frame: 320, db10: -60 }];
+    base.covers = vec![broll];
+    let playlist =
+        build_flat_program_playlist(&input(100, vec![base]), &mut resolver(&["base", "cover"], timebase)).unwrap();
+    let ranges: Vec<(i64, i64)> = playlist.items.iter().map(|item| (item.record_range.in_frame, item.record_range.out_frame)).collect();
+    assert_eq!(ranges, vec![(0, 10), (10, 50), (50, 60), (60, 80), (80, 90), (90, 100)]);
+    let a1 = |index: usize| {
+        let route = playlist.items[index].sources.iter().flat_map(|source| &source.audio_routes).find(|route| route.output_channel == PROGRAM_AUDIO_OUTPUT_A1).unwrap();
+        route.level_ramp.map(|ramp| (ramp.from, ramp.to, ramp.db10_from, ramp.db10_to))
+    };
+    assert_eq!(a1(0), Some((0, 10, 0, 0)), "the first point's level before it");
+    assert_eq!(a1(1), Some((10, 50, 0, -200)), "a line of dB between two points");
+    assert_eq!(a1(5), Some((90, 100, -200, -200)), "the last point's level after it");
+    let a2 = |index: usize| {
+        let route = playlist.items[index].sources.iter().flat_map(|source| &source.audio_routes).find(|route| route.output_channel == PROGRAM_AUDIO_OUTPUT_A2).unwrap();
+        route.level_ramp.map(|ramp| (ramp.db10_from, ramp.db10_to))
+    };
+    assert_eq!((a2(3), a2(4)), (Some((-60, -60)), Some((-60, -60))), "one point: its level over the whole cover");
+    let ramp = LevelRamp { from: 10, to: 50, db10_from: 0, db10_to: -200 };
+    assert!((ramp.gain_at(50.0) - 0.1).abs() < 1e-6, "-20 dB is a tenth");
 }

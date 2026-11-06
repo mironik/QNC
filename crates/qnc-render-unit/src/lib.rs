@@ -61,6 +61,10 @@ pub struct AudioPart {
     /// sample and after its last, linear between; left out without a fade.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub fade: Option<[u16; 2]>,
+    /// The level curve over the part (docs/98 2.1): tenths of a dB at its first sample and
+    /// after its last, a line of dB between; left out without one.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub level_ramp: Option<[i16; 2]>,
     /// Where the part starts in the unit's samples (user 2026-10-25: a crossfade is inside
     /// the unit of its picture, no unit of its own); left out at 0.
     #[serde(default, skip_serializing_if = "is_zero_u64")]
@@ -90,8 +94,17 @@ impl AudioPart {
         (from, self.length.map_or(samples, |length| (from + length).min(samples)))
     }
 
-    /// The fade factor at `sample` of `samples` of the part, 1 without a fade.
+    /// The factor of the fade and the level curve at `sample` of `samples` of the part, 1
+    /// without either.
     pub fn fade_at(&self, sample: usize, samples: usize) -> f32 {
+        let curve = self.level_ramp.map_or(1.0, |[from, to]| {
+            let db10 = f64::from(from) + (f64::from(to) - f64::from(from)) * sample as f64 / samples.max(1) as f64;
+            10f64.powf(db10 / 200.0) as f32
+        });
+        curve * self.fade_factor(sample, samples)
+    }
+
+    fn fade_factor(&self, sample: usize, samples: usize) -> f32 {
         let Some([from, to]) = self.fade else { return 1.0 };
         let (from, to) = (f32::from(from) / 1000.0, f32::from(to) / 1000.0);
         from + (to - from) * sample as f32 / samples.max(1) as f32
@@ -197,6 +210,7 @@ mod tests {
                 origin: (0, Rational { numerator: 1, denominator: 48000 }),
                 level_db,
                 fade: None,
+                level_ramp: None,
                 at_sample: 0,
                 length: None,
             });
@@ -206,6 +220,12 @@ mod tests {
         assert!(described.get("level_db").is_none(), "as recorded, described as before");
         assert_ne!(sound(0).fingerprint(&delivery), sound(3).fingerprint(&delivery));
         assert!((sound(-6).audio[0].gain() - 0.501).abs() < 0.001);
+        // A level curve (docs/98 2.1): described only when there is one, a line of dB.
+        assert!(described.get("level_ramp").is_none());
+        let mut curved = sound(0);
+        curved.audio[0].level_ramp = Some([0, -200]);
+        assert_ne!(sound(0).fingerprint(&delivery), curved.fingerprint(&delivery));
+        assert!((curved.audio[0].fade_at(50, 100) - 0.316).abs() < 0.001, "-10 dB in the middle");
     }
 
     #[test]

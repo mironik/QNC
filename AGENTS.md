@@ -8048,3 +8048,19 @@ postojeci `source_frame`, pomak klipa unutar izvora vraca gresku kraja klipa umj
 (redni broj slicice), `qnc-transcript-db` (raspon reda prijepisa i prijepisa), `qnc-program-view` (slika pokrivalice u zoomu
 reza). Ponasanje za ispravne podatke isto; negativna vrijednost iz baze daje 0 ili gresku umjesto golemog broja. Testovi
 dotaknutih kocki.
+Izvedeno 2026-11-06 (korisnik: "pushaj kao novu verziju, pa nastavi"; verzija `v-2026-11-06`; sljedece po `docs/98`
+redoslijed 4: 2.1 krivulja razine): korak 1, krivulja razine u zvuku. Segment (A1) i pokrivalica (A2) imaju tocke razine:
+`qnc-program-db` stupac `story_items.level_keys` (`[[slika klipa, desetinke dB], ...]`, prazno bez krivulje; prici
+napravljenoj prije dodaje se, redovi ostaju; citac starije price trazi vlasnika da ga doda), `LevelKey` (slika izvornog
+klipa, pa tocka ostaje na svom zvuku kad se komad skrati ili pomakne; od -60 do +12 dB, najvise 256, jedna po slici),
+operacija `SetLevelKeys` (cijela krivulja odjednom, jedan korak Undo; lead je nema); podjela pokrivalice markerom kopira
+krivulju. Izmedju dvije tocke razina ide pravcem u dB, prije prve i poslije zadnje ostaje njihova; krivulja se dodaje na
+razinu trake. `qnc-program-input` daje tocke playlisti na osi izvora u stopi price; `qnc-program-playlist`
+(`level_curve.rs`, `LevelPoint`, `LevelRamp`): svaka stavka se dijeli na tockama, pa je preko jedne stavke razina rute
+jedan pravac (`ProgramAudioRoute.level_ramp`), i u J/L produzecima; `qnc-broadcast-engine` (sabirnica mnozi uzorke
+pravcem; dio prerendera nosi krivulju na krajevima), `qnc-render-unit` (`AudioPart.level_ramp`, u otisku samo kad postoji,
+pa dijelovi bez krivulje zadrzavaju otisak; `fade_at` ukljucuje krivulju, pa je primjenjuju prerender i export). Ton A2 u
+Off i slozena izjava zasad bez krivulje. Testovi `qnc-program-db` (58), `qnc-program-playlist` (26), `qnc-render-unit`,
+`qnc-broadcast-engine`, `qnc-program-input`, `qnc-program-render`, `qnc-player-input`, `qnc-fcp7-xml`. Nije izvedeno
+(korak 2, ceka odluku o gestama jer je mapa misa zakljucana): crtanje krivulje na Wrap retku i u zoomu, dodavanje,
+pomicanje i brisanje tocaka; val programa jos ne prati krivulju. Uzivo nije provjereno.

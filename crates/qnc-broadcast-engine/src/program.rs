@@ -41,9 +41,21 @@ struct Bus {
     /// and falls over `fade_out`'s, as the playlist route says.
     fade_in: Option<(u64, u64)>,
     fade_out: Option<(u64, u64)>,
+    /// The level curve over this bus (docs/98 2.1), program frames, added to `level_db`.
+    level_ramp: Option<qnc_program_playlist::LevelRamp>,
 }
 
 impl Bus {
+    /// The factor of the level curve at program position `frame` (fractional), 1 without one.
+    fn ramp_at(&self, frame: f64) -> f32 {
+        self.level_ramp.map_or(1.0, |ramp| ramp.gain_at(frame))
+    }
+
+    /// The level curve over program frames `[from, to)` as tenths of a dB at each end.
+    fn ramp_over(&self, from: u64, to: u64) -> Option<[i16; 2]> {
+        self.level_ramp.map(|ramp| [ramp.db10_at(from as f64).round() as i16, ramp.db10_at(to as f64).round() as i16])
+    }
+
     fn gain(&self) -> f32 {
         qnc_gain::level_gain(self.level_db, false)
     }
@@ -217,7 +229,7 @@ fn with_prerendered(
                 record_in: from,
                 record_out: to,
                 buses: (0..channels)
-                    .map(|output| Bus { output, clip: index, source_in: 0, stream_index, channel_index: output, stream_channels, level_db: 0, fade_in: None, fade_out: None }) // the level is in the rendered unit
+                    .map(|output| Bus { output, clip: index, source_in: 0, stream_index, channel_index: output, stream_channels, level_db: 0, fade_in: None, fade_out: None, level_ramp: None }) // the level is in the rendered unit
                     .collect(),
             });
             continue;
@@ -330,6 +342,7 @@ impl ProgramPlan {
                     origin: plan.audio_origin,
                     level_db: bus.level_db,
                     fade: bus.fade_over(a, b),
+                    level_ramp: bus.ramp_over(a, b),
                     at_sample: at,
                     length: (!whole).then_some(end - at),
                 });
@@ -1265,9 +1278,10 @@ impl ProgramSound {
             let source = &taken[&key];
             let gain = bus.gain();
             // Two A2 sounds share the output while they cross-fade: they add up.
-            let faded = bus.fade_in.is_some() || bus.fade_out.is_some();
+            let faded = bus.fade_in.is_some() || bus.fade_out.is_some() || bus.level_ramp.is_some();
             for (index, value) in source.iter().take(frames).enumerate() {
-                let fade = if faded { bus.fade_at(frame as f64 + index as f64 / frames as f64) } else { 1.0 };
+                let at = frame as f64 + index as f64 / frames as f64;
+                let fade = if faded { bus.fade_at(at) * bus.ramp_at(at) } else { 1.0 };
                 samples[index * channels + usize::from(bus.output)] += *value * gain * fade;
             }
         }
@@ -1350,6 +1364,7 @@ fn program_spans(
                     level_db: route.level_db,
                     fade_in: route.fade_in.map(|(a, b)| Ok::<_, BroadcastEngineError>((frame(a)?, frame(b)?))).transpose()?,
                     fade_out: route.fade_out.map(|(a, b)| Ok::<_, BroadcastEngineError>((frame(a)?, frame(b)?))).transpose()?,
+                    level_ramp: route.level_ramp,
                 });
             }
         }

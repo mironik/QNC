@@ -232,6 +232,7 @@ pub(crate) fn audio_routes(
         level_db,
         fade_in: None,
         fade_out: None,
+        level_ramp: None,
     }]
 }
 

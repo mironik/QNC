@@ -245,3 +245,29 @@ pub(crate) fn join_before(conn: &Connection, segment_id: &str) -> Result<String>
     leads::refuse_lead(conn, &before)?;
     Ok(before)
 }
+
+impl Store {
+    /// The level curve of a segment (its A1) or a cover (its A2), the whole curve as it is to
+    /// be (docs/98 2.1). A lead has no curve of its own.
+    pub(crate) fn set_level_keys(&mut self, item_id: &str, keys: &[LevelKey]) -> Result<Data> {
+        let keys = LevelKey::checked(keys.to_vec())?;
+        let item_id = item_id.trim();
+        let lead: Option<String> = self
+            .conn
+            .query_row("SELECT lead FROM story_items WHERE item_id = ?1", [item_id], |row| row.get(0))
+            .optional()
+            .map_err(err)?;
+        match lead.as_deref() {
+            None => return Err(format!("item_id not found: {item_id}")),
+            Some("") => {}
+            Some(_) => return Err(qnc_ui_text::text("story.lead_is_automatic").into()),
+        }
+        self.conn
+            .execute(
+                "UPDATE story_items SET level_keys = ?1, updated_at = ?2 WHERE item_id = ?3",
+                params![LevelKey::to_column(&keys), story_now(), item_id],
+            )
+            .map_err(err)?;
+        Ok(Data::Changed)
+    }
+}

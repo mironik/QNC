@@ -317,6 +317,7 @@ impl Store {
             Operation::SetCoverOverlap { cover_id, lead_frames, tail_frames } => {
                 self.set_cover_overlap(cover_id, *lead_frames, *tail_frames)
             }
+            Operation::SetLevelKeys { item_id, keys } => self.set_level_keys(item_id, keys),
             Operation::DeleteCover { cover_id } => self.delete_cover(cover_id),
             Operation::SelectCover { cover_id } => self.select_cover(cover_id),
         }

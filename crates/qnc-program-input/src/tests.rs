@@ -27,6 +27,7 @@ fn part(id: &str, kind: &str, clip: &str, range: (u64, u64), active: bool) -> Pr
         a2_off: false,
         a2_lead_frames: 0,
         a2_tail_frames: 0,
+        level_keys: Vec::new(),
     }
 }
 
@@ -47,6 +48,7 @@ fn cover(id: &str, program: (u64, u64), shot: &str) -> ProgramCover {
         a2_off: false,
         a2_lead_frames: 0,
         a2_tail_frames: 0,
+        level_keys: Vec::new(),
     }
 }
 

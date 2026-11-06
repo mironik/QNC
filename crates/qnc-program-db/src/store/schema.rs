@@ -13,6 +13,10 @@ pub(crate) const SCHEMA_COLUMNS: &[(&str, &[&str])] = &[
     ),
 ];
 
+/// Columns of `story_items` added to a story made before them, its rows kept (a story
+/// without one is brought up by its owner, never removed).
+pub(crate) const ADDED_ITEM_COLUMNS: &[(&str, &str)] = &[("level_keys", "TEXT NOT NULL DEFAULT ''")];
+
 /// The tables of the story before segments and covers shared one table; a project that still
 /// has them is an older story.
 const OLD_TABLES: [&str; 2] = ["story_parts", "story_covers"];
@@ -34,7 +38,8 @@ pub(crate) fn schema_outdated(conn: &Connection) -> Result<bool> {
             return Ok(true);
         }
     }
-    Ok(false)
+    let items = table_columns(conn, "story_items")?;
+    Ok(!items.is_empty() && ADDED_ITEM_COLUMNS.iter().any(|(column, _)| !items.iter().any(|have| have == column)))
 }
 
 /// The revision of the story: kept apart from the story tables, so Undo never takes it
@@ -118,6 +123,13 @@ pub(crate) fn ensure_story_schema(conn: &Connection) -> Result<()> {
         )
         .map_err(err)?;
     }
+    // Columns added to a story made before them; its rows stay (the views below read them).
+    let have = table_columns(conn, "story_items")?;
+    for (column, definition) in ADDED_ITEM_COLUMNS {
+        if !have.is_empty() && !have.iter().any(|name| name == column) {
+            conn.execute_batch(&format!("ALTER TABLE story_items ADD COLUMN {column} {definition};")).map_err(err)?;
+        }
+    }
     conn.execute_batch(
         "DROP VIEW IF EXISTS public_program_segments;
          DROP VIEW IF EXISTS public_program_markers;
@@ -183,6 +195,7 @@ pub(crate) fn ensure_story_schema(conn: &Connection) -> Result<()> {
             a2_off INTEGER NOT NULL DEFAULT 0,
             a2_lead_frames INTEGER NOT NULL DEFAULT 0,
             a2_tail_frames INTEGER NOT NULL DEFAULT 0,
+            level_keys TEXT NOT NULL DEFAULT '',
             created_at TEXT NOT NULL,
             updated_at TEXT NOT NULL
          );
@@ -241,7 +254,7 @@ pub(crate) fn ensure_story_schema(conn: &Connection) -> Result<()> {
                 source_out_frame AS out_frame, source_fps_num AS fps_num, source_fps_den AS fps_den,
                 active, duration_frames, duration_label, duration_color_key, a1_source_channel,
                 a1_level_db, a1_off, v_lead_frames, lead, a1_lead_frames, a1_tail_frames, v_tail_frames,
-                a2_source_channel, a2_level_db, a2_off, a2_lead_frames, a2_tail_frames
+                a2_source_channel, a2_level_db, a2_off, a2_lead_frames, a2_tail_frames, level_keys
          FROM story_items WHERE role = 'segment';
          DROP VIEW IF EXISTS public_story_markers;
          CREATE VIEW public_story_markers AS
@@ -263,7 +276,7 @@ pub(crate) fn ensure_story_schema(conn: &Connection) -> Result<()> {
          SELECT item_id AS cover_id, slot_id, slot_signature, slot_index, timeline_start_frame,
                 timeline_end_frame, clip_id, virtual_shot_id, source_in_frame, source_out_frame,
                 source_fps_num AS fps_num, source_fps_den AS fps_den, a2_source_channel,
-                a2_level_db, a2_off, a2_lead_frames, a2_tail_frames
+                a2_level_db, a2_off, a2_lead_frames, a2_tail_frames, level_keys
          FROM story_items WHERE role = 'cover';",
     )
     .map_err(err)?;

@@ -54,6 +54,7 @@ pub fn build_input(
             a2_off: segment.a2_off,
             a2_lead_frames: i64::from(segment.a2_lead_frames),
             a2_tail_frames: i64::from(segment.a2_tail_frames),
+            a1_points: points(&segment.level_keys, num, den),
         });
         start += frames;
     }
@@ -126,5 +127,14 @@ pub(crate) fn cover_input(cover: &ProgramCover, story_rate: (u32, u32)) -> Resul
         active: true,
         a2_lead_frames: i64::from(cover.a2_lead_frames),
         a2_tail_frames: i64::from(cover.a2_tail_frames),
+        a2_points: points(&cover.level_keys, num, den),
     })
+}
+
+/// The level curve of a segment or cover (frames of its clip) on its source counted at the
+/// story rate (docs/98 2.1).
+fn points(keys: &[qnc_program_db::LevelKey], num: i64, den: i64) -> Vec<qnc_program_playlist::LevelPoint> {
+    keys.iter()
+        .map(|key| qnc_program_playlist::LevelPoint { source_frame: i64::try_from(key.frame).unwrap_or(i64::MAX / 4) * num / den, db10: key.db10 })
+        .collect()
 }

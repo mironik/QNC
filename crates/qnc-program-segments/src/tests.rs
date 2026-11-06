@@ -25,6 +25,7 @@ fn stored(id: &str, kind: &str, range: (u64, u64)) -> ProgramSegment {
         a2_off: false,
         a2_lead_frames: 0,
         a2_tail_frames: 0,
+        level_keys: Vec::new(),
     }
 }
 
@@ -332,6 +333,7 @@ fn cover(id: &str, slot_id: &str, frames: (u64, u64)) -> ProgramCover {
         a2_off: false,
         a2_lead_frames: 0,
         a2_tail_frames: 0,
+        level_keys: Vec::new(),
     }
 }
 
@@ -631,6 +633,7 @@ fn a_moved_slot_takes_its_cover_with_it_in_the_edit_pictures() {
         a2_off: false,
         a2_lead_frames: 0,
         a2_tail_frames: 0,
+        level_keys: Vec::new(),
     };
     segments.stored_covers = vec![
         cover("c0", "S|m1", (0, 15), "prev"),

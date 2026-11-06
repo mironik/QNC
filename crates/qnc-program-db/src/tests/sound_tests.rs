@@ -201,3 +201,44 @@ fn a_negative_j_or_l_is_a_hole_in_the_sound_and_an_older_story_keeps_its_rows() 
     assert_eq!(segments(&mut store).len() as i64 + covers(&mut store).len() as i64, count, "the rows stay");
     run(&mut store, Operation::SetJoinSound { segment_id: users[1].clone(), tail_frames: -1, lead_frames: 0 }).unwrap();
 }
+
+/// docs/98 2.1: the level curve of a segment (A1) and of a cover (A2) is kept on the frames of
+/// its clip, sorted; a step of Undo; a lead has none; a story made before it keeps its rows.
+#[test]
+fn a_level_curve_is_kept_sorted_on_its_clip_and_undone_in_one_step() {
+    let dir = tempfile::tempdir().unwrap();
+    let path = dir.path().join("db");
+    let mut store = imported_store(&path);
+    three_segments(&mut store);
+    let segment = segments(&mut store)[0].segment_id.clone();
+    assert!(segments(&mut store)[0].level_keys.is_empty());
+    let keys = vec![LevelKey { frame: 20, db10: -60 }, LevelKey { frame: 5, db10: 0 }];
+    run(&mut store, Operation::SetLevelKeys { item_id: segment.clone(), keys }).unwrap();
+    assert_eq!(
+        segments(&mut store)[0].level_keys,
+        vec![LevelKey { frame: 5, db10: 0 }, LevelKey { frame: 20, db10: -60 }],
+        "sorted by the frame of the clip"
+    );
+    let same = vec![LevelKey { frame: 5, db10: 0 }, LevelKey { frame: 5, db10: -10 }];
+    assert!(run(&mut store, Operation::SetLevelKeys { item_id: segment.clone(), keys: same }).is_err());
+    let loud = vec![LevelKey { frame: 5, db10: 121 }];
+    assert!(run(&mut store, Operation::SetLevelKeys { item_id: segment.clone(), keys: loud }).is_err());
+    run(&mut store, Operation::UndoStory).unwrap();
+    assert!(segments(&mut store)[0].level_keys.is_empty(), "one Undo step");
+    // The curve is the middle of its points in dB, theirs before and after them.
+    let curve = [LevelKey { frame: 10, db10: 0 }, LevelKey { frame: 20, db10: -100 }];
+    assert_eq!(LevelKey::level_at(&curve, 0.0), 0.0);
+    assert_eq!(LevelKey::level_at(&curve, 15.0), -50.0);
+    assert_eq!(LevelKey::level_at(&curve, 30.0), -100.0);
+    drop(store);
+    // A story made before the column: the owner adds it, the rows stay.
+    let conn = Connection::open(&path).unwrap();
+    conn.execute_batch(
+        "DROP VIEW public_story_parts; DROP VIEW public_story_covers; ALTER TABLE story_items DROP COLUMN level_keys;",
+    )
+    .unwrap();
+    drop(conn);
+    let mut store = reopen(&path);
+    assert_eq!(segments(&mut store).len(), 3, "its rows stay");
+    assert!(segments(&mut store)[0].level_keys.is_empty());
+}

@@ -40,6 +40,7 @@ fn source(
                 level_db: 0,
                 fade_in: None,
                 fade_out: None,
+                level_ramp: None,
             })
             .into_iter()
             .collect(),
@@ -163,7 +164,7 @@ fn buses_take_the_chosen_saved_channel_to_a1_and_a2() {
         stream_index: 2,
         channel_index: 0,
         stream_channels: 1,
-        level_db: 0, fade_in: None, fade_out: None
+        level_db: 0, fade_in: None, fade_out: None, level_ramp: None
     };
     assert_eq!(
         audio[0].buses,
@@ -184,7 +185,7 @@ fn buses_take_the_chosen_saved_channel_to_a1_and_a2() {
                 stream_index: 1,
                 channel_index: 0,
                 stream_channels: 2,
-                level_db: 0, fade_in: None, fade_out: None
+                level_db: 0, fade_in: None, fade_out: None, level_ramp: None
             },
         ],
         "the segment keeps A1 under the cover; the cover is heard on A2"
@@ -217,7 +218,7 @@ fn a_cover_has_its_own_lane_so_its_sound_opens_before_the_cut() {
         stream_index: 1,
         channel_index: 0,
         stream_channels: 4,
-        level_db: 0, fade_in: None, fade_out: None
+        level_db: 0, fade_in: None, fade_out: None, level_ramp: None
     };
     let span = |record_in, bus| AudioSpan {
         record_in,
@@ -254,7 +255,7 @@ fn the_picture_decoder_of_the_next_cover_opens_two_seconds_ahead() {
 
 #[test]
 fn a_cover_cut_in_two_opens_its_sound_once_at_its_first_part() {
-    let bus = |clip, source_in| Bus { output: 1, clip, source_in, stream_index: 2, channel_index: 0, stream_channels: 1, level_db: 0 , fade_in: None, fade_out: None};
+    let bus = |clip, source_in| Bus { output: 1, clip, source_in, stream_index: 2, channel_index: 0, stream_channels: 1, level_db: 0 , fade_in: None, fade_out: None, level_ramp: None };
     let span = |record_in, record_out, buses| AudioSpan { record_in, record_out, buses };
     // The cover 2878..3088 over the end of a segment (2961): two items, the same lane.
     let spans = vec![
@@ -273,7 +274,7 @@ fn a_cover_cut_in_two_opens_its_sound_once_at_its_first_part() {
 /// frames, and a unit carries the factors at its ends.
 #[test]
 fn a_crossfading_bus_rises_and_falls_over_its_frames() {
-    let bus = Bus { output: 1, clip: 0, source_in: 0, stream_index: 2, channel_index: 0, stream_channels: 1, level_db: 0, fade_in: Some((10, 14)), fade_out: Some((40, 44)) };
+    let bus = Bus { output: 1, clip: 0, source_in: 0, stream_index: 2, channel_index: 0, stream_channels: 1, level_db: 0, fade_in: Some((10, 14)), fade_out: Some((40, 44)), level_ramp: None };
     assert_eq!(bus.fade_at(9.0), 0.0);
     assert_eq!(bus.fade_at(12.0), 0.5);
     assert_eq!(bus.fade_at(20.0), 1.0);
@@ -292,7 +293,7 @@ fn units_are_cut_where_the_picture_changes_and_a_crossfade_lies_inside_one() {
     // Clip 0 from 0, its cover clip 1 from 40 over 40..80 (items cut at 36 and 40 by the
     // crossfade), then black.
     let video = [span(0, 36, Some((0, 100))), span(36, 40, Some((0, 136))), span(40, 80, Some((1, 0))), span(80, 100, None)];
-    let bus = |output, clip, source_in, fade_in| Bus { output, clip, source_in, stream_index: 0, channel_index: 0, stream_channels: 1, level_db: 0, fade_in, fade_out: None };
+    let bus = |output, clip, source_in, fade_in| Bus { output, clip, source_in, stream_index: 0, channel_index: 0, stream_channels: 1, level_db: 0, fade_in, fade_out: None, level_ramp: None };
     let audio = [
         AudioSpan { record_in: 0, record_out: 36, buses: vec![bus(0, 0, 100, None)] },
         AudioSpan { record_in: 36, record_out: 40, buses: vec![bus(0, 0, 136, None), bus(1, 1, 0, Some((36, 40)))] },
@@ -305,4 +306,17 @@ fn units_are_cut_where_the_picture_changes_and_a_crossfade_lies_inside_one() {
     // A jump in the same clip's source is a cut.
     let jump = [span(0, 10, Some((0, 0))), span(10, 20, Some((0, 50)))];
     assert_eq!(unit_cuts(&jump, &[], 20), vec![0, 10, 20]);
+}
+
+/// docs/98 2.1: a bus with a level curve is that line of dB over its frames, and a prerender
+/// piece of it carries the curve at its ends.
+#[test]
+fn a_bus_with_a_level_curve_plays_its_line_of_db() {
+    let ramp = qnc_program_playlist::LevelRamp { from: 0, to: 100, db10_from: 0, db10_to: -200 };
+    let bus = Bus { output: 0, clip: 0, source_in: 0, stream_index: 0, channel_index: 0, stream_channels: 1, level_db: 0, fade_in: None, fade_out: None, level_ramp: Some(ramp) };
+    assert_eq!(bus.ramp_at(0.0), 1.0);
+    assert!((bus.ramp_at(100.0) - 0.1).abs() < 1e-6);
+    assert_eq!(bus.ramp_over(50, 100), Some([-100, -200]));
+    let flat = Bus { level_ramp: None, ..bus };
+    assert_eq!((flat.ramp_at(50.0), flat.ramp_over(0, 10)), (1.0, None));
 }

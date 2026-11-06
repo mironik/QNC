@@ -286,11 +286,11 @@ pub(crate) fn split_cover_at(conn: &Connection, marker_id: &str, frame: i64) -> 
             timeline_end_sec, slot_signature, slot_index, clip_id, virtual_shot_id, title, note,
             in_tc, out_tc, in_seconds, out_seconds, source_in_frame, source_out_frame, source_fps,
             source_fps_num, source_fps_den, sort_index, a2_source_channel, a2_level_db, a2_off,
-            a2_lead_frames, a2_tail_frames, created_at, updated_at)
+            a2_lead_frames, a2_tail_frames, level_keys, created_at, updated_at)
          SELECT 'cover', ?1, ?2, ?3, timeline_end_frame, ?4, timeline_end_sec, slot_signature, slot_index,
             clip_id, virtual_shot_id, title, note, ?5, out_tc, ?6, out_seconds, ?7, source_out_frame,
             source_fps, source_fps_num, source_fps_den, sort_index, a2_source_channel, a2_level_db,
-            a2_off, 0, a2_tail_frames, ?8, ?8
+            a2_off, 0, a2_tail_frames, level_keys, ?8, ?8
          FROM story_items WHERE role = 'cover' AND item_id = ?9",
         params![
             format!("cover_{created:x}"),

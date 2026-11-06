@@ -63,6 +63,74 @@ pub struct ProgramSegment {
     pub a2_lead_frames: i32,
     #[serde(default)]
     pub a2_tail_frames: i32,
+    /// The level curve of its A1 (user 2026-11-06, docs/98 2.1): points on its clip, empty for
+    /// none; between two the level goes in a line of dB, before the first and after the last
+    /// it stays theirs. Added to the level of the lane.
+    #[serde(default)]
+    pub level_keys: Vec<LevelKey>,
+}
+
+/// One point of a level curve (docs/98 2.1): a frame of the item's clip (source frames, so
+/// it stays on its sound when the item is trimmed or moved) and the level there in tenths
+/// of a dB, added to the lane's level.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub struct LevelKey {
+    pub frame: u64,
+    pub db10: i16,
+}
+
+/// The lowest and highest level of a point, tenths of a dB.
+pub const LEVEL_KEY_RANGE: (i16, i16) = (-600, 120);
+
+/// The most points on one item.
+pub const LEVEL_KEYS_MAX: usize = 256;
+
+impl LevelKey {
+    /// The level at source frame `frame` (fractional) of a curve sorted by frame, tenths of
+    /// a dB; 0 without points.
+    pub fn level_at(keys: &[LevelKey], frame: f64) -> f64 {
+        let (Some(first), Some(last)) = (keys.first(), keys.last()) else { return 0.0 };
+        if frame <= first.frame as f64 {
+            return f64::from(first.db10);
+        }
+        if frame >= last.frame as f64 {
+            return f64::from(last.db10);
+        }
+        let after = keys.iter().position(|key| key.frame as f64 > frame).unwrap_or(keys.len() - 1);
+        let (a, b) = (keys[after - 1], keys[after]);
+        let t = (frame - a.frame as f64) / (b.frame - a.frame).max(1) as f64;
+        f64::from(a.db10) + (f64::from(b.db10) - f64::from(a.db10)) * t
+    }
+
+    /// The curve as the story keeps it: sorted, one point per frame, each in range.
+    pub fn checked(mut keys: Vec<LevelKey>) -> std::result::Result<Vec<LevelKey>, String> {
+        if keys.len() > LEVEL_KEYS_MAX {
+            return Err(qnc_ui_text::fill("story.level_keys_many", &[("count", &LEVEL_KEYS_MAX.to_string())]));
+        }
+        keys.sort_by_key(|key| key.frame);
+        if keys.windows(2).any(|pair| pair[0].frame == pair[1].frame) {
+            return Err(qnc_ui_text::text("story.level_keys_same_frame").into());
+        }
+        if keys.iter().any(|key| key.db10 < LEVEL_KEY_RANGE.0 || key.db10 > LEVEL_KEY_RANGE.1) {
+            return Err(qnc_ui_text::text("story.level_key_range").into());
+        }
+        Ok(keys)
+    }
+
+    /// The column text of a curve (`[[frame, db10], ...]`, empty for none).
+    pub fn to_column(keys: &[LevelKey]) -> String {
+        if keys.is_empty() {
+            return String::new();
+        }
+        serde_json::to_string(&keys.iter().map(|key| (key.frame, key.db10)).collect::<Vec<_>>()).unwrap_or_default()
+    }
+
+    /// A curve from its column; a text that is not one is no curve.
+    pub fn from_column(text: &str) -> Vec<LevelKey> {
+        serde_json::from_str::<Vec<(u64, i16)>>(text)
+            .map(|keys| keys.into_iter().map(|(frame, db10)| LevelKey { frame, db10 }).collect())
+            .unwrap_or_default()
+    }
 }
 
 /// An M marker on the program axis (v5 `story_markers`). `system_role` is
@@ -114,6 +182,9 @@ pub struct ProgramCover {
     pub a2_lead_frames: i32,
     #[serde(default)]
     pub a2_tail_frames: i32,
+    /// The level curve of its A2 (docs/98 2.1), as a segment's on A1.
+    #[serde(default)]
+    pub level_keys: Vec<LevelKey>,
 }
 
 /// The stored Story selection (v5 `story_state`).
@@ -334,6 +405,9 @@ pub enum Operation {
     SetCoverSound { cover_id: String, channel: u16, level_db: i8, off: bool },
     /// The J and L of a cover's A2 (user 2026-10-21), story frames. An UNDO step.
     SetCoverOverlap { cover_id: String, lead_frames: i32, tail_frames: i32 },
+    /// The level curve of a segment (A1) or a cover (A2) (docs/98 2.1): the whole curve
+    /// as it is to be, empty for none. An UNDO step.
+    SetLevelKeys { item_id: String, keys: Vec<LevelKey> },
     /// v5 `delete_cover`; its B-roll virtual shot stays.
     DeleteCover { cover_id: String },
     /// v5 `select_cover`.
@@ -373,6 +447,7 @@ impl Operation {
                 | Self::SetSegmentSound { .. }
                 | Self::SetCoverSound { .. }
                 | Self::SetCoverOverlap { .. }
+                | Self::SetLevelKeys { .. }
         )
     }
 

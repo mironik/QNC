@@ -32,7 +32,7 @@ svaki trajni podatak je u bazi projekta kroz javnog pisca. Red je po vaznosti za
 
 | # | Alat | Kocke | Sto radi |
 |---|---|---|---|
-| 2.1 | **Krivulja razine (keyframeovi)** | `qnc-level-keys` (tocke razine na osi komada) + tablica uz `story_items` + engine/prerender mnozi po tocki | razina A1/A2 se mijenja unutar segmenta/pokrivalice; crta se na traci; mis i Ctrl+klik dodaju tocku |
+| 2.1 | **Krivulja razine (keyframeovi)** | `qnc-level-keys` (tocke razine na osi komada) + tablica uz `story_items` + engine/prerender mnozi po tocki | razina A1/A2 se mijenja unutar segmenta/pokrivalice; crta se na traci; mis i Ctrl+klik dodaju tocku (KORAK 1 IZVEDEN 2026-11-06: zapis, playlista, player, prerender, export; crtanje i uredjivanje ceka) |
 | 2.2 | **Automatsko stisavanje ambijenta pod govorom (ducking)** | `qnc-ducking` (iz glasnoce A1 po odsjecima: gdje je govor, A2 dolje za N dB s rampom) -> tocke 2.1 | jedna tipka za cijelu pricu, rezultat su obicne tocke razine koje se mogu ispraviti |
 | 2.3 | **Ciscenje govora (offline)** | `qnc-voice-clean` (dodatak po ugovoru kao prijepis: RNNoise ili DeepFilterNet) + render u prerender | sum i vjetar s izjave; original ostaje, ocisceni zvuk je artefakt |
 | 2.4 | Pretapanje tona na rubu komada | postoji (crossfade, J/L) | - |

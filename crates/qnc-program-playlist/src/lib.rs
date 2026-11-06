@@ -22,6 +22,7 @@ mod ton_a2;
 mod build;
 mod overlay;
 mod window;
+mod level_curve;
 
 pub(crate) use build::*;
 pub use a1_joins::{cross_a1, hole_a1, join_a1, A1Join};
@@ -29,7 +30,7 @@ pub use overlay::*;
 pub use window::*;
 
 pub use contract::{
-    FlatProgramItem, FlatProgramPlaylist, FlatProgramSource, FrameRange, MediaRef, PlaylistError,
+    FlatProgramItem, FlatProgramPlaylist, FlatProgramSource, FrameRange, LevelPoint, LevelRamp, MediaRef, PlaylistError,
     PlaylistResult, ProbedAudioFormat, ProbedVideoFormat, ProgramAudioLayout, ProgramAudioRoute,
     ProgramFrameRange, ProgramVideoLayer, ScanMode,
 };
@@ -114,6 +115,8 @@ pub struct ProgramSegmentInput {
     pub a2_off: bool,
     pub a2_lead_frames: i64,
     pub a2_tail_frames: i64,
+    /// The level curve of its A1 (docs/98 2.1), on the frames of `source_range`; empty for none.
+    pub a1_points: Vec<LevelPoint>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -133,6 +136,8 @@ pub struct ProgramCoverInput {
     pub a2_lead_frames: i64,
     /// Frames the cover's A2 goes on after its picture (an L), 0 for none.
     pub a2_tail_frames: i64,
+    /// The level curve of its A2 (docs/98 2.1), on the frames of `source_range`; empty for none.
+    pub a2_points: Vec<LevelPoint>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -179,6 +184,8 @@ pub fn build_flat_program_playlist(
     crossfade::holes_a2(&mut items, &holes)?;
     // After the covers' own A2: a cover overwrites A2 where it lies.
     ton_a2::ton_a2_into_offs(&mut items, &input.segments, input.a2_crossfade_frames, resolver)?;
+    // The level curves last: every route there is gets its line (docs/98 2.1).
+    level_curve::level_curves(&mut items, &input.segments)?;
     let playlist = FlatProgramPlaylist {
         playlist_id: input.playlist_id.clone(),
         project_id: input.project_id.clone(),
