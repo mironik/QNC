@@ -8214,3 +8214,7 @@ nemaju vlastitih boja ni gumba. Palete tema Soft i High contrast (AGENTS 16: dok
 `qnc_desktop_theme::danger` (ista vrijednost) i nova `done`; Close project kroz `qnc_ui_kit::sized_button` (sada prima
 bilo kakav tekst); `qnc-desktop` boje ugovora pretvara kroz `qnc_desktop_theme::rgb` (vlastiti `rgb` uklonjen). Izgled
 isti. C15: 15 -> 12. Testovi, `cargo check --workspace --all-targets`, conformance. Uzivo nije provjereno.
+Izvedeno 2026-11-06 (korisnik: "da, pushaj i kreni s level meterom"; gui-kit C15): `qnc-level-meter` nema vlastitih
+boja. Zone mjeraca (ispod -12, od -12, od -3 dBFS) su `MeterStyle.zones`; daje ih traka razine iz teme timelinea
+(`TimelineTheme.meter`), koju puni gui-kit (`qnc_theme_styles::timeline`), s istim vrijednostima. Izgled isti.
+C15: 12 -> 11. Testovi, `cargo check --workspace --all-targets`, conformance. Uzivo nije provjereno.

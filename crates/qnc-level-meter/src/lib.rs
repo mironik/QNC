@@ -25,6 +25,8 @@ pub struct MeterStyle {
     pub background: Color32,
     pub border: Color32,
     pub text: Color32,
+    /// The zones of the bar: under -12 dBFS, from -12, from -3 (gui-kit C15: the theme's).
+    pub zones: [Color32; 3],
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -99,10 +101,10 @@ pub fn show(ui: &mut Ui, id: Id, rect: Rect, lanes: &[(&str, Option<f32>)], styl
         moving |= state.moves_alone(now);
         ui.painter().text(egui::pos2(row.left(), row.center().y), Align2::LEFT_CENTER, *label, FontId::proportional(11.0), style.text);
         ui.painter().rect_filled(bar, 1.0, style.background);
-        paint_level(ui, bar, state.shown);
+        paint_level(ui, bar, state.shown, style.zones);
         if state.peak > FLOOR_DBFS {
             let x = bar.left() + bar.width() * scale(state.peak);
-            ui.painter().line_segment([egui::pos2(x, bar.top()), egui::pos2(x, bar.bottom())], Stroke::new(2.0, colour(state.peak)));
+            ui.painter().line_segment([egui::pos2(x, bar.top()), egui::pos2(x, bar.bottom())], Stroke::new(2.0, colour(state.peak, style.zones)));
         }
         ui.painter().rect_stroke(bar, 1.0, Stroke::new(1.0, style.border), StrokeKind::Inside);
     }
@@ -112,7 +114,7 @@ pub fn show(ui: &mut Ui, id: Id, rect: Rect, lanes: &[(&str, Option<f32>)], styl
 }
 
 /// The bar up to `dbfs`, each part in the colour of its zone.
-fn paint_level(ui: &Ui, bar: Rect, dbfs: f32) {
+fn paint_level(ui: &Ui, bar: Rect, dbfs: f32, zones_colours: [Color32; 3]) {
     let zones = [(FLOOR_DBFS, YELLOW_DBFS), (YELLOW_DBFS, RED_DBFS), (RED_DBFS, 0.0)];
     for (from, to) in zones {
         if dbfs <= from {
@@ -120,17 +122,17 @@ fn paint_level(ui: &Ui, bar: Rect, dbfs: f32) {
         }
         let x0 = bar.left() + bar.width() * scale(from);
         let x1 = bar.left() + bar.width() * scale(dbfs.min(to));
-        ui.painter().rect_filled(Rect::from_min_max(egui::pos2(x0, bar.top() + 1.0), egui::pos2(x1, bar.bottom() - 1.0)), 0.0, colour(from + 0.01));
+        ui.painter().rect_filled(Rect::from_min_max(egui::pos2(x0, bar.top() + 1.0), egui::pos2(x1, bar.bottom() - 1.0)), 0.0, colour(from + 0.01, zones_colours));
     }
 }
 
-fn colour(dbfs: f32) -> Color32 {
+fn colour(dbfs: f32, [low, middle, high]: [Color32; 3]) -> Color32 {
     if dbfs >= RED_DBFS {
-        Color32::from_rgb(220, 60, 50)
+        high
     } else if dbfs >= YELLOW_DBFS {
-        Color32::from_rgb(230, 200, 60)
+        middle
     } else {
-        Color32::from_rgb(70, 190, 110)
+        low
     }
 }
 

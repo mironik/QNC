@@ -257,6 +257,8 @@ pub struct TimelineTheme {
     pub cut_side: Color32,
     /// Voice no word was heard for, under the words of a trim zoom.
     pub unheard: Color32,
+    /// The zones of a level meter: under -12 dBFS, from -12, from -3.
+    pub meter: [Color32; 3],
 }
 
 

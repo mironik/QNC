@@ -43,6 +43,7 @@ pub fn timeline(theme: &Theme) -> qnc_timeline::TimelineTheme {
         cut: rgb(230, 30, 30),
         cut_side: rgb(255, 64, 64),
         unheard: Color32::from_rgba_premultiplied(70, 10, 10, 70),
+        meter: [rgb(70, 190, 110), rgb(230, 200, 60), rgb(220, 60, 50)],
     }
 }
 

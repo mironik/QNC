@@ -36,7 +36,7 @@ pub fn show(ui: &mut Ui, row: Rect, levels: [Option<f32>; 2], (normalize, assist
     let ai = Rect::from_min_max(Pos2::new(keep.min.x - GAP - AI_W, rect.min.y), Pos2::new(keep.min.x - GAP, rect.max.y));
     let norm = Rect::from_min_max(Pos2::new(ai.min.x - GAP - NORM_W, rect.min.y), Pos2::new(ai.min.x - GAP, rect.max.y));
     let meter = Rect::from_min_max(rect.min, Pos2::new(norm.min.x - GAP, rect.max.y));
-    let style = qnc_level_meter::MeterStyle { background: theme.background, border: theme.border, text: theme.muted };
+    let style = qnc_level_meter::MeterStyle { background: theme.background, border: theme.border, text: theme.muted, zones: theme.meter };
     qnc_level_meter::show(ui, ui.make_persistent_id("qnc_level_bar_meter"), meter.shrink2(Vec2::new(0.0, 1.0)), &[("A1", levels[0]), ("A2", levels[1])], style);
     let norm_clicked = toggle(ui, norm, ("story.ui.normalized", "story.ui.normalize_hint"), normalize, theme);
     let ai_clicked = toggle(ui, ai, ("story.ui.sound_assist", "story.ui.sound_assist_hint"), assist, theme);
