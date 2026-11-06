@@ -52,6 +52,7 @@ pub(crate) fn normalize_covers<R: ProgramMediaResolver>(
             source_out: source_in + (cover.program_end_frame - cover.program_start_frame),
             level_db: cover.a2_level_db,
             off: cover.a2_off,
+            curve: cover.level_keys.iter().map(|key| (key.frame * num as u64 / den as u64, key.db10)).collect(),
         };
         let gain = qnc_program_loudness::cover_gain(story_rate, &placement, rule, |id| {
             measured.get(id).map(|(channels, duration_frames)| ClipMeasure { channels, duration_frames: *duration_frames })

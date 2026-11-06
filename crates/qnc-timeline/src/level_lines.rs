@@ -41,15 +41,7 @@ impl TimelineLevelCurve {
 
     /// Its level at program position `at`, tenths of a dB.
     fn level_at(&self, at: f64) -> f64 {
-        let corners = self.corners();
-        for pair in corners.windows(2) {
-            let ((a, da), (b, db)) = (pair[0], pair[1]);
-            if at <= b {
-                let t = if b > a { ((at - a) / (b - a)).clamp(0.0, 1.0) } else { 1.0 };
-                return da + (db - da) * t;
-            }
-        }
-        corners.last().map_or(0.0, |corner| corner.1)
+        qnc_gain::curve_at(&self.corners(), at)
     }
 }
 
@@ -61,12 +53,28 @@ fn x_at(track: Rect, start: u64, duration: u64, at: f64) -> f32 {
 /// Draws every curve of `lane` (0 A1, 1 A2) over its band.
 pub(crate) fn paint(ui: &egui::Ui, band: Rect, lane: u8, input: &TimelineInput<'_>) {
     let (start, duration) = (input.state.range_start(), input.state.duration_frames());
-    let painter = ui.painter().with_clip_rect(band);
-    for curve in input.level_curves.iter().filter(|curve| curve.lane == lane) {
+    let colors = [input.theme.level_curve, input.theme.lane_taken, input.theme.marker_hover];
+    paint_level_curves(ui.painter(), band, (start, duration), lane, input.level_curves, input.state.playhead_frame, colors);
+}
+
+/// Draws the level curves of `lane` over `band`, which shows frames `[start, start + length)`
+/// (`window`); the point on the playhead line of the taken curve is circled. The one drawing of
+/// the timeline and of the trim zoom (rule 0.12). `colors`: a curve, the taken curve, its point.
+pub fn paint_level_curves(
+    painter: &egui::Painter,
+    band: Rect,
+    (start, duration): (u64, u64),
+    lane: u8,
+    curves: &[TimelineLevelCurve],
+    playhead: Option<u64>,
+    [plain, taken, point]: [Color32; 3],
+) {
+    let painter = painter.with_clip_rect(band);
+    for curve in curves.iter().filter(|curve| curve.lane == lane) {
         if curve.to <= start || curve.from >= start + duration {
             continue;
         }
-        let color = if curve.taken { input.theme.lane_taken } else { input.theme.level_curve };
+        let color = if curve.taken { taken } else { plain };
         let line: Vec<Pos2> = curve
             .corners()
             .into_iter()
@@ -78,19 +86,25 @@ pub(crate) fn paint(ui: &egui::Ui, band: Rect, lane: u8, input: &TimelineInput<'
             painter.rect_filled(Rect::from_center_size(center, egui::vec2(4.0, 4.0)), 0.0, color);
         }
         // The point the keys control: on the playhead line of the taken curve.
-        if let Some(playhead) = input.state.playhead_frame.filter(|frame| curve.taken && (curve.from..curve.to).contains(frame)) {
+        if let Some(playhead) = playhead.filter(|frame| curve.taken && (curve.from..curve.to).contains(frame)) {
             let at = playhead as f64;
             let center = Pos2::new(x_at(band, start, duration, at), level_y(band, curve.level_at(at)));
-            painter.circle_stroke(center, 3.5, Stroke::new(1.5, input.theme.marker_hover));
+            painter.circle_stroke(center, 3.5, Stroke::new(1.5, point));
         }
     }
 }
 
 /// A right click near a curve of `lane` on its band: the program frame clicked.
 pub(crate) fn hit(band: Rect, lane: u8, pos: Pos2, input: &TimelineInput<'_>) -> Option<u64> {
-    let (start, duration) = (input.state.range_start(), input.state.duration_frames());
+    let window = (input.state.range_start(), input.state.duration_frames());
+    level_curve_hit(band, window, lane, pos, input.level_curves)
+}
+
+/// The frame of a click near a curve of `lane` on `band` showing frames `window` (timeline and
+/// trim zoom alike).
+pub fn level_curve_hit(band: Rect, (start, duration): (u64, u64), lane: u8, pos: Pos2, curves: &[TimelineLevelCurve]) -> Option<u64> {
     let frame = frame_for_x(band, start, duration, pos.x);
-    let curve = input.level_curves.iter().find(|curve| curve.lane == lane && (curve.from..curve.to).contains(&frame))?;
+    let curve = curves.iter().find(|curve| curve.lane == lane && (curve.from..curve.to).contains(&frame))?;
     let y = level_y(band, curve.level_at(frame as f64));
     ((pos.y - y).abs() <= REACH).then_some(frame)
 }

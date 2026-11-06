@@ -104,7 +104,6 @@ impl FineWave {
                 self.ask(locator, &piece.clip_id, piece.channel, first, last);
                 continue;
             };
-            let gain = qnc_gain::level_gain(piece.level_db, false);
             let span = (to - from) as f64 / columns as f64;
             for (column, peak) in peaks.iter_mut().enumerate() {
                 let (c0, c1) = (from as f64 + column as f64 * span, from as f64 + (column + 1) as f64 * span);
@@ -115,6 +114,8 @@ impl FineWave {
                 let sample = |p: f64| ((seconds(source_at(p)) - chunk.from_seconds) * f64::from(chunk.rate)).max(0.0) as usize;
                 let (s0, s1) = (sample(p0).min(chunk.samples.len()), sample(p1).min(chunk.samples.len()));
                 let loudest = chunk.samples[s0..s1.max(s0)].iter().fold(0f32, |most, value| most.max(value.abs()));
+                // Its level and its level curve there (docs/98 2.1).
+                let gain = piece.gain_at(source_at((p0 + p1) / 2.0));
                 *peak = peak.max((loudest * gain).min(1.0));
             }
         }

@@ -549,6 +549,7 @@ fn fine_wave(preview: &SourcePreview, clip_id: &str, name: &str, at: u64) {
             source_out: to,
             level_db: 0,
             off: false,
+            curve: Vec::new(),
         };
         let mut wave = qnc_fine_wave::FineWave::new();
         let started = Instant::now();

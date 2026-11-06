@@ -159,6 +159,7 @@ impl ProgramSegments {
                 source_out: self.source.duration_frames.max(to),
                 level_db: lane.level_db,
                 off: lane.off,
+                curve: Vec::new(),
             };
             return Some(qnc_program_view::ZoomSound { from, to, cut, lanes: [vec![lane(&self.source.lanes[0])], vec![lane(&self.source.lanes[1])]], playhead, lane_choices: self.source.lane_choices, ..Default::default() });
         }
@@ -177,7 +178,19 @@ impl ProgramSegments {
         let position = self.source.playing.filter(|(program, _, _)| *program).map(|(_, frame, playing)| (frame, playing));
         let playhead = self.zoom_follow.playhead(cut, position);
         let (from, to) = qnc_program_view::zoom_window(earliest, latest, half, view.total_frames, playhead);
-        let (segments, covers) = view.wave_placements();
+        let (mut segments, mut covers) = view.wave_placements();
+        // A taken level curve (docs/98 2.1): its wave is its draft and the curve is drawn over it.
+        let level_curve = view.level_curves().into_iter().find(|curve| curve.taken);
+        if let Some(curve) = &level_curve {
+            let (placements, index) = if curve.lane == 0 {
+                (&mut segments, view.rows.iter().position(|row| row.segment_id == curve.id))
+            } else {
+                (&mut covers, view.covers.iter().position(|cover| cover.cover_id == curve.id))
+            };
+            if let (Some(placement), Some((_, _, keys))) = (index.and_then(|index| placements.get_mut(index)), &view.level_line) {
+                placement.curve = qnc_program_db::LevelKey::pairs(keys);
+            }
+        }
         let reach = qnc_program_view::zoom_reach(from, to, playhead);
         let near = |placements: Vec<qnc_program_waveform::Placement>| placements.into_iter().filter(|at| at.program_start < reach && from < at.program_end).collect();
         let taken_cut = self.marker_edit.as_ref().map(|(id, _)| id.clone());

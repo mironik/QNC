@@ -8102,3 +8102,18 @@ Izvedeno 2026-11-06 (korisnik: "makni Shift+W i pushaj"): Shift+W (`toggle_sourc
 (scopeovi `storyboard` i `timeline_modal`): nijedna kocka ga nije obradivala, tipka nije radila nista. Radnja ostaje u
 katalogu i u ostalim presetima (preslika qnc_v4); conformance iznimke od qnc_v4 dopunjene. Testovi
 `qnc-keyboard-shortcut`, `qnc-panel-focus`, `qnc-conformance`, conformance.
+Izvedeno 2026-11-06 (korisnik: "nastavi s valom i zoomom za krivulju razine"): korak 3 krivulje razine (docs/98 2.1).
+Pravilo krivulje je jednom, u `qnc-gain` (`curve_at`, `db10_to_gain`); koriste ga `qnc-program-db` (`LevelKey::level_at`,
+`LevelKey::pairs`), `qnc-program-playlist` (`LevelPoint`, `LevelRamp`), `qnc-level-curve`, `qnc-timeline` i
+`qnc-render-unit` (cetiri kopije uklonjene). Val: `qnc-program-waveform` `Placement.curve` i `gain_at` (razina i krivulja
+na slici klipa); prate je val Wrap redova (`qnc-program-view` `wave_placements`), mjerenje glasnoce za NORM
+(`qnc-program-loudness`, i pravilo pokrivalica u `qnc-program-input` `normalize`) i fini val zooma (`qnc-fine-wave`);
+nacrt uzete krivulje vidi se u valu prije Entera (`qnc-program-segments` `view_with_waves`). Zoom: dok je krivulja uzeta,
+zoom reza je oko tocke na liniji playheada (`qnc-program-view` `point_stills`: zadnja slika prije i slika na tocki,
+rjecnik `story.still.before_point`, `story.still.at_point`), prati playhead (`set_playhead`); preko A1/A2 zooma crtaju se
+krivulje istom funkcijom kao na timelineu (`qnc-timeline` `paint_level_curves`, `level_curve_hit`, pravilo 0.12), desni
+klik na liniju u zoomu je `select_level_a1/a2` kao na timelineu. Pretvorba krivulja price u krivulje timelinea je jednom,
+`qnc-trim-overlay` `timeline_level_curves` (koristi je i panel Segmenti). Zoom source IN/OUT (os klipa) nema krivulje.
+Testovi `qnc-gain`, `qnc-program-waveform`, `qnc-program-segments` (73), `qnc-level-curve`, `qnc-program-loudness`,
+`qnc-timeline`, `qnc-trim-overlay`, `qnc-program-db`, `qnc-program-playlist`, `qnc-fine-wave`, `qnc-program-view`,
+conformance, `cargo check --workspace --all-targets`. Uzivo nije provjereno.

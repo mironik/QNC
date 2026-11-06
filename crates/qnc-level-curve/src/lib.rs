@@ -56,14 +56,7 @@ impl Placed {
         let mut corners = vec![(span.start as f64, f64::from(self.start_db10))];
         corners.extend(self.points.iter().map(|(point, db10)| (*point, f64::from(*db10))));
         corners.push((span.end as f64, f64::from(self.end_db10)));
-        for pair in corners.windows(2) {
-            let ((a, da), (b, db)) = (pair[0], pair[1]);
-            if at <= b {
-                let t = if b > a { ((at - a) / (b - a)).clamp(0.0, 1.0) } else { 1.0 };
-                return da + (db - da) * t;
-            }
-        }
-        f64::from(self.end_db10)
+        qnc_gain::curve_at(&corners, at)
     }
 
     /// The part of the curve inside program frames `[from, to)` (a Wrap row's window): its

@@ -87,7 +87,7 @@ impl ProgramSegments {
     }
 
     /// The status: the level of the curve on the playhead line and whether a point is there.
-    fn say_level(&mut self, frame: u64) {
+    pub(crate) fn say_level(&mut self, frame: u64) {
         let Some(line) = &self.level_line else { return };
         let level = format!("{:+.1}", f64::from(line.level_at(frame)) / 10.0);
         let key = if line.point_at(frame).is_some() { "story.msg.level_point" } else { "story.msg.level_line" };

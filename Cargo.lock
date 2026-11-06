@@ -4862,6 +4862,7 @@ dependencies = [
 name = "qnc-level-curve"
 version = "0.1.0"
 dependencies = [
+ "qnc-gain",
  "qnc-program-db",
 ]
 
@@ -5602,6 +5603,7 @@ dependencies = [
  "qnc-content-read",
  "qnc-content-store",
  "qnc-db-broker",
+ "qnc-gain",
  "qnc-import-fit",
  "qnc-media-metadata",
  "qnc-media-records",
@@ -6738,6 +6740,7 @@ dependencies = [
  "qnc-dev-diagnostics",
  "qnc-edit-verbs",
  "qnc-filmstrip",
+ "qnc-gain",
  "qnc-lane-choice",
  "qnc-mouse-map",
  "qnc-snap",

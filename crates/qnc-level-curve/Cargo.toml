@@ -5,4 +5,5 @@ edition = "2021"
 description = "QNC public piece: the level curve of one stored segment (A1) or cover (A2) taken on the Wrap row (docs/98 2.1): where its clip lies on the program, the point at the playhead line that the keys raise, lower or remove, its draft and the curve to write. Its own state only: no database, no player, no form."
 
 [dependencies]
+qnc-gain = { workspace = true }
 qnc-program-db = { workspace = true }

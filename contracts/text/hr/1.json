@@ -277,6 +277,8 @@
     "story.still.next_slot_first": "Sljedeći slot - prva",
     "story.still.before_marker_last": "Prije markera - zadnja",
     "story.still.after_marker_first": "Poslije markera - prva",
+    "story.still.before_point": "Prije točke razine - zadnja",
+    "story.still.at_point": "Na točki razine",
     "story.still.slot_new_first": "Slot - nova prva",
     "story.still.slot_new_last": "Slot - nova zadnja",
     "story.msg.pick_slot_for_broll": "Odaberite slot markera za pokrivalicu",

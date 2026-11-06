@@ -198,17 +198,8 @@ impl LevelPoint {
     /// The level at source frame `frame` (fractional) of points sorted by frame, tenths of a
     /// dB: a line of dB between two, theirs before the first and after the last; 0 without.
     pub fn level_at(points: &[LevelPoint], frame: f64) -> f64 {
-        let (Some(first), Some(last)) = (points.first(), points.last()) else { return 0.0 };
-        if frame <= first.source_frame as f64 {
-            return f64::from(first.db10);
-        }
-        if frame >= last.source_frame as f64 {
-            return f64::from(last.db10);
-        }
-        let after = points.iter().position(|point| point.source_frame as f64 > frame).unwrap_or(points.len() - 1);
-        let (a, b) = (points[after - 1], points[after]);
-        let t = (frame - a.source_frame as f64) / (b.source_frame - a.source_frame).max(1) as f64;
-        f64::from(a.db10) + (f64::from(b.db10) - f64::from(a.db10)) * t
+        let points: Vec<(f64, f64)> = points.iter().map(|point| (point.source_frame as f64, f64::from(point.db10))).collect();
+        qnc_gain::curve_at(&points, frame)
     }
 }
 
@@ -231,7 +222,7 @@ impl LevelRamp {
 
     /// The factor at program position `frame`.
     pub fn gain_at(&self, frame: f64) -> f32 {
-        10f64.powf(self.db10_at(frame) / 200.0) as f32
+        qnc_gain::db10_to_gain(self.db10_at(frame)) as f32
     }
 }
 

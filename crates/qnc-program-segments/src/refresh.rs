@@ -122,9 +122,11 @@ impl ProgramSegments {
         view.export_alert = self.export_alert.as_deref() == Some(view.message.as_str());
         view.editing = self.editing.clone();
         view.clips_are_slots = self.is_s_story();
-        view.edit_stills = match &self.slot_trim {
-            Some(trim) => qnc_program_view::trim_stills(&view, &slots(&self.stored_slots, None), &trim.slot_id, trim.start, trim.frames),
-            None => qnc_program_view::edit_stills(&view, &slots(&self.stored_slots, None), &self.edit_moves()),
+        view.edit_stills = match (&self.slot_trim, &self.level_line) {
+            (Some(trim), _) => qnc_program_view::trim_stills(&view, &slots(&self.stored_slots, None), &trim.slot_id, trim.start, trim.frames),
+            // A taken level curve: the zoom is around its point on the playhead line (docs/98 2.1).
+            (None, Some(_)) => qnc_program_view::point_stills(&view, &slots(&self.stored_slots, None), self.playhead.unwrap_or(0)),
+            (None, None) => qnc_program_view::edit_stills(&view, &slots(&self.stored_slots, None), &self.edit_moves()),
         };
         view.source_edit_stills = self.source_stills();
         view.trim_frames = match &self.slot_trim {

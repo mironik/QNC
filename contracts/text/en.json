@@ -277,6 +277,8 @@
     "story.still.next_slot_first": "Next slot - first",
     "story.still.before_marker_last": "Before the marker - last",
     "story.still.after_marker_first": "After the marker - first",
+    "story.still.before_point": "Before the level point - last",
+    "story.still.at_point": "On the level point",
     "story.still.slot_new_first": "Slot - new first",
     "story.still.slot_new_last": "Slot - new last",
     "story.msg.pick_slot_for_broll": "Pick a marker slot for the B-roll",

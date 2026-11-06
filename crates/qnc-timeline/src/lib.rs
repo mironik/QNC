@@ -14,7 +14,7 @@ use marker_reach::{marker_for_right_click, marker_to_drag, source_mark_in_reach,
 pub use events::take_marker_drag_event;
 mod lanes;
 mod level_lines;
-pub use level_lines::TimelineLevelCurve;
+pub use level_lines::{level_curve_hit, paint_level_curves, TimelineLevelCurve};
 pub use events::event;
 pub use lanes::{drafted_choice, lane_choice, lane_key, lane_message, Lane, LaneChoice, LaneKey};
 

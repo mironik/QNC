@@ -421,3 +421,16 @@ mod zoom_click_tests {
         assert_eq!(right(1), Some(("select_marker".into(), Some("m1".into()), Some(100))));
     }
 }
+
+/// The pictures at the point of a taken level curve (docs/98 2.1, the zoom is the timeline
+/// enlarged around the playhead): the last picture before the playhead line and the one on it.
+pub fn point_stills(view: &SegmentsView, slots: &[Slot], frame: u64) -> Vec<EditStill> {
+    let mut stills = Vec::new();
+    if frame > 0 {
+        stills.push(still(view, slots, &|frame| frame, frame, false).labelled(qnc_ui_text::text("story.still.before_point")));
+    }
+    if frame < view.total_frames {
+        stills.push(still(view, slots, &|frame| frame, frame, true).labelled(qnc_ui_text::text("story.still.at_point")).at_cut());
+    }
+    stills
+}

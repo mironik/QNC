@@ -43,11 +43,22 @@ pub struct Placement {
     /// wave is drawn as it sounds (user 2026-10-16).
     pub level_db: i8,
     pub off: bool,
+    /// Its level curve (docs/98 2.1): (frame of the clip, tenths of a dB), sorted; empty for none.
+    pub curve: Vec<(u64, i16)>,
 }
 
 impl Placement {
     fn gain(&self) -> f32 {
         qnc_gain::level_gain(self.level_db, self.off)
+    }
+
+    /// The factor at clip frame `source` (fractional): its level and its curve there.
+    pub fn gain_at(&self, source: f64) -> f32 {
+        if self.curve.is_empty() || self.off {
+            return self.gain();
+        }
+        let points: Vec<(f64, f64)> = self.curve.iter().map(|(frame, db10)| (*frame as f64, f64::from(*db10))).collect();
+        self.gain() * qnc_gain::db10_to_gain(qnc_gain::curve_at(&points, source)) as f32
     }
 }
 
@@ -125,7 +136,7 @@ fn fill(out: &mut [f32], program_duration: u64, at: &Placement, peaks: &[f32], s
             let t = ((frame - program_start) / (program_end - program_start).max(1.0)).clamp(0.0, 1.0);
             source_in as f64 + t * (source_out - source_in).max(1) as f64
         };
-        let peak = (max_peak(peaks, source_duration, map(from), map(to)) * at.gain()).min(1.0);
+        let peak = (max_peak(peaks, source_duration, map(from), map(to)) * at.gain_at(map((from + to) / 2.0))).min(1.0);
         out[bucket] = out[bucket].max(peak);
     }
 }

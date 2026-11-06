@@ -99,7 +99,7 @@ impl AudioPart {
     pub fn fade_at(&self, sample: usize, samples: usize) -> f32 {
         let curve = self.level_ramp.map_or(1.0, |[from, to]| {
             let db10 = f64::from(from) + (f64::from(to) - f64::from(from)) * sample as f64 / samples.max(1) as f64;
-            10f64.powf(db10 / 200.0) as f32
+            qnc_gain::db10_to_gain(db10) as f32
         });
         curve * self.fade_factor(sample, samples)
     }

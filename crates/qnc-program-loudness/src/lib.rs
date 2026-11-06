@@ -82,11 +82,12 @@ fn lane_loudness<'a>(
             complete = false;
             continue;
         };
-        let gain = qnc_gain::db_to_gain(f64::from(at.level_db));
         let segments = channel.energies.len() as u64;
         let (length, source) = (at.program_end - at.program_start, at.source_out.saturating_sub(at.source_in));
         for frame in at.program_start..at.program_end.min(total_frames) {
             let source_frame = at.source_in + (frame - at.program_start) * source / length;
+            // Its level and its level curve there (docs/98 2.1).
+            let gain = f64::from(at.gain_at(source_frame as f64));
             let index = (source_frame * segments / measure.duration_frames).min(segments - 1) as usize;
             sums[bin(frame)] += f64::from(channel.energies[index]) * gain * gain;
             peak = peak.max(f64::from(channel.true_peaks[index]) * gain);
@@ -157,6 +158,7 @@ mod tests {
             source_out: source.1,
             level_db,
             off,
+            curve: Vec::new(),
         }
     }
 

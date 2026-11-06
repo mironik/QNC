@@ -93,6 +93,7 @@ pub fn subsegment_placements(view: &SubsegmentView, pieces: &[Piece]) -> Vec<qnc
             source_out: piece.to_frame,
             level_db: piece.a1_level_db,
             off: piece.a1_off,
+            curve: Vec::new(),
         })
         .collect()
 }

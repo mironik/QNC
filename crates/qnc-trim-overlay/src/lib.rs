@@ -149,7 +149,10 @@ pub fn show(ctx: &egui::Context, segments: &SegmentsView) -> Option<ActionEvent>
                         ui.painter().rect_stroke(half, 0.0, Stroke::new(2.0, CUT_LINE), StrokeKind::Inside);
                     }
                 }
-                let (word, side) = paint_sound(ui, area, sound, gap_at, top.y, (panel, source), lane_choices(sound, segments), &visuals);
+                // The level curves on the program (docs/98 2.1), as the timeline draws them; a source
+                // IN/OUT zoom is on a clip's own axis and has none.
+                let curves = if source { Vec::new() } else { timeline_level_curves(&segments.level_curves(), sound.from, sound.to, 0) };
+                let (word, side) = paint_sound(ui, area, sound, gap_at, top.y, (panel, source), (lane_choices(sound, segments), &curves), &visuals);
                 // A word in every zoom (user 2026-11-04): the taken cut goes to it, else a cut.
                 if let Some((from, to)) = word {
                     turned = Some(Verb::Word { from, to }.event(panel));
@@ -204,7 +207,7 @@ fn cut_line_x(area: Rect, sound: &ZoomSound) -> f32 {
 }
 
 #[allow(clippy::too_many_arguments)]
-fn paint_sound(ui: &mut egui::Ui, area: Rect, sound: &ZoomSound, gap_at: Option<f32>, pictures_top: f32, (panel, source): (&str, bool), choices: [Option<ChannelChoice>; 2], visuals: &egui::Visuals) -> (Option<(u64, u64)>, Option<ActionEvent>) {
+fn paint_sound(ui: &mut egui::Ui, area: Rect, sound: &ZoomSound, gap_at: Option<f32>, pictures_top: f32, (panel, source): (&str, bool), (choices, curves): ([Option<ChannelChoice>; 2], &[qnc_timeline::TimelineLevelCurve]), visuals: &egui::Visuals) -> (Option<(u64, u64)>, Option<ActionEvent>) {
     let mut word = None;
     let mut side = None;
     let span = (sound.to - sound.from) as f32;
@@ -228,6 +231,19 @@ fn paint_sound(ui: &mut egui::Ui, area: Rect, sound: &ZoomSound, gap_at: Option<
                 ui.painter().line_segment([egui::pos2(x, middle - height), egui::pos2(x, middle + height.max(0.5))], Stroke::new(step.max(1.0), Color32::from_rgb(80, 190, 148)));
             }
         }
+        // The level curves of this lane, the timeline's drawing; the controlled point is on the
+        // zoom's line (the playhead of the taken curve). A right click near a line takes it, as on
+        // the timeline (Ctrl+Shift+1/2).
+        let window = (sound.from, sound.to.saturating_sub(sound.from).max(1));
+        qnc_timeline::paint_level_curves(ui.painter(), band, window, lane as u8, curves, Some(sound.cut), [CURVE_LINE, LANE_TAKEN, CUT_LINE]);
+        let curve_clicked = ui
+            .input(|i| i.pointer.secondary_clicked().then(|| i.pointer.interact_pos()).flatten())
+            .filter(|pos| band.contains(*pos))
+            .and_then(|pos| qnc_timeline::level_curve_hit(band, window, lane as u8, pos, curves));
+        if let Some(frame) = curve_clicked {
+            let action = if lane == 0 { "select_level_a1" } else { "select_level_a2" };
+            side = Some(ActionEvent::key(action).with_value(frame).at(panel));
+        }
         // The lane's tools are the timeline's (AGENTS 0.12, docs/97 step 3): its label button
         // (red when off, a yellow rim while taken), its level, and while taken its channel
         // column. The label is made after the band's sides so that its click is its own.
@@ -243,7 +259,7 @@ fn paint_sound(ui: &mut egui::Ui, area: Rect, sound: &ZoomSound, gap_at: Option<
         // A right click on the lane's sound is Ctrl+ (user 2026-11-03: "a right click on the
         // sound in the zoom should do the same"): it takes the cut's sound on that lane, as the
         // lane's label does.
-        if let Some(cut) = sound.taken_cut.as_deref() {
+        if let Some(cut) = sound.taken_cut.as_deref().filter(|_| curve_clicked.is_none()) {
             let right = ui.input(|i| i.pointer.secondary_clicked() && i.pointer.interact_pos().is_some_and(|pos| band.contains(pos)));
             if right {
                 side = Some(Verb::TakeSound { cut: cut.to_string(), lane: lane_of(lane) }.event(panel));
@@ -522,4 +538,28 @@ fn event_of(action: &qnc_program_view::StillAction, panel: &str) -> ActionEvent 
         event = event.with_value(value);
     }
     event
+}
+
+/// The colour of a level curve that is not taken in the zoom (the timeline's own).
+const CURVE_LINE: Color32 = Color32::from_rgb(235, 235, 235);
+
+/// The level curves of a story inside program frames `[from, to)` as a timeline draws them,
+/// their frames counted from `origin` (a Wrap row's start, 0 for the zoom's program axis). The
+/// one place a story's curve becomes a timeline's (the segment panel and the zoom).
+pub fn timeline_level_curves(curves: &[qnc_program_view::LevelCurve], from: u64, to: u64, origin: u64) -> Vec<qnc_timeline::TimelineLevelCurve> {
+    curves
+        .iter()
+        .filter_map(|curve| {
+            let (a, b, part) = curve.placed.within(curve.span, from, to)?;
+            Some(qnc_timeline::TimelineLevelCurve {
+                lane: curve.lane,
+                from: a - origin,
+                to: b - origin,
+                start_db10: part.start_db10,
+                end_db10: part.end_db10,
+                points: part.points.iter().map(|(at, db10)| (at - origin as f64, *db10)).collect(),
+                taken: curve.taken,
+            })
+        })
+        .collect()
 }

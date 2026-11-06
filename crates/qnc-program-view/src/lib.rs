@@ -8,7 +8,7 @@ mod markers;
 mod program;
 pub use program::*;
 
-pub use edit_stills::{edit_stills, mark_clip_edges, program_picture, trim_stills, ClipEdge, EditStill, StillAction, StillPicture, StillStrip, story_zoom_clicks};
+pub use edit_stills::{edit_stills, mark_clip_edges, point_stills, program_picture, trim_stills, ClipEdge, EditStill, StillAction, StillPicture, StillStrip, story_zoom_clicks};
 
 pub use markers::{
     check_move, first_empty_slot, neighbour_marker, neighbour_segment, neighbour_slot,
@@ -371,6 +371,7 @@ impl SegmentsView {
             source_out: row.source_out_frame,
             level_db: row.a1_level_db,
             off: row.a1_off,
+            curve: qnc_program_db::LevelKey::pairs(&row.level_keys),
         });
         let covers = self.covers.iter().map(|cover| qnc_program_waveform::Placement {
             clip_id: cover.clip_id.clone(),
@@ -381,6 +382,7 @@ impl SegmentsView {
             source_out: cover.source_out_frame,
             level_db: cover.a2_level_db,
             off: cover.a2_off,
+            curve: qnc_program_db::LevelKey::pairs(&cover.level_keys),
         });
         (segments.collect(), covers.collect())
     }

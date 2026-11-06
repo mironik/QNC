@@ -1239,3 +1239,28 @@ fn backspace_undoes_what_is_picked_and_otherwise_in_time() {
     segments.apply(SegmentCommand::Cue(30));
     assert_eq!(segments.selected_marker, None, "a click lets go of the picked marker");
 }
+
+/// docs/98 2.1, user 2026-11-06: a level curve taken on the Wrap row is controlled at the
+/// playhead line; the zoom is around that point and the curve is drawn as drafted.
+#[test]
+fn a_taken_level_curve_opens_the_zoom_at_its_point_and_is_drafted_on_the_playhead_line() {
+    let mut segments = component();
+    let row = segments.view().rows[0].clone();
+    segments.set_playhead(Some(row.start_frame + 4));
+    assert!(segments.take_level_line(0, row.start_frame + 4));
+    assert!(segments.level_line_taken());
+    // The zoom: the last picture before the point and the one on it.
+    assert_eq!(segments.view().edit_stills.len(), 2);
+    assert!(segments.view().zoom_sound.as_ref().is_some_and(|zoom| zoom.cut == row.start_frame + 4));
+    assert!(segments.nudge_level(row.start_frame + 4, -3));
+    let curves = segments.view().level_curves();
+    let taken = curves.iter().find(|curve| curve.taken).expect("the taken curve");
+    assert_eq!(taken.placed.points.len(), 1);
+    assert_eq!(taken.placed.points[0].1, -30);
+    // The playhead moves: the zoom follows the point.
+    segments.set_playhead(Some(row.start_frame + 6));
+    assert!(segments.view().zoom_sound.as_ref().is_some_and(|zoom| zoom.cut == row.start_frame + 6));
+    assert!(!segments.remove_level_point(row.start_frame + 6), "no point there");
+    assert!(segments.release_level_line());
+    assert!(segments.view().edit_stills.is_empty());
+}

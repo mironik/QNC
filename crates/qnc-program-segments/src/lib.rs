@@ -421,6 +421,14 @@ impl ProgramSegments {
                 (placement.channel, placement.level_db, placement.off) = (draft.channel, draft.level_db, draft.off);
             }
         }
+        // A taken level curve's wave is its draft (docs/98 2.1).
+        if let Some((lane, id, keys)) = self.level_line_draft() {
+            let index = if lane == 0 { self.view.rows.iter().position(|row| row.segment_id == id) } else { self.view.covers.iter().position(|cover| cover.cover_id == id) };
+            let placements = if lane == 0 { &mut segments } else { &mut covers };
+            if let Some(placement) = index.and_then(|index| placements.get_mut(index)) {
+                placement.curve = qnc_program_db::LevelKey::pairs(&keys);
+            }
+        }
         let mut view = self.view.clone();
         view.peaks = self.waves.peaks(view.total_frames, &segments, &covers, |id| durations.get(id).copied());
         view.loudness = self.loudness_of(&view, segments, covers);
@@ -500,6 +508,10 @@ impl ProgramSegments {
         if self.playhead != playhead {
             self.playhead = playhead;
             self.view.playhead = playhead;
+            // A taken level curve's point is on the playhead line: its zoom and status follow it.
+            if let (Some(frame), true) = (playhead, self.level_line.is_some()) {
+                self.say_level(frame);
+            }
         }
     }
 

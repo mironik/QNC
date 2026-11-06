@@ -89,17 +89,13 @@ impl LevelKey {
     /// The level at source frame `frame` (fractional) of a curve sorted by frame, tenths of
     /// a dB; 0 without points.
     pub fn level_at(keys: &[LevelKey], frame: f64) -> f64 {
-        let (Some(first), Some(last)) = (keys.first(), keys.last()) else { return 0.0 };
-        if frame <= first.frame as f64 {
-            return f64::from(first.db10);
-        }
-        if frame >= last.frame as f64 {
-            return f64::from(last.db10);
-        }
-        let after = keys.iter().position(|key| key.frame as f64 > frame).unwrap_or(keys.len() - 1);
-        let (a, b) = (keys[after - 1], keys[after]);
-        let t = (frame - a.frame as f64) / (b.frame - a.frame).max(1) as f64;
-        f64::from(a.db10) + (f64::from(b.db10) - f64::from(a.db10)) * t
+        let points: Vec<(f64, f64)> = keys.iter().map(|key| (key.frame as f64, f64::from(key.db10))).collect();
+        qnc_gain::curve_at(&points, frame)
+    }
+
+    /// The curve as (frame, tenths of a dB) pairs, as the wave and the loudness take it.
+    pub fn pairs(keys: &[LevelKey]) -> Vec<(u64, i16)> {
+        keys.iter().map(|key| (key.frame, key.db10)).collect()
     }
 
     /// The curve as the story keeps it: sorted, one point per frame, each in range.
