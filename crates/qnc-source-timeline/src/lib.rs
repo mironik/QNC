@@ -87,6 +87,9 @@ pub struct SourceTimeline {
     sounds: qnc_clip_sound::ClipSounds,
     /// The shown clip's kept sound is applied (or it has none).
     sound_known: bool,
+    /// The kept sound of the shown clip as last read: a different answer (another form or
+    /// computer kept it) is applied while no lane is taken.
+    sound_read: Option<Option<qnc_clip_sound::ClipSound>>,
     /// A sound asked for a clip, applied when that clip is shown.
     wanted: Option<qnc_clip_sound::ClipSound>,
     timecodes: qnc_source_timecode::SourceTimecodes,
@@ -115,6 +118,7 @@ impl SourceTimeline {
             self.first_word.forget();
             self.lanes.new_clip();
             self.sound_known = false;
+            self.sound_read = None;
             self.message.clear();
         }
         let count = self.channels.for_clip(content, clip_id);
@@ -413,7 +417,7 @@ impl SourceTimeline {
                 }
             }
         }
-        if self.sound_known || self.lane_taken() {
+        if self.lane_taken() {
             return;
         }
         let Some(count) = count else {
@@ -422,6 +426,11 @@ impl SourceTimeline {
         let Some(kept) = self.sounds.for_clip(preview.project_target(), self.clip.as_deref()) else {
             return;
         };
+        // Applied once per clip, and again when the database answers something else.
+        if self.sound_known && self.sound_read.as_ref() == Some(&kept) {
+            return;
+        }
+        self.sound_read = Some(kept.clone());
         self.sound_known = true;
         if let Some(kept) = kept.filter(|kept| kept.a1.channel < count && kept.a2.channel < count) {
             let lane = |sound: qnc_clip_sound::LaneSound| Lane { channel: sound.channel, off: sound.off, level_db: sound.level_db };

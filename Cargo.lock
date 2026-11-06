@@ -3668,6 +3668,13 @@ dependencies = [
 ]
 
 [[package]]
+name = "qnc-clip-follow"
+version = "0.1.0"
+dependencies = [
+ "qnc-dev-diagnostics",
+]
+
+[[package]]
 name = "qnc-clip-posters"
 version = "0.1.0"
 dependencies = [
@@ -3692,6 +3699,7 @@ dependencies = [
 name = "qnc-clip-shots"
 version = "0.1.0"
 dependencies = [
+ "qnc-clip-follow",
  "qnc-db-broker",
  "qnc-shot-db",
  "qnc-source-preview",
@@ -3701,6 +3709,7 @@ dependencies = [
 name = "qnc-clip-sound"
 version = "0.1.0"
 dependencies = [
+ "qnc-clip-follow",
  "qnc-db-broker",
  "qnc-dev-diagnostics",
  "qnc-ui-text",
@@ -6470,6 +6479,7 @@ dependencies = [
 name = "qnc-source-channels"
 version = "0.1.0"
 dependencies = [
+ "qnc-clip-follow",
  "qnc-content-store",
  "qnc-media-metadata",
 ]
@@ -6627,6 +6637,7 @@ dependencies = [
 name = "qnc-source-timecode"
 version = "0.1.0"
 dependencies = [
+ "qnc-clip-follow",
  "qnc-content-store",
  "qnc-media-metadata",
 ]

@@ -141,6 +141,7 @@ members = [
     "crates/qnc-shot-detect",
     "crates/qnc-shot-db",
     "crates/qnc-shot-analysis",
+    "crates/qnc-clip-follow",
     "crates/qnc-clip-shots",
     "crates/qnc-shot-panel",
     "crates/qnc-transcribe-run",
@@ -449,6 +450,7 @@ qnc-subsegment-edit = { path = "crates/qnc-subsegment-edit" }
 qnc-shot-detect = { path = "crates/qnc-shot-detect" }
 qnc-shot-db = { path = "crates/qnc-shot-db" }
 qnc-shot-analysis = { path = "crates/qnc-shot-analysis" }
+qnc-clip-follow = { path = "crates/qnc-clip-follow" }
 qnc-clip-shots = { path = "crates/qnc-clip-shots" }
 qnc-shot-panel = { path = "crates/qnc-shot-panel" }
 qnc-transcribe-run = { path = "crates/qnc-transcribe-run" }

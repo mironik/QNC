@@ -299,7 +299,7 @@ Gdje se blokira ili nepotrebno kopira (iz loga i koda):
 
 | pravilo | stanje u kodu |
 |---|---|
-| 0.1 baza je jedina veza | Uglavnom postuje se. Izuzetak su predmemorije kocki citane samo na dogadaj (P1-4). |
+| 0.1 baza je jedina veza | Postuje se. Predmemorije prikazanog klipa (zvuk, kanali, timecode, kadrovi) citaju bazu ponovno u ritmu kroz `qnc-clip-follow` (P1-4, izvedeno 2026-11-06); artefakti (val, filmstrip, posteri) citaju se dok nedostaju, jer se pisu jednom po verziji. |
 | 0.11 forma samo layout, kocka jedna odgovornost | Forme su tanke (ploce 93-155 redaka). Odgovornost se skupila u `qnc-script`, `qnc-panel-focus`, `qnc-program-segments`. |
 | 0.12 timeline i zoom isti alati | Rjecnik radnji (`qnc-edit-verbs`), pravila ruba i reza (`qnc-edit-edge`, `qnc-edit-cut`) su zajednicki; stanje uzetog i dalje je dvaput (prica, slozena izjava). |
 | 2 nema monolita | Tri kandidata iznad. |
@@ -312,8 +312,11 @@ Sto bih pojednostavio prvo (redom):
    stabilnost, jer se tu najvise mijenjalo zadnjih dana.
 3. ~~**`qnc-panel-focus` svesti na usmjeravanje** (P1-3)~~ - izvedeno 2026-11-06: pravila price u `qnc-program-segments`,
    Sync u `qnc-sync-session`, shuttle i trim u svoje kocke (vec postoje), fokus ih samo poziva.
-4. **Ocistiti ovisnosti** (P2-5, P2-6): mehanicki posao, manja gradnja.
-5. Tek onda nove mogucnosti iz `docs/98-missing-tools-plan.md`.
+4. ~~**Predmemorije citane samo na dogadaj** (P1-4)~~ - izvedeno 2026-11-06: jedna kocka `qnc-clip-follow`
+   (citanje u pozadini, ponovno svake sekunde, zadnji odgovor ostaje kad citanje ne uspije); koriste je zvuk klipa,
+   kanali, timecode i kadrovi.
+5. **Ocistiti ovisnosti** (P2-5, P2-6): mehanicki posao, manja gradnja.
+6. Tek onda nove mogucnosti iz `docs/98-missing-tools-plan.md`.
 
 ## 7. Sirovi rezultati alata (za usporedbu poslije)
 

@@ -5,6 +5,7 @@ edition = "2021"
 description = "QNC public module: the A1/A2 sound chosen for each clip on the source timeline (channel, on/off, level) as a table module of the project database intermediary; it knows no form, worker or application"
 
 [dependencies]
+qnc-clip-follow = { workspace = true }
 qnc-ui-text = { workspace = true }
 qnc-db-broker = { workspace = true }
 qnc-dev-diagnostics = { workspace = true }

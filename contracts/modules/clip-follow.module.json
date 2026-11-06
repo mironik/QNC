@@ -1,0 +1,21 @@
+{
+  "module_id": "qnc.module.clip-follow",
+  "module_name": "Clip Follow",
+  "module_version": "0.1.0",
+  "module_kind": "library",
+  "capabilities": ["db.follow.shown_clip"],
+  "input_contract_version": "0.1.0",
+  "output_contract_version": "0.1.0",
+  "transport_protocol_version": "0.1.0",
+  "transport_scope": ["local", "lan", "intranet"],
+  "supported_os": ["windows", "linux", "macos"],
+  "supported_cpu": ["x86_64", "aarch64"],
+  "forbidden_calls": ["ffprobe", "media.decode", "database.write", "playback.clock"],
+  "forbidden_dependencies": ["qnc.module.media-probe", "qnc.module.scanner"],
+  "state_policy": "session_local",
+  "database_write_policy": "no_db_writes",
+  "runtime_crate": "qnc-clip-follow",
+  "input": "The project and clip a form shows and the read of one value of it, given by the caller.",
+  "output": "The last answer of the database for that clip, read in a background thread and read again in a rhythm while the clip stays shown; a failed read keeps the last answer and says why; a value the caller wrote is not undone by an older read.",
+  "specification": "User rule 2026-11-06: the database is the only truth, no other link between forms; docs/arhitektura.md P1-4 (AGENTS.md)."
+}

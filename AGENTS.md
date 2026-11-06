@@ -8000,3 +8000,16 @@ match frame (F), tipke Export prozora i rijec u zoomu Wrap redova (koraci do gra
 (prije 32, uklonjene i neiskoristene `qnc-wheel-jog` i `eframe`), 1042 retka (prije 1207). Ponasanje isto: zlatna tablica
 tipki nepromijenjena, testovi `qnc-panel-focus`, `qnc-segments-keys`, `qnc-source-timeline`, `cargo check --workspace`,
 conformance, `cargo machete` bez neiskoristenih ovisnosti. Uzivo nije provjereno.
+Izvedeno 2026-11-06 (korisnik: "da,,," na P1-4 iz `docs/arhitektura.md`; pravilo korisnika: "jedina mjerodavna istina je
+baza, druga veza medu formama ne smije postojati"): predmemorije prikazanog klipa koje su bazu citale jednom po klipu sada je
+citaju u ritmu. Nova javna kocka `crates/qnc-clip-follow` (+ ugovor `contracts/modules/clip-follow.module.json`): jedna
+vrijednost klipa koji forma pokazuje, procitana u pozadinskoj niti i procitana ponovno u ritmu dok je klip prikazan; neuspjelo
+citanje zadrzava zadnji odgovor i kaze razlog (`error`); vrijednost koju je pozivatelj sam zapisao (`set`) ne ponistava
+starije citanje; dok pozivateljev upis putuje, citanje ceka (`may_read`). Sama nista ne cita: citanje daje pozivatelj.
+Koriste je (cetiri kopije istog "procitaj jednom" uklonjene): `qnc-clip-sound` `ClipSounds` (svake sekunde: zvuk A1/A2
+zadrzan u drugoj formi ili na drugom racunalu se cuje), `qnc-source-channels` (zapis klipa dovrsen poslije, u pozadini, daje
+broj kanala), `qnc-source-timecode` `SourceTimecodes` i `qnc-clip-shots` (svake 3 s i nakon sto analiza postoji: ponovno
+napravljena analiza se pokaze). Source timeline (`qnc-source-timeline`) zvuk klipa ne primjenjuje vise samo jednom: kad baza
+odgovori drukcije (druga forma ga je zadrzala) i nijedna traka nije uzeta, primijeni ga. Val, filmstrip i posteri i dalje se citaju dok nedostaju (pisu se jednom po verziji). Testovi
+`qnc-clip-follow` (2: promjena drugog pisca se vidi, neuspjelo citanje cuva zadnji odgovor; zapisana vrijednost se ne
+ponistava starijim citanjem), testovi dotaknutih kocki, conformance. Uzivo nije provjereno.

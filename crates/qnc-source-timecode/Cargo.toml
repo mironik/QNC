@@ -10,5 +10,6 @@ default = []
 read = ["dep:qnc-content-store", "dep:qnc-media-metadata"]
 
 [dependencies]
+qnc-clip-follow = { workspace = true }
 qnc-content-store = { workspace = true, optional = true }
 qnc-media-metadata = { workspace = true, optional = true }

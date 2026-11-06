@@ -11,7 +11,7 @@
 
 mod store;
 
-use std::sync::{mpsc, Arc};
+use std::sync::Arc;
 
 use qnc_db_broker::{Access, ProjectDbTarget, ProjectDbWriter, TableModuleFactory};
 use serde::{Deserialize, Serialize};
@@ -84,21 +84,25 @@ pub fn read(target: &ProjectDbTarget, clip_id: &str) -> Result<Option<ClipSound>
     }
 }
 
-/// The sound of the clips one form shows: read once per clip in the background, kept
-/// through the project's serial writer without waiting. The database stays the truth:
-/// another clip or another project reads it again.
-#[derive(Default)]
+/// The sound of the clip one form shows: read in the background and read again every second
+/// while it is shown (piece `qnc-clip-follow`), so a sound kept by another form or computer
+/// is heard; kept through the project's serial writer without waiting. While a write of this
+/// form is on its way no read starts, and a read started before it does not undo it.
 pub struct ClipSounds {
-    /// The clip read (project URI, clip) and what it holds.
-    current: Option<(String, String, Option<ClipSound>)>,
-    reading: Option<(String, String, mpsc::Receiver<Option<ClipSound>>)>,
+    follow: qnc_clip_follow::ClipFollow<Option<ClipSound>>,
     writer: Option<(String, ProjectDbWriter)>,
     pending: Vec<qnc_db_broker::Pending>,
 }
 
+impl Default for ClipSounds {
+    fn default() -> Self {
+        Self { follow: qnc_clip_follow::ClipFollow::new("clip-sound", qnc_clip_follow::EVERY), writer: None, pending: Vec::new() }
+    }
+}
+
 impl std::fmt::Debug for ClipSounds {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.debug_struct("ClipSounds").field("current", &self.current).finish_non_exhaustive()
+        f.debug_struct("ClipSounds").field("follow", &self.follow).finish_non_exhaustive()
     }
 }
 
@@ -107,7 +111,7 @@ impl ClipSounds {
         Self::default()
     }
 
-    /// The sound kept for `clip_id`: `Some(None)` when it has none, `None` while it is read.
+    /// The sound kept for `clip_id`: `Some(None)` when it has none, `None` until it is read.
     pub fn for_clip(&mut self, target: Option<&ProjectDbTarget>, clip_id: Option<&str>) -> Option<Option<ClipSound>> {
         self.pending.retain(|pending| match pending.try_take() {
             None => true,
@@ -118,34 +122,15 @@ impl ClipSounds {
             }
         });
         let (target, clip_id) = (target?, clip_id?);
-        if let Some((uri, id, done)) = &self.reading {
-            if let Ok(sound) = done.try_recv() {
-                self.current = Some((uri.clone(), id.clone(), sound));
-                self.reading = None;
-            }
-        }
-        let is = |uri: &str, id: &str| uri == target.uri() && id == clip_id;
-        if let Some((_, _, sound)) = self.current.as_ref().filter(|(uri, id, _)| is(uri, id)) {
-            return Some(sound.clone());
-        }
-        if !self.reading.as_ref().is_some_and(|(uri, id, _)| is(uri, id)) {
-            let (send, done) = mpsc::channel();
+        self.follow.get(target.uri(), clip_id, self.pending.is_empty(), || {
             let (owned, clip) = (target.clone(), clip_id.to_string());
-            std::thread::spawn(move || {
-                let sound = read(&owned, &clip).unwrap_or_else(|error| {
-                    qnc_dev_diagnostics::log_line(qnc_dev_diagnostics::DiagnosticsStream::Player, format!("clip-sound not read: {error}"));
-                    None
-                });
-                let _ = send.send(sound);
-            });
-            self.reading = Some((target.uri().to_string(), clip_id.to_string(), done));
-        }
-        None
+            move || read(&owned, &clip)
+        })
     }
 
-    /// `sound` is kept for its clip (written in the background; the form never waits).
+    /// Keeps `sound` of its clip in the project of `target` (through the serial writer).
     pub fn keep(&mut self, target: &ProjectDbTarget, sound: ClipSound) {
-        if self.current.as_ref().is_some_and(|(uri, id, kept)| uri == target.uri() && *id == sound.clip_id && kept.as_ref() == Some(&sound)) {
+        if self.follow.known(target.uri(), &sound.clip_id).is_some_and(|kept| kept.as_ref() == Some(&sound)) {
             return;
         }
         if !self.writer.as_ref().is_some_and(|(uri, _)| uri == target.uri()) {
@@ -162,7 +147,8 @@ impl ClipSounds {
             Ok(pending) => self.pending.push(pending),
             Err(error) => qnc_dev_diagnostics::log_line(qnc_dev_diagnostics::DiagnosticsStream::Player, format!("clip-sound not kept: {error}")),
         }
-        self.current = Some((target.uri().to_string(), sound.clip_id.clone(), Some(sound)));
+        let (uri, clip) = (target.uri().to_string(), sound.clip_id.clone());
+        self.follow.set(&uri, &clip, Some(sound));
     }
 }
 

@@ -1,0 +1,8 @@
+[package]
+name = "qnc-clip-follow"
+version = "0.1.0"
+edition = "2021"
+description = "QNC public piece: one value of the clip a form shows, read from the database in the background and read again in a rhythm while it stays shown; the last answer stays when a read fails; it reads nothing itself"
+
+[dependencies]
+qnc-dev-diagnostics = { workspace = true }

@@ -1,14 +1,11 @@
 //! The shots of the clip on the preview (user 2026-10-27: Video AI in AI Media Assist): the
 //! analysis the background worker kept in the project database, read outside the UI thread
-//! and read again now and then while the clip has none yet, so the shots show when they are
-//! made. A click on a shot puts the playhead on its start. It analyses nothing itself.
+//! and read again every few seconds while the clip is shown (piece `qnc-clip-follow`), so the
+//! shots show when they are made or made again. A click on a shot puts the playhead on its
+//! start. It analyses nothing itself.
 
-use std::{
-    sync::{mpsc, Arc},
-    time::{Duration, Instant},
-};
+use std::{sync::Arc, time::Duration};
 
-use qnc_db_broker::ProjectDbTarget;
 use qnc_shot_db::ClipShots as Analysis;
 use qnc_source_preview::SourcePreview;
 
@@ -20,7 +17,7 @@ pub const CUE_SHOT: &str = "shot_cue";
 /// Add SubClip (Shift+S) keeps it as a SubClip.
 pub const OPEN_PART: &str = "shot_open_part";
 
-/// A clip without an analysis is asked again after this.
+/// The shown clip's analysis is read again after this.
 const ASK_AGAIN: Duration = Duration::from_secs(3);
 
 /// What the Video AI panel shows of the clip on the preview.
@@ -48,16 +45,19 @@ impl ShotsView {
     }
 }
 
-type Read = (String, String, mpsc::Receiver<Result<Option<Analysis>, String>>);
-
-#[derive(Debug, Default)]
+#[derive(Debug)]
 pub struct ClipShots {
     view: ShotsView,
-    /// The project and clip of the shown analysis, and when it was read.
-    read: Option<(String, String, Instant)>,
-    reading: Option<Read>,
+    /// The shown clip's analysis as the database holds it, read again in a rhythm.
+    follow: qnc_clip_follow::ClipFollow<Option<Arc<Analysis>>>,
     /// A clip and IN/OUT a chosen part opens on the source timeline.
     source_request: Option<(String, u64, u64)>,
+}
+
+impl Default for ClipShots {
+    fn default() -> Self {
+        Self { view: ShotsView::default(), follow: qnc_clip_follow::ClipFollow::new("clip-shots", ASK_AGAIN), source_request: None }
+    }
 }
 
 impl ClipShots {
@@ -91,48 +91,13 @@ impl ClipShots {
             self.view.clip_id = clip_id.clone();
         }
         if let (Some(project), Some(clip_id)) = (project.as_ref(), clip_id.as_deref()) {
-            self.take_read(project, clip_id);
-            self.ask(project, clip_id);
+            let analysis = self.follow.get(project.uri(), clip_id, true, || {
+                let (target, clip) = (project.clone(), clip_id.to_string());
+                move || qnc_shot_db::read_clip(&target, &clip).map(|analysis| analysis.map(Arc::new))
+            });
+            self.view.analysis = analysis.flatten();
+            self.view.message = self.follow.error(project.uri(), clip_id).unwrap_or_default().to_string();
         }
         self.view != before
-    }
-
-    fn take_read(&mut self, project: &ProjectDbTarget, clip_id: &str) {
-        let Some((uri, clip, done)) = &self.reading else { return };
-        match done.try_recv() {
-            Ok(answer) => {
-                if uri == project.uri() && clip == clip_id {
-                    match answer {
-                        Ok(analysis) => {
-                            self.view.analysis = analysis.map(Arc::new);
-                            self.view.message.clear();
-                        }
-                        Err(error) => self.view.message = error,
-                    }
-                }
-                self.read = Some((uri.clone(), clip.clone(), Instant::now()));
-                self.reading = None;
-            }
-            Err(mpsc::TryRecvError::Disconnected) => self.reading = None,
-            Err(mpsc::TryRecvError::Empty) => {}
-        }
-    }
-
-    /// Reads the clip's analysis when it was not read, or again a while after it had none.
-    fn ask(&mut self, project: &ProjectDbTarget, clip_id: &str) {
-        if self.reading.is_some() {
-            return;
-        }
-        let fresh = self.read.as_ref().is_some_and(|(uri, clip, at)| {
-            uri == project.uri() && clip == clip_id && (self.view.analysis.is_some() || at.elapsed() < ASK_AGAIN)
-        });
-        if fresh {
-            return;
-        }
-        let (send, done) = mpsc::channel();
-        let (target, clip) = (project.clone(), clip_id.to_string());
-        if std::thread::Builder::new().name("qnc-clip-shots-read".into()).spawn(move || _ = send.send(qnc_shot_db::read_clip(&target, &clip))).is_ok() {
-            self.reading = Some((project.uri().to_string(), clip_id.to_string(), done));
-        }
     }
 }

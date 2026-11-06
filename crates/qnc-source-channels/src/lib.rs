@@ -26,43 +26,33 @@ pub fn read_clip(target: &ContentTarget, clip_id: &str) -> Result<Option<u16>, S
     Ok(u16::try_from(count).ok())
 }
 
-/// The channel count of the clip shown now, read once per clip. The database stays the
-/// truth: another clip, or another project, reads it again.
-#[derive(Debug, Default)]
+/// The channel count of the clip shown now, read from the database in the background and
+/// read again every second while it is shown (piece `qnc-clip-follow`): a record completed
+/// later, by the worker, shows its channels.
+#[derive(Debug)]
 pub struct SourceChannels {
-    current: Option<(String, String, Option<u16>)>,
-    /// The read of another clip on its own thread: the form's thread never waits on the
-    /// database (a background job writing it, e.g. the filmstrip, made a click wait 1.5 s).
-    reading: Option<(String, String, std::sync::mpsc::Receiver<Option<u16>>)>,
+    follow: qnc_clip_follow::ClipFollow<Option<u16>>,
+}
+
+impl Default for SourceChannels {
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 impl SourceChannels {
     pub fn new() -> Self {
-        Self::default()
+        Self { follow: qnc_clip_follow::ClipFollow::new("source-channels", qnc_clip_follow::EVERY) }
     }
 
-    /// The channel count of `clip_id` in the project behind `target`.
+    /// The channel count of `clip_id` in the project behind `target`; `None` until it is read.
     pub fn for_clip(&mut self, target: Option<&ContentTarget>, clip_id: Option<&str>) -> Option<u16> {
         let (target, clip_id) = (target?, clip_id?);
-        if let Some((uri, id, done)) = &self.reading {
-            if let Ok(count) = done.try_recv() {
-                self.current = Some((uri.clone(), id.clone(), count));
-                self.reading = None;
-            }
-        }
-        let is = |uri: &str, id: &str| uri == target.uri() && id == clip_id;
-        if let Some((_, _, count)) = self.current.as_ref().filter(|(uri, id, _)| is(uri, id)) {
-            return *count;
-        }
-        // `None` while the clip is read (in the background, once per clip).
-        if !self.reading.as_ref().is_some_and(|(uri, id, _)| is(uri, id)) {
-            let (send, done) = std::sync::mpsc::channel();
-            let (owned, clip) = (target.clone(), clip_id.to_string());
-            std::thread::spawn(move || {
-                let _ = send.send(read_clip(&owned, &clip).ok().flatten());
-            });
-            self.reading = Some((target.uri().to_string(), clip_id.to_string(), done));
-        }
-        None
+        self.follow
+            .get(target.uri(), clip_id, true, || {
+                let (owned, clip) = (target.clone(), clip_id.to_string());
+                move || read_clip(&owned, &clip)
+            })
+            .flatten()
     }
 }
