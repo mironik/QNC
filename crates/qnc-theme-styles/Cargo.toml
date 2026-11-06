@@ -5,6 +5,7 @@ edition = "2021"
 description = "QNC public piece: the look of every piece (timeline, dock, row, buttons, monitor, cards) from the one desktop theme"
 
 [dependencies]
+eframe = { workspace = true }
 qnc-desktop-theme = { workspace = true }
 qnc-media-card = { workspace = true }
 qnc-media-pool-head = { workspace = true }

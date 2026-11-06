@@ -12,7 +12,7 @@
 use eframe::egui::{self, Align2, Color32, FontId, Rect, Sense, Stroke, StrokeKind, Vec2};
 use qnc_action_event::ActionEvent;
 use qnc_edit_verbs::{Lane, Side, Verb};
-use qnc_timeline::ChannelChoice;
+use qnc_timeline::{ChannelChoice, TimelineTheme};
 use qnc_program_view::{ClipEdge, EditStill, SegmentsView, ZoomCutSound, ZoomSound};
 
 pub const MODULE_ID: &str = "qnc.module.trim-overlay";
@@ -31,18 +31,11 @@ const LANE_HEIGHT: f32 = 64.0;
 const LANES_GAP: f32 = 8.0;
 /// The row of the words said on A1, under its wave (user 2026-10-26).
 const WORDS_HEIGHT: f32 = 22.0;
-/// The thin line through the cut.
-const CUT_LINE: Color32 = Color32::from_rgb(230, 30, 30);
 /// The sides of the taken cut's sound on A2 (user 2026-10-29), as red as on the Wrap row; a
 /// click within `SIDE_REACH` pixels takes a side.
-const SIDE_LINE: Color32 = Color32::from_rgb(255, 64, 64);
 const SIDE_REACH: f32 = 40.0;
-/// A taken lane's rim, as on the timeline (user 2026-10-15: yellow).
-const LANE_TAKEN: Color32 = Color32::from_rgb(240, 200, 40);
 /// A lane's label button in the zoom.
 const LABEL_SIZE: Vec2 = Vec2::new(30.0, 20.0);
-/// The voice no word was heard for: the cut line's red, faint.
-const UNHEARD_FILL: Color32 = Color32::from_rgba_premultiplied(70, 10, 10, 70);
 /// The row of Undo, Save and Cancel under the pictures, centred on the cut (user 2026-10-30:
 /// "so placing the playhead and saving are not confused"); each is its key's action.
 const BUTTONS_HEIGHT: f32 = 30.0;
@@ -56,7 +49,7 @@ const SCREEN_SHARE: f32 = 0.92;
 /// rows' or, for a segment edge, the source timeline's).
 /// The wheel and the touchpad over the window are the wheel of the panel the taken thing is
 /// on (user 2026-10-26: "in the zoom only the arrows work"), its system action.
-pub fn show(ctx: &egui::Context, segments: &SegmentsView) -> Option<ActionEvent> {
+pub fn show(ctx: &egui::Context, segments: &SegmentsView, theme: &TimelineTheme) -> Option<ActionEvent> {
     let source = !segments.source_edit_stills.is_empty();
     let stills = if source { &segments.source_edit_stills } else { &segments.edit_stills };
     if stills.is_empty() {
@@ -92,7 +85,7 @@ pub fn show(ctx: &egui::Context, segments: &SegmentsView) -> Option<ActionEvent>
                 let left = top.x + index as f32 * (picture.x + GAP);
                 let pane = Rect::from_min_size(egui::pos2(left, top.y), picture);
                 let in_focus = focus.map_or(still.cut, |side| still.after == side);
-                paint_still(ui, pane, still, in_focus, &visuals);
+                paint_still(ui, pane, still, in_focus, &visuals, theme);
                 // A left click on a picture or on its strip picks its side of the cut and never
                 // closes the zoom (user 2026-11-05: "a left click on the picture closed the zoom, it
                 // must mark what is chosen"): the owner's own pick when it gives one (a
@@ -108,7 +101,7 @@ pub fn show(ctx: &egui::Context, segments: &SegmentsView) -> Option<ActionEvent>
                 let at = response.interact_pointer_pos();
                 let on_strip = strip_rect.zip(at).is_some_and(|(strip, at)| strip.contains(at));
                 if let (Some(strip), Some(rect)) = (still.strip.as_ref(), strip_rect) {
-                    paint_strip(ui, rect, strip, in_focus, ui.rect_contains_pointer(rect));
+                    paint_strip(ui, rect, strip, in_focus, ui.rect_contains_pointer(rect), theme);
                 }
                 if response.clicked() {
                     if let Some(pick) = pick {
@@ -131,7 +124,7 @@ pub fn show(ctx: &egui::Context, segments: &SegmentsView) -> Option<ActionEvent>
             // V over the pictures while a cut is taken (user 2026-10-30: J and L of the picture
             // too): a click takes only the picture of the cut, as Ctrl+I there.
             if let Some((sound, cut)) = sound.and_then(|sound| sound.taken_cut.as_deref().map(|cut| (sound, cut))) {
-                if let Some(clicked) = paint_take_button(ui, top, "V", Verb::TakePicture { cut: cut.to_string() }.event(panel), sound.picture_taken, &visuals) {
+                if let Some(clicked) = paint_take_button(ui, top, "V", Verb::TakePicture { cut: cut.to_string() }.event(panel), sound.picture_taken, &visuals, theme) {
                     turned = Some(clicked);
                 }
             }
@@ -145,14 +138,14 @@ pub fn show(ctx: &egui::Context, segments: &SegmentsView) -> Option<ActionEvent>
                     let x = area.left() + area.width() * (sound.cut.clamp(sound.from, sound.to) - sound.from) as f32 / width;
                     let half = if after { Rect::from_min_max(egui::pos2(x, area.top()), area.max) } else { Rect::from_min_max(area.min, egui::pos2(x, area.bottom())) };
                     if half.width() > 1.0 {
-                        ui.painter().rect_filled(half, 0.0, Color32::from_rgba_unmultiplied(230, 30, 30, 28));
-                        ui.painter().rect_stroke(half, 0.0, Stroke::new(2.0, CUT_LINE), StrokeKind::Inside);
+                        ui.painter().rect_filled(half, 0.0, theme.cut.gamma_multiply(28.0 / 255.0));
+                        ui.painter().rect_stroke(half, 0.0, Stroke::new(2.0, theme.cut), StrokeKind::Inside);
                     }
                 }
                 // The level curves on the program (docs/98 2.1), as the timeline draws them; a source
                 // IN/OUT zoom is on a clip's own axis and has none.
                 let curves = if source { Vec::new() } else { timeline_level_curves(&segments.level_curves(), sound.from, sound.to, 0) };
-                let (word, side) = paint_sound(ui, area, sound, gap_at, top.y, (panel, source), (lane_choices(sound, segments), &curves), &visuals);
+                let (word, side) = paint_sound(ui, area, sound, gap_at, top.y, (panel, source), (lane_choices(sound, segments), &curves), &visuals, theme);
                 // A word in every zoom (user 2026-11-04): the taken cut goes to it, else a cut.
                 if let Some((from, to)) = word {
                     turned = Some(Verb::Word { from, to }.event(panel));
@@ -179,7 +172,7 @@ fn paint_buttons(ui: &mut egui::Ui, row: Rect, centre: f32) -> Option<ActionEven
     let mut pressed = None;
     for (index, (text, action)) in BUTTONS.iter().enumerate() {
         let at = egui::pos2(left + index as f32 * (BUTTON_SIZE.x + GAP), row.center().y - BUTTON_SIZE.y / 2.0);
-        let button = egui::Button::new(qnc_ui_text::text(text)).min_size(BUTTON_SIZE);
+        let button = qnc_ui_kit::sized_button(qnc_ui_text::text(text), BUTTON_SIZE);
         if ui.put(Rect::from_min_size(at, BUTTON_SIZE), button).clicked() {
             pressed = Some(ActionEvent::key(*action));
         }
@@ -207,7 +200,7 @@ fn cut_line_x(area: Rect, sound: &ZoomSound) -> f32 {
 }
 
 #[allow(clippy::too_many_arguments)]
-fn paint_sound(ui: &mut egui::Ui, area: Rect, sound: &ZoomSound, gap_at: Option<f32>, pictures_top: f32, (panel, source): (&str, bool), (choices, curves): ([Option<ChannelChoice>; 2], &[qnc_timeline::TimelineLevelCurve]), visuals: &egui::Visuals) -> (Option<(u64, u64)>, Option<ActionEvent>) {
+fn paint_sound(ui: &mut egui::Ui, area: Rect, sound: &ZoomSound, gap_at: Option<f32>, pictures_top: f32, (panel, source): (&str, bool), (choices, curves): ([Option<ChannelChoice>; 2], &[qnc_timeline::TimelineLevelCurve]), visuals: &egui::Visuals, theme: &TimelineTheme) -> (Option<(u64, u64)>, Option<ActionEvent>) {
     let mut word = None;
     let mut side = None;
     let span = (sound.to - sound.from) as f32;
@@ -216,10 +209,10 @@ fn paint_sound(ui: &mut egui::Ui, area: Rect, sound: &ZoomSound, gap_at: Option<
     for lane in 0..2 {
         let top = area.top() + lane as f32 * (LANE_HEIGHT + GAP / 2.0 + WORDS_HEIGHT);
         if lane == 1 {
-            word = paint_words(ui, Rect::from_min_size(egui::pos2(area.left(), top - WORDS_HEIGHT - GAP / 4.0), Vec2::new(area.width(), WORDS_HEIGHT)), sound, &x_of, visuals);
+            word = paint_words(ui, Rect::from_min_size(egui::pos2(area.left(), top - WORDS_HEIGHT - GAP / 4.0), Vec2::new(area.width(), WORDS_HEIGHT)), sound, &x_of, visuals, theme);
         }
         let band = Rect::from_min_size(egui::pos2(area.left(), top), Vec2::new(area.width(), LANE_HEIGHT));
-        ui.painter().rect_filled(band, 2.0, Color32::from_rgb(17, 103, 88));
+        ui.painter().rect_filled(band, 2.0, theme.audio_primary_background);
         let peaks = &sound.peaks[lane];
         let middle = band.center().y;
         let half = LANE_HEIGHT / 2.0 - 2.0;
@@ -228,14 +221,14 @@ fn paint_sound(ui: &mut egui::Ui, area: Rect, sound: &ZoomSound, gap_at: Option<
             for (column, peak) in peaks.iter().enumerate() {
                 let height = shown_height(*peak) * half;
                 let x = band.left() + (column as f32 + 0.5) * step;
-                ui.painter().line_segment([egui::pos2(x, middle - height), egui::pos2(x, middle + height.max(0.5))], Stroke::new(step.max(1.0), Color32::from_rgb(80, 190, 148)));
+                ui.painter().line_segment([egui::pos2(x, middle - height), egui::pos2(x, middle + height.max(0.5))], Stroke::new(step.max(1.0), theme.audio_wave));
             }
         }
         // The level curves of this lane, the timeline's drawing; the controlled point is on the
         // zoom's line (the playhead of the taken curve). A right click near a line takes it, as on
         // the timeline (Ctrl+Shift+1/2).
         let window = (sound.from, sound.to.saturating_sub(sound.from).max(1));
-        qnc_timeline::paint_level_curves(ui.painter(), band, window, lane as u8, curves, Some(sound.cut), [CURVE_LINE, LANE_TAKEN, CUT_LINE]);
+        qnc_timeline::paint_level_curves(ui.painter(), band, window, lane as u8, curves, Some(sound.cut), [theme.level_curve, theme.lane_taken, theme.cut]);
         let curve_clicked = ui
             .input(|i| i.pointer.secondary_clicked().then(|| i.pointer.interact_pos()).flatten())
             .filter(|pos| band.contains(*pos))
@@ -249,11 +242,11 @@ fn paint_sound(ui: &mut egui::Ui, area: Rect, sound: &ZoomSound, gap_at: Option<
         // column. The label is made after the band's sides so that its click is its own.
         let taken_lane = sound.cut_sound.as_ref().filter(|cut| usize::from(cut.lane) == lane).is_some();
         if let Some(cut_sound) = sound.cut_sound.as_ref().filter(|cut| usize::from(cut.lane) == lane) {
-            if let Some(event) = paint_cut_sound(ui, band, sound, cut_sound, &x_of, lane == 0, panel) {
+            if let Some(event) = paint_cut_sound(ui, band, sound, cut_sound, &x_of, lane == 0, panel, theme) {
                 side = Some(event);
             }
         }
-        if let Some(clicked) = paint_lane_tools(ui, (area, band), lane, (sound, choices[lane], taken_lane), (panel, source), visuals) {
+        if let Some(clicked) = paint_lane_tools(ui, (area, band), lane, (sound, choices[lane], taken_lane), (panel, source), visuals, theme) {
             side = Some(clicked);
         }
         // A right click on the lane's sound is Ctrl+ (user 2026-11-03: "a right click on the
@@ -274,7 +267,7 @@ fn paint_sound(ui: &mut egui::Ui, area: Rect, sound: &ZoomSound, gap_at: Option<
     // While the player plays the window follows it (user 2026-10-30): the cut line only
     // while the cut is in the window, and the playhead, white, through both waves.
     if (sound.from..=sound.to).contains(&sound.cut) {
-        ui.painter().line_segment([egui::pos2(cut_x, from_top), egui::pos2(cut_x, area.bottom())], Stroke::new(1.5, CUT_LINE));
+        ui.painter().line_segment([egui::pos2(cut_x, from_top), egui::pos2(cut_x, area.bottom())], Stroke::new(1.5, theme.cut));
     }
     if let Some(playhead) = sound.playhead.filter(|frame| (sound.from..=sound.to).contains(frame)) {
         let x = x_of(playhead);
@@ -294,9 +287,10 @@ fn paint_lane_tools(
     (sound, choice, cut_sound_taken): (&ZoomSound, Option<ChannelChoice>, bool),
     (panel, source): (&str, bool),
     visuals: &egui::Visuals,
+    theme: &TimelineTheme,
 ) -> Option<ActionEvent> {
     let text = if lane == 0 { "A1" } else { "A2" };
-    let look = qnc_timeline::LaneLook { label_background: visuals.window_fill, silent: CUT_LINE, taken: LANE_TAKEN, text: visuals.text_color(), accent: SIDE_LINE };
+    let look = qnc_timeline::LaneLook { label_background: visuals.window_fill, silent: theme.cut, taken: theme.lane_taken, text: visuals.text_color(), accent: theme.cut_side };
     let label = Rect::from_min_size(band.left_top() + Vec2::new(2.0, 2.0), LABEL_SIZE);
     // The sound of the taken cut on this lane shows as a taken lane.
     let shown = choice.or(cut_sound_taken.then_some(ChannelChoice { selected: 0, count: 0, open: true, off: false, level_db: 0, heard_db: 0 }));
@@ -354,10 +348,10 @@ fn lane_of(lane: usize) -> Lane {
 
 /// A button of the taken cut at `corner` (A1, A2 or V): a click takes that part of the cut, as
 /// its key does; the part taken has a red frame.
-fn paint_take_button(ui: &mut egui::Ui, corner: egui::Pos2, text: &str, event: ActionEvent, taken: bool, visuals: &egui::Visuals) -> Option<ActionEvent> {
+fn paint_take_button(ui: &mut egui::Ui, corner: egui::Pos2, text: &str, event: ActionEvent, taken: bool, visuals: &egui::Visuals, theme: &TimelineTheme) -> Option<ActionEvent> {
     let rect = Rect::from_min_size(corner + Vec2::new(4.0, 3.0), Vec2::new(26.0, 18.0));
     let response = ui.interact(rect, ui.id().with(("zoom_take", text)), Sense::click());
-    let frame = if taken { SIDE_LINE } else if response.hovered() { visuals.strong_text_color() } else { visuals.text_color() };
+    let frame = if taken { theme.cut_side } else if response.hovered() { visuals.strong_text_color() } else { visuals.text_color() };
     ui.painter().rect_filled(rect, 2.0, visuals.window_fill);
     ui.painter().rect_stroke(rect, 2.0, Stroke::new(if taken { 2.0 } else { 1.0 }, frame), egui::StrokeKind::Inside);
     ui.painter().text(rect.center(), Align2::CENTER_CENTER, text, FontId::proportional(12.0), visuals.text_color());
@@ -371,19 +365,19 @@ fn paint_take_button(ui: &mut egui::Ui, corner: egui::Pos2, text: &str, event: A
 /// where the sound after starts (J) and where the sound before ends (L), red, the moving ones
 /// thick, joined at the top of A2. A click near a side takes it, a drag moves it, the same
 /// system actions as on the Wrap row.
-fn paint_cut_sound(ui: &mut egui::Ui, band: Rect, sound: &ZoomSound, cut_sound: &ZoomCutSound, x_of: &dyn Fn(u64) -> f32, a1: bool, panel: &str) -> Option<ActionEvent> {
+fn paint_cut_sound(ui: &mut egui::Ui, band: Rect, sound: &ZoomSound, cut_sound: &ZoomCutSound, x_of: &dyn Fn(u64) -> f32, a1: bool, panel: &str, theme: &TimelineTheme) -> Option<ActionEvent> {
     let sides: Vec<u64> = cut_sound.lead.into_iter().chain(cut_sound.tail).filter(|frame| (sound.from..=sound.to).contains(frame)).collect();
     let cut_x = x_of(sound.cut);
     let (mut left, mut right) = (cut_x, cut_x);
     for side in &sides {
         let x = x_of(*side);
         let width = if cut_sound.moving.contains(side) { 3.0 } else { 2.0 };
-        ui.painter().line_segment([egui::pos2(x, band.top()), egui::pos2(x, band.bottom())], Stroke::new(width, SIDE_LINE));
+        ui.painter().line_segment([egui::pos2(x, band.top()), egui::pos2(x, band.bottom())], Stroke::new(width, theme.cut_side));
         (left, right) = (left.min(x), right.max(x));
     }
     // Joined at the picture's edge of the lane: the bottom of A1, the top of A2.
     let edge = if a1 { band.bottom() } else { band.top() };
-    ui.painter().line_segment([egui::pos2(left, edge), egui::pos2(right, edge)], Stroke::new(1.0, SIDE_LINE));
+    ui.painter().line_segment([egui::pos2(left, edge), egui::pos2(right, edge)], Stroke::new(1.0, theme.cut_side));
     let response = ui.interact(band, ui.id().with(("cut_sound", a1)), Sense::click_and_drag());
     let span = (sound.to - sound.from).max(1) as f32;
     let frame_at = |x: f32| sound.from + (((x - band.left()) / band.width()).clamp(0.0, 1.0) * span).round() as u64;
@@ -414,7 +408,7 @@ fn paint_cut_sound(ui: &mut egui::Ui, band: Rect, sound: &ZoomSound, cut_sound: 
 /// The words said on A1 in the window, each from where it is said, cut where the next one
 /// starts; a short tick marks a word's start, so a pause between words is seen.
 /// A double click on a word gives its frames (user 2026-10-26: as on the transcript, a cut).
-fn paint_words(ui: &mut egui::Ui, row: Rect, sound: &ZoomSound, x_of: &dyn Fn(u64) -> f32, visuals: &egui::Visuals) -> Option<(u64, u64)> {
+fn paint_words(ui: &mut egui::Ui, row: Rect, sound: &ZoomSound, x_of: &dyn Fn(u64) -> f32, visuals: &egui::Visuals, theme: &TimelineTheme) -> Option<(u64, u64)> {
     let mut clicked = None;
     let font = FontId::proportional(13.0);
     // Voice no word was heard for (user 2026-10-26): red, so a word the transcript missed is seen.
@@ -422,9 +416,9 @@ fn paint_words(ui: &mut egui::Ui, row: Rect, sound: &ZoomSound, x_of: &dyn Fn(u6
         let (left, right) = (x_of(from).max(row.left()), x_of(to).min(row.right()));
         if right > left {
             let span = Rect::from_min_max(egui::pos2(left, row.top() + 2.0), egui::pos2(right, row.bottom() - 2.0));
-            ui.painter().rect_filled(span, 2.0, UNHEARD_FILL);
-            ui.painter().rect_stroke(span, 2.0, Stroke::new(1.0, CUT_LINE), StrokeKind::Inside);
-            ui.painter().with_clip_rect(span).text(span.center(), Align2::CENTER_CENTER, "?", font.clone(), CUT_LINE);
+            ui.painter().rect_filled(span, 2.0, theme.unheard);
+            ui.painter().rect_stroke(span, 2.0, Stroke::new(1.0, theme.cut), StrokeKind::Inside);
+            ui.painter().with_clip_rect(span).text(span.center(), Align2::CENTER_CENTER, "?", font.clone(), theme.cut);
         }
     }
     for (index, word) in sound.words.iter().enumerate() {
@@ -472,20 +466,20 @@ const STRIP_HEIGHT: f32 = 24.0;
 
 /// A slot's length strip: the colour of its length, its length, brighter when chosen or under
 /// the mouse (as a cover's strip on the timeline).
-fn paint_strip(ui: &egui::Ui, rect: Rect, strip: &qnc_program_view::StillStrip, focused: bool, hovered: bool) {
-    let base = strip.fill.map_or(ui.visuals().selection.bg_fill, |[r, g, b]| Color32::from_rgb(r, g, b));
+fn paint_strip(ui: &egui::Ui, rect: Rect, strip: &qnc_program_view::StillStrip, focused: bool, hovered: bool, theme: &TimelineTheme) {
+    let base = strip.fill.map_or(ui.visuals().selection.bg_fill, qnc_desktop_theme::rgb);
     let fill = if focused || strip.chosen || hovered { base.linear_multiply(0.95) } else { base.linear_multiply(0.6) };
     ui.painter().rect_filled(rect, 1.0, fill);
     // The side the next action is on: framed red as its pictures (user 2026-11-05).
     if focused {
-        ui.painter().rect_stroke(rect, 1.0, Stroke::new(3.0, CUT_LINE), StrokeKind::Inside);
+        ui.painter().rect_stroke(rect, 1.0, Stroke::new(3.0, theme.cut), StrokeKind::Inside);
     } else if strip.chosen {
         ui.painter().rect_stroke(rect, 1.0, Stroke::new(2.0, Color32::WHITE), StrokeKind::Inside);
     }
     ui.painter().text(rect.center(), Align2::CENTER_CENTER, &strip.label, FontId::proportional(12.0), Color32::BLACK);
 }
 
-fn paint_still(ui: &mut egui::Ui, pane: Rect, still: &EditStill, framed: bool, visuals: &egui::Visuals) {
+fn paint_still(ui: &mut egui::Ui, pane: Rect, still: &EditStill, framed: bool, visuals: &egui::Visuals, theme: &TimelineTheme) {
     ui.painter().rect_filled(pane, 0.0, Color32::BLACK);
     if let Some(image) = still.image.as_deref().filter(|_| still.picture.is_some()) {
         let _ = qnc_ui_kit::paint_rgba_image(ui, pane, &still.id, image.content_key, image.size, &image.pixels);
@@ -499,12 +493,12 @@ fn paint_still(ui: &mut egui::Ui, pane: Rect, still: &EditStill, framed: bool, v
             ClipEdge::Start => Rect::from_min_max(pane.min, egui::pos2(pane.left() + width, pane.bottom())),
             ClipEdge::End => Rect::from_min_max(egui::pos2(pane.right() - width, pane.top()), pane.max),
         };
-        ui.painter().rect_filled(band, 0.0, Color32::from_rgb(230, 30, 30));
+        ui.painter().rect_filled(band, 0.0, theme.cut);
     }
     if framed {
         // The focus: the side in focus, else the picture at the cut being moved (user
         // 2026-10-13: a red frame).
-        ui.painter().rect_stroke(pane, 0.0, Stroke::new(4.0, Color32::from_rgb(230, 30, 30)), StrokeKind::Inside);
+        ui.painter().rect_stroke(pane, 0.0, Stroke::new(4.0, theme.cut), StrokeKind::Inside);
     }
     ui.painter().text(
         egui::pos2(pane.center().x, pane.bottom() + LABEL_HEIGHT / 2.0 + 2.0),
@@ -539,9 +533,6 @@ fn event_of(action: &qnc_program_view::StillAction, panel: &str) -> ActionEvent 
     }
     event
 }
-
-/// The colour of a level curve that is not taken in the zoom (the timeline's own).
-const CURVE_LINE: Color32 = Color32::from_rgb(235, 235, 235);
 
 /// The level curves of a story inside program frames `[from, to)` as a timeline draws them,
 /// their frames counted from `origin` (a Wrap row's start, 0 for the zoom's program axis). The

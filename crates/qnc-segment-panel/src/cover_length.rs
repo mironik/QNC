@@ -74,15 +74,15 @@ mod tests {
 /// The trim zoom with every picture's slot strip in the colour of its length, as the strips
 /// on the timeline (user 2026-11-05: the zoom is the timeline enlarged); one place for the Story,
 /// the S-Story and a composite statement.
-pub fn trim_zoom(ctx: &eframe::egui::Context, zoom: &qnc_program_view::SegmentsView, bands: &[CoverLengthBand]) -> Option<qnc_action_event::ActionEvent> {
+pub fn trim_zoom(ctx: &eframe::egui::Context, zoom: &qnc_program_view::SegmentsView, bands: &[CoverLengthBand], theme: &qnc_timeline::TimelineTheme) -> Option<qnc_action_event::ActionEvent> {
     let has_strips = zoom.edit_stills.iter().chain(&zoom.source_edit_stills).any(|still| still.strip.is_some());
     if !has_strips {
-        return qnc_trim_overlay::show(ctx, zoom);
+        return qnc_trim_overlay::show(ctx, zoom, theme);
     }
     let mut zoom = zoom.clone();
     let timebase = zoom.timebase;
     for strip in zoom.edit_stills.iter_mut().chain(zoom.source_edit_stills.iter_mut()).filter_map(|still| still.strip.as_mut()) {
         strip.fill = cover_fill(strip.frames, timebase, bands).map(|fill| [fill.r(), fill.g(), fill.b()]);
     }
-    qnc_trim_overlay::show(ctx, &zoom)
+    qnc_trim_overlay::show(ctx, &zoom, theme)
 }

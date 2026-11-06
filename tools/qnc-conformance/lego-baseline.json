@@ -44,9 +44,6 @@
   "C15 piece colour outside theme|crates/qnc-level-meter/src/lib.rs": 3,
   "C15 piece colour outside theme|crates/qnc-media-card/src/lib.rs": 12,
   "C15 piece colour outside theme|crates/qnc-shell-footer/src/lib.rs": 16,
-  "C15 piece colour outside theme|crates/qnc-timeline/src/level_lines.rs": 1,
-  "C15 piece colour outside theme|crates/qnc-timeline/src/lib.rs": 18,
-  "C15 piece colour outside theme|crates/qnc-trim-overlay/src/lib.rs": 13,
   "C15 piece colour outside theme|tools/qnc-dev-diagnostics-app/src/main.rs": 5,
   "C15 piece private widget|crates/qnc-confirm-dialog/src/lib.rs": 2,
   "C15 piece private widget|crates/qnc-ingest-import-bar/src/lib.rs": 2,
@@ -57,7 +54,6 @@
   "C15 piece private widget|crates/qnc-settings-switches/src/lib.rs": 1,
   "C15 piece private widget|crates/qnc-shell-footer/src/lib.rs": 1,
   "C15 piece private widget|crates/qnc-source-dock/src/lib.rs": 1,
-  "C15 piece private widget|crates/qnc-trim-overlay/src/lib.rs": 1,
   "C15 piece private widget|tools/qnc-dev-diagnostics-app/src/main.rs": 7
   }
 }

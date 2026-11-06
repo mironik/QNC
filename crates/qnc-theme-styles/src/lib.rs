@@ -2,13 +2,48 @@
 //! Story and Project forms and their layout models each turned the theme into the same
 //! styles). One function per piece; it knows no form.
 
+use eframe::egui::Color32;
 use qnc_desktop_theme::Theme;
 
 pub const MODULE_ID: &str = "qnc.module.theme-styles";
 
-/// The colours of every timeline.
+/// The colours of every timeline (and of its trim zoom, the timeline enlarged); the gui-kit holds
+/// them (C15), the timeline only draws with them.
 pub fn timeline(theme: &Theme) -> qnc_timeline::TimelineTheme {
-    qnc_timeline::TimelineTheme::from_qnc_theme(theme.bg, theme.surface, theme.surface_alt, theme.border_soft, theme.text, theme.text_muted, theme.accent)
+    let rgb = |r, g, b| Color32::from_rgb(r, g, b);
+    qnc_timeline::TimelineTheme {
+        background: theme.bg,
+        label_background: theme.surface_alt,
+        video_background: theme.surface,
+        // Audio lanes in the colours of a story's video segment: its dark green band with
+        // the mint of its body as the wave (user 2026-10-14).
+        audio_primary_background: rgb(17, 103, 88),
+        audio_secondary_background: rgb(17, 103, 88),
+        border: theme.border_soft,
+        text: theme.text,
+        muted: theme.text_muted,
+        playhead: theme.accent,
+        focus: rgb(255, 180, 60),
+        shot_range: rgb(96, 165, 250),
+        in_out_dim: Color32::from_black_alpha(133),
+        wave_a1: rgb(132, 214, 158),
+        wave_a2: rgb(132, 214, 158),
+        wave_a3: rgb(132, 214, 158),
+        wave_a4: rgb(132, 214, 158),
+        audio_wave: rgb(80, 190, 148),
+        lane_taken: rgb(240, 200, 40),
+        lane_silent: rgb(200, 45, 45),
+        marker_hover: rgb(230, 40, 40),
+        level_marks: [
+            Color32::from_rgba_unmultiplied(220, 230, 225, 70),
+            Color32::from_rgba_unmultiplied(240, 200, 40, 150),
+            Color32::from_rgba_unmultiplied(220, 60, 50, 170),
+        ],
+        level_curve: rgb(235, 235, 235),
+        cut: rgb(230, 30, 30),
+        cut_side: rgb(255, 64, 64),
+        unheard: Color32::from_rgba_premultiplied(70, 10, 10, 70),
+    }
 }
 
 /// The chrome of a dock and its header; `header_timeline_gap` is the form's measure.

@@ -8195,3 +8195,11 @@ izjave (ranije, kasnije, ukloni) u `qnc-subsegment-panel` crtaju se kroz `qnc_ui
 koji dobiva parametar `enabled` (sivo kad se ne moze; segment panel predaje `true`). Izgled isti. C15 kljuc
 subsegment panela uklonjen iz baselinea (21 -> 20). Testovi, `cargo check --workspace --all-targets`, conformance.
 Uzivo nije provjereno.
+Izvedeno 2026-11-06 (korisnik: "da, pushaj i kreni s trim overlayem"; gui-kit C15): trim zoom je uvecani timeline
+(pravilo 0.12), pa ima boje teme timelinea. `TimelineTheme` je dobio boje reza (`cut`, `cut_side`, `unheard`); sve boje
+teme timelinea gradi gui-kit (`qnc_theme_styles::timeline`, tijelo premjesteno iz `TimelineTheme::from_qnc_theme`, koji
+je uklonjen; `qnc-theme-styles` dobio ovisnost `eframe`). `qnc-trim-overlay::show` prima `&TimelineTheme` (predaju ga
+`qnc-segment-panel::trim_zoom`, Story ploca u istom retku i subsegment panel); vlastite konstante boja uklonjene, boja
+trake iz ugovora kroz `qnc_desktop_theme::rgb`, Ponisti/Spremi/Zatvori kroz novi `qnc_ui_kit::sized_button`. Izgled
+isti (blagi crveni sloj strane u fokusu sada je `cut` s istom prozirnoscu). C15: 20 -> 16 (`qnc-timeline` i
+`qnc-trim-overlay` bez prekrsaja). Testovi, `cargo check --workspace --all-targets`, conformance. Uzivo nije provjereno.

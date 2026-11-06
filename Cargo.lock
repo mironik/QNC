@@ -6750,6 +6750,7 @@ dependencies = [
 name = "qnc-theme-styles"
 version = "0.1.0"
 dependencies = [
+ "eframe",
  "qnc-desktop-theme",
  "qnc-media-card",
  "qnc-media-pool-head",
@@ -6966,6 +6967,7 @@ version = "0.1.0"
 dependencies = [
  "eframe",
  "qnc-action-event",
+ "qnc-desktop-theme",
  "qnc-edit-verbs",
  "qnc-program-view",
  "qnc-timeline",

@@ -201,7 +201,7 @@ pub fn show(ui: &mut egui::Ui, view: &SubsegmentView, theme: TimelineTheme, leng
     // The strips under its pictures in the colour of their length, as the timeline's (the one
     // coloured zoom of every timeline, on the SubSegment's frame rate).
     let zoom = view.zoom.as_deref().map(|zoom| qnc_program_view::SegmentsView { timebase: zoom.timebase.or(view.rate), ..zoom.clone() });
-    let zoomed = zoom.as_ref().and_then(|zoom| qnc_segment_panel::trim_zoom(ui.ctx(), zoom, lengths)).map(|event| match event.action_id.as_str() {
+    let zoomed = zoom.as_ref().and_then(|zoom| qnc_segment_panel::trim_zoom(ui.ctx(), zoom, lengths, &theme)).map(|event| match event.action_id.as_str() {
         "transcript_cut_word" => ActionEvent { action_id: qnc_script::ZOOM_WORD.to_string(), ..event },
         // A picture or its strip: the timeline row's action, on the row's panel (the zoom is the
         // timeline enlarged).

@@ -83,3 +83,9 @@ pub fn look_button(ui: &mut Ui, text: &str, enabled: bool, look: ButtonLook) -> 
 pub fn small_button(ui: &mut Ui, text: &str, enabled: bool, selected: bool) -> egui::Response {
     ui.add_enabled(enabled, Button::new(RichText::new(text).small()).selected(selected))
 }
+
+/// A button of egui's own look at a size (e.g. Undo, Save and Close of the trim zoom), put where
+/// its caller places it.
+pub fn sized_button(text: &str, size: Vec2) -> Button<'static> {
+    Button::new(RichText::new(text)).min_size(size)
+}

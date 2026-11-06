@@ -250,50 +250,15 @@ pub struct TimelineTheme {
     pub level_marks: [Color32; 3],
     /// The level curve of a segment's A1 or a cover's A2 that is not taken (docs/98 2.1).
     pub level_curve: Color32,
+    /// The cut in a trim zoom: its line, the frame of the side in focus, a clip's end (gui-kit C15:
+    /// the zoom is the timeline enlarged, its colours are the timeline's).
+    pub cut: Color32,
+    /// The sides of a cut's sound (J and L) and a taken part of the cut in a trim zoom.
+    pub cut_side: Color32,
+    /// Voice no word was heard for, under the words of a trim zoom.
+    pub unheard: Color32,
 }
 
-impl TimelineTheme {
-    pub fn from_qnc_theme(
-        background: Color32,
-        surface: Color32,
-        surface_alt: Color32,
-        border: Color32,
-        text: Color32,
-        muted: Color32,
-        accent: Color32,
-    ) -> Self {
-        Self {
-            background,
-            label_background: surface_alt,
-            video_background: surface,
-            // Audio lanes in the colours of a story's video segment: its dark green band with
-            // the mint of its body as the wave (user 2026-10-14).
-            audio_primary_background: Color32::from_rgb(17, 103, 88),
-            audio_secondary_background: Color32::from_rgb(17, 103, 88),
-            border,
-            text,
-            muted,
-            playhead: accent,
-            focus: Color32::from_rgb(255, 180, 60),
-            shot_range: Color32::from_rgb(96, 165, 250),
-            in_out_dim: Color32::from_black_alpha(133),
-            wave_a1: Color32::from_rgb(132, 214, 158),
-            wave_a2: Color32::from_rgb(132, 214, 158),
-            wave_a3: Color32::from_rgb(132, 214, 158),
-            wave_a4: Color32::from_rgb(132, 214, 158),
-            audio_wave: Color32::from_rgb(80, 190, 148),
-            lane_taken: Color32::from_rgb(240, 200, 40),
-            lane_silent: Color32::from_rgb(200, 45, 45),
-            marker_hover: Color32::from_rgb(230, 40, 40),
-            level_marks: [
-                Color32::from_rgba_unmultiplied(220, 230, 225, 70),
-                Color32::from_rgba_unmultiplied(240, 200, 40, 150),
-                Color32::from_rgba_unmultiplied(220, 60, 50, 170),
-            ],
-            level_curve: level_lines::CURVE,
-        }
-    }
-}
 
 
 /// How the timeline paints the mark in focus.

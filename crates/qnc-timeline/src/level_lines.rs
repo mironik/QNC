@@ -109,9 +109,6 @@ pub fn level_curve_hit(band: Rect, (start, duration): (u64, u64), lane: u8, pos:
     ((pos.y - y).abs() <= REACH).then_some(frame)
 }
 
-/// The colour of a level curve that is not taken.
-pub(crate) const CURVE: Color32 = Color32::from_rgb(235, 235, 235);
-
 #[cfg(test)]
 mod tests {
     use super::*;
