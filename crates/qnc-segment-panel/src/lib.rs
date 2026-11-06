@@ -61,7 +61,7 @@ impl SegmentPanelStyle {
             muted: theme.muted,
             segment: theme.playhead,
             playhead: theme.focus,
-            total: Color32::from_rgb(255, 120, 120),
+            total: qnc_desktop_theme::total_text(),
         }
     }
 }

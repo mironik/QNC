@@ -8184,3 +8184,9 @@ promjene izgleda: `qnc-newsroom-sheet`, `qnc-settings-form` (nova ovisnost `qnc-
 broji i `TextEdit::` u kockama koje crtaju; danas nijedan, pa baseline nema novog kljuca. Project ploca (zamrznuta
 forma) zadrzava svoja polja. Testovi dotaknutih kocki, `cargo check --workspace --all-targets`, conformance. Uzivo
 nije provjereno.
+Izvedeno 2026-11-06 (korisnik: "da, pushaj i kreni sa segment panelom"; gui-kit C15): `qnc-segment-panel` crta gumbe
+i boje samo kroz gui-kit. Gumbi trake (akcija, bljesak, ikona) kroz `qnc_ui_kit::look_button` s istim izgledom
+(`bar_look`), gumbi redaka taba Segment kroz novi `qnc_ui_kit::small_button` (mali tekst, oznaka izabranog za Edit);
+boje traka pokrivalica iz ugovora kroz `qnc_desktop_theme::rgb` (sada javna, jedina pretvorba), boja ukupnog trajanja
+u zaglavlju je `qnc_desktop_theme::total_text` (ista vrijednost). Cetiri C15 kljuca segment panela uklonjena iz
+baselinea (25 -> 21). Testovi, `cargo check --workspace --all-targets`, conformance. Uzivo nije provjereno.

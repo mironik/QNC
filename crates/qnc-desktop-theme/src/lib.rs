@@ -64,6 +64,12 @@ pub fn danger() -> Color32 {
     Color32::from_rgb(239, 68, 68)
 }
 
+/// The colour of the total length of a story in the head of the segment panel (gui-kit C15: it
+/// was the panel's own).
+pub fn total_text() -> Color32 {
+    Color32::from_rgb(255, 120, 120)
+}
+
 pub fn apply(ctx: &egui::Context, theme: &Theme) {
     let mut style = (*ctx.style()).clone();
     style.text_styles = [
@@ -160,7 +166,8 @@ pub fn apply_settings_look(ctx: &egui::Context, theme: &Theme) {
     ctx.set_style(style);
 }
 
-fn rgb(value: [u8; 3]) -> Color32 {
+/// A colour of a layout contract (`[r, g, b]`) as egui draws it; the one conversion of the gui-kit.
+pub fn rgb(value: [u8; 3]) -> Color32 {
     Color32::from_rgb(value[0], value[1], value[2])
 }
 

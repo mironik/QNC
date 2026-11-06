@@ -5,7 +5,7 @@
 //! `quick_cover_target`, `overwrite_cover_target`). Sync/B-roll is a switch with
 //! Pokrivalice on the source dock.
 
-use eframe::egui::{self, PointerButton, Pos2, Rect, RichText, Sense, Vec2};
+use eframe::egui::{self, PointerButton, Pos2, Rect, Sense, Vec2};
 use qnc_action_event::ActionEvent;
 use qnc_program_view::SegmentsView;
 use qnc_timeline::TimelineTheme;
@@ -188,11 +188,7 @@ fn flash_button(ui: &mut egui::Ui, label: &str, enabled: bool, flash: bool, them
     if !flash {
         return action_button(ui, label, enabled, theme);
     }
-    let button = egui::Button::new(RichText::new(label).color(theme.text).size(FONT_UI))
-        .min_size(Vec2::new(0.0, COMPACT_CTRL_H))
-        .fill(theme.focus)
-        .stroke(egui::Stroke::new(1.0, theme.focus));
-    ui.add_enabled(enabled, button)
+    qnc_ui_kit::look_button(ui, label, enabled, bar_look(theme, theme.focus, theme.focus, FONT_UI, 0.0))
 }
 
 fn action_button(
@@ -201,21 +197,17 @@ fn action_button(
     enabled: bool,
     theme: TimelineTheme,
 ) -> egui::Response {
-    let button = egui::Button::new(RichText::new(label).color(theme.text).size(FONT_UI))
-        .min_size(Vec2::new(0.0, COMPACT_CTRL_H))
-        .fill(egui::Color32::TRANSPARENT)
-        .stroke(egui::Stroke::new(1.0, theme.border));
-    ui.add_enabled(enabled, button)
+    qnc_ui_kit::look_button(ui, label, enabled, bar_look(theme, egui::Color32::TRANSPARENT, theme.border, FONT_UI, 0.0))
+}
+
+/// The look of a button of the bar (gui-kit, C15): the bar's text, its fill and border, rounded.
+fn bar_look(theme: TimelineTheme, fill: egui::Color32, border: egui::Color32, font: f32, width: f32) -> qnc_ui_kit::ButtonLook {
+    qnc_ui_kit::ButtonLook { text: theme.text, fill, border: Some(border), font_size: Some(font), strong: false, square: false, min_size: Vec2::new(width, COMPACT_CTRL_H) }
 }
 
 /// Icon button; an empty icon paints the small slot rectangle of v5.
 fn icon_button(ui: &mut egui::Ui, icon: &str, hint: &str, theme: TimelineTheme) -> egui::Response {
-    let response = ui.add(
-        egui::Button::new(RichText::new(icon).color(theme.text).size(18.0))
-            .min_size(Vec2::new(TRANSPORT_BTN_W, COMPACT_CTRL_H))
-            .fill(egui::Color32::TRANSPARENT)
-            .stroke(egui::Stroke::new(1.0, theme.border)),
-    );
+    let response = qnc_ui_kit::look_button(ui, icon, true, bar_look(theme, egui::Color32::TRANSPARENT, theme.border, 18.0, TRANSPORT_BTN_W));
     if icon.is_empty() && ui.is_rect_visible(response.rect) {
         let color = if response.hovered() {
             theme.text

@@ -77,3 +77,9 @@ pub fn look_button(ui: &mut Ui, text: &str, enabled: bool, look: ButtonLook) -> 
     }
     ui.add_enabled(enabled, button)
 }
+
+/// The small button of a list row (egui's own look, small text); `selected` draws it as chosen
+/// (e.g. Edit while that segment is edited).
+pub fn small_button(ui: &mut Ui, text: &str, selected: bool) -> egui::Response {
+    ui.add(Button::new(RichText::new(text).small()).selected(selected))
+}

@@ -6191,6 +6191,7 @@ dependencies = [
  "qnc-theme-styles",
  "qnc-timeline",
  "qnc-trim-overlay",
+ "qnc-ui-kit",
  "qnc-ui-text",
  "serde",
 ]

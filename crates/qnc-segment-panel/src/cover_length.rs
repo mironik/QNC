@@ -34,7 +34,7 @@ pub fn cover_fill(frames: u64, timebase: Option<(u32, u32)>, bands: &[CoverLengt
     bands
         .iter()
         .find(|band| band.holds(seconds))
-        .map(|band| Color32::from_rgb(band.rgb[0], band.rgb[1], band.rgb[2]))
+        .map(|band| qnc_desktop_theme::rgb(band.rgb))
 }
 
 #[cfg(test)]

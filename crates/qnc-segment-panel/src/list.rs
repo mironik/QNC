@@ -94,7 +94,7 @@ fn row_buttons(
 ) -> egui::Rect {
     let mut area = egui::Rect::NOTHING;
     let mut small = |ui: &mut egui::Ui, text: &str, hint: &str| {
-        let response = ui.add(egui::Button::new(RichText::new(text).small()));
+        let response = qnc_ui_kit::small_button(ui, text, false);
         area = area.union(response.rect);
         response.on_hover_text(hint).clicked()
     };
@@ -129,7 +129,7 @@ fn row_buttons(
         *command = Some(("segment_replace", id()));
     }
     // Edit (user rule 2026-10-01): IN/OUT of the segment on the source timeline.
-    let edit = ui.add(egui::Button::new(RichText::new(qnc_ui_text::text("story.ui.edit")).small()).selected(editing));
+    let edit = qnc_ui_kit::small_button(ui, qnc_ui_text::text("story.ui.edit"), editing);
     area = area.union(edit.rect);
     if edit.on_hover_text(qnc_ui_text::text("story.ui.edit_hint")).clicked() {
         *command = Some(("segment_edit", id()));
