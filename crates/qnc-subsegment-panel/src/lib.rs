@@ -164,6 +164,7 @@ pub fn show(ui: &mut egui::Ui, view: &SubsegmentView, theme: TimelineTheme, leng
                     wave_over_video: None,
                     trim_playheads: &trim,
                     a1_splits: &[],
+                    level_curves: &[],
                     pictures: &pictures,
                     holding: view.trim.is_some() || view.sound.is_some() || view.join_sound.is_some() || view.slide.is_some(),
                 },

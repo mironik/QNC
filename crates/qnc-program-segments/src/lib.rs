@@ -24,6 +24,7 @@ mod cut_part;
 pub use cut_part::{CutPart, CutSound, SoundEdge};
 mod marker_edit;
 mod part_sound;
+mod level_line;
 mod sync;
 mod commands;
 mod create;
@@ -237,6 +238,8 @@ pub struct ProgramSegments {
     source: SourcePick,
     /// The sound of a stored segment or cover taken on the Wrap row (`part_sound.rs`).
     part_sound: qnc_part_sound::PartSound,
+    /// The level curve taken on the Wrap row (`level_line.rs`, docs/98 2.1).
+    level_line: Option<qnc_level_curve::LevelLine>,
     /// Clip lengths in their own frames, as the form last gave them (`view_with_waves`):
     /// the edit pictures know where their clip ends.
     clip_frames: std::collections::HashMap<String, u64>,

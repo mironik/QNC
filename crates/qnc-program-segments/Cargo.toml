@@ -16,6 +16,7 @@ qnc-program-commands = { workspace = true }
 qnc-program-view = { workspace = true }
 qnc-lane-choice = { workspace = true }
 qnc-part-sound = { workspace = true }
+qnc-level-curve = { workspace = true }
 qnc-virtual-shots = { workspace = true }
 qnc-sync-cover = { workspace = true }
 qnc-program-waveform = { workspace = true }

@@ -87,15 +87,15 @@ pub fn cut_edge(
 /// The picture J or the cut's sound drafted on the Wrap row, as the program plays it before Enter.
 fn overlap_draft(segments: &ProgramSegments) -> Option<SoundDraft> {
     if let Some(covers) = segments.cut_sound_draft() {
-        return Some(SoundDraft { lane: 1, id: String::new(), channel: 0, level_db: 0, off: false, overlaps: covers, pictures: Vec::new(), joins: Vec::new() });
+        return Some(SoundDraft { lane: 1, id: String::new(), channel: 0, level_db: 0, off: false, overlaps: covers, pictures: Vec::new(), joins: Vec::new(), levels: Vec::new() });
     }
     // The A1 sound of a cut between two clips (user 2026-10-29).
     if let Some(joins) = segments.join_sound_draft() {
-        return Some(SoundDraft { lane: 1, id: String::new(), channel: 0, level_db: 0, off: false, overlaps: Vec::new(), pictures: Vec::new(), joins });
+        return Some(SoundDraft { lane: 1, id: String::new(), channel: 0, level_db: 0, off: false, overlaps: Vec::new(), pictures: Vec::new(), joins, levels: Vec::new() });
     }
     // The picture of a cut between two clips (user 2026-10-29).
     let pictures = segments.join_picture_draft()?;
-    Some(SoundDraft { lane: 1, id: String::new(), channel: 0, level_db: 0, off: false, overlaps: Vec::new(), pictures, joins: Vec::new() })
+    Some(SoundDraft { lane: 1, id: String::new(), channel: 0, level_db: 0, off: false, overlaps: Vec::new(), pictures, joins: Vec::new(), levels: Vec::new() })
 }
 
 /// A channel picked in the column of the taken sound (a click, or any device that names
@@ -164,7 +164,7 @@ pub fn dropped(preview: &mut SourcePreview, wrap: &WrapSession, segments: &mut P
 /// Enter on the segment panel confirms what it took (a marker, slot, slot edge, sound);
 /// false when there is nothing to confirm (the walk goes on).
 pub fn confirm(preview: &mut SourcePreview, segments: &mut ProgramSegments) -> bool {
-    let sound = segments.part_sound_taken() || segments.cut_picture_taken() || segments.cut_sound_taken();
+    let sound = segments.part_sound_taken() || segments.cut_picture_taken() || segments.cut_sound_taken() || segments.level_line_taken();
     let confirmed = segments.confirm_program();
     if sound && confirmed {
         preview.forget_program_draft(); // written: the program opens from the story
@@ -286,13 +286,13 @@ fn say_part_lane(segments: &mut ProgramSegments) {
 /// The sound drafted on the Wrap row, as the program plays it before Enter.
 fn sound_draft(segments: &ProgramSegments) -> Option<SoundDraft> {
     let (lane, id, draft) = segments.part_sound_draft_now()?;
-    Some(SoundDraft { lane, id, channel: draft.channel, level_db: draft.level_db, off: draft.off, overlaps: Vec::new(), pictures: Vec::new(), joins: Vec::new() })
+    Some(SoundDraft { lane, id, channel: draft.channel, level_db: draft.level_db, off: draft.off, overlaps: Vec::new(), pictures: Vec::new(), joins: Vec::new(), levels: Vec::new() })
 }
 
 /// The stored sound of the part taken on the Wrap row.
 fn stored_sound(segments: &ProgramSegments) -> Option<SoundDraft> {
     let (lane, id, stored) = segments.part_sound_stored()?;
-    Some(SoundDraft { lane, id, channel: stored.channel, level_db: stored.level_db, off: stored.off, overlaps: Vec::new(), pictures: Vec::new(), joins: Vec::new() })
+    Some(SoundDraft { lane, id, channel: stored.channel, level_db: stored.level_db, off: stored.off, overlaps: Vec::new(), pictures: Vec::new(), joins: Vec::new(), levels: Vec::new() })
 }
 
 #[cfg(test)]
@@ -308,4 +308,54 @@ mod tests {
         assert_eq!(sound("step_forward_frame", (&mut preview, &mut wrap, &mut segments)), ControlFlow::Continue(()), "no sound taken");
         assert_eq!(sound("clear_focus", (&mut preview, &mut wrap, &mut segments)), ControlFlow::Continue(()));
     }
+}
+
+/// The level curve of a stored segment (A1) or cover (A2) (docs/98 2.1, user 2026-11-06: a right
+/// click on its line, or Ctrl+Shift+1/2, takes it; the line of the playhead is the point that is
+/// controlled): up/down, Ctrl+left/right and Ctrl+wheel raise or lower that point a dB (made
+/// there when there is none), Delete removes it, Escape lets the curve go; each change is heard
+/// at once. The arrows and the wheel move the playhead as always. `Continue` for any other key.
+pub fn level(
+    action_id: &str,
+    (preview, wrap, segments): (&mut SourcePreview, &mut WrapSession, &mut ProgramSegments),
+) -> ControlFlow<Option<bool>> {
+    let frame = wrap.playhead();
+    let done = match action_id {
+        "select_level_a1" | "select_level_a2" => {
+            return ControlFlow::Break(Some(segments.take_level_line(u8::from(action_id == "select_level_a2"), frame)));
+        }
+        _ if !segments.level_line_taken() => return ControlFlow::Continue(()),
+        "step_prev_part" => segments.nudge_level(frame, 1),
+        "step_next_part" => segments.nudge_level(frame, -1),
+        "delete_marker" => segments.remove_level_point(frame),
+        "clear_focus" => {
+            let released = segments.release_level_line();
+            preview.hear_program_draft(None, None, frame); // the stored curve again
+            return ControlFlow::Break(Some(released));
+        }
+        key => match LaneKey::of(key) {
+            Some(LaneKey::Level(steps)) => segments.nudge_level(frame, i16::from(steps)),
+            _ => return ControlFlow::Continue(()),
+        },
+    };
+    preview.hear_program_draft(level_draft(segments), None, frame);
+    ControlFlow::Break(Some(done))
+}
+
+/// A left click on a Wrap row while the level curve is taken: the curve is saved and stays
+/// taken, so the playhead the click places is the next point controlled (user 2026-11-06). False
+/// when no curve is taken.
+pub fn keep_level_on_click(preview: &mut SourcePreview, segments: &mut ProgramSegments) -> bool {
+    if !segments.level_line_taken() {
+        return false;
+    }
+    let kept = segments.commit_level_line(true);
+    preview.forget_program_draft(); // written: the program opens from the story
+    kept
+}
+
+/// The drafted level curve, as the program plays it before Enter.
+fn level_draft(segments: &ProgramSegments) -> Option<SoundDraft> {
+    let (_, id, keys) = segments.level_line_draft()?;
+    Some(SoundDraft { lane: 1, id: String::new(), channel: 0, level_db: 0, off: false, overlaps: Vec::new(), pictures: Vec::new(), joins: Vec::new(), levels: vec![(id, keys)] })
 }

@@ -79,6 +79,9 @@ pub enum SegmentCommand {
     /// A right click on A1 (0) or A2 of a Wrap row: the sound of what lies at the program
     /// frame is taken as with Ctrl+1/Ctrl+2 there.
     TakeSound { lane: u8, frame: u64 },
+    /// A right click on the level curve of A1 (0) or A2 of a Wrap row (docs/98 2.1): the curve
+    /// of what lies at the program frame taken, as Ctrl+Shift+1/2 there.
+    TakeLevelLine { lane: u8, frame: u64 },
     /// A right click over the picture (`picture`) or A2 (`lane` 1) of a Wrap row: the nearest
     /// M marker taken with only that part of its cut moving (user 2026-10-21).
     CutPart { marker_id: String, picture: bool, lane: u8 },
@@ -237,6 +240,7 @@ impl SegmentCommand {
             (side @ ("step_prev_marker_slot" | "step_next_marker_slot"), _, _) => Self::StepSlot { up: side == "step_prev_marker_slot" },
             (side @ ("program_prev_marker" | "program_next_marker"), _, _) => Self::StepMarker { up: side == "program_prev_marker" },
             (lane @ ("select_audio_a1" | "select_audio_a2"), None, Some(frame)) => Self::TakeSound { lane: u8::from(lane == "select_audio_a2"), frame },
+            (lane @ ("select_level_a1" | "select_level_a2"), None, Some(frame)) => Self::TakeLevelLine { lane: u8::from(lane == "select_level_a2"), frame },
             (lane @ ("select_audio_a1" | "select_audio_a2"), Some(marker_id), _) => {
                 Self::CutPart { marker_id, picture: false, lane: u8::from(lane == "select_audio_a2") }
             }

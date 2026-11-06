@@ -150,6 +150,7 @@ impl ProgramSegments {
     /// What the view shows of a segment's or cover's sound taken on the Wrap row.
     pub(crate) fn lane_view(&self, view: &mut SegmentsView) {
         view.part_sound = self.part_sound_view();
+        view.level_line = self.level_line.as_ref().map(|line| (line.lane, line.id.clone(), line.draft().to_vec()));
     }
 
     /// A1 (lane 0) or A2 as the source timeline keeps it: what a new segment, cover or

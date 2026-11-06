@@ -51,6 +51,7 @@ pub fn program(
             duration_color_key: duration_color_key(frames, rate_num, rate_den),
             selected: selected == Some(segment.segment_id.as_str()),
             lead: !segment.lead.is_empty(),
+            level_keys: segment.level_keys.clone(),
         });
         start += frames;
     }
@@ -123,6 +124,7 @@ pub fn cover_spans(covers: &[ProgramCover], selected: Option<&str>, story_rate: 
             a2_source_channel: cover.a2_source_channel,
             a2_level_db: cover.a2_level_db,
             a2_off: cover.a2_off,
+            level_keys: cover.level_keys.clone(),
         })
         .collect()
 }

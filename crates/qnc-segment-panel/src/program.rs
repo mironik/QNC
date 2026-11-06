@@ -131,6 +131,23 @@ pub(crate) fn paint_program(
             sound_lane: pin.sound_lane,
         })
         .collect::<Vec<_>>();
+    // The level curves of the segments (A1) and covers (A2) on this row (docs/98 2.1).
+    let level_curves: Vec<qnc_timeline::TimelineLevelCurve> = segments
+        .level_curves()
+        .into_iter()
+        .filter_map(|curve| {
+            let (from, to, part) = curve.placed.within(curve.span, start, end)?;
+            Some(qnc_timeline::TimelineLevelCurve {
+                lane: curve.lane,
+                from: local(from),
+                to: local(to),
+                start_db10: part.start_db10,
+                end_db10: part.end_db10,
+                points: part.points.iter().map(|(at, db10)| (at - start as f64, *db10)).collect(),
+                taken: curve.taken,
+            })
+        })
+        .collect();
     // v5 `local_peaks_for_row`: this row's part of the program wave.
     let row_wave = |program: &[f32]| qnc_program_waveform::row_peaks(program, segments.total_frames, start, end);
     let (a1, a2) = (row_wave(&segments.peaks.a1), row_wave(&segments.peaks.a2));
@@ -218,6 +235,7 @@ pub(crate) fn paint_program(
             wave_over_video: segments.part_sound.as_ref().map(|part| (if part.lane == 0 { AudioLane::A1 } else { AudioLane::A2 }, 1)),
             trim_playheads: &trim_playheads,
             a1_splits: &a1_splits,
+            level_curves: &level_curves,
             pictures: &pictures,
             // Something taken on the row: a left click keeps it first (the mouse map).
             holding: !segments.trim_frames.is_empty() || segments.part_sound.is_some(),

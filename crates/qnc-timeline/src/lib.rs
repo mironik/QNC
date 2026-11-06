@@ -13,6 +13,8 @@ mod marker_reach;
 use marker_reach::{marker_for_right_click, marker_to_drag, source_mark_in_reach, taken_marker_for_right_click};
 pub use events::take_marker_drag_event;
 mod lanes;
+mod level_lines;
+pub use level_lines::TimelineLevelCurve;
 pub use events::event;
 pub use lanes::{drafted_choice, lane_choice, lane_key, lane_message, Lane, LaneChoice, LaneKey};
 
@@ -274,6 +276,8 @@ pub struct TimelineTheme {
     /// The thin level lines of an audio lane: alignment (-18 dBFS), permitted maximum
     /// (-9 dBFS), limit (-1 dBFS).
     pub level_marks: [Color32; 3],
+    /// The level curve of a segment's A1 or a cover's A2 that is not taken (docs/98 2.1).
+    pub level_curve: Color32,
 }
 
 impl TimelineTheme {
@@ -314,6 +318,7 @@ impl TimelineTheme {
                 Color32::from_rgba_unmultiplied(240, 200, 40, 150),
                 Color32::from_rgba_unmultiplied(220, 60, 50, 170),
             ],
+            level_curve: level_lines::CURVE,
         }
     }
 }
@@ -804,6 +809,8 @@ pub struct TimelineInput<'a> {
     /// A1 cuts whose picture is away from their sound, local (picture, sound) frames: red
     /// always (user 2026-10-22).
     pub a1_splits: &'a [(u64, u64)],
+    /// The level curves of the segments (A1) and covers (A2) on the row (docs/98 2.1).
+    pub level_curves: &'a [TimelineLevelCurve],
     /// Filmstrip pictures of a banded video row (empty: none).
     pub pictures: &'a [TimelinePicture<'a>],
     /// On a row with markers: the host holds something taken there (a slot, a slot edge, a
@@ -865,6 +872,8 @@ pub enum TimelineIntent {
     /// A right click on A1 or A2 of a row with markers (a Wrap row): the sound of what lies
     /// there, at that frame (as Ctrl+1/Ctrl+2 there).
     TakeSound { lane: AudioLane, frame: u64 },
+    /// A right click on a level curve (docs/98 2.1): taken as Ctrl+Shift+1/2, at the frame.
+    TakeLevelLine { lane: AudioLane, frame: u64 },
     /// A second right click over A2 near the taken M marker: only its sound moves (user
     /// 2026-10-22: a right click takes the whole marker, a second one its part). The row's
     /// owner decides whether it has parts (only the enlarged slot has).
@@ -994,6 +1003,7 @@ pub fn show_source_player_timeline_with_channel(
                 wave_over_video,
                 trim_playheads: &[],
                 a1_splits: &[],
+                level_curves: &[],
                 pictures: &[],
                 holding: false,
             },
@@ -1465,6 +1475,9 @@ fn paint_audio_band(ui: &mut egui::Ui, band: Rect, lane: AudioLane, peaks: &[f32
     let gain = lane_gain(input, lane);
     qnc_wave_view::paint_wave_peaks_gain(ui.painter(), track_rect, peaks, gain, input.theme.audio_wave);
     qnc_wave_view::paint_level_marks(ui.painter(), track_rect, 1.0, input.theme.level_marks);
+    if let Some(index) = lane_index(lane) {
+        level_lines::paint(ui, track_rect, index, input);
+    }
     paint_lane_level(ui, track_rect, lane, input);
     let label_response = ui.interact(
         label_rect,
@@ -1541,6 +1554,15 @@ fn label_intent(lane: AudioLane, picker: bool, input: &TimelineInput<'_>) -> Tim
     TimelineIntent::LaneLabel { lane, frame: Some(frame) }
 }
 
+/// 0 for A1, 1 for A2 (the lanes a level curve lies on).
+fn lane_index(lane: AudioLane) -> Option<u8> {
+    match lane {
+        AudioLane::A1 => Some(0),
+        AudioLane::A2 => Some(1),
+        _ => None,
+    }
+}
+
 /// A right click on A1/A2 (its label or its track) takes the lane, as Ctrl+1/Ctrl+2: on a
 /// Wrap row (markers) the sound of what lies at the clicked frame.
 fn take_lane_intent(responses: &[&egui::Response], track: Rect, lane: AudioLane, input: &TimelineInput<'_>) -> Option<TimelineIntent> {
@@ -1556,6 +1578,10 @@ fn take_lane_intent(responses: &[&egui::Response], track: Rect, lane: AudioLane,
             if let Some(id) = taken_marker_for_right_click(track, start, duration, pos, input.markers) {
                 return Some(TimelineIntent::TakeMarkerSound { id: id.to_string() });
             }
+        }
+        // Near a level curve: the curve (docs/98 2.1, user 2026-11-06), else the sound there.
+        if let Some(frame) = lane_index(lane).and_then(|index| level_lines::hit(track, index, pos, input)) {
+            return Some(TimelineIntent::TakeLevelLine { lane, frame });
         }
         let frame = frame_for_x(track, start, duration, pos.x);
         return Some(TimelineIntent::TakeSound { lane, frame });

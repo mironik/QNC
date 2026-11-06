@@ -228,6 +228,7 @@
     "story.take.slot_edge": "The taken slot edge",
     "story.take.sound": "The taken sound",
     "story.take.cover": "The taken B-roll",
+    "story.take.level_line": "The taken level curve",
     "story.take.overlap": "The taken J or L of a B-roll",
     "story.msg.slot_taken": "Slot: left/right arrows move it, Enter confirms, Esc cancels",
     "story.msg.slot_move_cancelled": "Slot move cancelled.",
@@ -1240,6 +1241,9 @@
     "story.msg.lane_off": "{lane}: off (level 0), right turns it on",
     "story.msg.lane_level": "{lane}: channel {channel}, level {level} dB",
     "story.msg.no_segment_at_playhead": "No segment under the Wrap playhead.",
-    "story.msg.no_cover_at_playhead": "No B-roll under the Wrap playhead."
+    "story.msg.no_cover_at_playhead": "No B-roll under the Wrap playhead.",
+    "story.msg.level_line": "Level curve {lane}: {level} dB on the playhead line. Up/down a dB (a point is made there), Delete removes a point, Enter saves, Esc drops.",
+    "story.msg.level_point": "Level curve {lane}: the point on the playhead line, {level} dB. Up/down a dB, Delete removes it, Enter saves, Esc drops.",
+    "story.msg.level_no_point": "No level point on the playhead line."
   }
 }

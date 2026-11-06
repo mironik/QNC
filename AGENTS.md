@@ -8064,3 +8064,37 @@ Off i slozena izjava zasad bez krivulje. Testovi `qnc-program-db` (58), `qnc-pro
 `qnc-broadcast-engine`, `qnc-program-input`, `qnc-program-render`, `qnc-player-input`, `qnc-fcp7-xml`. Nije izvedeno
 (korak 2, ceka odluku o gestama jer je mapa misa zakljucana): crtanje krivulje na Wrap retku i u zoomu, dodavanje,
 pomicanje i brisanje tocaka; val programa jos ne prati krivulju. Uzivo nije provjereno.
+Izvedeno 2026-11-06 (korisnik: "drzimo se ustaljenih tipova komandi: desni klik na liniju nivoa tona selektira liniju
+nivoa tona, klik postavlja playholder, linija playholdera je tocka koja se kontrolira; desni klik = Ctrl+"): korak 2
+krivulje razine (docs/98 2.1), uredivanje na Wrap retku. Nova kocka `crates/qnc-level-curve` (+ ugovor
+`contracts/modules/level-curve.module.json`): uzeta krivulja jednog segmenta (A1) ili pokrivalice (A2), preslikavanje
+slike price i slike klipa (`Span`, i 2:1), tocka na liniji playheada (`nudge` za 1 dB, nastaje ako je nema; `remove_at`),
+nacrt i krivulja za upis (`keep`), krivulja na osi price za crtanje (`place`, `Placed::within`). `qnc-program-view`:
+`SegmentRow.level_keys`, `CoverSpan.level_keys`, `SegmentsView.level_line`, `level_curves`, `level_item_at`.
+`qnc-timeline` (`level_lines.rs`, `TimelineLevelCurve`, `TimelineInput.level_curves`, `TimelineTheme.level_curve`):
+krivulja se crta u pojasu A1/A2 Wrap retka (0 dB na sedam desetina visine, -60 dB dno, +12 dB vrh), tocke kao
+kvadratici, uzeta krivulja zuta s kruzicem na tocki playheada; desni klik do 4 piksela od linije je
+`TakeLevelLine` (prije zvuka segmenta ili pokrivalice). Mapa misa (zakljucana, prosirena uz odluku korisnika):
+`right_click_level_a1` / `right_click_level_a2` -> `select_level_a1` / `select_level_a2` (`qnc-mouse-map`
+`RightClickLevelA1/A2`). Katalog: `select_level_a1` Ctrl+Shift+1, `select_level_a2` Ctrl+Shift+2 (QNC preset,
+storyboard; Ctrl+Alt bi na hrvatskoj tipkovnici bio AltGr). `qnc-program-commands` `TakeLevelLine`;
+`qnc-program-segments` (`level_line.rs`, `Take::LevelLine`: dok je uzeta nista drugo se ne uzima; Enter je pise
+`SetLevelKeys`, jedan korak Undo); `qnc-segments-keys` `level` (gore/dolje, Ctrl+strelice i Ctrl+kotacic 1 dB,
+Delete brise tocku na playheadu, Esc odustaje; strelice lijevo/desno i kotacic pomicu playhead) i
+`keep_level_on_click` (lijevi klik na Wrap retku sprema krivulju i ostavlja je uzetom, playhead ide na klik: sljedeca
+tocka); svaka promjena se odmah cuje (`SoundDraft.levels`, program se otvara s nacrtom). `qnc-panel-focus` (Ctrl+Shift+1/2
+s bilo kojeg panela prebacuje na Segmente). Nije izvedeno: val Wrap reda jos ne prati krivulju; krivulja u zoomu reza;
+Ton A2 u Off i slozena izjava bez krivulje. Uzivo nije provjereno.
+Izvedeno 2026-11-06 (korisnik: "provjeri konzistentnost komandi i sredi sortkat key-map help"): novi alat
+`crates/qnc-keyboard-shortcut/examples/audit.rs` (samo citanje kataloga: ista tipka na dvije radnje u scopeu, radnje s
+tipkom koje pomoc F1 ne pokazuje, radnje u pomoci bez tipke). Nalaz u QNC presetu: 13 radnji s tipkom bez mjesta u pomoci,
+3 u pomoci bez tipke, zastarjelo pravilo "Rez M markera" (Ctrl+Shift+J uklonjen 29. 10., Ctrl+2 uzima obje strane tona
+od 29. 10.). Pomoc (`help` u `contracts/qnc-keyboard-shortcuts.json`): pravilo "Rez M markera" prema danasnjem
+postupku, nova pravila "Krivulja razine" i "J / K / L", "Strelice" s kljucnom slikom dok je rez uzet, dijakritike;
+grupe: Reprodukcija (J, K, L, Shift+K, F), Audio (krivulja razine, N), Segmenti (Ctrl+Shift+S slip, Ctrl+E zoom,
+Ctrl+Delete), Opcenito (S snapping); uklonjeni `delete_part` (nema tipku od 21. 10.), tabovi SubSegment i Voice (bez
+tipke). Ostaje: Enter i Esc su u pravilima; Shift+W (`toggle_source_wrap`) je u katalogu iz v4, ali ga nijedna kocka ne
+obraduje (mrtva tipka); u scopeu `project` Enter je i `form_next_field` i `project_open_selected` (namjerno: polje
+obrasca), u `timeline_modal` Esc i `clear_focus` i `close_player`. Oznake radnji u katalogu ostaju kao u v4 (conformance).
+Testovi `qnc-keyboard-shortcut`, `qnc-key-cheatsheet`, `qnc-panel-focus`, conformance, `cargo check --workspace
+--all-targets`.

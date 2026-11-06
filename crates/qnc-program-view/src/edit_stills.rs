@@ -249,6 +249,7 @@ mod tests {
             duration_color_key: "under_3",
             selected: false,
             lead: false,
+            level_keys: Vec::new(),
         };
         let slot = |id: &str, start, end| Slot { slot_id: id.into(), start_frame: start, end_frame: end, has_cover: id == "s2", selected: false };
         let slots = vec![slot("s1", 0, 15), slot("s2", 15, 33), slot("s3", 33, 40)];
@@ -266,6 +267,7 @@ mod tests {
                 a2_source_channel: 1,
                 a2_level_db: 0,
                 a2_off: false,
+                level_keys: Vec::new(),
             }],
             total_frames: 40,
             slots: slots.clone(),
@@ -345,6 +347,7 @@ fn clip_covers(view: &SegmentsView, slots: &[Slot]) -> Vec<CoverSpan> {
                 a2_source_channel: 0,
                 a2_level_db: 0,
                 a2_off: true,
+                level_keys: Vec::new(),
             })
         })
         .collect()

@@ -293,6 +293,9 @@
     "story.msg.lane_off": "{lane}: isključeno (razina 0), desno uključuje",
     "story.msg.lane_level": "{lane}: kanal {channel}, razina {level} dB",
     "story.msg.no_segment_at_playhead": "Pod Wrap playheadom nema segmenta.",
-    "story.msg.no_cover_at_playhead": "Pod Wrap playheadom nema pokrivalice."
+    "story.msg.no_cover_at_playhead": "Pod Wrap playheadom nema pokrivalice.",
+    "story.msg.level_line": "Krivulja razine {lane}: {level} dB na liniji playheada. Gore/dolje dB (tu nastaje točka), Delete briše točku, Enter sprema, Esc odustaje.",
+    "story.msg.level_point": "Krivulja razine {lane}: točka na liniji playheada, {level} dB. Gore/dolje dB, Delete je briše, Enter sprema, Esc odustaje.",
+    "story.msg.level_no_point": "Na liniji playheada nema točke razine."
   }
 }

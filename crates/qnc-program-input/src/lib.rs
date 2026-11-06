@@ -76,6 +76,9 @@ pub struct SoundDraft {
     /// Clips with the J and L of their A1 sound as drafted at a cut (user 2026-10-29), story
     /// frames; the others keep theirs.
     pub joins: Vec<(String, (i32, i32))>,
+    /// Segments or covers with their level curve as drafted on the Wrap row (docs/98 2.1);
+    /// the others keep theirs.
+    pub levels: Vec<(String, Vec<qnc_program_db::LevelKey>)>,
 }
 
 impl SoundDraft {
@@ -87,6 +90,14 @@ impl SoundDraft {
         } else {
             for cover in covers.iter_mut().filter(|cover| cover.cover_id == self.id) {
                 (cover.a2_source_channel, cover.a2_level_db, cover.a2_off) = (self.channel, self.level_db, self.off);
+            }
+        }
+        for (id, keys) in &self.levels {
+            for segment in segments.iter_mut().filter(|segment| &segment.segment_id == id) {
+                segment.level_keys.clone_from(keys);
+            }
+            for cover in covers.iter_mut().filter(|cover| &cover.cover_id == id) {
+                cover.level_keys.clone_from(keys);
             }
         }
         for (id, (lead, tail)) in &self.joins {

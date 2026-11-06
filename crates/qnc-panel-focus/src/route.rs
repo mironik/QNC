@@ -170,7 +170,9 @@ impl PanelFocus {
             // A left click while something is taken on a Wrap row keeps it (as Enter, without
             // walking on), then the playhead goes where it was clicked (user rule 2026-10-20).
             if event.action_id == "segments_keep_edit" {
-                let kept = qnc_segments_keys::confirm(preview, segments);
+                // A taken level curve is saved and stays taken: the playhead the click places is
+                // its next point (user 2026-11-06).
+                let kept = qnc_segments_keys::keep_level_on_click(preview, segments) || qnc_segments_keys::confirm(preview, segments);
                 let cued = event.unsigned().is_some_and(|frame| segments.apply(qnc_program_segments::SegmentCommand::Cue(frame)));
                 return Some(Some(kept || cued));
             }
@@ -244,6 +246,13 @@ impl PanelFocus {
         match action_id {
             // Monitor Auto | On under the monitor: whatever the focus.
             qnc_source_preview::MONITOR_AUTO | qnc_source_preview::MONITOR_ON => return Some(preview.set_monitor_mode(action_id)),
+            // The level curve of a segment or cover (docs/98 2.1): its line is on the segment panel.
+            "select_level_a1" | "select_level_a2" => {
+                self.panel = Panel::Segments;
+                if let ControlFlow::Break(answer) = qnc_segments_keys::level(action_id, (preview, wrap, segments)) {
+                    return answer;
+                }
+            }
             // A left click on the source timeline while IN/OUT is drawn taken keeps it (piece
             // `qnc-source-timeline`): never Enter, which walks the panels.
             qnc_source_timeline::KEEP_MARK => {
@@ -290,6 +299,9 @@ impl PanelFocus {
         // 2. The segment panel: the sound of the stored segment (A1) or cover (A2) under the
         // Wrap playhead (piece `qnc-segments-keys`).
         if on_segments {
+            if let ControlFlow::Break(answer) = qnc_segments_keys::level(action_id, (preview, wrap, segments)) {
+                return answer;
+            }
             if let ControlFlow::Break(answer) = qnc_segments_keys::overlap(action_id, (preview, wrap, segments)) {
                 return answer;
             }

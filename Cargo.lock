@@ -4859,6 +4859,13 @@ dependencies = [
 ]
 
 [[package]]
+name = "qnc-level-curve"
+version = "0.1.0"
+dependencies = [
+ "qnc-program-db",
+]
+
+[[package]]
 name = "qnc-level-meter"
 version = "0.1.0"
 dependencies = [
@@ -5703,6 +5710,7 @@ dependencies = [
  "qnc-export-launch",
  "qnc-image-assets",
  "qnc-lane-choice",
+ "qnc-level-curve",
  "qnc-part-sound",
  "qnc-prerender-launch",
  "qnc-program-commands",
@@ -5727,6 +5735,7 @@ dependencies = [
  "qnc-alert",
  "qnc-export-choice",
  "qnc-image-assets",
+ "qnc-level-curve",
  "qnc-program-commands",
  "qnc-program-db",
  "qnc-program-filmstrip",

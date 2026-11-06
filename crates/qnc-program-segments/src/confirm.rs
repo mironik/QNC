@@ -36,6 +36,7 @@ impl ProgramSegments {
     /// Ctrl+S or the slot edge taken with Ctrl+I/O.
     pub fn confirm_program(&mut self) -> bool {
         self.commit_part_sound()
+            || self.commit_level_line(false)
             || self.commit_slip()
             || self.commit_marker_edit()
             || self.commit_slot_move()
@@ -132,6 +133,9 @@ impl ProgramSegments {
         if let Some((part, _)) = self.part_sound.taken() {
             return Some(Take::Sound(part.lane, part.id.clone()));
         }
+        if let Some(line) = &self.level_line {
+            return Some(Take::LevelLine(line.lane, line.id.clone()));
+        }
         self.cover_taken.clone().map(Take::Cover)
     }
 
@@ -185,6 +189,7 @@ impl ProgramSegments {
         self.slot_move = None;
         self.marker_edit = None;
         self.cover_taken = None;
+        self.level_line = None;
         if !keep_sound && self.part_sound.release() {
             self.sound_dropped = true;
         }
@@ -198,7 +203,7 @@ impl ProgramSegments {
 
     pub fn leave_panel(&mut self) -> bool {
         let taken = self.slot_trim.take().is_some() | self.slot_move.take().is_some();
-        let taken = taken | self.marker_edit.take().is_some() | self.cover_taken.take().is_some();
+        let taken = taken | self.marker_edit.take().is_some() | self.cover_taken.take().is_some() | self.level_line.take().is_some();
         if taken {
             self.refresh_view(qnc_ui_text::text("story.msg.panel_left_edit_dropped").into());
         }
@@ -218,6 +223,8 @@ pub(crate) enum Take {
     /// A lane (0 = A1 of a segment, 1 = A2 of a cover) and its part.
     Sound(u8, String),
     Cover(String),
+    /// The level curve of a segment (0, A1) or cover (1, A2) (docs/98 2.1).
+    LevelLine(u8, String),
 }
 
 impl Take {
@@ -231,6 +238,7 @@ impl Take {
             Self::SlotEdge(..) => "story.take.slot_edge",
             Self::Sound(..) => "story.take.sound",
             Self::Cover(_) => "story.take.cover",
+            Self::LevelLine(..) => "story.take.level_line",
         }
     }
 }

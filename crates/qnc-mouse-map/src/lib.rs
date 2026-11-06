@@ -58,6 +58,10 @@ pub enum Pointer {
     RightClickMarkerA2,
     /// A second right click over the picture near the taken M marker: its picture alone.
     RightClickTakenMarker,
+    /// A right click on the level curve on A1 or A2 (docs/98 2.1, user 2026-11-06): the curve
+    /// taken, as Ctrl+Shift+1/2.
+    RightClickLevelA1,
+    RightClickLevelA2,
     DragIn,
     DragOut,
     DragMarker,
@@ -73,7 +77,7 @@ pub enum Pointer {
 }
 
 impl Pointer {
-    pub const ALL: [Pointer; 34] = [
+    pub const ALL: [Pointer; 36] = [
         Self::Click,
         Self::ClickHolding,
         Self::ClickStrip,
@@ -98,6 +102,8 @@ impl Pointer {
         Self::RightClickA2,
         Self::RightClickMarkerA2,
         Self::RightClickTakenMarker,
+        Self::RightClickLevelA1,
+        Self::RightClickLevelA2,
         Self::DragIn,
         Self::DragOut,
         Self::DragMarker,
@@ -137,6 +143,8 @@ impl Pointer {
             Self::RightClickA2 => "right_click_a2",
             Self::RightClickMarkerA2 => "right_click_marker_a2",
             Self::RightClickTakenMarker => "right_click_taken_marker",
+            Self::RightClickLevelA1 => "right_click_level_a1",
+            Self::RightClickLevelA2 => "right_click_level_a2",
             Self::DragIn => "drag_in",
             Self::DragOut => "drag_out",
             Self::DragMarker => "drag_marker",

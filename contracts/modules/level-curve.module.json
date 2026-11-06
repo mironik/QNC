@@ -1,0 +1,20 @@
+{
+  "module_id": "qnc.module.level-curve",
+  "module_name": "Level curve",
+  "module_version": "0.1.0",
+  "module_kind": "library",
+  "capabilities": ["story.program.level_curve"],
+  "input_contract_version": "0.1.0",
+  "output_contract_version": "0.1.0",
+  "supported_os": ["windows", "linux", "macos"],
+  "supported_cpu": ["x86_64", "aarch64"],
+  "transport_protocol_version": "0.1.0",
+  "forbidden_calls": ["ffprobe", "media.decode", "database.read", "database.write", "player.command", "business.workflow"],
+  "forbidden_dependencies": ["qnc.module.media-probe", "qnc.module.content-store"],
+  "state_policy": "owned_by_calling_application",
+  "database_write_policy": "no_db_writes",
+  "runtime_crate": "qnc-level-curve",
+  "input": "A stored segment (A1) or cover (A2): its id, where it lies on the program and which frames of its clip it plays there, and its level points (frames of its clip, tenths of a dB); the playhead line and the keys that raise, lower or remove its point.",
+  "output": "The taken curve and its draft placed on the program for drawing; on Enter the whole curve for the story database's writer (SetLevelKeys).",
+  "specification": "docs/98 2.1, user 2026-11-06: a right click on the level line takes it (as Ctrl+), a click places the playhead, and the line of the playhead is the point that is controlled. Between two points the level goes in a line of dB, before the first and after the last it stays theirs."
+}

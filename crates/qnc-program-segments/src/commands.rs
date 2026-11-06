@@ -211,6 +211,9 @@ impl ProgramSegments {
             SegmentCommand::TakeSound { lane, frame } => {
                 self.take_part_sound(lane, frame);
             }
+            SegmentCommand::TakeLevelLine { lane, frame } => {
+                self.take_level_line(lane, frame);
+            }
             // The channel picked by mouse is the segment panel keys' (piece `qnc-segments-keys`:
             // the draft is heard at once); nothing to do here.
             SegmentCommand::PickChannel { .. } => return false,

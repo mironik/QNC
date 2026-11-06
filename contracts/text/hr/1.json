@@ -228,6 +228,7 @@
     "story.take.slot_edge": "Uzeti rub slota",
     "story.take.sound": "Uzeti ton",
     "story.take.cover": "Uzeta pokrivalica",
+    "story.take.level_line": "Uzeta krivulja razine",
     "story.take.overlap": "Uzeti J ili L pokrivalice",
     "story.msg.slot_taken": "Slot: strelice lijevo/desno ga pomiču, Enter potvrđuje, Esc odustaje",
     "story.msg.slot_move_cancelled": "Pomicanje slota otkazano.",

@@ -41,6 +41,8 @@ pub struct SegmentRow {
     /// The automatic lead-in or lead-out (user 2026-10-24): shown glued to the first or last
     /// segment of the user, never edited.
     pub lead: bool,
+    /// The level curve of its A1 (docs/98 2.1), points on frames of its clip.
+    pub level_keys: Vec<qnc_program_db::LevelKey>,
 }
 
 impl SegmentRow {
@@ -75,6 +77,19 @@ pub struct CoverSpan {
     pub a2_source_channel: u16,
     pub a2_level_db: i8,
     pub a2_off: bool,
+    /// The level curve of its A2 (docs/98 2.1), points on frames of its clip.
+    pub level_keys: Vec<qnc_program_db::LevelKey>,
+}
+
+/// The level curve of one segment (lane 0, its A1) or cover (lane 1, its A2) on the program.
+#[derive(Debug, Clone, PartialEq)]
+pub struct LevelCurve {
+    pub lane: u8,
+    pub id: String,
+    pub span: qnc_level_curve::Span,
+    pub placed: qnc_level_curve::Placed,
+    /// It is the taken one (drawn as drafted).
+    pub taken: bool,
 }
 
 /// A segment's A1 or a cover's A2 taken on the Wrap row: its id, the draft channel, the
@@ -281,6 +296,9 @@ pub struct SegmentsView {
     /// The sound of a stored segment (A1) or cover (A2) taken on the Wrap row and its
     /// draft (user 2026-10-16).
     pub part_sound: Option<PartSoundView>,
+    /// The level curve taken on the Wrap row (docs/98 2.1): its lane (0 A1, 1 A2), its item and
+    /// its draft; the line of the playhead is its point.
+    pub level_line: Option<(u8, String, Vec<qnc_program_db::LevelKey>)>,
     /// The last Cover slot (`false`) or Overwrite (`true`) and when it was asked for,
     /// by click or key: its button flashes for a moment (user 2026-10-13).
     pub cover_pressed: Option<(bool, std::time::Instant)>,
@@ -304,6 +322,45 @@ impl SegmentsView {
 
 
     /// Where each clip sounds in the program: segments on A1, covers on A2.
+    /// Every level curve on the program (docs/98 2.1): segments on A1, covers on A2, the
+    /// taken one as drafted; an item without points has none.
+    pub fn level_curves(&self) -> Vec<LevelCurve> {
+        let taken = |lane: u8, id: &str| self.level_line.as_ref().filter(|(at, taken, _)| *at == lane && taken == id).map(|(_, _, keys)| keys);
+        let curve = |lane: u8, id: &str, span: qnc_level_curve::Span, keys: &[qnc_program_db::LevelKey]| {
+            let drafted = taken(lane, id);
+            let keys = drafted.map_or(keys, Vec::as_slice);
+            (drafted.is_some() || !keys.is_empty()).then(|| LevelCurve {
+                lane,
+                id: id.to_string(),
+                span,
+                placed: qnc_level_curve::place(span, keys),
+                taken: drafted.is_some(),
+            })
+        };
+        let segments = self.rows.iter().filter(|row| !row.lead).filter_map(|row| {
+            let span = qnc_level_curve::Span { start: row.start_frame, end: row.end_frame, source_in: row.source_in_frame, source_out: row.source_out_frame };
+            curve(0, &row.segment_id, span, &row.level_keys)
+        });
+        let covers = self.covers.iter().filter_map(|cover| {
+            let span = qnc_level_curve::Span { start: cover.start_frame, end: cover.end_frame, source_in: cover.source_in_frame, source_out: cover.source_out_frame };
+            curve(1, &cover.cover_id, span, &cover.level_keys)
+        });
+        segments.chain(covers).collect()
+    }
+
+    /// The segment (lane 0) or cover (lane 1) whose level line is at program frame `frame`:
+    /// its id, its span and its stored points.
+    pub fn level_item_at(&self, lane: u8, frame: u64) -> Option<(String, qnc_level_curve::Span, Vec<qnc_program_db::LevelKey>)> {
+        if lane == 0 {
+            let row = self.user_segment_at(frame)?;
+            let span = qnc_level_curve::Span { start: row.start_frame, end: row.end_frame, source_in: row.source_in_frame, source_out: row.source_out_frame };
+            return Some((row.segment_id.clone(), span, row.level_keys.clone()));
+        }
+        let cover = self.covers.iter().find(|cover| cover.start_frame <= frame && frame < cover.end_frame)?;
+        let span = qnc_level_curve::Span { start: cover.start_frame, end: cover.end_frame, source_in: cover.source_in_frame, source_out: cover.source_out_frame };
+        Some((cover.cover_id.clone(), span, cover.level_keys.clone()))
+    }
+
     pub fn wave_placements(&self) -> (Vec<qnc_program_waveform::Placement>, Vec<qnc_program_waveform::Placement>) {
         let segments = self.rows.iter().map(|row| qnc_program_waveform::Placement {
             clip_id: row.clip_id.clone(),

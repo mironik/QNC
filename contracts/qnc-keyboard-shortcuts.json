@@ -367,6 +367,12 @@
     "lane_level_up": {
       "label": "Uzeta traka A1/A2: razina 1 dB vise"
     },
+    "select_level_a1": {
+      "label": "Uzmi krivulju razine A1 segmenta (desni klik na liniju): gore/dolje razina tocke na playheadu, Delete je brise, Enter sprema"
+    },
+    "select_level_a2": {
+      "label": "Uzmi krivulju razine A2 pokrivalice (desni klik na liniju): gore/dolje razina tocke na playheadu, Delete je brise, Enter sprema"
+    },
     "select_current_marker_slot": {
       "label": "Selektiraj M–M slot pod playheadom"
     },
@@ -681,13 +687,15 @@
       { "keys": "Lijevi klik mišem", "meaning": "Postavlja playhead. Na traci u boji pokrivalice bira slot. Ako je nešto uzeto, klik ga najprije sprema (kao Enter), pa postavlja playhead." },
       { "keys": "Desni klik mišem", "meaning": "Isto kao Ctrl + tipka: uzima ono na što pokazuješ: bliži IN ili OUT, najbliži M marker (M je OUT i IN u jednoj oznaci; početni i završni se ne uzimaju), slot na traci u boji, A1/A2. Playhead ide na uzeto. Kotačić ili strelice mijenjaju uzeto, Enter ili lijevi klik sprema, Esc odustaje." },
       { "keys": "Povlačenje mišem", "meaning": "Vuče samo ono što je uzeto (desnim klikom ili Ctrl + tipkom)." },
-      { "keys": "Rez M markera", "meaning": "Ctrl+M (ili desni klik) uzme najblizi marker: strelice i kotacic pomicu cijeli rez. Dok je uzet: Ctrl+I ili Ctrl+O pomice samo sliku (ton ostaje), Ctrl+2 samo ton A2 (ranije J, kasnije L), Ctrl+M opet cijeli rez. Samo slika ili samo ton rade u uvecanom slotu; tamo drugi desni klik na uzeti marker iznad slike uzme sliku reza, iznad A2 njegov ton. Na Wrap retku marker se uvijek pomice cijeli. Ctrl+Shift+J: slika govornika (Ton segment) prije njegova tona. Odmah se cuje i vidi, Enter sprema, Esc odustaje." },
-      { "keys": "Dvoklik", "meaning": "Na A1 segmenta u Wrap retku: otvara segment na source timelineu (Edit). Na slici ili A2: uvecava slot na mjestu source timelinea (Ctrl+E), Esc zatvara." },
+      { "keys": "Rez M markera", "meaning": "Ctrl+M (ili desni klik) uzima najbliži marker: strelice i kotačić pomiču cijeli rez. U uvećanom slotu (dvoklik ili Ctrl+E), dok je rez uzet: Ctrl+I ili Ctrl+O pomiče samo sliku (ton ostaje), Ctrl+1 ili Ctrl+2 uzima ton A1 ili A2 reza; s uzetim tonom Ctrl+I je J (ton poslije reza počinje ranije), Ctrl+O je L (ton prije reza traje dulje), Ctrl+1 ili Ctrl+2 opet obje strane. Na Wrap retku marker se uvijek pomiče cijeli. Odmah se čuje i vidi, Enter sprema, Esc odustaje." },
+      { "keys": "Krivulja razine", "meaning": "Desni klik na liniju razine A1 ili A2 u Wrap retku (ili Ctrl+Shift+1 / Ctrl+Shift+2) uzima krivulju razine tog segmenta ili pokrivalice. Klik postavlja playhead i sprema; točka na liniji playheada je ona koja se kontrolira: gore/dolje, Ctrl+strelice ili Ctrl+kotačić za 1 dB (točka nastaje ako je nema), Delete je briše. Odmah se čuje, Enter sprema, Esc odustaje." },
+      { "keys": "Dvoklik", "meaning": "Na A1 segmenta u Wrap retku: otvara segment na source timelineu (Edit). Na slici ili A2: uvećava slot na mjestu source timelinea (Ctrl+E), Esc zatvara." },
       { "keys": "Shift + lijevi klik", "meaning": "Kao Shift + M: dodaje M marker na mjesto klika." },
       { "keys": "Srednja tipka / kotačić", "meaning": "Srednja tipka reže (IN i OUT na source timelineu, M marker u segmentima). Kotačić je kao strelice lijevo/desno, Ctrl + kotačić kao Ctrl + strelice." },
       { "keys": "Shift + tipka", "meaning": "Dodaje nešto novo (segment, marker u nastavku, pokrivalica, IN i OUT po trajanju slota)." },
       { "keys": "Alt + strelice", "meaning": "Skače po objektima: marker, slot, segment; na source timelineu početak, IN, OUT." },
-      { "keys": "Strelice", "meaning": "Lijevo/desno za jedan frame, a kad je nešto uzeto mijenjaju to; gore/dolje prethodni ili sljedeći blok." },
+      { "keys": "Strelice", "meaning": "Lijevo/desno za jedan frame, a kad je nešto uzeto mijenjaju to; gore/dolje prethodni ili sljedeći blok, a dok je rez uzet skok na prethodnu ili sljedeću ključnu sliku." },
+      { "keys": "J / K / L", "meaning": "J unazad, L naprijed (ponovno 2x, 4x, 8x), K stani. Shift+K: play oko uzetog reza ukrug; K tada zaustavlja i uzeti rub ide na playhead." },
       { "keys": "Enter", "meaning": "Potvrda, uvijek u panelu u fokusu." },
       { "keys": "Esc", "meaning": "Odustani od onoga što nije zapisano, jedno po pritisku: pusti uzeto, odbaci nacrt Synca, zatvori uređivanje segmenta, zatvori uvećani slot." },
       { "keys": "Delete", "meaning": "Briše objekt, jedan po pritisku, samo ono uzeto (Ctrl ili desni klik): uzeti M marker, uzeti B-roll ili B-roll odabranog slota. Ctrl+Delete trajno briše isključeni segment." },
@@ -695,14 +703,14 @@
       { "keys": "Tab / klik", "meaning": "Tipke djeluju samo na panel u fokusu; Tab ili klik mijenja panel." }
     ],
     "groups": [
-      { "title": "Reprodukcija i playhead", "actions": ["play_pause", "step_back_frame", "step_forward_frame", "playlist_input_start", "go_to_mark_in"] },
+      { "title": "Reprodukcija i playhead", "actions": ["play_pause", "shuttle_back", "shuttle_stop", "shuttle_forward", "trim_play_around", "step_back_frame", "step_forward_frame", "playlist_input_start", "go_to_mark_in", "match_frame"] },
       { "title": "IN / OUT", "actions": ["mark_in", "mark_out", "select_mark_in", "select_mark_out", "mark_in_fit_duration", "save_virtual_shot"] },
-      { "title": "Audio A1 / A2", "actions": ["select_audio_a1", "select_audio_a2", "lane_level_down", "lane_level_up"] },
-      { "title": "Segmenti", "actions": ["add_ton_segment", "add_off_segment", "step_prev_part", "step_next_part", "select_segment_start", "select_segment_end", "delete_part"] },
+      { "title": "Audio A1 / A2", "actions": ["select_audio_a1", "select_audio_a2", "lane_level_down", "lane_level_up", "select_level_a1", "select_level_a2", "toggle_loudness_normalize"] },
+      { "title": "Segmenti", "actions": ["add_ton_segment", "add_off_segment", "step_prev_part", "step_next_part", "select_segment_start", "select_segment_end", "select_slip", "wrap_zoom", "segment_purge"] },
       { "title": "Markeri i slotovi", "actions": ["add_marker", "add_marker_continue", "select_marker", "delete_marker", "select_current_marker_slot", "select_mark_in", "select_mark_out", "navigate_prev_object", "navigate_next_object"] },
       { "title": "Pokrivalice", "actions": ["quick_overwrite_cover", "overwrite_cover", "cover_mode_covers", "cover_mode_sync"] },
-      { "title": "Pool i tabovi", "actions": ["save_virtual_shot", "page_prev", "page_next", "toggle_focused_item", "editorial_tab_all", "editorial_tab_virtual", "editorial_tab_broll", "editorial_tab_segment", "editorial_tab_transcript", "editorial_tab_subsegment", "editorial_tab_voice"] },
-      { "title": "Općenito", "actions": ["undo_object", "redo_object", "undo_selected", "redo_selected", "focus_next", "focus_prev", "toggle_cheatsheet"] }
+      { "title": "Pool i tabovi", "actions": ["save_virtual_shot", "page_prev", "page_next", "toggle_focused_item", "editorial_tab_all", "editorial_tab_virtual", "editorial_tab_broll", "editorial_tab_segment", "editorial_tab_transcript"] },
+      { "title": "Općenito", "actions": ["undo_object", "redo_object", "undo_selected", "redo_selected", "toggle_snapping", "focus_next", "focus_prev", "toggle_cheatsheet"] }
     ]
   },
   "presets": {
@@ -1030,6 +1038,8 @@
         ],
         "select_audio_a1": [{ "code": "Digit1", "ctrl": true, "shift": false }],
         "select_audio_a2": [{ "code": "Digit2", "ctrl": true, "shift": false }],
+        "select_level_a1": [{ "code": "Digit1", "ctrl": true, "shift": true }],
+        "select_level_a2": [{ "code": "Digit2", "ctrl": true, "shift": true }],
         "lane_level_down": [{ "code": "ArrowLeft", "key": "ArrowLeft", "ctrl": true, "shift": false }],
         "lane_level_up": [{ "code": "ArrowRight", "key": "ArrowRight", "ctrl": true, "shift": false }],
         "focus_next": [
