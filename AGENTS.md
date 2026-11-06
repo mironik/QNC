@@ -8147,3 +8147,8 @@ ne dira. Poruke: pomocnik iskljucen, nema prijedloga, zadrzano n dijelova (rjecn
 F1 grupa Audio, `qnc-program-commands` `KeepSoundAssist`. Testovi `qnc-program-db` (60), `qnc-program-segments` (75),
 `qnc-program-commands`, `qnc-panel-focus`, `qnc-keyboard-shortcut`, `qnc-ui-text`, conformance, `cargo check --workspace
 --all-targets`. Uzivo nije provjereno.
+Izvedeno 2026-11-06 (korisnik: "dodaj dugme za zadrzavanje pokraj AI"): u traci razine (`qnc-level-bar`) desno od AI je
+dugme ZADRZI / KEEP (radnja `sound_assist_keep`, isto sto Ctrl+Shift+N); moze se pritisnuti samo dok je pomocnik ukljucen
+(inace sivo). Sirina trake ostaje 240 px, mjerac je uzi. Rjecnik `story.ui.sound_assist_keep`, `_keep_hint`. Testovi
+`qnc-level-bar`, `qnc-ui-text`, `qnc-source-timeline`, conformance, `cargo check --workspace --all-targets`. Uzivo nije
+provjereno.

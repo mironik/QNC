@@ -289,6 +289,8 @@
     "story.ui.normalized": "NORM",
     "story.ui.normalize_hint": "Glasnoća A1 i A2 svake pokrivalice na ciljeve projekta (EBU R 128), kako je daje export; upaljeno: uključeno (N)",
     "story.ui.sound_assist": "AI",
+    "story.ui.sound_assist_keep": "ZADRŽI",
+    "story.ui.sound_assist_keep_hint": "Zadrži prijedlog pomoćnika tona kao svoje krivulje razine, jedan korak Undo (Ctrl+Shift+N); samo dok je pomoćnik uključen.",
     "story.ui.sound_assist_hint": "Pomoćnik tona: pokrivalice stišane pod govorom, govor izjednačen između segmenata, kako ga daje export; upaljeno: uključeno (Shift+N). Dio s vlastitom krivuljom razine ostaje kakav jest.",
     "story.msg.sound_assist_on": "Pomoćnik tona uključen: pokrivalice stišane pod govorom, govor izjednačen (Shift+N isključuje, Ctrl+Shift+N zadržava prijedlog kao tvoje krivulje).",
     "story.msg.sound_assist_off": "Pomoćnik tona isključen: ton kako je montiran (Shift+N uključuje).",

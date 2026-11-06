@@ -13,29 +13,36 @@ pub const VERSION: &str = env!("CARGO_PKG_VERSION");
 /// The bar's size (as on the Segments bar: the width of its seven middle buttons).
 pub const WIDTH: f32 = 240.0;
 pub const HEIGHT: f32 = 22.0;
-/// The width of NORM, of the sound assistant's AI and the gap before each.
+/// The width of NORM, of the sound assistant's AI, of its Keep and the gap before each.
 const NORM_W: f32 = 52.0;
 const AI_W: f32 = 34.0;
+const KEEP_W: f32 = 58.0;
 const GAP: f32 = 6.0;
 
 /// The catalog action of a click on NORM (the N key).
 pub const NORMALIZE: &str = "toggle_loudness_normalize";
 /// The catalog action of a click on AI (the sound assistant on or off, user 2026-11-06).
 pub const SOUND_ASSIST: &str = "toggle_sound_assist";
+/// The catalog action of a click on Keep (the assistant's proposal kept as the user's curves).
+pub const SOUND_ASSIST_KEEP: &str = "sound_assist_keep";
 
 /// The bar centred in `row`; `normalize` is NORM's state (`None`: the form has no story to
-/// normalise, NORM is shown but off), `assist` the sound assistant's (AI) the same. The action
-/// of the button clicked, if one was.
+/// normalise, NORM is shown but off), `assist` the sound assistant's (AI) the same; Keep, right
+/// of AI, is there to press only while the assistant is on. The action of the button clicked.
+
 pub fn show(ui: &mut Ui, row: Rect, levels: [Option<f32>; 2], (normalize, assist): (Option<bool>, Option<bool>), theme: &qnc_timeline::TimelineTheme) -> Option<&'static str> {
     let rect = Rect::from_center_size(row.center(), Vec2::new(WIDTH, HEIGHT));
-    let ai = Rect::from_min_max(Pos2::new(rect.max.x - AI_W, rect.min.y), rect.max);
+    let keep = Rect::from_min_max(Pos2::new(rect.max.x - KEEP_W, rect.min.y), rect.max);
+    let ai = Rect::from_min_max(Pos2::new(keep.min.x - GAP - AI_W, rect.min.y), Pos2::new(keep.min.x - GAP, rect.max.y));
     let norm = Rect::from_min_max(Pos2::new(ai.min.x - GAP - NORM_W, rect.min.y), Pos2::new(ai.min.x - GAP, rect.max.y));
     let meter = Rect::from_min_max(rect.min, Pos2::new(norm.min.x - GAP, rect.max.y));
     let style = qnc_level_meter::MeterStyle { background: theme.background, border: theme.border, text: theme.muted };
     qnc_level_meter::show(ui, ui.make_persistent_id("qnc_level_bar_meter"), meter.shrink2(Vec2::new(0.0, 1.0)), &[("A1", levels[0]), ("A2", levels[1])], style);
     let norm_clicked = toggle(ui, norm, ("story.ui.normalized", "story.ui.normalize_hint"), normalize, theme);
     let ai_clicked = toggle(ui, ai, ("story.ui.sound_assist", "story.ui.sound_assist_hint"), assist, theme);
-    norm_clicked.then_some(NORMALIZE).or(ai_clicked.then_some(SOUND_ASSIST))
+    let keep_state = assist.filter(|on| *on).map(|_| false);
+    let keep_clicked = toggle(ui, keep, ("story.ui.sound_assist_keep", "story.ui.sound_assist_keep_hint"), keep_state, theme);
+    norm_clicked.then_some(NORMALIZE).or(ai_clicked.then_some(SOUND_ASSIST)).or(keep_clicked.then_some(SOUND_ASSIST_KEEP))
 }
 
 /// One on/off button of the bar (`None`: shown but off); true when clicked.

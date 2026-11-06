@@ -1239,6 +1239,8 @@
     "story.ui.normalized": "NORM",
     "story.ui.normalize_hint": "Loudness of A1 and every cover's A2 to the project's targets (EBU R 128), as the export gives it; lit: on (N)",
     "story.ui.sound_assist": "AI",
+    "story.ui.sound_assist_keep": "KEEP",
+    "story.ui.sound_assist_keep_hint": "Keep the sound assistant's proposal as your level curves, one Undo step (Ctrl+Shift+N); only while the assistant is on.",
     "story.ui.sound_assist_hint": "Sound assistant: covers ducked under speech, speech evened out between segments, as the export gives it; lit: on (Shift+N). A part with a level curve of its own is left alone.",
     "story.msg.sound_assist_on": "Sound assistant on: covers ducked under speech, speech evened out (Shift+N turns it off, Ctrl+Shift+N keeps its proposal as your curves).",
     "story.msg.sound_assist_off": "Sound assistant off: the sound as edited (Shift+N turns it on).",
