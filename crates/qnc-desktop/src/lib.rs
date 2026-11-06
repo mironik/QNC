@@ -343,7 +343,7 @@ impl QncShell {
 
     /// The shell palette of the chosen theme.
     fn palette(&self) -> Palette {
-        self.theme_id.palette(contract_palette(&self.layout.colors))
+        qnc_theme_styles::shell_palette(self.theme_id, contract_palette(&self.layout.colors))
     }
 
     /// What the footer place of the desktop frame shows this frame.
@@ -523,19 +523,15 @@ pub fn apply_visuals(ctx: &egui::Context, shell: &ShellLayoutContract) {
 /// The palette of the shell layout contract (the Dark theme).
 fn contract_palette(colors: &ThemeColors) -> Palette {
     Palette {
-        bg: rgb(colors.bg),
-        surface: rgb(colors.surface),
-        raised: rgb(colors.raised),
-        border: rgb(colors.border),
-        text: rgb(colors.text),
-        muted: rgb(colors.muted),
-        accent: rgb(colors.accent),
-        focus: rgb(colors.focus),
+        bg: qnc_desktop_theme::rgb(colors.bg),
+        surface: qnc_desktop_theme::rgb(colors.surface),
+        raised: qnc_desktop_theme::rgb(colors.raised),
+        border: qnc_desktop_theme::rgb(colors.border),
+        text: qnc_desktop_theme::rgb(colors.text),
+        muted: qnc_desktop_theme::rgb(colors.muted),
+        accent: qnc_desktop_theme::rgb(colors.accent),
+        focus: qnc_desktop_theme::rgb(colors.focus),
     }
-}
-
-fn rgb(value: [u8; 3]) -> Color32 {
-    Color32::from_rgb(value[0], value[1], value[2])
 }
 
 /// The QNC root of the shell (`qnc-dev-diagnostics` holds the one rule).

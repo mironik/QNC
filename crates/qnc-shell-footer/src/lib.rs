@@ -37,32 +37,6 @@ impl ThemeId {
         }
     }
 
-    /// The palette of this theme; Dark is the one of the shell contract.
-    pub fn palette(self, contract: Palette) -> Palette {
-        match self {
-            ThemeId::Dark => contract,
-            ThemeId::Soft => Palette {
-                bg: Color32::from_rgb(22, 27, 38),
-                surface: Color32::from_rgb(32, 40, 56),
-                raised: Color32::from_rgb(45, 55, 74),
-                border: Color32::from_rgb(75, 88, 110),
-                text: Color32::from_rgb(236, 239, 244),
-                muted: Color32::from_rgb(168, 178, 194),
-                accent: Color32::from_rgb(52, 199, 148),
-                focus: Color32::from_rgb(255, 196, 90),
-            },
-            ThemeId::HighContrast => Palette {
-                bg: Color32::BLACK,
-                surface: Color32::from_rgb(18, 18, 18),
-                raised: Color32::from_rgb(36, 36, 36),
-                border: Color32::from_rgb(180, 180, 180),
-                text: Color32::WHITE,
-                muted: Color32::from_rgb(200, 200, 200),
-                accent: Color32::from_rgb(0, 255, 170),
-                focus: Color32::from_rgb(255, 200, 0),
-            },
-        }
-    }
 }
 
 /// Measures from the shell layout contract.
@@ -144,12 +118,12 @@ pub fn show(
             cols[2].with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
                 ui.set_min_height(h);
                 if input.project_open {
-                    let close_button = egui::Button::new(
+                    let close_button = qnc_ui_kit::sized_button(
                         RichText::new(qnc_ui_text::text("shell.close_project"))
                             .size(style.font_ui)
                             .color(palette.text),
-                    )
-                    .min_size(Vec2::new(118.0, 24.0));
+                        Vec2::new(118.0, 24.0),
+                    );
                     if ui.add(close_button).on_hover_text(qnc_ui_text::text("shell.close_active_project")).clicked() {
                         intent = Some(FooterIntent::CloseProject);
                     }
@@ -157,8 +131,8 @@ pub fn show(
                 let text = RichText::new(input.status).size(style.font_ui);
                 let tone = match input.tone {
                     qnc_status_line::Tone::Plain => None,
-                    qnc_status_line::Tone::Alert => Some(Color32::from_rgb(239, 68, 68)),
-                    qnc_status_line::Tone::Done => Some(Color32::from_rgb(34, 197, 94)),
+                    qnc_status_line::Tone::Alert => Some(qnc_desktop_theme::danger()),
+                    qnc_status_line::Tone::Done => Some(qnc_desktop_theme::done()),
                 };
                 match input.link {
                     Some(link) => {

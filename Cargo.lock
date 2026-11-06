@@ -3888,6 +3888,7 @@ dependencies = [
  "qnc-board",
  "qnc-contracts",
  "qnc-desktop-tabs",
+ "qnc-desktop-theme",
  "qnc-dev-diagnostics",
  "qnc-program-output",
  "qnc-project-close",
@@ -3895,6 +3896,7 @@ dependencies = [
  "qnc-shell-desktop-api",
  "qnc-shell-footer",
  "qnc-status-line",
+ "qnc-theme-styles",
  "qnc-ui-text",
  "rusqlite",
  "serde",
@@ -6266,7 +6268,9 @@ name = "qnc-shell-footer"
 version = "0.1.0"
 dependencies = [
  "eframe",
+ "qnc-desktop-theme",
  "qnc-status-line",
+ "qnc-ui-kit",
  "qnc-ui-text",
 ]
 
@@ -6755,6 +6759,7 @@ dependencies = [
  "qnc-media-card",
  "qnc-media-pool-head",
  "qnc-monitor",
+ "qnc-shell-footer",
  "qnc-source-dock",
  "qnc-timeline",
  "qnc-ui-kit",

@@ -64,6 +64,11 @@ pub fn danger() -> Color32 {
     Color32::from_rgb(239, 68, 68)
 }
 
+/// The colour of a status line that says work is done (an export written).
+pub fn done() -> Color32 {
+    Color32::from_rgb(34, 197, 94)
+}
+
 /// The colour of the total length of a story in the head of the segment panel (gui-kit C15: it
 /// was the panel's own).
 pub fn total_text() -> Color32 {

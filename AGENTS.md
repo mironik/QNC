@@ -8208,3 +8208,9 @@ boja. `CardStyle` je dobio boje tockica stanja (`dot_ready`, `dot_original_ready
 kvacice izbora (`check_on`, `check_mark`, `check_off`, `check_off_rim`), s istim vrijednostima; puni ih gui-kit
 (`qnc_theme_styles::cards`). `paint_clip_status` prima `&CardStyle`. Izgled isti. C15: 16 -> 15. Testovi,
 `cargo check --workspace --all-targets`, conformance. Uzivo nije provjereno.
+Izvedeno 2026-11-06 (korisnik: "da, pushaj i kreni sa shell footerom"; gui-kit C15): `qnc-shell-footer` i `qnc-desktop`
+nemaju vlastitih boja ni gumba. Palete tema Soft i High contrast (AGENTS 16: dok ne budu u UI ugovoru) premjestene iz
+`ThemeId::palette` u gui-kit `qnc_theme_styles::shell_palette` (Dark je i dalje paleta ugovora ljuske); boje statusa su
+`qnc_desktop_theme::danger` (ista vrijednost) i nova `done`; Close project kroz `qnc_ui_kit::sized_button` (sada prima
+bilo kakav tekst); `qnc-desktop` boje ugovora pretvara kroz `qnc_desktop_theme::rgb` (vlastiti `rgb` uklonjen). Izgled
+isti. C15: 15 -> 12. Testovi, `cargo check --workspace --all-targets`, conformance. Uzivo nije provjereno.

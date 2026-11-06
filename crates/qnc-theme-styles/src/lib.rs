@@ -108,3 +108,33 @@ pub fn cards(theme: &Theme) -> qnc_media_card::CardStyle {
         check_off_rim: Color32::from_rgba_unmultiplied(255, 255, 255, 140),
     }
 }
+
+/// The shell palette of a theme of the footer's picker: Dark is the shell contract's, Soft and
+/// High contrast are the gui-kit's (gui-kit C15; AGENTS 16: until they are in the UI contract).
+pub fn shell_palette(theme: qnc_shell_footer::ThemeId, contract: qnc_shell_footer::Palette) -> qnc_shell_footer::Palette {
+    use qnc_shell_footer::{Palette, ThemeId};
+    let rgb = |r, g, b| Color32::from_rgb(r, g, b);
+    match theme {
+        ThemeId::Dark => contract,
+        ThemeId::Soft => Palette {
+            bg: rgb(22, 27, 38),
+            surface: rgb(32, 40, 56),
+            raised: rgb(45, 55, 74),
+            border: rgb(75, 88, 110),
+            text: rgb(236, 239, 244),
+            muted: rgb(168, 178, 194),
+            accent: rgb(52, 199, 148),
+            focus: rgb(255, 196, 90),
+        },
+        ThemeId::HighContrast => Palette {
+            bg: Color32::BLACK,
+            surface: rgb(18, 18, 18),
+            raised: rgb(36, 36, 36),
+            border: rgb(180, 180, 180),
+            text: Color32::WHITE,
+            muted: rgb(200, 200, 200),
+            accent: rgb(0, 255, 170),
+            focus: rgb(255, 200, 0),
+        },
+    }
+}

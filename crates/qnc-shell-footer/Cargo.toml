@@ -5,6 +5,8 @@ edition = "2021"
 description = "QNC public passive UI component: the shell footer block (theme picker, application tabs, Close project, status)"
 
 [dependencies]
+qnc-desktop-theme = { workspace = true }
+qnc-ui-kit = { workspace = true }
 qnc-status-line = { workspace = true }
 qnc-ui-text = { workspace = true }
 eframe = { workspace = true }

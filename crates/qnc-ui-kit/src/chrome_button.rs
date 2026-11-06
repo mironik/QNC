@@ -86,6 +86,6 @@ pub fn small_button(ui: &mut Ui, text: &str, enabled: bool, selected: bool) -> e
 
 /// A button of egui's own look at a size (e.g. Undo, Save and Close of the trim zoom), put where
 /// its caller places it.
-pub fn sized_button(text: &str, size: Vec2) -> Button<'static> {
-    Button::new(RichText::new(text)).min_size(size)
+pub fn sized_button(text: impl Into<egui::WidgetText>, size: Vec2) -> Button<'static> {
+    Button::new(text).min_size(size)
 }
