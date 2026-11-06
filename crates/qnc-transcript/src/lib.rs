@@ -172,8 +172,10 @@ struct Running {
 
 pub struct Transcript {
     view: TranscriptView,
-    /// The project and clip whose transcripts are shown, and what is kept for them.
+    /// The project and clip whose transcripts are shown, as last read from the database (the
+    /// only truth: read again every `QUEUE_EVERY`, whoever wrote it), and when.
     kept: Option<(String, String, Vec<ClipTranscript>)>,
+    kept_at: Option<Instant>,
     reading: Option<(String, String, mpsc::Receiver<Kept>)>,
     ticks: BTreeSet<String>,
     quality: QueueQuality,
@@ -199,6 +201,7 @@ impl Default for Transcript {
         Self {
             view: TranscriptView { fast: true, ..TranscriptView::default() },
             kept: None,
+            kept_at: None,
             reading: None,
             ticks: BTreeSet::new(),
             quality: QueueQuality::Fast,
@@ -511,11 +514,17 @@ impl Transcript {
         if let Some((uri, clip, done)) = &self.reading {
             match done.try_recv() {
                 Ok(kept) => {
-                    if let Err(error) = &kept {
-                        self.view.message = error.clone();
+                    let kept = kept.unwrap_or_else(|error| {
+                        self.view.message = error;
+                        Vec::new()
+                    });
+                    // Shown again only when the database says something else than before.
+                    let same = self.kept.as_ref().is_some_and(|(was_uri, was_clip, was)| was_uri == uri && was_clip == clip && *was == kept);
+                    if !same {
+                        self.kept = Some((uri.clone(), clip.clone(), kept));
+                        self.rev += 1;
                     }
-                    self.kept = Some((uri.clone(), clip.clone(), kept.unwrap_or_default()));
-                    self.rev += 1;
+                    self.kept_at = Some(Instant::now());
                     self.reading = None;
                 }
                 Err(mpsc::TryRecvError::Disconnected) => self.reading = None,
@@ -523,7 +532,10 @@ impl Transcript {
             }
         }
         let is = |uri: &str, clip: &str| uri == project.uri() && clip == clip_id;
-        if self.kept.as_ref().is_some_and(|(uri, clip, _)| is(uri, clip)) || self.reading.as_ref().is_some_and(|(uri, clip, _)| is(uri, clip)) {
+        // The shown clip's transcript is read from the database again every `QUEUE_EVERY`: a
+        // transcript another form or process wrote is seen without any link between them.
+        let fresh = self.kept_at.is_some_and(|at| at.elapsed() < QUEUE_EVERY);
+        if (fresh && self.kept.as_ref().is_some_and(|(uri, clip, _)| is(uri, clip))) || self.reading.is_some() {
             return;
         }
         let (send, done) = mpsc::channel();

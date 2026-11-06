@@ -7952,3 +7952,10 @@ skracena rijec zadrzava preostala slova kad su poravnata, inace ostaje cijela; i
 skracuje), `qnc-script-db` operacija `KeepOf` (dio postaje rasponi koji ostaju: prvi zadrzava spoj, ostali rez; `CutOut` je
 njezin poseban slucaj; jedan korak undoa), `qnc-script-panel` `text_editor.rs`. Testovi `text_edit` (2), conformance,
 release build s libav. Uzivo nije provjereno.
+Popravak 2026-11-06 (korisnik: "zasto se ne vidi transcribirani text u MA Script kad se klikne na transcribirani klip";
+"jedina mjerodavna istina je baza, druga veza medu formama ne smije postojati"): log: Mironik 3608 (clip-b07ff91a) prepisan
+je i upisan u bazu (Done), ali MA Script je prijepis tog klipa procitao dok je jos bio u radu i taj prazan rezultat drzao u
+memoriji kao istinu; ponovno citanje bilo je samo na promjenu klipa ili na kraj prijepisa u istoj formi. Sada `qnc-transcript`
+prijepis prikazanog klipa cita iz baze ponovno svake sekunde (`kept_at`, `QUEUE_EVERY`), tko god ga je napisao; prikaz se
+slaze iznova samo kad baza kaze nesto drugo. Nema veze medu formama. Testovi, conformance, release build s libav. Uzivo nije
+provjereno.
