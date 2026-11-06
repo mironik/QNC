@@ -112,7 +112,7 @@ fn change(ui: &mut egui::Ui, editor: &mut ProfileEditor, theme: &Theme) {
         label(ui, theme, qnc_ui_text::text("sp.name"));
         ui.add_enabled(!locked, row_box(&mut profile.name, width * 0.5));
     });
-    ui.checkbox(&mut profile.locked, qnc_ui_text::text("sp.locked"));
+    qnc_ui_kit::check_box(ui, &mut profile.locked, qnc_ui_text::text("sp.locked"), true);
     ui.add_space(ROW_GAP);
     let (mut up, mut down, mut gone) = (None, None, None);
     let count = profile.kinds.len();
@@ -205,8 +205,8 @@ fn kind_rows(ui: &mut egui::Ui, kind: &mut KindSpec, theme: &Theme) {
         if kind.role == Role::Note {
             kind.counts = Counts::None;
         }
-        ui.add_enabled(kind.role == Role::Spoken, egui::Checkbox::new(&mut kind.recorded, qnc_ui_text::text("sp.recorded")));
-        ui.checkbox(&mut kind.cues, qnc_ui_text::text("sp.cues"));
+        qnc_ui_kit::check_box(ui, &mut kind.recorded, qnc_ui_text::text("sp.recorded"), kind.role == Role::Spoken);
+        qnc_ui_kit::check_box(ui, &mut kind.cues, qnc_ui_text::text("sp.cues"), true);
     });
     ui.horizontal(|ui| {
         ui.add(row_box(&mut kind.cue, width * 0.45).hint_text(qnc_ui_text::text("sp.cue_hint")));

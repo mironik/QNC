@@ -8228,3 +8228,7 @@ provjereno.
 Izvedeno 2026-11-06 (isti nastavak): gumbi zaglavlja source docka (`qnc-source-dock`, nova ovisnost `qnc-ui-kit`) kroz
 `qnc_ui_kit::framed_button`; `qnc-ingest-layout::rgb` je samo `qnc_desktop_theme::rgb` (jedna pretvorba boje ugovora).
 C15: 5 -> 3; ostaju urednik profila scenarija (3 gumba) i dijagnosticki alat (7 gumba, 5 boja).
+Izvedeno 2026-11-06 (korisnik: "da, pushaj i kreni s urednikom profila"; gui-kit C15): kvacice urednika profila
+scenarija (`qnc-script-profile-editor`: Locked, snima se (samo izgovorena vrsta), in/out cue) kroz
+`qnc_ui_kit::check_box`. Izgled isti. C15: 3 -> 2; ostaje samo dijagnosticki alat (`tools/qnc-dev-diagnostics-app`).
+Testovi, `cargo check --workspace --all-targets`, conformance. Uzivo nije provjereno.

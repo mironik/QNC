@@ -6158,6 +6158,7 @@ dependencies = [
  "qnc-desktop-theme",
  "qnc-newsroom-sheet",
  "qnc-script-profile",
+ "qnc-ui-kit",
  "qnc-ui-text",
 ]
 

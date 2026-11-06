@@ -5,6 +5,7 @@ edition = "2021"
 description = "QNC public piece: the editor of script profiles (user 2026-10-28: the form of the script is programmable) - choose a profile of this computer, change it (its kinds of blocks: name, mark, role, length, recording, cues, cue label, fields) and keep it, give it to the active project; a prepared profile is copied, never written over; it knows no form or database"
 
 [dependencies]
+qnc-ui-kit = { workspace = true }
 eframe = { workspace = true }
 qnc-desktop-theme = { workspace = true }
 qnc-newsroom-sheet = { workspace = true }
