@@ -1277,3 +1277,14 @@ fn the_sound_assistant_is_turned_on_and_off() {
     segments.apply_action("toggle_sound_assist");
     assert!(!segments.sound_assist_on());
 }
+
+/// User 2026-11-06: the assistant's proposal is kept only while it is on and proposes something.
+#[test]
+fn the_sound_assistants_proposal_is_kept_only_while_it_is_on_and_proposes() {
+    let mut segments = component();
+    assert!(!segments.keep_sound_assist());
+    assert_eq!(segments.view().message, qnc_ui_text::text("story.msg.sound_assist_keep_off"));
+    segments.apply_action("toggle_sound_assist");
+    assert!(!segments.apply_action("sound_assist_keep") || segments.view().message == qnc_ui_text::text("story.msg.sound_assist_keep_none"));
+    assert_eq!(segments.view().message, qnc_ui_text::text("story.msg.sound_assist_keep_none"), "no waves read: nothing proposed");
+}

@@ -196,6 +196,8 @@ pub enum SegmentCommand {
     ToggleNormalize,
     /// The sound assistant on or off (user 2026-11-06).
     ToggleSoundAssist,
+    /// The sound assistant's proposal kept as the user's curves (user 2026-11-06).
+    KeepSoundAssist,
     /// The export box (user 2026-10-24): a line chosen, export with it, or closed.
     ExportChoose(usize),
     /// The PAL (false) or NTSC (true) tab of the export box (user 2026-10-25).
@@ -286,6 +288,7 @@ impl SegmentCommand {
             "toggle_wrap_video" => Self::ToggleWrapVideo,
             "toggle_loudness_normalize" => Self::ToggleNormalize,
             "toggle_sound_assist" => Self::ToggleSoundAssist,
+            "sound_assist_keep" => Self::KeepSoundAssist,
             "wrap_zoom" => Self::Zoom { slot: None, frame: None },
             "cover_mode_covers" => Self::CoverMode { sync: false },
             "cover_mode_sync" => Self::CoverMode { sync: true },

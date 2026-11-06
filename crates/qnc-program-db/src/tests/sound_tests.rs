@@ -260,3 +260,23 @@ fn the_sound_assistant_is_on_or_off_in_the_story_and_undone_in_one_step() {
     run(&mut store, Operation::UndoStory).unwrap();
     assert!(!assist(&mut store), "one Undo step");
 }
+
+/// User 2026-11-06: the sound assistant's proposal kept as the user's curves, all at once, one
+/// Undo step; one item that cannot take its curve leaves nothing written.
+#[test]
+fn several_curves_are_written_at_once_and_undone_together() {
+    let dir = tempfile::tempdir().unwrap();
+    let path = dir.path().join("db");
+    let mut store = imported_store(&path);
+    three_segments(&mut store);
+    let ids: Vec<String> = segments(&mut store).iter().map(|row| row.segment_id.clone()).collect();
+    let curve = |db10| vec![LevelKey { frame: 2, db10 }];
+    let curves = vec![(ids[0].clone(), curve(-30)), (ids[1].clone(), curve(-60))];
+    run(&mut store, Operation::SetLevelKeysMany { curves }).unwrap();
+    assert_eq!(segments(&mut store)[1].level_keys, curve(-60));
+    let wrong = vec![(ids[2].clone(), curve(-10)), ("missing".to_string(), curve(-10))];
+    assert!(run(&mut store, Operation::SetLevelKeysMany { curves: wrong }).is_err());
+    assert!(segments(&mut store)[2].level_keys.is_empty(), "nothing of a refused write");
+    run(&mut store, Operation::UndoStory).unwrap();
+    assert!(segments(&mut store).iter().all(|row| row.level_keys.is_empty()), "one Undo step");
+}

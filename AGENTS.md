@@ -8137,3 +8137,13 @@ razine citao je `view().normalize`, koji osnovni prikaz nije postavljao). Prekid
 `qnc-program-input`, `qnc-level-bar`, `qnc-source-timeline`, `qnc-panel-focus`, `qnc-keyboard-shortcut`, `qnc-ui-text`,
 conformance, `cargo check --workspace --all-targets`. Nije izvedeno: Ton A2 u Off i slozena izjava bez pomocnika;
 prijedlog jos nije moguce "zadrzati" kao korisnikove krivulje. Uzivo nije provjereno.
+Izvedeno 2026-11-06 (korisnik: "pushaj i dodaj zadrzavanje prijedloga kao korisnikove krivulje"): prijedlog pomocnika
+tona zadrzava se kao korisnikove krivulje razine. `qnc-program-db` operacija `SetLevelKeysMany` (sve krivulje odjednom u
+jednoj transakciji: stavka koja ne prima krivulju ne ostavlja nista upisano; jedan korak Undo). `qnc-program-segments`
+pamti krivulje pomocnika kakve se prikazuju (`assist_curves`, s id-em segmenta ili pokrivalice, na slikama klipa) i
+`keep_sound_assist` ih upisuje; od tada su obicne krivulje (Ctrl+Shift+1/2, desni klik na liniju), a pomocnik te dijelove
+ne dira. Poruke: pomocnik iskljucen, nema prijedloga, zadrzano n dijelova (rjecnik `story.msg.sound_assist_kept`,
+`_keep_off`, `_keep_none`). Radnja kataloga `sound_assist_keep` (Ctrl+Shift+N, QNC preset, s bilo kojeg panela), pomoc
+F1 grupa Audio, `qnc-program-commands` `KeepSoundAssist`. Testovi `qnc-program-db` (60), `qnc-program-segments` (75),
+`qnc-program-commands`, `qnc-panel-focus`, `qnc-keyboard-shortcut`, `qnc-ui-text`, conformance, `cargo check --workspace
+--all-targets`. Uzivo nije provjereno.

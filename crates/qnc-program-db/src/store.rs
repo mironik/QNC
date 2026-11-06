@@ -324,6 +324,12 @@ impl Store {
                 self.set_cover_overlap(cover_id, *lead_frames, *tail_frames)
             }
             Operation::SetLevelKeys { item_id, keys } => self.set_level_keys(item_id, keys),
+            Operation::SetLevelKeysMany { curves } => {
+                for (item_id, keys) in curves {
+                    self.set_level_keys(item_id, keys)?;
+                }
+                Ok(Data::Changed)
+            }
             Operation::SetSoundAssist { on } => self.set_sound_assist(*on),
             Operation::DeleteCover { cover_id } => self.delete_cover(cover_id),
             Operation::SelectCover { cover_id } => self.select_cover(cover_id),

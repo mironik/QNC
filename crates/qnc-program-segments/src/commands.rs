@@ -130,6 +130,9 @@ impl ProgramSegments {
                 self.export_alert = Some(running.clone());
                 self.refresh_view(running);
             }
+            SegmentCommand::KeepSoundAssist => {
+                self.keep_sound_assist();
+            }
             SegmentCommand::ToggleSoundAssist => {
                 self.sound_assist = !self.sound_assist;
                 self.write(Operation::SetSoundAssist { on: self.sound_assist });

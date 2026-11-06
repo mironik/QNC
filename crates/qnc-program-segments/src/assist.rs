@@ -30,17 +30,39 @@ impl ProgramSegments {
                 proposals
             }
         };
+        self.assist_curves.clear();
         for proposal in proposals {
             let keys: Vec<qnc_program_db::LevelKey> = proposal.points.iter().map(|(frame, db10)| qnc_program_db::LevelKey { frame: *frame, db10: *db10 }).collect();
-            if proposal.index < lanes[0] {
+            let id = if proposal.index < lanes[0] {
                 segments[proposal.index].curve = proposal.points.clone();
-                view.rows[proposal.index].level_keys = keys;
+                view.rows[proposal.index].level_keys = keys.clone();
+                view.rows[proposal.index].segment_id.clone()
             } else {
                 let index = proposal.index - lanes[0];
                 covers[index].curve = proposal.points.clone();
-                view.covers[index].level_keys = keys;
-            }
+                view.covers[index].level_keys = keys.clone();
+                view.covers[index].cover_id.clone()
+            };
+            self.assist_curves.push((id, keys));
         }
+    }
+
+    /// The assistant's proposal kept as the user's curves (user 2026-11-06), all at once, one Undo
+    /// step: from then on they are edited as any curve and the assistant leaves those parts alone.
+    pub fn keep_sound_assist(&mut self) -> bool {
+        let (kept, message) = if !self.sound_assist {
+            (false, qnc_ui_text::text("story.msg.sound_assist_keep_off").to_string())
+        } else if self.assist_curves.is_empty() {
+            (false, qnc_ui_text::text("story.msg.sound_assist_keep_none").to_string())
+        } else {
+            let count = self.assist_curves.len();
+            let curves = std::mem::take(&mut self.assist_curves);
+            self.write(qnc_program_db::Operation::SetLevelKeysMany { curves });
+            self.assisted = None;
+            (true, qnc_ui_text::fill("story.msg.sound_assist_kept", &[("count", &count.to_string())]))
+        };
+        self.refresh_view(message);
+        kept
     }
 }
 

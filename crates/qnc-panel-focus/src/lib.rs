@@ -27,7 +27,7 @@ pub use panel::*;
 
 /// Actions of the segment panel that also run from the other panels: they use
 /// the source the user marked (v5 dispatches them whatever the focus).
-const SOURCE_TO_PROGRAM: [&str; 9] = [
+const SOURCE_TO_PROGRAM: [&str; 10] = [
     "add_ton_segment",
     // S-Story sends its story on to the Story (user 2026-10-31).
     "story_send_draft",
@@ -41,6 +41,7 @@ const SOURCE_TO_PROGRAM: [&str; 9] = [
     "toggle_loudness_normalize",
     // The sound assistant on or off, from any panel (user 2026-11-06).
     "toggle_sound_assist",
+    "sound_assist_keep",
 ];
 
 #[derive(Debug, Default)]

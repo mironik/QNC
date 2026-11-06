@@ -407,6 +407,9 @@ pub enum Operation {
     /// The level curve of a segment (A1) or a cover (A2) (docs/98 2.1): the whole curve
     /// as it is to be, empty for none. An UNDO step.
     SetLevelKeys { item_id: String, keys: Vec<LevelKey> },
+    /// Several curves written at once (user 2026-11-06: the sound assistant's proposal kept as the
+    /// user's curves). One UNDO step; an item that cannot take its curve leaves nothing written.
+    SetLevelKeysMany { curves: Vec<(String, Vec<LevelKey>)> },
     /// The sound assistant on or off (user 2026-11-06). An UNDO step.
     SetSoundAssist { on: bool },
     /// v5 `delete_cover`; its B-roll virtual shot stays.
@@ -449,6 +452,7 @@ impl Operation {
                 | Self::SetCoverSound { .. }
                 | Self::SetCoverOverlap { .. }
                 | Self::SetLevelKeys { .. }
+                | Self::SetLevelKeysMany { .. }
                 | Self::SetSoundAssist { .. }
         )
     }

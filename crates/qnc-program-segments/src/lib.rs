@@ -200,6 +200,8 @@ pub struct ProgramSegments {
     sound_assist: bool,
     /// Its last proposals and what they were made of (made again only when that changes).
     assisted: Option<(assist::AssistKey, Vec<qnc_sound_assist::Proposal>)>,
+    /// The assistant's curves as shown now (item, curve on its clip): what Keep writes.
+    assist_curves: Vec<(String, Vec<qnc_program_db::LevelKey>)>,
     /// The open export box (user 2026-10-24).
     export: Option<qnc_export_choice::ExportChoice>,
     /// The export running in the background (`qnc-export`).
@@ -451,6 +453,8 @@ impl ProgramSegments {
         // heard in the wave, as the player plays them (`qnc-program-input`).
         if self.sound_assist {
             self.assist(&mut view, &mut segments, &mut covers);
+        } else {
+            self.assist_curves.clear();
         }
         view.sound_assist = self.sound_assist;
         view.peaks = self.waves.peaks(view.total_frames, &segments, &covers, |id| durations.get(id).copied());

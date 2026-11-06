@@ -340,6 +340,9 @@
     "toggle_sound_assist": {
       "label": "Pomoćnik tona (AI): stišava pokrivalice pod govorom i izjednačava govor segmenata, ili ton kako je montiran"
     },
+    "sound_assist_keep": {
+      "label": "Zadrži prijedlog pomoćnika tona kao svoje krivulje razine (jedan korak Undo), pa ih uređuješ kao svaku krivulju"
+    },
     "shuttle_back": {
       "label": "Shuttle: unazad 1x, ponovno 2x, 4x, 8x"
     },
@@ -708,7 +711,7 @@
     "groups": [
       { "title": "Reprodukcija i playhead", "actions": ["play_pause", "shuttle_back", "shuttle_stop", "shuttle_forward", "trim_play_around", "step_back_frame", "step_forward_frame", "playlist_input_start", "go_to_mark_in", "match_frame"] },
       { "title": "IN / OUT", "actions": ["mark_in", "mark_out", "select_mark_in", "select_mark_out", "mark_in_fit_duration", "save_virtual_shot"] },
-      { "title": "Audio A1 / A2", "actions": ["select_audio_a1", "select_audio_a2", "lane_level_down", "lane_level_up", "select_level_a1", "select_level_a2", "toggle_loudness_normalize", "toggle_sound_assist"] },
+      { "title": "Audio A1 / A2", "actions": ["select_audio_a1", "select_audio_a2", "lane_level_down", "lane_level_up", "select_level_a1", "select_level_a2", "toggle_loudness_normalize", "toggle_sound_assist", "sound_assist_keep"] },
       { "title": "Segmenti", "actions": ["add_ton_segment", "add_off_segment", "step_prev_part", "step_next_part", "select_segment_start", "select_segment_end", "select_slip", "wrap_zoom", "segment_purge"] },
       { "title": "Markeri i slotovi", "actions": ["add_marker", "add_marker_continue", "select_marker", "delete_marker", "select_current_marker_slot", "select_mark_in", "select_mark_out", "navigate_prev_object", "navigate_next_object"] },
       { "title": "Pokrivalice", "actions": ["quick_overwrite_cover", "overwrite_cover", "cover_mode_covers", "cover_mode_sync"] },
@@ -1115,6 +1118,7 @@
           }
         ],
         "toggle_sound_assist": [{ "code": "KeyN", "ctrl": false, "shift": true }],
+        "sound_assist_keep": [{ "code": "KeyN", "ctrl": true, "shift": true }],
         "select_current_marker_slot": [
           {
             "code": "KeyS",
