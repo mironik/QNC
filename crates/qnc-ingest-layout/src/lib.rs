@@ -11,6 +11,6 @@ pub use qnc_desktop_theme as theme;
 pub use qnc_desktop_theme::{ShellColors, ShellLayoutContract, ShellThemeMetrics};
 
 /// A colour of the layout contract (`[r, g, b]`).
-pub fn rgb([r, g, b]: [u8; 3]) -> eframe::egui::Color32 {
-    eframe::egui::Color32::from_rgb(r, g, b)
+pub fn rgb(value: [u8; 3]) -> eframe::egui::Color32 {
+    qnc_desktop_theme::rgb(value)
 }

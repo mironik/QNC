@@ -6488,6 +6488,7 @@ dependencies = [
  "qnc-source-timecode",
  "qnc-timeline",
  "qnc-timeline-assets",
+ "qnc-ui-kit",
  "qnc-ui-text",
 ]
 

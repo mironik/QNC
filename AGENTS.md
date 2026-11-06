@@ -8222,6 +8222,9 @@ Izvedeno 2026-11-06 (korisnik: "da, pushaj i nastavi"; gui-kit C15): gui-kit (`q
 (tekst pozivatelja, ispuna, obrub od 1 px ili bez, ravni ili zaobljeni kutovi, najmanja velicina) i `check_box`
 (moze biti iskljucen). Kroz njih idu gumbi potvrdnog dijaloga (`qnc-confirm-dialog`), gumbi transporta glave poola i
 naredbe reda (`qnc-media-pool-head`), kvacice trake uvoza (`qnc-ingest-import-bar`), kvacica Locked obrasca priloga
-(`qnc-newsroom-sheet`) i prekidaci postavki (`qnc-settings-switches`). Izgled isti. C15: 11 -> 5 (ostaju urednik
-profila scenarija i dijagnosticki alat). Testovi, `cargo check --workspace --all-targets`, conformance. Uzivo nije
+(`qnc-newsroom-sheet`) i prekidaci postavki (`qnc-settings-switches`). Izgled isti. C15: 11 -> 5.
+Testovi, `cargo check --workspace --all-targets`, conformance. Uzivo nije
 provjereno.
+Izvedeno 2026-11-06 (isti nastavak): gumbi zaglavlja source docka (`qnc-source-dock`, nova ovisnost `qnc-ui-kit`) kroz
+`qnc_ui_kit::framed_button`; `qnc-ingest-layout::rgb` je samo `qnc_desktop_theme::rgb` (jedna pretvorba boje ugovora).
+C15: 5 -> 3; ostaju urednik profila scenarija (3 gumba) i dijagnosticki alat (7 gumba, 5 boja).
