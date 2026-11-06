@@ -8152,3 +8152,11 @@ dugme ZADRZI / KEEP (radnja `sound_assist_keep`, isto sto Ctrl+Shift+N); moze se
 (inace sivo). Sirina trake ostaje 240 px, mjerac je uzi. Rjecnik `story.ui.sound_assist_keep`, `_keep_hint`. Testovi
 `qnc-level-bar`, `qnc-ui-text`, `qnc-source-timeline`, conformance, `cargo check --workspace --all-targets`. Uzivo nije
 provjereno.
+Analiza 2026-11-06 (korisnik: "pronadi svako mjesto gdje je procesna logika pomijesana s egui kodom ... predlozi podjelu
+na qnc-core i qnc-gui"): `docs/99-core-gui-split.md`. 83 paketa izravno ovise o egui-ju, 25 logickih paketa vuce egui
+preko UI paketa (najvise zbog tipova `qnc-timeline`: `TimelineProjection`, `LaneKey`; te `Alert`, `Choice`,
+`MonitorState`, `Follow`, `Wheel`); mjesovite kocke `qnc-source-timeline`, `qnc-timeline`, `qnc-focus-walk`,
+`qnc-keyboard-shortcut`, `qnc-newsroom-sheet`, `qnc-monitor`; stanje rada u egui memoriji (nacrt teksta izjave, pretraga
+prijepisa, kanal povlacenja markera kroz `ctx`); poll aplikacije tece iz petlje crtanja (`qnc-form-host`). Prijedlog:
+ne dva monolitna paketa (AGENTS 0.11, 12), nego pravilo slojeva core/gui s conformance provjerom i dijeljenje
+mjesovitih kocki na `qnc-x` + `qnc-x-view`; pet koraka od najmanje rizicnog. Kod nije mijenjan.
