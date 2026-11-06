@@ -13,7 +13,6 @@ qnc-dir-browser = { workspace = true }
 qnc-filmstrip = { workspace = true }
 qnc-mxf-index = { workspace = true }
 qnc-frame-timebase = { workspace = true }
-qnc-image-assets = { workspace = true }
 qnc-contracts = { workspace = true }
 qnc-media-decode = { workspace = true }
 qnc-media-metadata = { workspace = true }

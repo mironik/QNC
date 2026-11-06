@@ -6,6 +6,5 @@ description = "QNC public piece: the shots of the clip on the preview as the bac
 
 [dependencies]
 qnc-clip-follow = { workspace = true }
-qnc-db-broker = { workspace = true }
 qnc-shot-db = { workspace = true }
 qnc-source-preview = { workspace = true }

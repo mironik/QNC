@@ -15,10 +15,8 @@ qnc-camera-detector = { workspace = true }
 qnc-camera-patterns = { workspace = true }
 qnc-contracts = { workspace = true }
 qnc-dir-browser = { workspace = true }
-qnc-ffprobe-metadata = { workspace = true }
 qnc-image-assets = { workspace = true }
 qnc-ingest-store = { workspace = true }
-qnc-media-metadata-compose = { workspace = true }
 qnc-media-probe = { workspace = true }
 qnc-db-broker = { workspace = true }
 qnc-record-probe = { workspace = true }

@@ -9,6 +9,5 @@ qnc-clip-row = { workspace = true }
 qnc-desktop-theme = { workspace = true }
 qnc-theme-styles = { workspace = true }
 eframe = { workspace = true }
-qnc-image-assets = { workspace = true }
 qnc-monitor = { workspace = true }
 qnc-program-output = { workspace = true }

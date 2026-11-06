@@ -5,7 +5,6 @@ edition = "2021"
 description = "Shared QNC filmstrip plan and passive background assets"
 
 [dependencies]
-qnc-contracts = { workspace = true }
 qnc-frame-timebase = { workspace = true }
 qnc-image-assets = { workspace = true }
 qnc-media-metadata = { workspace = true }

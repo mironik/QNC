@@ -9,5 +9,4 @@ qnc-pool-pointer = { workspace = true }
 eframe = { workspace = true }
 qnc-ui-kit = { workspace = true }
 qnc-key-list = { workspace = true }
-qnc-image-assets = { workspace = true }
 qnc-clip-row = { workspace = true }

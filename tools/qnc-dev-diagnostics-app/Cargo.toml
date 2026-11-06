@@ -18,4 +18,3 @@ qnc-dev-diagnostics = { workspace = true }
 qnc-ingest-store = { workspace = true }
 qnc-ingest-work-plan = { workspace = true }
 qnc-media-metadata = { workspace = true }
-qnc-work-settings = { workspace = true }

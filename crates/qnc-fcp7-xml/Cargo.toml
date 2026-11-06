@@ -6,5 +6,4 @@ description = "QNC public block: the story's flat program playlist as a Final Cu
 
 [dependencies]
 qnc-source-timecode = { workspace = true }
-qnc-gain = { workspace = true }
 qnc-program-playlist = { workspace = true }

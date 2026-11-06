@@ -9,5 +9,4 @@ qnc-decoder-jobs = { workspace = true }
 qnc-ffmpeg-decode = { workspace = true }
 qnc-frame-timebase = { workspace = true }
 qnc-plugin-process = { workspace = true }
-serde_json = { workspace = true }
 tempfile = "3"

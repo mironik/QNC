@@ -3436,7 +3436,6 @@ version = "0.1.0"
 dependencies = [
  "qnc-application-catalog",
  "qnc-contracts",
- "qnc-transport-resolver",
  "serde",
  "serde_json",
  "tempfile",
@@ -3700,7 +3699,6 @@ name = "qnc-clip-shots"
 version = "0.1.0"
 dependencies = [
  "qnc-clip-follow",
- "qnc-db-broker",
  "qnc-shot-db",
  "qnc-source-preview",
 ]
@@ -3800,7 +3798,6 @@ dependencies = [
 name = "qnc-contracts"
 version = "0.1.0"
 dependencies = [
- "serde",
  "serde_json",
 ]
 
@@ -3841,7 +3838,6 @@ dependencies = [
  "qnc-ffmpeg-decode",
  "qnc-frame-timebase",
  "qnc-plugin-process",
- "serde_json",
  "tempfile",
 ]
 
@@ -3941,7 +3937,6 @@ dependencies = [
  "qnc-ingest-store",
  "qnc-ingest-work-plan",
  "qnc-media-metadata",
- "qnc-work-settings",
 ]
 
 [[package]]
@@ -4021,21 +4016,17 @@ dependencies = [
  "qnc-panel-focus",
  "qnc-pending-marks",
  "qnc-pool-tabs",
- "qnc-prerender-launch",
  "qnc-program-segments",
- "qnc-program-waveform",
  "qnc-short-save",
  "qnc-shot-stills",
  "qnc-source-bindings",
  "qnc-source-preview",
  "qnc-source-timeline",
  "qnc-status-line",
- "qnc-timeline",
  "qnc-timeline-assets",
  "qnc-trim-stills",
  "qnc-ui-text",
  "qnc-virtual-short-cards",
- "qnc-virtual-short-stills",
  "qnc-virtual-shots",
  "qnc-work-settings",
  "qnc-wrap-session",
@@ -4060,7 +4051,6 @@ dependencies = [
  "qnc-panel-focus",
  "qnc-pool-tabs-panel",
  "qnc-right-panel",
- "qnc-script",
  "qnc-segment-panel",
  "qnc-source-timeline",
  "qnc-subsegment-panel",
@@ -4068,7 +4058,6 @@ dependencies = [
  "qnc-timeline",
  "qnc-transcript",
  "qnc-transport-panel",
- "qnc-trim-overlay",
  "qnc-ui-kit",
 ]
 
@@ -4083,7 +4072,6 @@ dependencies = [
  "qnc-editorial-blocks",
  "qnc-editorial-layout",
  "qnc-form-host",
- "qnc-key-intents",
  "qnc-keyboard-shortcut",
  "qnc-paint-pace",
  "qnc-status-line",
@@ -4100,26 +4088,10 @@ dependencies = [
  "qnc-contracts",
  "qnc-desktop-theme",
  "qnc-keyboard-shortcut",
- "qnc-media-pool-head",
  "qnc-pool-tabs",
  "qnc-segment-panel",
- "qnc-source-dock",
- "qnc-timeline",
- "qnc-ui-kit",
  "qnc-ui-text",
  "serde",
- "serde_json",
-]
-
-[[package]]
-name = "qnc-editorial-shell"
-version = "0.1.0"
-dependencies = [
- "eframe",
- "qnc-media-card",
- "qnc-media-pool-head",
- "qnc-source-dock",
- "qnc-timeline",
  "serde_json",
 ]
 
@@ -4151,7 +4123,6 @@ dependencies = [
  "qnc-voice-catalog",
  "qnc-voice-take",
  "qnc-work-settings",
- "serde_json",
 ]
 
 [[package]]
@@ -4197,7 +4168,6 @@ dependencies = [
 name = "qnc-fcp7-xml"
 version = "0.1.0"
 dependencies = [
- "qnc-gain",
  "qnc-program-playlist",
  "qnc-source-timecode",
 ]
@@ -4236,7 +4206,6 @@ dependencies = [
 name = "qnc-filmstrip"
 version = "0.1.0"
 dependencies = [
- "qnc-contracts",
  "qnc-frame-timebase",
  "qnc-image-assets",
  "qnc-media-metadata",
@@ -4256,7 +4225,6 @@ dependencies = [
  "qnc-dir-browser",
  "qnc-filmstrip",
  "qnc-frame-timebase",
- "qnc-image-assets",
  "qnc-media-decode",
  "qnc-media-metadata",
  "qnc-media-records",
@@ -4387,22 +4355,18 @@ name = "qnc-ingest-application"
 version = "0.1.0"
 dependencies = [
  "image",
- "qnc-active-project-read",
  "qnc-application-sequence",
  "qnc-camera-adapter",
  "qnc-choice-box",
  "qnc-clip-posters",
  "qnc-clip-row",
- "qnc-content-store",
  "qnc-contracts",
  "qnc-dev-diagnostics",
  "qnc-dir-browser",
  "qnc-focus-walk",
  "qnc-form-pieces",
- "qnc-image-assets",
  "qnc-ingest-cameras",
  "qnc-ingest-catalog",
- "qnc-ingest-clip-list",
  "qnc-ingest-import-run",
  "qnc-ingest-pieces",
  "qnc-ingest-preview-source",
@@ -4462,8 +4426,6 @@ dependencies = [
  "qnc-plugin-process",
  "qnc-record-format-plugin",
  "qnc-sony-metadata",
- "serde",
- "serde_json",
  "tempfile",
 ]
 
@@ -4499,8 +4461,6 @@ dependencies = [
  "qnc-ingest-application",
  "qnc-ingest-blocks",
  "qnc-ingest-layout",
- "qnc-key-intents",
- "qnc-keyboard-shortcut",
  "qnc-paint-pace",
 ]
 
@@ -4548,11 +4508,8 @@ dependencies = [
  "qnc-camera-adapter",
  "qnc-camera-profile-adapter",
  "qnc-camera-profiles",
- "qnc-content-read",
- "qnc-contracts",
  "qnc-dir-browser",
  "qnc-ffprobe-metadata",
- "qnc-filmstrip",
  "qnc-import-fit",
  "qnc-ingest-select",
  "qnc-ingest-store",
@@ -4600,13 +4557,11 @@ name = "qnc-ingest-preview-source"
 version = "0.1.0"
 dependencies = [
  "qnc-content-artifacts",
- "qnc-content-store",
  "qnc-image-assets",
  "qnc-ingest-select",
  "qnc-ingest-store",
  "qnc-player-client",
  "qnc-player-input",
- "qnc-player-timeline",
  "qnc-source-bindings",
  "qnc-source-preview",
  "qnc-source-timeline",
@@ -4648,13 +4603,11 @@ dependencies = [
  "qnc-db-broker",
  "qnc-decoder-catalog",
  "qnc-dir-browser",
- "qnc-ffprobe-metadata",
  "qnc-image-assets",
  "qnc-import-fit",
  "qnc-ingest-cameras",
  "qnc-ingest-store",
  "qnc-media-metadata",
- "qnc-media-metadata-compose",
  "qnc-media-probe",
  "qnc-media-record-db",
  "qnc-missing-posters",
@@ -4708,12 +4661,8 @@ dependencies = [
  "qnc-content-store",
  "qnc-contracts",
  "qnc-db-contract",
- "qnc-json-transport",
- "qnc-media-records",
  "qnc-transport-resolver",
- "qnc-work-settings",
  "rusqlite",
- "serde",
  "tempfile",
 ]
 
@@ -4743,7 +4692,6 @@ dependencies = [
  "qnc-source-reader",
  "qnc-transcribe-queue",
  "qnc-ui-text",
- "qnc-work-settings",
 ]
 
 [[package]]
@@ -5040,7 +4988,6 @@ version = "0.1.0"
 dependencies = [
  "eframe",
  "qnc-clip-row",
- "qnc-image-assets",
  "qnc-key-list",
  "qnc-pool-pointer",
  "qnc-ui-kit",
@@ -5241,7 +5188,6 @@ dependencies = [
  "eframe",
  "qnc-clip-row",
  "qnc-desktop-theme",
- "qnc-image-assets",
  "qnc-monitor",
  "qnc-program-output",
  "qnc-theme-styles",
@@ -5502,18 +5448,15 @@ name = "qnc-player-runner"
 version = "0.1.0"
 dependencies = [
  "pollster",
- "qnc-audio-output",
  "qnc-broadcast-engine",
  "qnc-decoder-catalog",
  "qnc-dev-diagnostics",
  "qnc-json-transport",
- "qnc-media-decode",
  "qnc-media-stream",
  "qnc-player-contract",
  "qnc-player-frame-transport",
  "qnc-player-input",
  "qnc-source-reader",
- "qnc-transport-resolver",
  "qnc-video-output",
  "qnc-work-settings",
  "serde",
@@ -5678,7 +5621,6 @@ dependencies = [
  "qnc-artifact-db",
  "qnc-clip-sound",
  "qnc-db-broker",
- "qnc-frame-timebase",
  "qnc-loudness",
  "qnc-media-metadata",
  "qnc-player-input",
@@ -5770,7 +5712,6 @@ dependencies = [
  "qnc-program-view",
  "qnc-program-waveform",
  "qnc-source-channels",
- "qnc-source-timecode",
  "qnc-sync-cover",
  "qnc-ui-text",
  "qnc-virtual-shots",
@@ -6028,7 +5969,6 @@ dependencies = [
  "qnc-source-timecode",
  "qnc-transcript",
  "qnc-transcript-panel",
- "qnc-ui-text",
 ]
 
 [[package]]
@@ -6223,9 +6163,7 @@ dependencies = [
  "qnc-theme-styles",
  "qnc-timeline",
  "qnc-trim-overlay",
- "qnc-ui-kit",
  "qnc-ui-text",
- "qnc-wheel-jog",
  "serde",
 ]
 
@@ -6552,16 +6490,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "qnc-source-input"
-version = "0.1.0"
-dependencies = [
- "qnc-contracts",
- "qnc-dir-browser",
- "qnc-source-bindings",
- "qnc-source-reader",
-]
-
-[[package]]
 name = "qnc-source-mark-focus"
 version = "0.1.0"
 dependencies = [
@@ -6590,9 +6518,6 @@ dependencies = [
  "qnc-dev-diagnostics",
  "qnc-filmstrip",
  "qnc-gain",
- "qnc-media-metadata",
- "qnc-media-records",
- "qnc-media-stream",
  "qnc-monitor",
  "qnc-playback-activity",
  "qnc-player-client",
@@ -6604,7 +6529,6 @@ dependencies = [
  "qnc-pool-pointer",
  "qnc-program-input",
  "qnc-source-bindings",
- "qnc-source-contract",
  "qnc-still-locator",
  "qnc-timeline",
  "qnc-timeline-assets",
@@ -6669,7 +6593,6 @@ dependencies = [
  "qnc-timeline-assets",
  "qnc-ui-kit",
  "qnc-ui-text",
- "qnc-wheel-jog",
 ]
 
 [[package]]
@@ -6754,9 +6677,7 @@ dependencies = [
  "qnc-script",
  "qnc-segment-panel",
  "qnc-timeline",
- "qnc-trim-overlay",
  "qnc-ui-text",
- "qnc-wheel-jog",
 ]
 
 [[package]]
@@ -6837,7 +6758,6 @@ dependencies = [
  "qnc-media-records",
  "qnc-ui-text",
  "qnc-wave",
- "qnc-work-settings",
 ]
 
 [[package]]
@@ -7017,7 +6937,6 @@ dependencies = [
  "qnc-decoder-catalog",
  "qnc-dev-diagnostics",
  "qnc-fine-wave",
- "qnc-frame-timebase",
  "qnc-image-assets",
  "qnc-media-decode",
  "qnc-media-metadata",

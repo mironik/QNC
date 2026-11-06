@@ -8,6 +8,5 @@ description = "Read-only timeline asset loader for QNC"
 qnc-ui-text = { workspace = true }
 qnc-filmstrip = { workspace = true }
 qnc-image-assets = { workspace = true }
-qnc-work-settings = { workspace = true }
 qnc-media-records = { workspace = true }
 qnc-wave = { workspace = true }

@@ -8013,3 +8013,11 @@ napravljena analiza se pokaze). Source timeline (`qnc-source-timeline`) zvuk kli
 odgovori drukcije (druga forma ga je zadrzala) i nijedna traka nije uzeta, primijeni ga. Val, filmstrip i posteri i dalje se citaju dok nedostaju (pisu se jednom po verziji). Testovi
 `qnc-clip-follow` (2: promjena drugog pisca se vidi, neuspjelo citanje cuva zadnji odgovor; zapisana vrijednost se ne
 ponistava starijim citanjem), testovi dotaknutih kocki, conformance. Uzivo nije provjereno.
+Izvedeno 2026-11-06 (korisnik: "da, kreni s ciscenjem ovisnosti"; P2-5 i P2-6 iz `docs/arhitektura.md`): uklonjeno 59
+neiskoristenih ovisnosti iz 33 paketa (nalaz `cargo machete`, svaki provjeren gradnjom `cargo check --workspace --all-targets`
+i gradnjom s `libav`) te kocke koje nitko ne koristi, `qnc-editorial-shell` i `qnc-source-input` s ugovorima
+`contracts/modules/editorial-shell.module.json` i `source-input.module.json` i kljucevima C5 u
+`tools/qnc-conformance/lego-baseline.json` (kod ostaje u git povijesti). Ostavljeno: `xml-rs` u `qnc-camera-profiles` i
+`qnc-sony-metadata` (uvozi se kao `xml`, lazni nalaz), `qnc-decoder-catalog` u `qnc-app` i `qnc-story` (treba ga znacajka
+`libav`), te ovisnosti zamrznutog Projecta (`qnc-project-blocks`, `qnc-project-session`; manifest Projecta trazi
+dir-browser). Svaka biblioteka workspacea sada ima korisnika. Conformance prolazi. Uzivo nije provjereno.

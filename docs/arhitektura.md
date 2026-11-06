@@ -266,7 +266,7 @@ Gdje se blokira ili nepotrebno kopira (iz loga i koda):
    sliku `qnc-keyframe-jump`, match frame, tipke Export prozora i rijec u zoomu Wrap redova u
    `qnc-segments-keys`, rijec na uzetu source oznaku u `qnc-source-timeline` (`mark_to_word`).
    Fokus drzi samo redoslijed kocki i krug panela; 27 ovisnosti (prije 32), 1042 retka (prije 1207).
-4. **Memorija kao istina u drugim kockama**: pregledati sve `Option<(uri, clip, data)>`
+4. ~~**Memorija kao istina u drugim kockama**~~ (izvedeno 2026-11-06, `qnc-clip-follow`): pregledati sve `Option<(uri, clip, data)>`
    predmemorije koje se citaju samo na promjenu klipa (posteri, zvuk klipa, kadrovi, kanali) i
    dati im isti obrazac kao prijepisu (ponovno citanje u ritmu, usporedba).
 
@@ -315,7 +315,9 @@ Sto bih pojednostavio prvo (redom):
 4. ~~**Predmemorije citane samo na dogadaj** (P1-4)~~ - izvedeno 2026-11-06: jedna kocka `qnc-clip-follow`
    (citanje u pozadini, ponovno svake sekunde, zadnji odgovor ostaje kad citanje ne uspije); koriste je zvuk klipa,
    kanali, timecode i kadrovi.
-5. **Ocistiti ovisnosti** (P2-5, P2-6): mehanicki posao, manja gradnja.
+5. ~~**Ocistiti ovisnosti** (P2-5, P2-6)~~ - izvedeno 2026-11-06: 59 neiskoristenih ovisnosti u 33 paketa i kocke
+   `qnc-editorial-shell` i `qnc-source-input` uklonjene. `cargo machete` jos javlja samo lazne nalaze (`xml-rs` se uvozi
+   kao `xml`, `qnc-decoder-catalog` u aplikacijama treba znacajka `libav`) i dvije ovisnosti zamrznutog Projecta.
 6. Tek onda nove mogucnosti iz `docs/98-missing-tools-plan.md`.
 
 ## 7. Sirovi rezultati alata (za usporedbu poslije)

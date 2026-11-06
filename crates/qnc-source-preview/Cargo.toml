@@ -14,14 +14,10 @@ qnc-monitor = { workspace = true }
 qnc-still-locator = { workspace = true }
 qnc-worker-wake = { workspace = true }
 qnc-ui-text = { workspace = true }
-qnc-source-contract = { workspace = true }
-qnc-media-metadata = { workspace = true }
-qnc-media-stream = { workspace = true }
 qnc-content-read = { workspace = true }
 qnc-content-store = { workspace = true }
 qnc-db-broker = { workspace = true }
 qnc-filmstrip = { workspace = true }
-qnc-media-records = { workspace = true }
 qnc-playback-activity = { workspace = true }
 qnc-player-client = { workspace = true }
 qnc-player-input = { workspace = true }

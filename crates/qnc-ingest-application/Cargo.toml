@@ -6,9 +6,7 @@ edition = "2021"
 [dependencies]
 qnc-clip-row = { workspace = true }
 qnc-source-panel = { workspace = true }
-qnc-active-project-read = { workspace = true }
 qnc-contracts = { workspace = true }
-qnc-content-store = { workspace = true }
 qnc-focus-walk = { workspace = true }
 qnc-ui-text = { workspace = true }
 qnc-dev-diagnostics = { workspace = true }
@@ -22,7 +20,6 @@ qnc-ingest-catalog = { workspace = true }
 qnc-ingest-project = { workspace = true }
 qnc-form-pieces = { workspace = true }
 qnc-ingest-pieces = { workspace = true }
-qnc-ingest-clip-list = { workspace = true }
 qnc-ingest-work-plan = { workspace = true }
 qnc-camera-adapter = { workspace = true }
 qnc-ingest-cameras = { workspace = true }
@@ -39,7 +36,6 @@ qnc-timeline = { workspace = true }
 qnc-timeline-assets = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
-qnc-image-assets = { workspace = true }
 
 [dev-dependencies]
 qnc-dir-browser = { workspace = true }

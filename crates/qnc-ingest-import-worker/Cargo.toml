@@ -8,11 +8,8 @@ description = "QNC public module: executes the import of a claimed clip by the p
 qnc-import-fit = { workspace = true }
 qnc-worker-wake = { workspace = true }
 qnc-ui-text = { workspace = true }
-qnc-content-read = { workspace = true }
 qnc-active-project-read = { workspace = true }
-qnc-contracts = { workspace = true }
 qnc-dir-browser = { workspace = true }
-qnc-filmstrip = { workspace = true }
 qnc-playback-activity = { workspace = true }
 qnc-ingest-select = { workspace = true }
 qnc-ingest-store = { workspace = true }

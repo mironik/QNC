@@ -26,7 +26,6 @@ members = [
     "crates/qnc-dir-browser",
     "crates/qnc-editorial-application",
     "crates/qnc-editorial-desktop",
-    "crates/qnc-editorial-shell",
     "crates/qnc-frame-timebase",
     "crates/qnc-gain",
     "crates/qnc-short-save",
@@ -287,7 +286,6 @@ members = [
     "crates/qnc-source-contract",
     "crates/qnc-source-dock",
     "crates/qnc-source-groups",
-    "crates/qnc-source-input",
     "crates/qnc-source-index-contract",
     "crates/qnc-source-index-db",
     "crates/qnc-scanner",
@@ -337,7 +335,6 @@ qnc-dev-diagnostics = { path = "crates/qnc-dev-diagnostics" }
 qnc-dir-browser = { path = "crates/qnc-dir-browser" }
 qnc-editorial-application = { path = "crates/qnc-editorial-application" }
 qnc-editorial-desktop = { path = "crates/qnc-editorial-desktop" }
-qnc-editorial-shell = { path = "crates/qnc-editorial-shell" }
 qnc-frame-timebase = { path = "crates/qnc-frame-timebase" }
 qnc-gain = { path = "crates/qnc-gain" }
 qnc-short-save = { path = "crates/qnc-short-save" }
@@ -589,7 +586,6 @@ qnc-source-preview = { path = "crates/qnc-source-preview" }
 qnc-source-contract = { path = "crates/qnc-source-contract" }
 qnc-source-dock = { path = "crates/qnc-source-dock" }
 qnc-source-groups = { path = "crates/qnc-source-groups" }
-qnc-source-input = { path = "crates/qnc-source-input" }
 qnc-source-index-contract = { path = "crates/qnc-source-index-contract" }
 qnc-source-index-db = { path = "crates/qnc-source-index-db" }
 qnc-scanner = { path = "crates/qnc-scanner" }

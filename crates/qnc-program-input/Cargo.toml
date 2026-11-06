@@ -11,7 +11,6 @@ qnc-program-db = { workspace = true }
 qnc-clip-sound = { workspace = true }
 qnc-prerender-db = { workspace = true }
 serde_json = { workspace = true }
-qnc-frame-timebase = { workspace = true }
 qnc-media-metadata = { workspace = true }
 qnc-player-input = { workspace = true }
 qnc-program-playlist = { workspace = true }
