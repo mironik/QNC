@@ -1,4 +1,4 @@
-//! Target picture rules C1-C13 (docs/89-qnc-target-lego-catalog.md).
+//! Target picture rules C1-C13 (docs/89-qnc-target-lego-catalog.md) and C14 (docs/99-core-gui-split.md).
 //!
 //! A form is only a board of public lego pieces; the pieces are public and
 //! universal. Every rule counts its violations per key. Known violations live in
@@ -69,6 +69,7 @@ pub(crate) fn current_counts(root: &Path) -> BTreeMap<String, u64> {
     single_readers(root, &packages, &mut counts);
     fallback_paths(root, &packages, &mut counts);
     project_layout_literals(root, &packages, &mut counts);
+    core_pieces_without_egui(&packages, &mut counts);
     counts.retain(|_, count| *count > 0);
     counts
 }
@@ -122,6 +123,8 @@ struct Package {
     name: String,
     dir: PathBuf,
     runtime_deps: Vec<String>,
+    /// It draws or reads input with egui itself (`eframe` or `egui` among its dependencies).
+    gui: bool,
 }
 
 fn packages(root: &Path) -> BTreeMap<String, Package> {
@@ -137,6 +140,7 @@ fn packages(root: &Path) -> BTreeMap<String, Package> {
                     name: name.clone(),
                     dir: cargo_toml.parent()?.to_path_buf(),
                     runtime_deps: runtime_dependency_names(&contents, &index),
+                    gui: draws_with_egui(&contents),
                 },
             ))
         })
@@ -543,5 +547,34 @@ mod tests {
         compare(&BTreeMap::from([("a".to_string(), 1)]), &baseline, &mut report);
         assert!(report.is_ok());
         assert_eq!(report.warnings.len(), 2);
+    }
+}
+
+/// `eframe` or `egui` among the `[dependencies]` of a Cargo.toml.
+fn draws_with_egui(contents: &str) -> bool {
+    let mut in_dependencies = false;
+    contents.lines().any(|line| {
+        let trimmed = line.trim();
+        if trimmed.starts_with('[') {
+            in_dependencies = trimmed == "[dependencies]";
+            return false;
+        }
+        let key = trimmed.split(['=', '.']).next().unwrap_or("").trim();
+        in_dependencies && (key == "eframe" || key == "egui")
+    })
+}
+
+/// Pieces of the gui layer by their role without egui of their own: the styles of the gui pieces from
+/// the theme, and the acceptance tool that opens the program output window.
+const GUI_BY_ROLE: [&str; 2] = ["qnc-theme-styles", "qnc-player-acceptance"];
+
+/// C14 (docs/99): a core piece (it neither draws nor reads input with egui) does not depend on a
+/// piece that does: model, rules, database, player and workers build and are tested without a
+/// window. Applications (`apps/*`) host the forms and are left out.
+fn core_pieces_without_egui(packages: &BTreeMap<String, Package>, counts: &mut BTreeMap<String, u64>) {
+    for package in packages.values().filter(|package| !package.gui && !GUI_BY_ROLE.contains(&package.name.as_str()) && !package.dir.components().any(|part| part.as_os_str() == "apps")) {
+        for dep in package.runtime_deps.iter().filter(|dep| packages.get(*dep).is_some_and(|dep| dep.gui)) {
+            add(counts, format!("C14 core piece pulls egui|{} -> {dep}", package.name), 1);
+        }
     }
 }
