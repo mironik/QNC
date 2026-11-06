@@ -4,7 +4,7 @@
 //! which tab is chosen from its view; a click is answered with the index, the caller
 //! turns it into its own `action_id`. Same look as the copies it replaces.
 
-use eframe::egui::{self, Button, Color32, CornerRadius, Label, RichText, Sense, Stroke, Ui, Vec2};
+use eframe::egui::{self, Color32, Label, RichText, Sense, Stroke, Ui, Vec2};
 
 /// Colours and sizes from the caller's theme.
 #[derive(Debug, Clone, Copy)]
@@ -82,11 +82,5 @@ pub fn tab(ui: &mut Ui, text: &str, selected: bool, style: &RowStyle) -> egui::R
 
 fn command(ui: &mut Ui, text: &str, on: bool, style: &RowStyle) -> egui::Response {
     let colour = if on { style.accent } else { style.text };
-    ui.add(
-        Button::new(RichText::new(text).color(colour))
-            .fill(Color32::TRANSPARENT)
-            .stroke(Stroke::new(1.0, if on { style.accent } else { style.border }))
-            .corner_radius(CornerRadius::same(0))
-            .min_size(Vec2::new(40.0, style.control_height)),
-    )
+    ui.add(qnc_ui_kit::framed_button(RichText::new(text).color(colour), Vec2::new(40.0, style.control_height), Color32::TRANSPARENT, Some(if on { style.accent } else { style.border }), true))
 }

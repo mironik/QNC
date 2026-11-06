@@ -3732,6 +3732,7 @@ name = "qnc-confirm-dialog"
 version = "0.1.0"
 dependencies = [
  "eframe",
+ "qnc-ui-kit",
 ]
 
 [[package]]
@@ -5067,6 +5068,7 @@ name = "qnc-media-pool-head"
 version = "0.1.0"
 dependencies = [
  "eframe",
+ "qnc-ui-kit",
 ]
 
 [[package]]
@@ -6248,6 +6250,7 @@ version = "0.1.0"
 dependencies = [
  "eframe",
  "qnc-settings-path",
+ "qnc-ui-kit",
  "serde",
  "serde_json",
 ]

@@ -8218,3 +8218,10 @@ Izvedeno 2026-11-06 (korisnik: "da, pushaj i kreni s level meterom"; gui-kit C15
 boja. Zone mjeraca (ispod -12, od -12, od -3 dBFS) su `MeterStyle.zones`; daje ih traka razine iz teme timelinea
 (`TimelineTheme.meter`), koju puni gui-kit (`qnc_theme_styles::timeline`), s istim vrijednostima. Izgled isti.
 C15: 12 -> 11. Testovi, `cargo check --workspace --all-targets`, conformance. Uzivo nije provjereno.
+Izvedeno 2026-11-06 (korisnik: "da, pushaj i nastavi"; gui-kit C15): gui-kit (`qnc-ui-kit`) dobio je `framed_button`
+(tekst pozivatelja, ispuna, obrub od 1 px ili bez, ravni ili zaobljeni kutovi, najmanja velicina) i `check_box`
+(moze biti iskljucen). Kroz njih idu gumbi potvrdnog dijaloga (`qnc-confirm-dialog`), gumbi transporta glave poola i
+naredbe reda (`qnc-media-pool-head`), kvacice trake uvoza (`qnc-ingest-import-bar`), kvacica Locked obrasca priloga
+(`qnc-newsroom-sheet`) i prekidaci postavki (`qnc-settings-switches`). Izgled isti. C15: 11 -> 5 (ostaju urednik
+profila scenarija i dijagnosticki alat). Testovi, `cargo check --workspace --all-targets`, conformance. Uzivo nije
+provjereno.

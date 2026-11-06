@@ -36,7 +36,7 @@ pub fn show(ui: &mut eframe::egui::Ui, settings: &mut Value, switches: &[Switch]
     let mut changed = false;
     for switch in switches {
         let mut checked = switch.is_on(settings);
-        if ui.checkbox(&mut checked, switch.label.as_str()).changed() {
+        if qnc_ui_kit::check_box(ui, &mut checked, switch.label.as_str(), true).changed() {
             switch.set(settings, checked);
             changed = true;
         }

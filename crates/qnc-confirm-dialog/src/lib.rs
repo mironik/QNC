@@ -84,13 +84,8 @@ pub fn show(ctx: &egui::Context, style: &DialogStyle, question: Question<'_>) ->
                 egui::pos2(no_rect.right() + gap, no_rect.top()),
                 Vec2::new(button_w, style.button_height),
             );
-            let no = egui::Button::new(RichText::new(question.no).color(style.text).size(style.font_size))
-                .fill(Color32::TRANSPARENT)
-                .stroke(egui::Stroke::new(1.0, style.border));
-            let yes = egui::Button::new(
-                RichText::new(question.yes).color(Color32::WHITE).strong().size(style.font_size),
-            )
-            .fill(style.accent);
+            let no = qnc_ui_kit::framed_button(RichText::new(question.no).color(style.text).size(style.font_size), Vec2::ZERO, Color32::TRANSPARENT, Some(style.border), false);
+            let yes = qnc_ui_kit::framed_button(RichText::new(question.yes).color(Color32::WHITE).strong().size(style.font_size), Vec2::ZERO, style.accent, None, false);
             let no_clicked = ui.put(no_rect, no).clicked();
             let yes_clicked = ui.put(yes_rect, yes).clicked();
             if no_clicked {

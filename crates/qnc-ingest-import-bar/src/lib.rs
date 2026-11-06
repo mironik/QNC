@@ -84,12 +84,12 @@ pub fn show(
         let tick = |text: &str| RichText::new(text).color(theme.text).size(theme.font_ui);
         if now.archive_available {
             let mut archive = now.archive;
-            if ui.checkbox(&mut archive, tick(spec.archive_label)).changed() {
+            if qnc_ui_kit::check_box(ui, &mut archive, tick(spec.archive_label), true).changed() {
                 asked = Some(ImportBarAction::Archive(archive));
             }
         }
         let mut ai = now.ai_mining;
-        if ui.add_enabled(false, eframe::egui::Checkbox::new(&mut ai, tick(spec.ai_label))).changed() {
+        if qnc_ui_kit::check_box(ui, &mut ai, tick(spec.ai_label), false).changed() {
             asked = Some(ImportBarAction::AiMining(ai));
         }
     });

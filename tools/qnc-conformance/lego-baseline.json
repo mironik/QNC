@@ -41,13 +41,7 @@
   "C14 core piece pulls egui|qnc-segments-keys -> qnc-source-timeline": 1,
   "C15 piece colour outside theme|crates/qnc-ingest-layout/src/lib.rs": 1,
   "C15 piece colour outside theme|tools/qnc-dev-diagnostics-app/src/main.rs": 5,
-  "C15 piece private widget|crates/qnc-confirm-dialog/src/lib.rs": 2,
-  "C15 piece private widget|crates/qnc-ingest-import-bar/src/lib.rs": 2,
-  "C15 piece private widget|crates/qnc-media-pool-head/src/lib.rs": 1,
-  "C15 piece private widget|crates/qnc-media-pool-head/src/row.rs": 1,
-  "C15 piece private widget|crates/qnc-newsroom-sheet/src/lib.rs": 1,
   "C15 piece private widget|crates/qnc-script-profile-editor/src/lib.rs": 3,
-  "C15 piece private widget|crates/qnc-settings-switches/src/lib.rs": 1,
   "C15 piece private widget|crates/qnc-source-dock/src/lib.rs": 1,
   "C15 piece private widget|tools/qnc-dev-diagnostics-app/src/main.rs": 7
   }

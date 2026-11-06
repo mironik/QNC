@@ -5,4 +5,5 @@ edition = "2021"
 description = "QNC public passive UI component: a modal yes/no question over the window"
 
 [dependencies]
+qnc-ui-kit = { workspace = true }
 eframe = { workspace = true }

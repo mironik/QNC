@@ -89,3 +89,21 @@ pub fn small_button(ui: &mut Ui, text: &str, enabled: bool, selected: bool) -> e
 pub fn sized_button(text: impl Into<egui::WidgetText>, size: Vec2) -> Button<'static> {
     Button::new(text).min_size(size)
 }
+
+/// A button of its caller's text (its size, colour, font), a fill and a 1 px `border` or none,
+/// square corners or egui's rounding, at least `size`; put or added where its caller places it.
+pub fn framed_button(text: impl Into<egui::WidgetText>, size: Vec2, fill: Color32, border: Option<Color32>, square: bool) -> Button<'static> {
+    let mut button = Button::new(text).fill(fill).min_size(size);
+    if let Some(border) = border {
+        button = button.stroke(Stroke::new(1.0, border));
+    }
+    if square {
+        button = button.corner_radius(CornerRadius::same(0));
+    }
+    button
+}
+
+/// A check box of the gui-kit, greyed while not `enabled`.
+pub fn check_box(ui: &mut Ui, checked: &mut bool, text: impl Into<egui::WidgetText>, enabled: bool) -> egui::Response {
+    ui.add_enabled(enabled, egui::Checkbox::new(checked, text))
+}

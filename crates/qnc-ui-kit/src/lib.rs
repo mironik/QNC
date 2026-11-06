@@ -5,7 +5,7 @@ mod option_columns;
 mod raster;
 mod text_field;
 mod two_way_switch;
-pub use chrome_button::{chrome_button, fill_block, look_button, sized_button, small_button, strong_button, ButtonLook, ChromeButtonStyle};
+pub use chrome_button::{chrome_button, fill_block, check_box, framed_button, look_button, sized_button, small_button, strong_button, ButtonLook, ChromeButtonStyle};
 pub use option_columns::*;
 pub use raster::{paint_rgba_image, paint_rgba_image_filled};
 pub use raster::paint_stream_frame;

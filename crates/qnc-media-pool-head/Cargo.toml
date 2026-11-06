@@ -5,4 +5,5 @@ edition = "2021"
 description = "QNC public passive module: media pool head (library tabs and compact transport strip)"
 
 [dependencies]
+qnc-ui-kit = { workspace = true }
 eframe = { workspace = true }

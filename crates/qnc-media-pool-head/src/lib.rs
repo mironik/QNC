@@ -207,22 +207,17 @@ fn transport_btn(
     } else {
         Color32::TRANSPARENT
     };
-    let stroke = if active {
-        egui::Stroke::new(1.0, style.accent)
-    } else {
-        egui::Stroke::new(1.0, style.border)
-    };
-    ui.add(
-        egui::Button::new(
+    let border = if active { style.accent } else { style.border };
+    ui.add(qnc_ui_kit::framed_button(
             RichText::new(label)
                 .color(text)
                 .monospace()
                 .size(style.font_ui),
-        )
-        .min_size(Vec2::new(width, style.chrome_control_height))
-        .fill(fill)
-        .stroke(stroke),
-    )
+        Vec2::new(width, style.chrome_control_height),
+        fill,
+        Some(border),
+        false,
+    ))
 }
 
 /// Text tab link (underline when active).

@@ -251,7 +251,7 @@ fn editor(ui: &mut egui::Ui, overlay: &mut SheetOverlay, theme: &Theme) {
         label(ui, theme, qnc_ui_text::text("sheet.name"));
         ui.add_enabled(!sheet.locked, row_box(&mut sheet.name, width - LABEL_WIDTH - ROW_GAP));
     });
-    ui.checkbox(&mut sheet.locked, qnc_ui_text::text("sheet.locked"));
+    qnc_ui_kit::check_box(ui, &mut sheet.locked, qnc_ui_text::text("sheet.locked"), true);
     ui.add_space(ROW_GAP);
     fields_editor(ui, "qnc_story_sheet", &mut sheet.fields, &mut sheet.options, &mut overlay.new_label, sheet.locked, theme);
     if !overlay.message.is_empty() {
