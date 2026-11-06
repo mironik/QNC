@@ -8098,3 +8098,7 @@ obraduje (mrtva tipka); u scopeu `project` Enter je i `form_next_field` i `proje
 obrasca), u `timeline_modal` Esc i `clear_focus` i `close_player`. Oznake radnji u katalogu ostaju kao u v4 (conformance).
 Testovi `qnc-keyboard-shortcut`, `qnc-key-cheatsheet`, `qnc-panel-focus`, conformance, `cargo check --workspace
 --all-targets`.
+Izvedeno 2026-11-06 (korisnik: "makni Shift+W i pushaj"): Shift+W (`toggle_source_wrap`) uklonjen iz QNC preseta
+(scopeovi `storyboard` i `timeline_modal`): nijedna kocka ga nije obradivala, tipka nije radila nista. Radnja ostaje u
+katalogu i u ostalim presetima (preslika qnc_v4); conformance iznimke od qnc_v4 dopunjene. Testovi
+`qnc-keyboard-shortcut`, `qnc-panel-focus`, `qnc-conformance`, conformance.

@@ -894,6 +894,9 @@ const V4_KEY_EXCEPTIONS: &[(&str, &str, &str)] = &[
     // 2026-10-21 (user: "Backspace deletes the last action, Delete deletes an object"; Escape is
     // one action): Escape is clear_focus only, Delete one object (delete_marker), Backspace Undo.
     ("default", "storyboard", "close_player"),
+    // 2026-11-06 (user: "makni Shift+W"): no piece handles toggle_source_wrap, the key did nothing.
+    ("default", "storyboard", "toggle_source_wrap"),
+    ("default", "timeline_modal", "toggle_source_wrap"),
     ("default", "storyboard", "delete_part"),
     ("default", "storyboard", "delete_marker"),
     ("default", "storyboard", "undo_object"),
