@@ -14,7 +14,7 @@
 use qnc_choice_box::Choice;
 use qnc_clip_row::{ClipRow, SaveState};
 use qnc_import_fit::{Conflict, Needs};
-use qnc_ingest_store::content::ContentTarget;
+use qnc_content_store::ContentTarget;
 use std::{
     sync::mpsc::{self, Receiver, TryRecvError},
     thread::JoinHandle,

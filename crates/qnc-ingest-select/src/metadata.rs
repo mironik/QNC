@@ -5,7 +5,7 @@
 //! publishes snapshots to the caller and never writes the content DB itself.
 
 use crate::*;
-use qnc_ingest_store::content::InventoryClip;
+use qnc_content_store::InventoryClip;
 
 /// What one metadata worker needs; shared by all workers of a Select run.
 pub(crate) struct Worker<'a> {

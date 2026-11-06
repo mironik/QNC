@@ -5,7 +5,7 @@ pub mod transport_engine;
 
 pub use engine_contract::{
     AudioFramePacket, AudioOutputAdapter, BroadcastEngineError, BroadcastEngineErrorKind,
-    DecodedVideoFrame, EngineFrameRequest, EngineSourceHandle, FramePresenter, MonotonicScheduler,
+    DecodedVideoFrame, EngineFrameRequest, EngineSourceHandle, FramePresenter,
     PlayoutFrame, PlayoutOutput, SourceOpenAdapter, VideoDecodeAdapter,
 };
 pub use frame_clock::{

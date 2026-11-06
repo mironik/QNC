@@ -25,26 +25,21 @@ use qnc_program_playlist::{
 pub const MODULE_ID: &str = "qnc.module.program-input";
 pub const VERSION: &str = env!("CARGO_PKG_VERSION");
 
-/// The prepared input of a clip of the active project (`qnc-player-input`).
-pub trait ClipInputs {
-    fn prepared(&self, clip_id: &str) -> Result<PreparedInput, String>;
-    /// Frames of the A2 crossfade, the project `audio.crossfade_frames` (user 2026-10-21).
-    fn crossfade_frames(&self) -> Result<u16, String>;
-}
-
-/// `qnc-player-input` reader of the active project workspace.
+/// The prepared input of the clips of the active project: the `qnc-player-input` reader of
+/// its workspace, under one read of the project settings.
 pub struct PlayerClipInputs<'a> {
     pub session: &'a qnc_player_input::ClipSession<'a>,
 }
 
-impl ClipInputs for PlayerClipInputs<'_> {
-    fn prepared(&self, clip_id: &str) -> Result<PreparedInput, String> {
+impl PlayerClipInputs<'_> {
+    pub fn prepared(&self, clip_id: &str) -> Result<PreparedInput, String> {
         self.session
             .load(clip_id)
             .map_err(|error| format!("Klip '{clip_id}': {error}"))
     }
 
-    fn crossfade_frames(&self) -> Result<u16, String> {
+    /// Frames of the A2 crossfade, the project `audio.crossfade_frames` (user 2026-10-21).
+    pub fn crossfade_frames(&self) -> Result<u16, String> {
         self.session.settings().audio_crossfade_frames().map_err(|error| error.to_string())
     }
 }

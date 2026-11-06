@@ -3,7 +3,7 @@
 use crate::{InTheWay, Request, CANCEL_IMPORT, SKIP_CONFLICTS};
 use qnc_choice_box::{Choice, ChoiceOption};
 use qnc_import_fit::{Conflict, Needs, Playback};
-use qnc_ingest_store::content::Access;
+use qnc_content_store::Access;
 
 
 /// The selected clips that do not serve what the project uses.

@@ -2,7 +2,7 @@
 
 use crate::{load, LoadedCatalog};
 use qnc_active_project_read::ActiveProjectReader;
-use qnc_ingest_store::content::CatalogStats;
+use qnc_content_store::CatalogStats;
 
 /// Loads the catalog off the caller's thread: start it, poll for the outcome.
 /// Only one load runs at a time and a cancelled load never delivers.

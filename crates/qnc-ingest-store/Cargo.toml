@@ -8,7 +8,6 @@ description = "IngestQNC owned registry database store; project content is owned
 qnc-contracts = { workspace = true }
 qnc-db-contract = { workspace = true }
 qnc-transport-resolver = { workspace = true }
-qnc-content-store = { workspace = true }
 rusqlite = { workspace = true, features = ["hooks"] }
 
 [dev-dependencies]

@@ -1,5 +1,5 @@
 use crate::*;
-use qnc_ingest_store::content::{Access, ContentClient};
+use qnc_content_store::{Access, ContentClient};
 use qnc_media_probe::{ProbeBackend, Request as ProbeRequest};
 use serde_json::json;
 use std::{

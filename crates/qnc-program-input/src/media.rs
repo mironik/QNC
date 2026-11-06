@@ -127,13 +127,13 @@ pub fn timecode_start(clip_id: &str, input: &PreparedInput) -> Result<Option<i64
         .transpose()
 }
 
-pub(crate) struct PreparedResolver<'a, C> {
-    pub(crate) clips: &'a C,
+pub(crate) struct PreparedResolver<'a, 's> {
+    pub(crate) clips: &'a PlayerClipInputs<'s>,
     pub(crate) prepared: BTreeMap<String, PreparedInput>,
     pub(crate) story_rate: (u32, u32),
 }
 
-impl<C: ClipInputs> PreparedResolver<'_, C> {
+impl PreparedResolver<'_, '_> {
     pub(crate) fn prepared(&mut self, clip_id: &str) -> Result<&PreparedInput, String> {
         if !self.prepared.contains_key(clip_id) {
             let input = self.clips.prepared(clip_id)?;
@@ -145,7 +145,7 @@ impl<C: ClipInputs> PreparedResolver<'_, C> {
     }
 }
 
-impl<C: ClipInputs> ProgramMediaResolver for PreparedResolver<'_, C> {
+impl ProgramMediaResolver for PreparedResolver<'_, '_> {
     fn resolve(&mut self, clip_id: &str) -> Result<ResolvedProgramMedia, String> {
         let input = self.prepared(clip_id)?;
         let picture = input.media().map_err(|error| error.to_string())?;

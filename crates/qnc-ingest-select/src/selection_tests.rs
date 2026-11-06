@@ -1,7 +1,7 @@
 use super::*;
 use qnc_media_probe::Request as ProbeRequest;
 use crate::selection_config::{Binding, ProbeConfig, SourceConfig};
-use qnc_ingest_store::content::ContentClient;
+use qnc_content_store::ContentClient;
 use serde_json::json;
 use std::{path::Path, sync::mpsc};
 
@@ -440,7 +440,7 @@ fn select_uses_same_source_and_database_contracts_over_lan_and_intranet() {
         let (dir, mut config) = fixture();
         let content_uri = format!("qnc://{environment}/fixture/db/ingest_content/p1");
         crate::test_support::project_database(&dir.path().join("content.db"));
-        let mut content = qnc_ingest_store::content::ContentStore::open_owner_binding(
+        let mut content = qnc_content_store::ContentStore::open_owner_binding(
             &dir.path().join("content.db"),
             &content_uri,
             Access::ReadWrite,
@@ -478,7 +478,7 @@ fn select_uses_same_source_and_database_contracts_over_lan_and_intranet() {
                     continue;
                 };
                 match request.url() {
-                    qnc_ingest_store::content::ENDPOINT => qnc_ingest_store::content::respond(
+                    qnc_content_store::ENDPOINT => qnc_content_store::respond(
                         request,
                         &mut content,
                         &published_content,
@@ -764,7 +764,7 @@ fn a_declared_clip_from_the_card_can_be_selected_and_queued_for_import_without_a
     let mut client = ContentClient::from_owner_binding(
         &content,
         "qnc://local/db/ingest_content/p1",
-        qnc_ingest_store::content::Access::ReadWrite,
+        qnc_content_store::Access::ReadWrite,
     )
     .unwrap();
     client.select(ids, true).unwrap();

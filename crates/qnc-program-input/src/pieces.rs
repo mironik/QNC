@@ -34,7 +34,7 @@ pub struct PieceInput {
 pub fn load_pieces(
     target: &ProjectDbTarget,
     project_id: &str,
-    clips: &impl ClipInputs,
+    clips: &PlayerClipInputs<'_>,
     pieces: &[PieceInput],
 ) -> Result<ProgramInput, String> {
     let first = pieces.first().ok_or(qnc_ui_text::text("story.msg.program_is_empty"))?;

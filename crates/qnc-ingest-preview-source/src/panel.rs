@@ -3,7 +3,7 @@
 
 use crate::preview_context;
 use qnc_ingest_select::SelectionConfig;
-use qnc_ingest_store::content::ContentTarget;
+use qnc_content_store::ContentTarget;
 use qnc_source_preview::{MonitorState, SourcePreview};
 use qnc_timeline_assets::SourceTimelineAssets;
 use qnc_work_settings::{SettingsReader, WorkSettings};

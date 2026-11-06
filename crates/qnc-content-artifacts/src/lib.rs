@@ -255,17 +255,6 @@ impl qnc_filmstrip_worker::FilmstripContentRead for ProjectFilmstripContentReade
     }
 }
 
-#[derive(Clone)]
-struct ProjectFilmstripContentWriteFactory {
-    target: ProjectDbTarget,
-    lease: Option<qnc_db_broker::WriteLease>,
-}
-
-impl qnc_filmstrip_worker::FilmstripContentWriteFactory for ProjectFilmstripContentWriteFactory {
-    fn start(&self) -> Result<Box<dyn qnc_filmstrip_worker::FilmstripContentWrite>, String> {
-        Ok(Box::new(ProjectFilmstripContentWriter(ArtifactPublisher::start(&self.target, self.lease.clone())?)))
-    }
-}
 
 struct ProjectFilmstripContentWriter(ArtifactPublisher);
 
@@ -344,17 +333,6 @@ impl qnc_wave_worker::WaveContentRead for ProjectWaveContentReader {
     }
 }
 
-#[derive(Clone)]
-struct ProjectWaveContentWriteFactory {
-    target: ProjectDbTarget,
-    lease: Option<qnc_db_broker::WriteLease>,
-}
-
-impl qnc_wave_worker::WaveContentWriteFactory for ProjectWaveContentWriteFactory {
-    fn start(&self) -> Result<Box<dyn qnc_wave_worker::WaveContentWrite>, String> {
-        Ok(Box::new(ProjectWaveContentWriter(ArtifactPublisher::start(&self.target, self.lease.clone())?)))
-    }
-}
 
 struct ProjectWaveContentWriter(ArtifactPublisher);
 
@@ -464,17 +442,21 @@ pub fn artifacts_context(
             artifacts: artifacts.clone(),
             enabled: filmstrip_enabled,
         }),
-        filmstrip_writer: Arc::new(ProjectFilmstripContentWriteFactory {
-            target: project_db.clone(),
-            lease: lease.clone(),
-        }),
+        filmstrip_writer: {
+            let (target, lease) = (project_db.clone(), lease.clone());
+            Arc::new(move || -> Result<Box<dyn qnc_filmstrip_worker::FilmstripContentWrite>, String> {
+                Ok(Box::new(ProjectFilmstripContentWriter(ArtifactPublisher::start(&target, lease.clone())?)))
+            })
+        },
         filmstrip_sources: filmstrip_source_bindings(source_bindings)?,
         wave_reader: Arc::new(ProjectWaveContentReader {
             read: SharedRead::new(content_target),
             artifacts,
             enabled: wave_enabled,
         }),
-        wave_writer: Arc::new(ProjectWaveContentWriteFactory { target: project_db, lease }),
+        wave_writer: Arc::new(move || -> Result<Box<dyn qnc_wave_worker::WaveContentWrite>, String> {
+            Ok(Box::new(ProjectWaveContentWriter(ArtifactPublisher::start(&project_db, lease.clone())?)))
+        }),
         wave_sources: wave_source_bindings(source_bindings)?,
     })
 }

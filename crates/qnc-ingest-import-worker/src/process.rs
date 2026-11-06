@@ -10,12 +10,12 @@
 //! the worker did last. The form never waits for the worker.
 
 use crate::{run_next, ConfigMediaOpener, ImportQueue, TransportQueue};
-use qnc_ingest_store::content::{ImportedCopy, StoredClip};
+use qnc_content_store::{ImportedCopy, StoredClip};
 use qnc_media_metadata::MediaRepresentation;
 use qnc_active_project_read::ActiveProjectReader;
 use qnc_playback_activity::{Lease, Writer, WORKER, WORKER_FRESH_SECONDS, WORKER_RESULT};
 use qnc_ingest_select::selection_config::SelectionConfig;
-use qnc_ingest_store::content::ContentTarget;
+use qnc_content_store::ContentTarget;
 use qnc_ingest_work_plan::IngestWorkPlan;
 use qnc_work_settings::SettingsReader;
 use std::{
@@ -44,7 +44,7 @@ impl Project {
         reader: &SettingsReader,
         plan: &IngestWorkPlan,
         target: &ContentTarget,
-        lease: Option<qnc_ingest_store::content::WriteLease>,
+        lease: Option<qnc_content_store::WriteLease>,
     ) -> Result<Self, String> {
         let dir = reader
             .local_workspace_dir(&plan.settings)

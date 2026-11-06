@@ -4,7 +4,7 @@
 //! content DB already holds as final are not returned again.
 
 use crate::*;
-use qnc_ingest_store::content::InventoryClip;
+use qnc_content_store::InventoryClip;
 use qnc_source_groups::{FileFact, GroupProposal};
 
 pub(crate) fn register_groups(

@@ -76,9 +76,8 @@ pub trait FilmstripContentWrite: Send {
     fn has_pending(&self) -> bool;
 }
 
-pub trait FilmstripContentWriteFactory: Send + Sync {
-    fn start(&self) -> Result<Box<dyn FilmstripContentWrite>, String>;
-}
+/// Starts a writer for one worker thread (a writer is `Send`, not `Sync`).
+pub type FilmstripContentWriteFactory = Arc<dyn Fn() -> Result<Box<dyn FilmstripContentWrite>, String> + Send + Sync>;
 
 #[derive(Clone)]
 pub struct FilmstripSourceBinding {
@@ -181,7 +180,7 @@ pub struct FilmstripContext {
     pub filmstrip_root_uri: String,
     pub filmstrip_dir: PathBuf,
     pub content_reader: Arc<dyn FilmstripContentRead>,
-    pub content_writer: Arc<dyn FilmstripContentWriteFactory>,
+    pub content_writer: FilmstripContentWriteFactory,
     pub source_bindings: Vec<FilmstripSourceBinding>,
 }
 
@@ -471,7 +470,7 @@ impl TimelineFilmstripService {
         let Some(context) = &self.context else {
             return;
         };
-        match context.content_writer.start() {
+        match (context.content_writer)() {
             Ok(publisher) => self.publisher = Some(publisher),
             Err(error) => eprintln!("Filmstrip content transport start: {error}"),
         }

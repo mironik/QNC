@@ -7,7 +7,6 @@ use qnc_db_contract::DatabaseContract;
 use qnc_transport_resolver::{ResolvedEndpoint, ResolverConfig};
 use rusqlite::{params, Connection};
 
-pub mod content;
 mod ids;
 mod records;
 mod store;

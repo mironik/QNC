@@ -66,9 +66,8 @@ pub trait WaveContentWrite: Send {
     fn has_pending(&self) -> bool;
 }
 
-pub trait WaveContentWriteFactory: Send + Sync {
-    fn start(&self) -> Result<Box<dyn WaveContentWrite>, String>;
-}
+/// Starts a writer for one worker thread (a writer is `Send`, not `Sync`).
+pub type WaveContentWriteFactory = Arc<dyn Fn() -> Result<Box<dyn WaveContentWrite>, String> + Send + Sync>;
 
 #[derive(Clone)]
 pub struct WaveSourceBinding {
@@ -170,7 +169,7 @@ pub struct WaveContext {
     pub project_id: String,
     pub wave_root_uri: String,
     pub content_reader: Arc<dyn WaveContentRead>,
-    pub content_writer: Arc<dyn WaveContentWriteFactory>,
+    pub content_writer: WaveContentWriteFactory,
     pub source_bindings: Vec<WaveSourceBinding>,
 }
 
@@ -502,7 +501,7 @@ impl TimelineWaveService {
         let Some(context) = &self.context else {
             return;
         };
-        match context.content_writer.start() {
+        match (context.content_writer)() {
             Ok(publisher) => self.publisher = Some(publisher),
             Err(error) => {
                 wave_log(|| format!("qnc-wave-worker-error: stage=transport_start error={error}"))

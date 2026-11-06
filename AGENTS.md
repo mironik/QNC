@@ -8021,3 +8021,15 @@ i gradnjom s `libav`) te kocke koje nitko ne koristi, `qnc-editorial-shell` i `q
 `qnc-sony-metadata` (uvozi se kao `xml`, lazni nalaz), `qnc-decoder-catalog` u `qnc-app` i `qnc-story` (treba ga znacajka
 `libav`), te ovisnosti zamrznutog Projecta (`qnc-project-blocks`, `qnc-project-session`; manifest Projecta trazi
 dir-browser). Svaka biblioteka workspacea sada ima korisnika. Conformance prolazi. Uzivo nije provjereno.
+Izvedeno 2026-11-06 (korisnik: "da, kreni s P2-7 i P2-8" iz `docs/arhitektura.md`): traitovi s jednom implementacijom i
+prosljedivaci. Uklonjeno: `MonotonicScheduler` u `qnc-broadcast-player` (nitko ga nije koristio osim vlastitog testa s laznim
+rasporedivacem; test uklonjen, 79 testova playera), `ClipInputs` u `qnc-program-input` (jedna implementacija u istoj kocki:
+`PlayerClipInputs` s vlastitim metodama), traitovi `FilmstripContentWriteFactory` i `WaveContentWriteFactory` (sada tip
+funkcije koja pokrece pisca za nit radnika; tvornice u `qnc-content-artifacts` su zatvaranja). Ostaju jer su granica:
+`DecoderJobs` (ugovor dodatka dekodera), `PictureSource` (libav je zasebna kocka koju `qnc-media-decode` ne smije znati),
+`FrameBlocks` (ploca ne zna za desktop), citaci i pisci filmstripa i vala (radnici ne znaju za bazu). Prosljedivaci:
+`qnc-ingest-store::content` uklonjen, Ingest kocke, `qnc-player-input` i dijagnostika koriste `qnc-content-store` izravno
+(pravilo conformancea "public DB write boundary" trazi isti uzorak pod novim imenom); `qnc-wheel-jog` vise ne izvozi postavku
+`qnc-edit-step`, `qnc-right-panel` vise ne izvozi konstante `qnc-side-pieces`. Ponasanje isto. Testovi dotaknutih kocki,
+`cargo check --workspace --all-targets`, conformance (baseline spusten: dijagnostika vise ne ovisi o
+`qnc-ingest-store`). Uzivo nije provjereno.

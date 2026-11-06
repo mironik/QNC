@@ -15,7 +15,7 @@ serde = { workspace = true }
 serde_json = { workspace = true }
 
 [dev-dependencies]
-qnc-ingest-store = { workspace = true }
+qnc-content-store = { workspace = true }
 qnc-transport-resolver = { workspace = true }
 rusqlite = { workspace = true }
 tempfile = "3"

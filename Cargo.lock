@@ -3932,9 +3932,9 @@ dependencies = [
  "eframe",
  "qnc-active-project-read",
  "qnc-artifact-db",
+ "qnc-content-store",
  "qnc-db-broker",
  "qnc-dev-diagnostics",
- "qnc-ingest-store",
  "qnc-ingest-work-plan",
  "qnc-media-metadata",
 ]
@@ -4360,6 +4360,7 @@ dependencies = [
  "qnc-choice-box",
  "qnc-clip-posters",
  "qnc-clip-row",
+ "qnc-content-store",
  "qnc-contracts",
  "qnc-dev-diagnostics",
  "qnc-dir-browser",
@@ -4435,7 +4436,7 @@ version = "0.1.0"
 dependencies = [
  "qnc-active-project-read",
  "qnc-clip-row",
- "qnc-ingest-store",
+ "qnc-content-store",
  "qnc-ingest-work-plan",
  "qnc-media-thumbnail",
  "qnc-ui-text",
@@ -4492,10 +4493,10 @@ version = "0.1.0"
 dependencies = [
  "qnc-choice-box",
  "qnc-clip-row",
+ "qnc-content-store",
  "qnc-import-fit",
  "qnc-ingest-import-worker",
  "qnc-ingest-selection-write",
- "qnc-ingest-store",
  "qnc-ui-text",
  "qnc-work-settings",
 ]
@@ -4508,11 +4509,11 @@ dependencies = [
  "qnc-camera-adapter",
  "qnc-camera-profile-adapter",
  "qnc-camera-profiles",
+ "qnc-content-store",
  "qnc-dir-browser",
  "qnc-ffprobe-metadata",
  "qnc-import-fit",
  "qnc-ingest-select",
- "qnc-ingest-store",
  "qnc-ingest-work-plan",
  "qnc-media-metadata",
  "qnc-media-optimize",
@@ -4557,9 +4558,9 @@ name = "qnc-ingest-preview-source"
 version = "0.1.0"
 dependencies = [
  "qnc-content-artifacts",
+ "qnc-content-store",
  "qnc-image-assets",
  "qnc-ingest-select",
- "qnc-ingest-store",
  "qnc-player-client",
  "qnc-player-input",
  "qnc-source-bindings",
@@ -4577,9 +4578,9 @@ version = "0.1.0"
 dependencies = [
  "qnc-active-project-read",
  "qnc-application-sequence",
+ "qnc-content-store",
  "qnc-ingest-catalog",
  "qnc-ingest-select",
- "qnc-ingest-store",
  "qnc-ingest-work-plan",
  "qnc-media-thumbnail",
  "qnc-ui-text",
@@ -4599,6 +4600,7 @@ dependencies = [
  "qnc-camera-patterns",
  "qnc-camera-profile-adapter",
  "qnc-camera-profiles",
+ "qnc-content-store",
  "qnc-contracts",
  "qnc-db-broker",
  "qnc-decoder-catalog",
@@ -4606,7 +4608,6 @@ dependencies = [
  "qnc-image-assets",
  "qnc-import-fit",
  "qnc-ingest-cameras",
- "qnc-ingest-store",
  "qnc-media-metadata",
  "qnc-media-probe",
  "qnc-media-record-db",
@@ -4649,8 +4650,8 @@ version = "0.1.0"
 dependencies = [
  "qnc-choice-box",
  "qnc-clip-row",
+ "qnc-content-store",
  "qnc-import-fit",
- "qnc-ingest-store",
  "qnc-ui-text",
 ]
 
@@ -4658,7 +4659,6 @@ dependencies = [
 name = "qnc-ingest-store"
 version = "0.1.0"
 dependencies = [
- "qnc-content-store",
  "qnc-contracts",
  "qnc-db-contract",
  "qnc-transport-resolver",
@@ -5417,9 +5417,9 @@ dependencies = [
 name = "qnc-player-input"
 version = "0.3.0"
 dependencies = [
+ "qnc-content-store",
  "qnc-contracts",
  "qnc-frame-timebase",
- "qnc-ingest-store",
  "qnc-media-metadata",
  "qnc-media-records",
  "qnc-program-playlist",

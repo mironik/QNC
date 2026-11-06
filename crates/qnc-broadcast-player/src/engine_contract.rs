@@ -323,20 +323,6 @@ pub trait PlayoutOutput {
     fn stop_playout(&mut self) -> Result<Vec<BroadcastEvent>, BroadcastEngineError>;
 }
 
-pub trait MonotonicScheduler {
-    fn start_at_frame(
-        &mut self,
-        frame: FrameNumber,
-        timebase: Timebase,
-        rate_num: i32,
-        rate_den: u32,
-    ) -> Result<(), BroadcastEngineError>;
-
-    fn stop(&mut self) -> Result<(), BroadcastEngineError>;
-
-    fn next_due_frame(&mut self) -> Result<Option<FrameNumber>, BroadcastEngineError>;
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -419,20 +405,6 @@ mod tests {
                 peak_dbfs_x100: -1200
             } if track_id == "monitor"
         )));
-    }
-
-    #[test]
-    fn scheduler_contract_returns_due_frames_only() {
-        let mut scheduler = FakeScheduler::default();
-
-        scheduler
-            .start_at_frame(20, Timebase::new(25, 1).unwrap(), 1, 1)
-            .unwrap();
-
-        assert_eq!(scheduler.next_due_frame().unwrap(), Some(20));
-        assert_eq!(scheduler.next_due_frame().unwrap(), Some(21));
-        scheduler.stop().unwrap();
-        assert_eq!(scheduler.next_due_frame().unwrap(), None);
     }
 
     #[test]
@@ -574,43 +546,6 @@ mod tests {
 
         fn stop_audio(&mut self) -> Result<Vec<BroadcastEvent>, BroadcastEngineError> {
             Ok(Vec::new())
-        }
-    }
-
-    #[derive(Default)]
-    struct FakeScheduler {
-        next_frame: Option<FrameNumber>,
-    }
-
-    impl MonotonicScheduler for FakeScheduler {
-        fn start_at_frame(
-            &mut self,
-            frame: FrameNumber,
-            _timebase: Timebase,
-            _rate_num: i32,
-            rate_den: u32,
-        ) -> Result<(), BroadcastEngineError> {
-            if rate_den == 0 {
-                return Err(BroadcastEngineError::new(
-                    BroadcastEngineErrorKind::Schedule,
-                    "rate_den must be greater than zero",
-                ));
-            }
-            self.next_frame = Some(frame);
-            Ok(())
-        }
-
-        fn stop(&mut self) -> Result<(), BroadcastEngineError> {
-            self.next_frame = None;
-            Ok(())
-        }
-
-        fn next_due_frame(&mut self) -> Result<Option<FrameNumber>, BroadcastEngineError> {
-            let Some(frame) = self.next_frame else {
-                return Ok(None);
-            };
-            self.next_frame = Some(frame.saturating_add(1));
-            Ok(Some(frame))
         }
     }
 }

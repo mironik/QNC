@@ -25,7 +25,7 @@ fn reads_existing_active_settings_and_v4_directory_roles_without_ui_payload() {
 
 #[test]
 fn missing_project_db_is_not_recreated_and_import_is_rejected() {
-    use qnc_ingest_store::content::{Access, ContentTarget};
+    use qnc_content_store::{Access, ContentTarget};
     let root = fixture();
     let reader = SettingsReader::local(root.path().join("data/qnc-projects.db"));
     let target = ContentTarget::for_project(&reader, &reader.read().unwrap()).unwrap();

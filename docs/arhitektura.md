@@ -277,11 +277,13 @@ Gdje se blokira ili nepotrebno kopira (iz loga i koda):
    `qnc-source-preview` (4), `qnc-ingest-import-worker` (3), `qnc-player-runner` (3).
    Napomena: conformance trazi da manifest i kod budu uskladeni, pa ih treba maknuti, ne ignorirati.
 6. **Kocke koje nitko ne koristi**: `qnc-editorial-shell`, `qnc-source-input`.
-7. **Traitovi s jednom implementacijom** (provjeriti trebaju li za testove ili granicu):
+7. ~~**Traitovi s jednom implementacijom**~~ (izvedeno 2026-11-06: uklonjeni `MonotonicScheduler`, `ClipInputs`,
+   `FilmstripContentWriteFactory` i `WaveContentWriteFactory` kao traitovi; ostaju kao granice `DecoderJobs`, `PictureSource`,
+   `FrameBlocks` i citaci/pisci filmstripa i vala) (provjeriti trebaju li za testove ili granicu):
    `ClipInputs`, `DecoderJobs`, `FilmstripContentRead/Write/WriteFactory`,
    `WaveContentRead/Write/WriteFactory`, `FrameBlocks`, `MonotonicScheduler`, `PictureSource`.
    Filmstrip i val imaju po tri zrcalna traita; jedan par citac/pisac artefakata bio bi dovoljan.
-8. **Prosljedivaci**: `qnc-ingest-store::content` (samo re-export `qnc-content-store`),
+8. ~~**Prosljedivaci**~~ (izvedeno 2026-11-06): `qnc-ingest-store::content` (samo re-export `qnc-content-store`),
    `qnc-wheel-jog` (ponovno izvozi postavku iz `qnc-edit-step`), `qnc-right-panel` (ponovno izvozi
    konstante `qnc-side-pieces`).
 

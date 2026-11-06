@@ -36,7 +36,7 @@ fn marking_an_uncommitted_preview_is_local_and_stale_ack_does_not_mark_it_saved(
 
 #[test]
 fn project_poster_thumbnails_load_after_active_project_plan_is_set() {
-    use qnc_ingest_store::content::{Access, ContentClient, ContentTarget};
+    use qnc_content_store::{Access, ContentClient, ContentTarget};
     use std::sync::{
         atomic::{AtomicUsize, Ordering},
         Arc,
@@ -140,7 +140,7 @@ fn reload_changes_plan_from_db_and_discards_unpersisted_ui_state() {
 
 #[test]
 fn activation_checks_catalog_signature_and_reloads_only_when_db_changed() {
-    use qnc_ingest_store::content::{Access, ContentClient, ContentTarget};
+    use qnc_content_store::{Access, ContentClient, ContentTarget};
     use std::sync::{
         atomic::{AtomicUsize, Ordering},
         Arc,
@@ -205,7 +205,7 @@ fn activation_checks_catalog_signature_and_reloads_only_when_db_changed() {
 
 #[test]
 fn catalog_selection_and_source_metadata_survive_restart_and_project_switch_without_probe() {
-    use qnc_ingest_store::content::{Access, ContentClient, ContentTarget};
+    use qnc_content_store::{Access, ContentClient, ContentTarget};
     use std::sync::{
         atomic::{AtomicUsize, Ordering},
         Arc,

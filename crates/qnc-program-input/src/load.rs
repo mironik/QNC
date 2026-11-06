@@ -4,7 +4,7 @@ use super::*;
 pub fn load_program(
     target: &ProjectDbTarget,
     project_id: &str,
-    clips: &impl ClipInputs,
+    clips: &PlayerClipInputs<'_>,
     normalize: Option<CoverRule>,
 ) -> Result<ProgramInput, String> {
     load(target, project_id, clips, None, None, normalize)
@@ -17,7 +17,7 @@ pub fn load_program(
 pub fn load_sound_bed(
     target: &ProjectDbTarget,
     project_id: &str,
-    clips: &impl ClipInputs,
+    clips: &PlayerClipInputs<'_>,
     window: (u64, u64),
 ) -> Result<ProgramInput, String> {
     load(target, project_id, clips, Some(window), None, None)
@@ -52,7 +52,7 @@ pub fn sound_only(mut playlist: qnc_program_playlist::FlatProgramPlaylist) -> qn
 pub(crate) fn load(
     target: &ProjectDbTarget,
     project_id: &str,
-    clips: &impl ClipInputs,
+    clips: &PlayerClipInputs<'_>,
     window: Option<(u64, u64)>,
     draft: Option<&SoundDraft>,
     normalize: Option<CoverRule>,

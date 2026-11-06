@@ -44,23 +44,23 @@ impl ImportQueue for ContentClient {
 /// The import queue reached through the serialized content write transport: the
 /// only way this module writes to the content database.
 pub struct TransportQueue {
-    transport: qnc_ingest_store::content::ContentWriteTransport,
+    transport: qnc_content_store::ContentWriteTransport,
     sequence: u64,
 }
 
 impl TransportQueue {
-    pub fn start(target: qnc_ingest_store::content::ContentTarget) -> Result<Self, String> {
+    pub fn start(target: qnc_content_store::ContentTarget) -> Result<Self, String> {
         Self::start_leased(target, None)
     }
 
     /// A queue whose writes are made under `lease` (external audit 2026-10-17): once the
     /// worker lost it, the database owner refuses its claims and results.
     pub fn start_leased(
-        target: qnc_ingest_store::content::ContentTarget,
-        lease: Option<qnc_ingest_store::content::WriteLease>,
+        target: qnc_content_store::ContentTarget,
+        lease: Option<qnc_content_store::WriteLease>,
     ) -> Result<Self, String> {
         Ok(Self {
-            transport: qnc_ingest_store::content::ContentWriteTransport::start_leased(target, lease)
+            transport: qnc_content_store::ContentWriteTransport::start_leased(target, lease)
                 .map_err(|e| e.to_string())?,
             sequence: 0,
         })
@@ -71,7 +71,7 @@ impl TransportQueue {
         format!("import-{what}-{}", self.sequence)
     }
 
-    fn wait(&mut self, key: &str) -> Result<qnc_ingest_store::content::ContentWriteData, String> {
+    fn wait(&mut self, key: &str) -> Result<qnc_content_store::ContentWriteData, String> {
         loop {
             for completion in self.transport.poll() {
                 if completion.key == key {
@@ -114,7 +114,7 @@ impl ImportQueue for TransportQueue {
     }
 
     fn claim_next(&mut self) -> Result<Option<StoredClip>, String> {
-        use qnc_ingest_store::content::ContentWriteData;
+        use qnc_content_store::ContentWriteData;
         let key = self.next_key("claim");
         self.transport
             .claim_next(key.clone())
@@ -143,6 +143,6 @@ impl ImportQueue for TransportQueue {
 }
 
 /// Queues the selected clips through the write transport of `target`.
-pub fn queue_selected(target: qnc_ingest_store::content::ContentTarget, needs: qnc_import_fit::Needs) -> Result<(), String> {
+pub fn queue_selected(target: qnc_content_store::ContentTarget, needs: qnc_import_fit::Needs) -> Result<(), String> {
     TransportQueue::start(target)?.queue_selected(needs)
 }

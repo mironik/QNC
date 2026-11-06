@@ -1,5 +1,5 @@
 //! Read-only diagnostic. Does not open any source media or start playback.
-use qnc_ingest_store::content::{Access, ContentTarget, PAGE_SIZE};
+use qnc_content_store::{Access, ContentTarget, PAGE_SIZE};
 use qnc_player_input::{InputReader, PlayerClipRecord, PlayerContentRead};
 use qnc_work_settings::SettingsReader;
 use std::{path::PathBuf, sync::Arc};
@@ -17,8 +17,8 @@ impl PlayerContentRead for StorePlayerContentReader {
             snapshot: stored.clip.snapshot,
             imported_media_uri: stored.imported_media_uri,
             imported_copy_of: stored.imported_copy_of.map(|copy| match copy {
-                qnc_ingest_store::content::ImportedCopy::Original => qnc_player_input::Representation::Original,
-                qnc_ingest_store::content::ImportedCopy::Proxy => qnc_player_input::Representation::Proxy,
+                qnc_content_store::ImportedCopy::Original => qnc_player_input::Representation::Original,
+                qnc_content_store::ImportedCopy::Proxy => qnc_player_input::Representation::Proxy,
             }),
             imported_optimized: stored.imported_optimized,
         }))

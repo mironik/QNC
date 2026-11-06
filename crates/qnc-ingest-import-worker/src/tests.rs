@@ -1,6 +1,6 @@
 use super::*;
 use qnc_ingest_select::{test_support, Event};
-use qnc_ingest_store::content::{Access, ImportStatus};
+use qnc_content_store::{Access, ImportStatus};
 use qnc_ingest_work_plan::IngestWorkPlan;
 use std::{
     collections::BTreeMap,
@@ -89,7 +89,7 @@ struct Fixture {
     _card: tempfile::TempDir,
     project: tempfile::TempDir,
     client: ContentClient,
-    target: qnc_ingest_store::content::ContentTarget,
+    target: qnc_content_store::ContentTarget,
     media: BTreeMap<String, Vec<u8>>,
     original: String,
     proxy: String,
@@ -121,7 +121,7 @@ fn fixture_with(queued: bool) -> Fixture {
     let mut client =
         ContentClient::from_owner_binding(&content, DB_URI, Access::ReadWrite).unwrap();
     let target =
-        qnc_ingest_store::content::ContentTarget::from_owner_binding(&content, DB_URI).unwrap();
+        qnc_content_store::ContentTarget::from_owner_binding(&content, DB_URI).unwrap();
     client.select(ids.clone(), true).unwrap();
     if queued {
         client.queue_selected(qnc_import_fit::Needs::original_only()).unwrap();
@@ -246,7 +246,7 @@ fn original_mode_copies_the_original_into_the_project_and_records_the_outcome() 
     assert_eq!(stored.imported_media_uri.as_deref(), Some(uri.as_str()));
     assert_eq!(
         stored.imported_copy_of,
-        Some(qnc_ingest_store::content::ImportedCopy::Original),
+        Some(qnc_content_store::ImportedCopy::Original),
         "the copy says which representation it copies"
     );
 }

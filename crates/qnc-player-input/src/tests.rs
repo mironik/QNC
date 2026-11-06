@@ -1,7 +1,7 @@
 #![cfg(test)]
 use super::*;
-use qnc_ingest_store::content::{
-    self, Access, CatalogClip, ContentClient, ContentStore, ContentTarget, Credentials,
+use qnc_content_store::{
+    self as content, Access, CatalogClip, ContentClient, ContentStore, ContentTarget, Credentials,
     ImportStatus, StoredClip, content_uri,
 };
 use qnc_media_metadata as m;
@@ -22,8 +22,8 @@ impl PlayerClipSource for StoredClip {
 
     fn imported_copy_of(&self) -> Option<Representation> {
         self.imported_copy_of.map(|copy| match copy {
-            qnc_ingest_store::content::ImportedCopy::Original => Representation::Original,
-            qnc_ingest_store::content::ImportedCopy::Proxy => Representation::Proxy,
+            qnc_content_store::ImportedCopy::Original => Representation::Original,
+            qnc_content_store::ImportedCopy::Proxy => Representation::Proxy,
         })
     }
 
@@ -49,8 +49,8 @@ impl PlayerContentRead for StorePlayerContentReader {
             snapshot: stored.clip.snapshot,
             imported_media_uri: stored.imported_media_uri,
             imported_copy_of: stored.imported_copy_of.map(|copy| match copy {
-                qnc_ingest_store::content::ImportedCopy::Original => crate::Representation::Original,
-                qnc_ingest_store::content::ImportedCopy::Proxy => crate::Representation::Proxy,
+                qnc_content_store::ImportedCopy::Original => crate::Representation::Original,
+                qnc_content_store::ImportedCopy::Proxy => crate::Representation::Proxy,
             }),
             imported_optimized: stored.imported_optimized,
         }))
@@ -535,7 +535,7 @@ fn an_imported_copy_of_the_original_plays_from_the_copy_with_the_saved_record() 
     let copy = "qnc://local/source/project-p1/file/original/c1_clip.mxf".to_string();
     clip.import_status = ImportStatus::Imported;
     clip.imported_media_uri = Some(copy.clone());
-    clip.imported_copy_of = Some(qnc_ingest_store::content::ImportedCopy::Original);
+    clip.imported_copy_of = Some(qnc_content_store::ImportedCopy::Original);
     let input = prepare(&settings("qnc://local", "original"), &clip).unwrap();
     assert_eq!(input.media().unwrap().media_uri, copy, "picture from the copy");
     assert_eq!(input.audio_media().media_uri, copy, "sound from the copy");

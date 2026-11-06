@@ -3,7 +3,7 @@
 
 use crate::{CatalogClipRow, CatalogThumbStatus};
 use qnc_active_project_read::ActiveProjectReader;
-use qnc_ingest_store::content::{Access, CatalogStats, ContentTarget, ImportStatus, StoredClipSummary};
+use qnc_content_store::{Access, CatalogStats, ContentTarget, ImportStatus, StoredClipSummary};
 use qnc_ingest_work_plan::IngestWorkPlan;
 
 #[derive(Debug)]

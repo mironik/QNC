@@ -8,7 +8,7 @@
 use qnc_active_project_read::ActiveProjectReader;
 use qnc_ingest_catalog::{CatalogClipRow, CatalogLoader, CatalogSource};
 use qnc_ingest_select::SelectTarget;
-use qnc_ingest_store::content::{CatalogStats, ContentTarget};
+use qnc_content_store::{CatalogStats, ContentTarget};
 use qnc_ingest_work_plan::IngestWorkPlan;
 use qnc_work_settings::SettingsReader;
 

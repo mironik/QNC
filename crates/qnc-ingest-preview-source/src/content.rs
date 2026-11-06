@@ -1,7 +1,7 @@
 //! The Ingest content database as the source of the clips the universal preview opens.
 
 use qnc_ingest_select::SelectionConfig;
-use qnc_ingest_store::content::{Access, ContentTarget};
+use qnc_content_store::{Access, ContentTarget};
 use qnc_player_input::{PlayerClipRecord, PlayerContentRead};
 use qnc_source_bindings::SourceBinding;
 use qnc_source_preview::PreviewContext;
@@ -21,8 +21,8 @@ impl PlayerContentRead for IngestPlayerContent {
             snapshot: stored.clip.snapshot,
             imported_media_uri: stored.imported_media_uri,
             imported_copy_of: stored.imported_copy_of.map(|copy| match copy {
-                qnc_ingest_store::content::ImportedCopy::Original => qnc_player_input::Representation::Original,
-                qnc_ingest_store::content::ImportedCopy::Proxy => qnc_player_input::Representation::Proxy,
+                qnc_content_store::ImportedCopy::Original => qnc_player_input::Representation::Original,
+                qnc_content_store::ImportedCopy::Proxy => qnc_player_input::Representation::Proxy,
             }),
             imported_optimized: stored.imported_optimized,
         }))

@@ -10,7 +10,7 @@ qnc-image-assets = { workspace = true }
 qnc-source-timeline = { workspace = true }
 qnc-content-artifacts = { workspace = true }
 qnc-ingest-select = { workspace = true }
-qnc-ingest-store = { workspace = true }
+qnc-content-store = { workspace = true }
 qnc-player-client = { workspace = true }
 qnc-player-input = { workspace = true }
 qnc-source-bindings = { workspace = true }

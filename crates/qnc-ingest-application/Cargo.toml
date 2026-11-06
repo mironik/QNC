@@ -27,6 +27,7 @@ qnc-ingest-select = { workspace = true }
 qnc-ingest-select-run = { workspace = true }
 qnc-source-timeline = { workspace = true }
 qnc-ingest-store = { workspace = true }
+qnc-content-store = { workspace = true }
 qnc-clip-posters = { workspace = true }
 qnc-media-thumbnail = { workspace = true }
 qnc-work-settings = { workspace = true }

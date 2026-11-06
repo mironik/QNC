@@ -5,7 +5,7 @@
 //! metadata, no probe and no database write.
 
 use crate::*;
-use qnc_ingest_store::content::InventoryClip;
+use qnc_content_store::InventoryClip;
 use qnc_source_groups::{FileFact, GroupProposal};
 
 pub(crate) struct Scanned {

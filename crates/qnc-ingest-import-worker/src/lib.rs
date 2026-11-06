@@ -35,7 +35,7 @@ pub use queue::{queue_selected, ImportQueue, TransportQueue};
 pub use run::{drain, run_next, Outcome};
 pub(crate) use copy::*;
 pub(crate) use plan::*;
-use qnc_ingest_store::content::{ContentClient, ImportedCopy, StoredClip};
+use qnc_content_store::{ContentClient, ImportedCopy, StoredClip};
 use qnc_media_metadata::MediaRepresentation;
 use qnc_ingest_work_plan::{IngestMedia, IngestWorkPlan, PlaybackInput};
 use std::{io::Read, path::Path};

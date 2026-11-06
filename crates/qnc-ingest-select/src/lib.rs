@@ -16,7 +16,7 @@ pub use types::*;
 pub(crate) use run::*;
 
 use qnc_camera_adapter::{CameraRegistry, MetadataSufficiency};
-use qnc_ingest_store::content::{
+use qnc_content_store::{
     Access, CatalogClip, ContentTarget, ContentWriteData, ContentWriteResult,
     ContentWriteTransport, ImportStatus, StoredClip,
 };

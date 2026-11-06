@@ -6,7 +6,7 @@
 //! copy is frame N of the original and the export can take the original.
 
 use crate::{inside_project, safe_name, MediaOpener};
-use qnc_ingest_store::content::StoredClip;
+use qnc_content_store::StoredClip;
 use qnc_ingest_work_plan::IngestWorkPlan;
 use qnc_media_metadata::{FrameCount, MediaRepresentation, StreamDetails};
 use std::{fs, path::Path, sync::atomic::AtomicBool, sync::OnceLock};

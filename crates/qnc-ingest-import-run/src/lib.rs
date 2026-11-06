@@ -8,7 +8,7 @@ use std::{path::Path, sync::Arc};
 
 use qnc_clip_row::ClipRow;
 use qnc_ingest_selection_write::SelectionWriter;
-use qnc_ingest_store::content::ContentTarget;
+use qnc_content_store::ContentTarget;
 use qnc_work_settings::WorkSettings;
 
 pub use qnc_choice_box::Choice;

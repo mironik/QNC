@@ -13,7 +13,7 @@ pub const VERSION: &str = env!("CARGO_PKG_VERSION");
 
 /// The wheel's direction is this computer's choice, read in the one step block
 /// (`qnc-edit-step`, user 2026-11-05: every timeline the same blocks).
-pub use qnc_edit_step::{playhead_up_forward, SETTING_FILE};
+use qnc_edit_step::playhead_up_forward;
 
 /// Whether a scroll is a mouse wheel's whole notch (or page); a fine one (points, or a
 /// fraction of a notch as Windows gives a touchpad) is the touchpad's.

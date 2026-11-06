@@ -5,7 +5,7 @@
 //! confirmed.
 
 use crate::*;
-use qnc_ingest_store::content::InventoryClip;
+use qnc_content_store::InventoryClip;
 
 /// Writes the published clips until the channel closes or Select is cancelled.
 pub(crate) fn publish_batches(

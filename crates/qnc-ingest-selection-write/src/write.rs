@@ -1,7 +1,7 @@
 //! The selection written once through the content write transport, on the writer's thread.
 
 use crate::{conflicts::in_the_way, Applied, Request, Stop};
-use qnc_ingest_store::content::ContentWriteTransport;
+use qnc_content_store::ContentWriteTransport;
 use std::time::Duration;
 
 pub(crate) fn write(mut request: Request) -> Result<Applied, Stop> {

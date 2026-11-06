@@ -1832,7 +1832,7 @@ fn scan_public_db_write_boundary(root: &Path) -> CheckResult {
         for forbidden in [
             "ContentClient::from_owner_binding(",
             "ContentStore::open_owner_binding(",
-            ".open(qnc_ingest_store::content::Access::ReadWrite)",
+            ".open(qnc_content_store::Access::ReadWrite)",
             ".open(Access::ReadWrite)",
             "rusqlite::Connection::open(",
             "Connection::open(",

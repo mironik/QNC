@@ -31,10 +31,10 @@ pub struct ArtifactsContext {
     pub wave_root_uri: String,
     pub timeline_reader: Arc<dyn TimelineArtifactRead>,
     pub filmstrip_reader: Arc<dyn FilmstripContentRead>,
-    pub filmstrip_writer: Arc<dyn FilmstripContentWriteFactory>,
+    pub filmstrip_writer: FilmstripContentWriteFactory,
     pub filmstrip_sources: Vec<FilmstripSourceBinding>,
     pub wave_reader: Arc<dyn WaveContentRead>,
-    pub wave_writer: Arc<dyn WaveContentWriteFactory>,
+    pub wave_writer: WaveContentWriteFactory,
     pub wave_sources: Vec<WaveSourceBinding>,
 }
 

@@ -12,7 +12,7 @@ qnc-active-project-read = { workspace = true }
 qnc-dir-browser = { workspace = true }
 qnc-playback-activity = { workspace = true }
 qnc-ingest-select = { workspace = true }
-qnc-ingest-store = { workspace = true }
+qnc-content-store = { workspace = true }
 qnc-ingest-work-plan = { workspace = true }
 qnc-media-stream = { workspace = true }
 qnc-missing-posters = { workspace = true }
