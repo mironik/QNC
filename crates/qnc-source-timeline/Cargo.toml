@@ -28,3 +28,4 @@ qnc-wheel-jog = { workspace = true }
 qnc-edit-step = { workspace = true }
 qnc-clip-sound = { workspace = true }
 qnc-edit-words = { workspace = true }
+qnc-edit-edge = { workspace = true }

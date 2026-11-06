@@ -21,30 +21,36 @@ impl PanelFocus {
         // transport (Space, a click on a timeline) ends its own movement.
         // Dynamic trim (docs/98 1.4): the play around a taken cut, and K brings the taken
         // edge to where it stopped the playhead (JKL in trim, as in every editor).
-        if action_id == qnc_trim_play::AROUND {
-            return Some(self.trim_around(pieces.0, pieces.2));
+        if action_id == qnc_playhead_moves::AROUND {
+            let cut = self.taken_cut(pieces.2);
+            return Some(self.moves.around(cut, pieces.0));
         }
-        if action_id == qnc_shuttle::STOP {
-            self.shuttle_key(action_id, pieces.0);
-            self.trim_to_stop((&mut *pieces.0, &mut *pieces.1, &mut *pieces.2, &mut *pieces.3));
+        if action_id == qnc_playhead_moves::STOP {
+            // K with a cut taken: the taken edge goes where the playhead stopped, by the same
+            // steps the arrows give it, so every kind of taken cut keeps its own rules.
+            let cut = self.taken_cut(pieces.2);
+            let by = self.moves.stopped(cut, pieces.0);
+            let action = if by > 0 { "step_forward_frame" } else { "step_back_frame" };
+            for _ in 0..by.unsigned_abs().min(500) {
+                self.route(action, (&mut *pieces.0, &mut *pieces.1, &mut *pieces.2, &mut *pieces.3));
+            }
             return Some(true);
         }
-        if let Some(done) = self.shuttle_key(action_id, pieces.0) {
+        if let Some(done) = self.moves.key(action_id, pieces.0) {
             return Some(done);
         }
         if matches!(action_id, "play_pause" | "timeline_cue_frame") {
-            self.shuttle.stop();
-            self.trim_loop = None;
-            pieces.0.set_scrubbing(false);
+            self.moves.stop(pieces.0);
         }
         // The one meaning of a word (`qnc-edit-words`, AGENTS 0.12): a click on a word of the
         // transcript while the source IN or OUT is taken brings that mark to the word (as in
         // the zoom), it does not only cue.
-        if action_id == qnc_transcript::CUE_WORD && self.source.mark_taken(pieces.3) {
-            let from = event.value.and_then(|from| u64::try_from(from).ok());
-            if let Some(from) = from {
+        if action_id == qnc_transcript::CUE_WORD {
+            if let Some(from) = event.value.and_then(|from| u64::try_from(from).ok()) {
                 let to = event.target.as_deref().and_then(|to| to.parse().ok()).unwrap_or(from + 1);
-                return Some(self.source_mark_to_word(qnc_edit_words::Word::new(from, to), pieces.0, pieces.3));
+                if let Some(done) = self.source.mark_to_word(from, to, pieces.0, pieces.3) {
+                    return Some(done);
+                }
             }
         }
         // The own actions of the right panel pieces this form has (transcript, script, shots).
@@ -53,8 +59,18 @@ impl PanelFocus {
         }
         // F: match frame (`qnc-match-frame`, docs/98 1.3): from the story to the same picture of
         // its clip on the source timeline, from the source timeline to where the story plays it.
-        if action_id == qnc_match_frame::MATCH_FRAME {
-            return Some(self.match_frame(pieces.0, pieces.1, pieces.2));
+        if action_id == qnc_segments_keys::MATCH_FRAME {
+            return Some(match qnc_segments_keys::match_frame(self.panel == Panel::Segments, pieces.0, pieces.1, pieces.2) {
+                Some(qnc_segments_keys::Matched::Source(done)) => {
+                    self.panel = Panel::SourceTimeline;
+                    done
+                }
+                Some(qnc_segments_keys::Matched::Story(done)) => {
+                    self.panel = Panel::Segments;
+                    done
+                }
+                None => false,
+            });
         }
         // Ctrl+Shift+S: a slip of the segment under the Wrap playhead (docs/98 1.5); the
         // SubSegment's own slip its script took above.
@@ -87,49 +103,28 @@ impl PanelFocus {
         if action_id == qnc_transcript::CUT_WORD {
             let word = event.value.and_then(|from| u64::try_from(from).ok()).zip(event.target.as_deref().and_then(|to| to.parse().ok()));
             let Some((from, to)) = word else { return Some(false) };
-            let word = qnc_edit_words::Word::new(from, to);
             // In the zoom of the Wrap rows (user 2026-11-04: "a click on a word in Story's zoom
             // too") the taken cut goes to the nearer edge of the word, the same steps as the
             // arrows give it, so every kind of taken cut (marker, slot edge, J/L) follows.
             if event.at.as_deref() == Some("segments") {
-                let Some(cut) = pieces.2.view().zoom_sound.as_ref().map(|sound| sound.cut) else { return Some(false) };
+                let Some((action, times)) = qnc_segments_keys::word_steps(pieces.2, from, to) else { return Some(false) };
                 self.panel = Panel::Segments;
-                let goal = word.goal(None, cut);
-                let action = if goal > cut { "step_forward_frame" } else { "step_back_frame" };
                 let mut done = false;
-                for _ in 0..goal.abs_diff(cut).min(500) {
+                for _ in 0..times {
                     done |= self.route_on_panel(action, (&mut *pieces.0, &mut *pieces.1, &mut *pieces.2, &mut *pieces.3)).unwrap_or(false);
                 }
                 return Some(done);
             }
             // In the trim zoom of a taken IN or OUT the word moves that mark: IN to its start,
             // OUT to its end; the mark stays taken.
-            if self.source.mark_taken(pieces.3) {
-                return Some(self.source_mark_to_word(word, pieces.0, pieces.3));
+            if let Some(done) = self.source.mark_to_word(from, to, pieces.0, pieces.3) {
+                return Some(done);
             }
-            return Some(self.source.cut_word(pieces.3, word.from, word.to));
+            return Some(self.source.cut_word(pieces.3, from, to));
         }
-        // The Export button opens the box of the project's export settings (user 2026-10-24);
-        // while it is open its keys are its own.
-        if action_id == "export_open" {
-            if let Some(export) = pieces.0.export_settings() {
-                pieces.2.open_export(&export, pieces.0.story_outputs());
-            }
-            return Some(true);
-        }
-        if pieces.2.export_open() && event.at.is_none() {
-            use qnc_program_segments::SegmentCommand;
-            match action_id {
-                "step_prev_part" | "step_prev_segment" | "page_prev" => pieces.2.export_step(true),
-                "step_next_part" | "step_next_segment" | "page_next" => pieces.2.export_step(false),
-                // Left and right: the PAL and NTSC tabs (user 2026-10-25).
-                "step_back_frame" => pieces.2.export_tab(false),
-                "step_forward_frame" => pieces.2.export_tab(true),
-                "activate_focused_item" => _ = pieces.2.apply(SegmentCommand::ExportConfirm),
-                "clear_focus" | "close_player" => _ = pieces.2.apply(SegmentCommand::ExportCancel),
-                _ => {}
-            }
-            return Some(true);
+        // The Export button and the box it opens (piece `qnc-segments-keys`).
+        if let Some(done) = qnc_segments_keys::export(action_id, event.at.is_some(), pieces.0, pieces.2) {
+            return Some(done);
         }
         let routed = match self.pointer(&event, (&mut *pieces.0, &mut *pieces.1, &mut *pieces.2, &mut *pieces.3)) {
             Some(answer) => answer,
@@ -226,33 +221,6 @@ impl PanelFocus {
                 None
             }
         }
-    }
-
-    /// F (match frame): on the segment panel the clip and frame under the Wrap playhead open on
-    /// the source timeline; elsewhere the story's place of the source picture shown becomes the
-    /// Wrap playhead (F again: the next place it is used). False when there is no such picture.
-    fn match_frame(&mut self, preview: &mut SourcePreview, wrap: &mut WrapSession, segments: &mut ProgramSegments) -> bool {
-        let view = segments.view();
-        // Covers first: a cover is over its segment.
-        let mut pieces: Vec<qnc_match_frame::Piece<'_>> = view.covers.iter().map(|cover| qnc_match_frame::Piece { clip_id: &cover.clip_id, source_in: cover.source_in_frame, source_out: cover.source_out_frame, start: cover.start_frame, end: cover.end_frame }).collect();
-        pieces.extend(view.rows.iter().filter(|row| !row.clip_id.is_empty()).map(|row| qnc_match_frame::Piece { clip_id: &row.clip_id, source_in: row.source_in_frame, source_out: row.source_out_frame, start: row.start_frame, end: row.end_frame }));
-        if self.panel == Panel::Segments {
-            let Some((clip, frame)) = qnc_match_frame::source_at(&pieces, wrap.playhead()).map(|(clip, frame)| (clip.to_string(), frame)) else { return false };
-            self.to_source(wrap);
-            self.panel = Panel::SourceTimeline;
-            return preview.open_at(&clip, frame) || preview.cue(frame);
-        }
-        let (Some(clip), Some(frame)) = (preview.view().clip_id.clone(), preview.clip_frame()) else { return false };
-        let Some(at) = qnc_match_frame::story_at(&pieces, &clip, frame, wrap.playhead() + 1) else { return false };
-        self.panel = Panel::Segments;
-        segments.apply(qnc_program_segments::SegmentCommand::Cue(at))
-    }
-
-    /// The taken source IN or OUT to a word (`qnc-edit-words`): IN to its start, OUT to its end;
-    /// the mark stays taken.
-    fn source_mark_to_word(&mut self, word: qnc_edit_words::Word, preview: &mut SourcePreview, timeline: &mut TimelineProjection) -> bool {
-        let edge = if timeline.source_mark_focus == qnc_timeline::TimelineSourceMarkFocus::In { qnc_edit_edge::Edge::In } else { qnc_edit_edge::Edge::Out };
-        self.source.drag(edge == qnc_edit_edge::Edge::In, word.goal(Some(edge), 0), preview, timeline)
     }
 
     pub(crate) fn route_on_panel(
@@ -357,15 +325,10 @@ impl PanelFocus {
             "step_prev_part" | "step_next_part"
                 if on_source && (self.taken(timeline) || (segments.trimming_edge() && qnc_source_mark_focus::is_taken(timeline))) =>
             {
-                let (clip, frame) = (preview.view().clip_id.clone(), qnc_source_mark_focus::taken_picture(timeline));
-                self.jump = Some(Jump::SourceMark);
-                let forward = action_id == "step_next_part";
-                return Some(clip.zip(frame).is_some_and(|(clip, frame)| self.keyframes.request(&clip, frame, forward, preview.still_locator())));
+                return Some(self.keyframes.source_mark(action_id == "step_next_part", preview, timeline));
             }
             "step_prev_part" | "step_next_part" if on_segments && segments.keyframe_reference().is_some() => {
-                let (clip, frame) = segments.keyframe_reference().unwrap_or_default();
-                self.jump = Some(Jump::Program);
-                return Some(self.keyframes.request(&clip, frame, action_id == "step_next_part", preview.still_locator()));
+                return self.keyframes.program(action_id == "step_next_part", preview, segments);
             }
             // Enter is the confirmation of the panel in focus only.
             "activate_focused_item" if on_source => {
@@ -425,7 +388,7 @@ impl PanelFocus {
             "mark_in_fit_duration" if on_source => match segments.fit_slot() {
                 Some(frames) => {
                     self.source.set_mark_taken(false);
-                    mark_cue(preview, qnc_source_mark_focus::fit(timeline, frames))
+                    qnc_source_panel::mark_cue(preview, qnc_source_mark_focus::fit(timeline, frames))
                 }
                 None => false,
             },

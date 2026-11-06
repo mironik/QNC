@@ -264,6 +264,17 @@ impl SourceTimeline {
         true
     }
 
+    /// A word said over clip frames `[from, to)` with IN or OUT taken: the mark goes to it (IN
+    /// to its start, OUT to its end; `qnc-edit-words`) and stays taken. `None` with no mark
+    /// taken.
+    pub fn mark_to_word(&mut self, from: u64, to: u64, preview: &mut SourcePreview, timeline: &mut TimelineProjection) -> Option<bool> {
+        if !self.mark_taken(timeline) {
+            return None;
+        }
+        let edge = if timeline.source_mark_focus == qnc_timeline::TimelineSourceMarkFocus::In { qnc_edit_edge::Edge::In } else { qnc_edit_edge::Edge::Out };
+        Some(self.drag(edge == qnc_edit_edge::Edge::In, qnc_edit_words::Word::new(from, to).goal(Some(edge), 0), preview, timeline))
+    }
+
     /// A click on a channel of the column (`action_id` from [`Self::action_of`]); `None`
     /// for any other action.
     pub fn choose_action(&mut self, action_id: &str, channel: u16, preview: &mut SourcePreview) -> Option<bool> {

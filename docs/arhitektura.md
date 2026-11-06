@@ -262,6 +262,10 @@ Gdje se blokira ili nepotrebno kopira (iz loga i koda):
 3. **`qnc-panel-focus` zna previse** (32 ovisnosti): uz usmjeravanje radnji drzi i pravila
    price, Synca, shuttlea, trima i match framea. Prema 0.11 trebao bi samo predavati radnju kocki
    panela.
+   **Izvedeno 2026-11-06**: shuttle i dinamicni trim su kocka `qnc-playhead-moves`, skok na kljucnu
+   sliku `qnc-keyframe-jump`, match frame, tipke Export prozora i rijec u zoomu Wrap redova u
+   `qnc-segments-keys`, rijec na uzetu source oznaku u `qnc-source-timeline` (`mark_to_word`).
+   Fokus drzi samo redoslijed kocki i krug panela; 27 ovisnosti (prije 32), 1042 retka (prije 1207).
 4. **Memorija kao istina u drugim kockama**: pregledati sve `Option<(uri, clip, data)>`
    predmemorije koje se citaju samo na promjenu klipa (posteri, zvuk klipa, kadrovi, kanali) i
    dati im isti obrazac kao prijepisu (ponovno citanje u ritmu, usporedba).
@@ -306,7 +310,7 @@ Sto bih pojednostavio prvo (redom):
 1. ~~**Jedna kocka citanja prijepisa** (P1-1)~~ - izvedeno 2026-11-06.
 2. ~~**Izdvojiti slozenu izjavu iz `qnc-script`** u svoju kocku (P1-2)~~ - izvedeno 2026-11-06. Najveci dobitak za
    stabilnost, jer se tu najvise mijenjalo zadnjih dana.
-3. **`qnc-panel-focus` svesti na usmjeravanje** (P1-3): pravila price u `qnc-program-segments`,
+3. ~~**`qnc-panel-focus` svesti na usmjeravanje** (P1-3)~~ - izvedeno 2026-11-06: pravila price u `qnc-program-segments`,
    Sync u `qnc-sync-session`, shuttle i trim u svoje kocke (vec postoje), fokus ih samo poziva.
 4. **Ocistiti ovisnosti** (P2-5, P2-6): mehanicki posao, manja gradnja.
 5. Tek onda nove mogucnosti iz `docs/98-missing-tools-plan.md`.
@@ -321,7 +325,7 @@ Sto bih pojednostavio prvo (redom):
     marker_edit, nav, part_sound, refresh, select, slip, slot_move, slot_trim, story_read, sync,
     undo_selected, writes, zoom);
   - `qnc-script`: 5 modula (pointer, read, text_edit, view, word_pick), ostatak u `lib.rs`;
-  - `qnc-panel-focus`: 4 modula (panel, route, trim, walk).
+  - `qnc-panel-focus`: 4 modula (panel, route, tests, walk).
 
 ## 8. Kako osvjeziti ovaj dokument
 

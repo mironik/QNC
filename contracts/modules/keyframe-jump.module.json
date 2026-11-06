@@ -1,0 +1,36 @@
+{
+  "module_id": "qnc.module.keyframe-jump",
+  "module_name": "Keyframe jump",
+  "module_version": "0.1.0",
+  "module_kind": "library",
+  "capabilities": [
+    "edit.keyframe_jump"
+  ],
+  "input_contract_version": "0.1.0",
+  "output_contract_version": "0.1.0",
+  "supported_os": [
+    "windows",
+    "linux",
+    "macos"
+  ],
+  "supported_cpu": [
+    "x86_64",
+    "aarch64"
+  ],
+  "transport_protocol_version": "0.1.0",
+  "forbidden_calls": [
+    "ffprobe",
+    "database.write",
+    "business.workflow"
+  ],
+  "forbidden_dependencies": [
+    "qnc.module.media-probe",
+    "qnc.module.content-store"
+  ],
+  "state_policy": "session_local",
+  "database_write_policy": "no_db_writes",
+  "runtime_crate": "qnc-keyframe-jump",
+  "input": "Up/Down on a taken source IN/OUT or a taken slot or marker of the story, with the preview, the source timeline and the story model.",
+  "output": "The taken edit moved to the key picture before or after it once the background search answers (the source playhead with a source mark); an error goes to the story status line.",
+  "specification": "User 2026-10-11, arhitektura.md P1-3: the key picture jump taken out of qnc-panel-focus over qnc-keyframe-nav. Nothing is written; a story edit is still written only on Enter."
+}

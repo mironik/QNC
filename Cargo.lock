@@ -4815,6 +4815,18 @@ dependencies = [
 ]
 
 [[package]]
+name = "qnc-keyframe-jump"
+version = "0.1.0"
+dependencies = [
+ "qnc-keyframe-nav",
+ "qnc-program-segments",
+ "qnc-source-mark-focus",
+ "qnc-source-panel",
+ "qnc-source-preview",
+ "qnc-timeline",
+]
+
+[[package]]
 name = "qnc-keyframe-nav"
 version = "0.1.0"
 dependencies = [
@@ -5308,25 +5320,21 @@ dependencies = [
 name = "qnc-panel-focus"
 version = "0.1.0"
 dependencies = [
- "eframe",
  "qnc-action-event",
  "qnc-clip-row",
  "qnc-clip-shots",
  "qnc-db-broker",
  "qnc-dev-diagnostics",
- "qnc-edit-edge",
  "qnc-edit-step",
  "qnc-edit-verbs",
- "qnc-edit-words",
  "qnc-focus-walk",
  "qnc-key-list",
- "qnc-keyframe-nav",
- "qnc-match-frame",
+ "qnc-keyframe-jump",
+ "qnc-playhead-moves",
  "qnc-pool-tabs",
  "qnc-program-segments",
  "qnc-script",
  "qnc-segments-keys",
- "qnc-shuttle",
  "qnc-side-pieces",
  "qnc-skeleton-versions",
  "qnc-snap",
@@ -5337,9 +5345,7 @@ dependencies = [
  "qnc-sync-session",
  "qnc-timeline",
  "qnc-transcript",
- "qnc-trim-play",
  "qnc-ui-kit",
- "qnc-wheel-jog",
  "qnc-wrap-session",
 ]
 
@@ -5516,6 +5522,16 @@ version = "0.1.0"
 dependencies = [
  "qnc-player-contract",
  "qnc-timeline",
+]
+
+[[package]]
+name = "qnc-playhead-moves"
+version = "0.1.0"
+dependencies = [
+ "qnc-dev-diagnostics",
+ "qnc-shuttle",
+ "qnc-source-preview",
+ "qnc-trim-play",
 ]
 
 [[package]]
@@ -6209,6 +6225,8 @@ name = "qnc-segments-keys"
 version = "0.1.0"
 dependencies = [
  "qnc-edit-step",
+ "qnc-edit-words",
+ "qnc-match-frame",
  "qnc-program-segments",
  "qnc-source-preview",
  "qnc-source-timeline",
@@ -6623,6 +6641,7 @@ dependencies = [
  "qnc-clip-sound",
  "qnc-desktop-theme",
  "qnc-dev-diagnostics",
+ "qnc-edit-edge",
  "qnc-edit-step",
  "qnc-edit-words",
  "qnc-key-intents",

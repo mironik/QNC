@@ -17,6 +17,9 @@ use qnc_wrap_session::WrapSession;
 pub const MODULE_ID: &str = "qnc.module.segments-keys";
 pub const VERSION: &str = env!("CARGO_PKG_VERSION");
 
+/// F: match frame (`qnc-match-frame`).
+pub use qnc_match_frame::MATCH_FRAME;
+
 /// The sound of a stored segment or cover on the Wrap row (user 2026-10-16): Ctrl+1, Ctrl+2
 /// take it under the Wrap playhead; while it is taken the lane keys draft it, heard at once;
 /// Escape lets it go and the stored sound is heard again. `Continue` for any other key.
@@ -206,6 +209,71 @@ pub fn step(action_id: &str, wrap: &mut WrapSession, segments: &mut ProgramSegme
         let frame = segments.view().playhead.unwrap_or(0).saturating_add_signed(frames);
         segments.apply(SegmentCommand::Cue(frame))
     }
+}
+
+/// The Export button opens the box of the project's export settings (user 2026-10-24); while
+/// it is open the keys are its own (up/down choose, left/right the PAL and NTSC tabs, Enter
+/// exports, Escape closes). `None` for any other key; a pointer event (`pointer`) goes on to
+/// its panel.
+pub fn export(action_id: &str, pointer: bool, preview: &SourcePreview, segments: &mut ProgramSegments) -> Option<bool> {
+    if action_id == "export_open" {
+        if let Some(export) = preview.export_settings() {
+            segments.open_export(&export, preview.story_outputs());
+        }
+        return Some(true);
+    }
+    if !segments.export_open() || pointer {
+        return None;
+    }
+    match action_id {
+        "step_prev_part" | "step_prev_segment" | "page_prev" => segments.export_step(true),
+        "step_next_part" | "step_next_segment" | "page_next" => segments.export_step(false),
+        // Left and right: the PAL and NTSC tabs (user 2026-10-25).
+        "step_back_frame" => segments.export_tab(false),
+        "step_forward_frame" => segments.export_tab(true),
+        "activate_focused_item" => _ = segments.apply(SegmentCommand::ExportConfirm),
+        "clear_focus" | "close_player" => _ = segments.apply(SegmentCommand::ExportCancel),
+        _ => {}
+    }
+    Some(true)
+}
+
+/// Where match frame took the keyboard.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Matched {
+    /// The clip and frame of the story opened on the source timeline.
+    Source(bool),
+    /// The story's place of the source picture is the Wrap playhead.
+    Story(bool),
+}
+
+/// F (match frame, `qnc-match-frame`, docs/98 1.3): from the segment panel (`on_segments`) the
+/// clip and frame under the Wrap playhead open on the source timeline; elsewhere the story's
+/// place of the source picture shown becomes the Wrap playhead (F again: the next place it is
+/// used). `None` when there is no such picture.
+pub fn match_frame(on_segments: bool, preview: &mut SourcePreview, wrap: &mut WrapSession, segments: &mut ProgramSegments) -> Option<Matched> {
+    let view = segments.view();
+    // Covers first: a cover is over its segment.
+    let mut pieces: Vec<qnc_match_frame::Piece<'_>> = view.covers.iter().map(|cover| qnc_match_frame::Piece { clip_id: &cover.clip_id, source_in: cover.source_in_frame, source_out: cover.source_out_frame, start: cover.start_frame, end: cover.end_frame }).collect();
+    pieces.extend(view.rows.iter().filter(|row| !row.clip_id.is_empty()).map(|row| qnc_match_frame::Piece { clip_id: &row.clip_id, source_in: row.source_in_frame, source_out: row.source_out_frame, start: row.start_frame, end: row.end_frame }));
+    if on_segments {
+        let (clip, frame) = qnc_match_frame::source_at(&pieces, wrap.playhead()).map(|(clip, frame)| (clip.to_string(), frame))?;
+        wrap.leave();
+        return Some(Matched::Source(preview.open_at(&clip, frame) || preview.cue(frame)));
+    }
+    let (Some(clip), Some(frame)) = (preview.view().clip_id.clone(), preview.clip_frame()) else { return None };
+    let at = qnc_match_frame::story_at(&pieces, &clip, frame, wrap.playhead() + 1)?;
+    Some(Matched::Story(segments.apply(SegmentCommand::Cue(at))))
+}
+
+/// A click on a word in the zoom of the Wrap rows (user 2026-11-04): the taken cut goes to the
+/// nearer edge of the word (`qnc-edit-words`) by the same steps the arrows give it, so every
+/// kind of taken cut (marker, slot edge, J/L) keeps its rules. The arrow and how many times;
+/// `None` without a zoom.
+pub fn word_steps(segments: &ProgramSegments, from: u64, to: u64) -> Option<(&'static str, u64)> {
+    let cut = segments.view().zoom_sound.as_ref()?.cut;
+    let goal = qnc_edit_words::Word::new(from, to).goal(None, cut);
+    Some((if goal > cut { "step_forward_frame" } else { "step_back_frame" }, goal.abs_diff(cut).min(500)))
 }
 
 /// The taken lane of the Wrap row in the status line, in the timeline's words.

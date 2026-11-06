@@ -13,7 +13,6 @@ use std::ops::ControlFlow;
 use qnc_action_event::ActionEvent;
 use qnc_program_segments::ProgramSegments;
 use qnc_source_preview::SourcePreview;
-use qnc_source_mark_focus::MarkKey;
 use qnc_timeline::{TimelineIntent, TimelineProjection};
 use qnc_wrap_session::WrapSession;
 
@@ -22,7 +21,6 @@ pub const VERSION: &str = env!("CARGO_PKG_VERSION");
 
 mod panel;
 mod route;
-mod trim;
 mod walk;
 
 pub use panel::*;
@@ -43,13 +41,6 @@ const SOURCE_TO_PROGRAM: [&str; 8] = [
     "toggle_loudness_normalize",
 ];
 
-/// What the answer of a key picture search moves.
-#[derive(Debug, Clone, Copy)]
-enum Jump {
-    SourceMark,
-    Program,
-}
-
 #[derive(Debug, Default)]
 pub struct PanelFocus {
     panel: Panel,
@@ -60,14 +51,11 @@ pub struct PanelFocus {
     /// The one source timeline (piece `qnc-source-timeline`): its keys, the wheel and the
     /// A1/A2 lanes, the same in every form.
     source: qnc_source_timeline::SourceTimeline,
-    /// Up/Down on a taken edit: the key picture search and what its answer moves.
-    keyframes: qnc_keyframe_nav::KeyframeNav,
-    jump: Option<Jump>,
-    /// The JKL shuttle (docs/98 1.1) and the frame it last cued.
-    shuttle: qnc_shuttle::Shuttle,
-    shuttle_cued: Option<u64>,
-    /// The play around a taken cut (dynamic trim, docs/98 1.4).
-    trim_loop: Option<qnc_trim_play::TrimLoop>,
+    /// Up/Down on a taken edit: the key picture search and what its answer moves (piece
+    /// `qnc-keyframe-jump`).
+    keyframes: qnc_keyframe_jump::KeyframeJump,
+    /// The JKL shuttle and the play round a taken cut (piece `qnc-playhead-moves`).
+    moves: qnc_playhead_moves::PlayheadMoves,
     /// The one focus walk of every form (piece `qnc-focus-walk`): the panels in the form's
     /// order, the pool tabs and the source dock buttons the arrows walk, and the keys on the
     /// media pool as numbered steps for the card grid (a step is not taken on read: one arrow
@@ -164,24 +152,14 @@ impl PanelFocus {
         if last != self.panel && matches!(self.panel, Panel::Pool | Panel::PoolTabs) && segments.view().zoom.is_some() {
             segments.apply(qnc_program_segments::SegmentCommand::CloseZoom);
         }
-        self.shuttle_tick(preview); // the shuttle's own speed moves the playhead
-        self.trim_tick(preview, segments); // the play around a taken cut goes round
+        // The shuttle's own speed moves the playhead; the play around a taken cut goes round.
+        let cut = self.taken_cut(segments);
+        self.moves.tick(preview, cut);
         qnc_segments_keys::dropped(preview, wrap, segments); // another edit took over
         qnc_sync_session::poll(preview, wrap, segments); // an IN pressed while the source plays starts Sync
         preview.normalize_program(segments.normalization()); // the program's A1/A2 to the project's targets
         self.source.offer_normalize(Some(segments.view().normalize)); // NORM on the source timeline's level bar
-        if let Some(answer) = self.keyframes.take() {
-            match (self.jump.take(), answer) {
-                (Some(Jump::SourceMark), Ok(frames)) => {
-                    mark_cue(preview, qnc_source_mark_focus::nudge(timeline, frames));
-                }
-                (Some(Jump::Program), Ok(frames)) => {
-                    segments.jump_edit(frames);
-                }
-                (_, Err(message)) => segments.say(message),
-                (None, Ok(_)) => {}
-            }
-        }
+        self.keyframes.poll(preview, segments, timeline); // a key picture found moves its edit
         let button = (self.panel == Panel::SourceButtons).then(|| self.walk.chosen_in(qnc_focus_walk::SOURCE_BUTTONS).map(str::to_string)).flatten();
         self.side.poll(preview, timeline, clips);
         // A take of a voice record clicked: its clip on the source timeline, A1 on its channel,
@@ -201,37 +179,17 @@ impl PanelFocus {
 
     /// Whether a key picture search runs (the caller repaints soon).
     pub fn busy(&self) -> bool {
-        self.keyframes.busy() || self.side.busy() || self.shuttle.running() || self.trim_loop.is_some()
+        self.keyframes.busy() || self.side.busy() || self.moves.running()
     }
 
-    /// J, K or L: the shuttle's speed; at 1x forward the player plays, at any other speed the
-    /// shuttle moves the playhead (`poll`). `None` for another action.
-    pub(crate) fn shuttle_key(&mut self, action_id: &str, preview: &mut SourcePreview) -> Option<bool> {
-        let (_, frame, _) = preview.playing_at().unwrap_or((false, 0, false));
-        let playing = preview.player_view().playing();
-        let frame = preview.clip_frame().or(preview.program_frame()).unwrap_or(frame);
-        let done = self.shuttle.press(action_id, std::time::Instant::now(), frame)?;
-        self.shuttle_cued = None;
-        self.trim_loop = None;
-        preview.set_scrubbing(self.shuttle.running());
-        Some(match done {
-            qnc_shuttle::Do::Play if !playing => preview.toggle_play(),
-            qnc_shuttle::Do::Play => true,
-            qnc_shuttle::Do::Pause => {
-                preview.pause();
-                true
-            }
-        })
-    }
-
-    /// While the shuttle runs: the playhead to the frame of its speed now.
-    fn shuttle_tick(&mut self, preview: &mut SourcePreview) {
-        let Some(interval) = preview.player_view().source_frame_interval() else { return };
-        let Some(frame) = self.shuttle.frame_at(std::time::Instant::now(), interval) else { return };
-        if self.shuttle_cued != Some(frame) {
-            self.shuttle_cued = Some(frame);
-            preview.cue(frame);
-        }
+    /// The cut the trim zoom shows (the SubSegment's first: it stands instead of the source
+    /// timeline) and the playhead on the zoom's axis while it follows the player.
+    fn taken_cut(&self, segments: &ProgramSegments) -> qnc_playhead_moves::TakenCut {
+        let script = &self.side.views().script;
+        let subsegment = script.subsegment.as_ref().and_then(|view| view.zoom.as_deref()).and_then(|zoom| zoom.zoom_sound.as_ref());
+        let view = segments.view();
+        let sound = subsegment.or(view.zoom_sound.as_ref())?;
+        Some((sound.cut, sound.playhead))
     }
 
     /// Whether a transcription of this process runs in the background (the caller repaints
@@ -295,15 +253,6 @@ pub fn cycle(panel: Panel, forward: bool, order: &[Panel]) -> Panel {
 /// The panel name of the segment panel, as its block gives it with a pointer event.
 fn qnc_segment_panel_name() -> &'static str {
     "segments"
-}
-
-/// A taken source mark moves the source playhead with it.
-fn mark_cue(preview: &mut SourcePreview, key: MarkKey) -> bool {
-    match key {
-        MarkKey::Cue(frame) => preview.cue(frame),
-        MarkKey::Changed => true,
-        MarkKey::Refused => false,
-    }
 }
 
 #[cfg(test)]

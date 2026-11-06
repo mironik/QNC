@@ -1,0 +1,11 @@
+[package]
+name = "qnc-playhead-moves"
+version = "0.1.0"
+edition = "2021"
+description = "QNC public block: the moves of the playhead that are not the player's own play (the JKL shuttle and the play round a taken cut, dynamic trim) driven on the one preview"
+
+[dependencies]
+qnc-dev-diagnostics = { workspace = true }
+qnc-shuttle = { workspace = true }
+qnc-source-preview = { workspace = true }
+qnc-trim-play = { workspace = true }

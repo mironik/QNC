@@ -7989,3 +7989,14 @@ teksta). `qnc-script` ponovno izvozi sve njezine nazive, pa paneli nisu mijenjan
 nasih ovisnosti 35 -> 28 (uklonjeno 9 koje vise ne koristi). Testovi `qnc-subsegment-edit` (4), `qnc-script`, `qnc-side-pieces`,
 `qnc-panel-focus` (zlatna tablica tipki), `qnc-subsegment-panel`, `qnc-script-panel`, `qnc-editorial-application`, cijeli
 workspace se kompajlira. Uzivo nije provjereno. Debug cache obrisan (`cargo clean --profile dev`, 19,4 GiB).
+Izvedeno 2026-11-06 (korisnik: "da, kreni s trecom tockom" iz `docs/arhitektura.md`, P1-3): `qnc-panel-focus` sveden na
+usmjeravanje. Kod je premjesten, ne prepisan: shuttle (J/K/L) i dinamicni trim (Shift+K, K pomakne uzeti rub) su nova javna
+kocka `crates/qnc-playhead-moves` (+ ugovor `contracts/modules/playhead-moves.module.json`; vozi samo preview, na K s uzetim
+rezom kaze koliko slika rub ide, a fokus ga mice koracima strelica kao prije); gore/dolje na uzetom rezu (skok na kljucnu sliku
+i primjena odgovora) nova javna kocka `crates/qnc-keyframe-jump` (+ ugovor `contracts/modules/keyframe-jump.module.json`);
+match frame (F), tipke Export prozora i rijec u zoomu Wrap redova (koraci do granice rijeci) u `qnc-segments-keys`
+(`match_frame`, `export`, `word_steps`); rijec na uzetu source oznaku u `qnc-source-timeline` (`mark_to_word`); kopija
+`mark_cue` uklonjena (koristi se `qnc-source-panel::mark_cue`). Fokus drzi samo redoslijed kocki i krug panela: 27 ovisnosti
+(prije 32, uklonjene i neiskoristene `qnc-wheel-jog` i `eframe`), 1042 retka (prije 1207). Ponasanje isto: zlatna tablica
+tipki nepromijenjena, testovi `qnc-panel-focus`, `qnc-segments-keys`, `qnc-source-timeline`, `cargo check --workspace`,
+conformance, `cargo machete` bez neiskoristenih ovisnosti. Uzivo nije provjereno.

@@ -1,0 +1,13 @@
+[package]
+name = "qnc-keyframe-jump"
+version = "0.1.0"
+edition = "2021"
+description = "QNC public block: Up/Down on a taken edit jumps it to the key picture before or after it (a taken source mark, or the taken slot or marker of the story)"
+
+[dependencies]
+qnc-keyframe-nav = { workspace = true }
+qnc-program-segments = { workspace = true }
+qnc-source-mark-focus = { workspace = true }
+qnc-source-panel = { workspace = true }
+qnc-source-preview = { workspace = true }
+qnc-timeline = { workspace = true }
