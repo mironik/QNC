@@ -271,3 +271,13 @@ impl Store {
         Ok(Data::Changed)
     }
 }
+
+impl Store {
+    /// The sound assistant on or off (user 2026-11-06): the whole story plays its curves or not.
+    pub(crate) fn set_sound_assist(&mut self, on: bool) -> Result<Data> {
+        self.conn
+            .execute("UPDATE story_state SET sound_assist = ?1, updated_at = ?2 WHERE id = 1", params![i64::from(on), story_now()])
+            .map_err(err)?;
+        Ok(Data::Changed)
+    }
+}

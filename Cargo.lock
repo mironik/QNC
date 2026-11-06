@@ -5638,6 +5638,7 @@ dependencies = [
  "qnc-program-loudness",
  "qnc-program-playlist",
  "qnc-program-waveform",
+ "qnc-sound-assist",
  "qnc-source-timecode",
  "qnc-ui-text",
  "qnc-wave",
@@ -5721,6 +5722,7 @@ dependencies = [
  "qnc-program-loudness",
  "qnc-program-view",
  "qnc-program-waveform",
+ "qnc-sound-assist",
  "qnc-source-channels",
  "qnc-sync-cover",
  "qnc-ui-text",
@@ -6387,6 +6389,15 @@ dependencies = [
  "serde",
  "serde_json",
  "xml-rs",
+]
+
+[[package]]
+name = "qnc-sound-assist"
+version = "0.1.0"
+dependencies = [
+ "qnc-loudness",
+ "qnc-program-loudness",
+ "qnc-program-waveform",
 ]
 
 [[package]]

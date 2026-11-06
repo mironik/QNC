@@ -32,7 +32,7 @@ impl ProgramSegments {
                         Some((clip.clone(), Some(count)))
                     })
                     .collect();
-                Ok((story.segments, story.markers, story.slots, story.covers, story.selection, channels))
+                Ok((story.segments, story.markers, story.slots, story.covers, story.selection, channels, story.sound_assist))
             });
             let _ = send.send(read);
         });
@@ -67,8 +67,9 @@ impl ProgramSegments {
 
     pub(crate) fn apply_read(&mut self, read: qnc_program_db::Result<StoryRead>) {
         match read {
-            Ok((stored, markers, slots, covers, selection, channels)) => {
+            Ok((stored, markers, slots, covers, selection, channels, sound_assist)) => {
                 self.clip_channels.extend(channels);
+                self.sound_assist = sound_assist;
                 if stored != self.stored || covers != self.stored_covers {
                     self.program_changed = true;
                     self.waker.wake(self.prerender.as_ref());

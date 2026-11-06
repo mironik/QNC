@@ -1,0 +1,20 @@
+{
+  "module_id": "qnc.module.sound-assist",
+  "module_name": "Sound assistant",
+  "module_version": "0.1.0",
+  "module_kind": "library",
+  "capabilities": ["story.program.sound_assist"],
+  "input_contract_version": "0.1.0",
+  "output_contract_version": "0.1.0",
+  "supported_os": ["windows", "linux", "macos"],
+  "supported_cpu": ["x86_64", "aarch64"],
+  "transport_protocol_version": "0.1.0",
+  "forbidden_calls": ["ffprobe", "media.decode", "database.read", "database.write", "player.command", "business.workflow"],
+  "forbidden_dependencies": ["qnc.module.media-probe", "qnc.module.content-store"],
+  "state_policy": "stateless",
+  "database_write_policy": "no_db_writes",
+  "runtime_crate": "qnc-sound-assist",
+  "input": "The story's items (segments on A1, covers on A2) as placements on the program, whether the user made a curve of his own for each, and the loudness measured with every clip's wave (100 ms segments).",
+  "output": "Level curves proposed for the items without a curve of the user's: covers ducked under speech on A1 (about 15 dB under it, at most 20 dB down, 200 ms ramps), speech of each segment evened out to the median of the segments (at most 10 dB).",
+  "specification": "User 2026-11-06: an assistant for the final fine sound that the user turns on and off. The curves it proposes are played (player, prerender, export) while it is on; the story keeps only what the user wrote."
+}

@@ -1264,3 +1264,16 @@ fn a_taken_level_curve_opens_the_zoom_at_its_point_and_is_drafted_on_the_playhea
     assert!(segments.release_level_line());
     assert!(segments.view().edit_stills.is_empty());
 }
+
+/// User 2026-11-06: the sound assistant is turned on and off (Shift+N or AI), from any panel.
+#[test]
+fn the_sound_assistant_is_turned_on_and_off() {
+    let mut segments = component();
+    assert!(!segments.sound_assist_on());
+    assert!(segments.handles("toggle_sound_assist"));
+    segments.apply_action("toggle_sound_assist");
+    assert!(segments.sound_assist_on());
+    assert_eq!(segments.view().message, qnc_ui_text::text("story.msg.sound_assist_on"));
+    segments.apply_action("toggle_sound_assist");
+    assert!(!segments.sound_assist_on());
+}

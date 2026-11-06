@@ -8117,3 +8117,23 @@ klik na liniju u zoomu je `select_level_a1/a2` kao na timelineu. Pretvorba krivu
 Testovi `qnc-gain`, `qnc-program-waveform`, `qnc-program-segments` (73), `qnc-level-curve`, `qnc-program-loudness`,
 `qnc-timeline`, `qnc-trim-overlay`, `qnc-program-db`, `qnc-program-playlist`, `qnc-fine-wave`, `qnc-program-view`,
 conformance, `cargo check --workspace --all-targets`. Uzivo nije provjereno.
+Izvedeno 2026-11-06 (korisnik: "mozda bi za finalno sredivanje tona u fino mogao postojati AI agent"; "da, pushaj i kreni s
+pomocnikom tona, da ga korisnik moze ukljuciti i iskljuciti"): pomocnik tona, prvi dio. Nova cista kocka
+`crates/qnc-sound-assist` (+ ugovor `contracts/modules/sound-assist.module.json`): iz glasnoce izmjerene s valom svakog
+klipa (odsjecci od 100 ms) predlaze krivulje razine: pokrivalica (A2) se pod govorom A1 (blok glasniji od -40 LUFS,
+praznine do 0,5 s spojene, najmanje 0,3 s) stisava rampom od 200 ms koliko treba da ambijent bude oko 15 dB ispod govora
+(najvise 20 dB, manje od 2 dB se ne radi); govor svakog segmenta ide na medijan govora segmenata (najvise 10 dB, manje od
+1,5 dB se ne radi). Stavka s vlastitom krivuljom korisnika (i nacrt uzete krivulje) ostaje kakva jest. Ukljucen ili
+iskljucen je zapis u bazi price: `qnc-program-db` stupac `story_state.sound_assist` (prici napravljenoj prije dodaje se,
+`ADDED_COLUMNS` sada za vise tablica), `ProgramSnapshot.sound_assist`, operacija `SetSoundAssist` (jedan korak Undo).
+`qnc-program-input`: mjerenja klipova izdvojena u `Measures` (koriste ih normalizacija pokrivalica i pomocnik), pomocnik
+radi poslije normalizacije (`assist.rs`), pa ga jednako cuju player, prerender i export. `qnc-program-segments`
+(`assist.rs`, predmemorija prijedloga): krivulje pomocnika crtaju se na Wrap redovima i u valu i ulaze u mjerenje
+NORM-a; `ToggleSoundAssist` (`qnc-program-commands`), getteri `normalizing`, `sound_assist_on` (popravak: NORM u traci
+razine citao je `view().normalize`, koji osnovni prikaz nije postavljao). Prekidac: dugme AI u traci razine
+(`qnc-level-bar`, uz NORM, vraca kliknutu radnju), `qnc-source-timeline` `offer_assist`; radnja kataloga
+`toggle_sound_assist` (Shift+N, QNC preset, s bilo kojeg panela), pomoc F1 grupa Audio, rjecnik `story.ui.sound_assist*`,
+`story.msg.sound_assist_on/off`. Testovi `qnc-sound-assist`, `qnc-program-db` (59), `qnc-program-segments` (74),
+`qnc-program-input`, `qnc-level-bar`, `qnc-source-timeline`, `qnc-panel-focus`, `qnc-keyboard-shortcut`, `qnc-ui-text`,
+conformance, `cargo check --workspace --all-targets`. Nije izvedeno: Ton A2 u Off i slozena izjava bez pomocnika;
+prijedlog jos nije moguce "zadrzati" kao korisnikove krivulje. Uzivo nije provjereno.

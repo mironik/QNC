@@ -197,6 +197,9 @@ pub struct ProgramSnapshot {
     pub markers: Vec<ProgramMarker>,
     pub slots: Vec<ProgramSlot>,
     pub selection: StorySelection,
+    /// The sound assistant is on (user 2026-11-06): the program plays the curves it proposes.
+    #[serde(default)]
+    pub sound_assist: bool,
 }
 
 #[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
@@ -404,6 +407,8 @@ pub enum Operation {
     /// The level curve of a segment (A1) or a cover (A2) (docs/98 2.1): the whole curve
     /// as it is to be, empty for none. An UNDO step.
     SetLevelKeys { item_id: String, keys: Vec<LevelKey> },
+    /// The sound assistant on or off (user 2026-11-06). An UNDO step.
+    SetSoundAssist { on: bool },
     /// v5 `delete_cover`; its B-roll virtual shot stays.
     DeleteCover { cover_id: String },
     /// v5 `select_cover`.
@@ -444,6 +449,7 @@ impl Operation {
                 | Self::SetCoverSound { .. }
                 | Self::SetCoverOverlap { .. }
                 | Self::SetLevelKeys { .. }
+                | Self::SetSoundAssist { .. }
         )
     }
 

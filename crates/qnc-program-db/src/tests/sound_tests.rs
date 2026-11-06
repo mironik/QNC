@@ -242,3 +242,21 @@ fn a_level_curve_is_kept_sorted_on_its_clip_and_undone_in_one_step() {
     assert_eq!(segments(&mut store).len(), 3, "its rows stay");
     assert!(segments(&mut store)[0].level_keys.is_empty());
 }
+
+/// User 2026-11-06: the sound assistant is on or off for the whole story, a step of Undo.
+#[test]
+fn the_sound_assistant_is_on_or_off_in_the_story_and_undone_in_one_step() {
+    let dir = tempfile::tempdir().unwrap();
+    let path = dir.path().join("db");
+    let mut store = imported_store(&path);
+    three_segments(&mut store);
+    let assist = |store: &mut _| match run(store, Operation::ReadProgramSnapshot).unwrap() {
+        Data::Program(snapshot) => snapshot.sound_assist,
+        _ => panic!(),
+    };
+    assert!(!assist(&mut store), "off until the user turns it on");
+    run(&mut store, Operation::SetSoundAssist { on: true }).unwrap();
+    assert!(assist(&mut store));
+    run(&mut store, Operation::UndoStory).unwrap();
+    assert!(!assist(&mut store), "one Undo step");
+}

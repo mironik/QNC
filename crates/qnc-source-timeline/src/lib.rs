@@ -64,6 +64,8 @@ pub struct SourceTimelineView {
     pub levels: [Option<f32>; 2],
     /// NORM's state on that bar; `None` where the form has no story to normalise.
     pub normalize: Option<bool>,
+    /// The sound assistant's (AI) state on that bar (user 2026-11-06); `None` the same.
+    pub sound_assist: Option<bool>,
     /// A question about what the source timeline's marks would save (the same statement
     /// already there, user 2026-11-01), shown over everything until answered.
     pub question: Option<qnc_choice_box::Choice>,
@@ -146,6 +148,11 @@ impl SourceTimeline {
     /// NORM's state for the level bar (a form with a story gives it; `None`: NORM off).
     pub fn offer_normalize(&mut self, on: Option<bool>) {
         self.view.normalize = on;
+    }
+
+    /// The sound assistant's state for the level bar (user 2026-11-06; `None`: AI off).
+    pub fn offer_assist(&mut self, on: Option<bool>) {
+        self.view.sound_assist = on;
     }
 
     pub fn view(&self) -> &SourceTimelineView {
@@ -480,6 +487,7 @@ impl SourceTimeline {
             message: self.message.clone(),
             levels: self.view.levels,
             normalize: self.view.normalize,
+            sound_assist: self.view.sound_assist,
             question: None,
         };
     }
@@ -530,17 +538,17 @@ pub fn show_with(
         .with_wave_over_video(view.wave_over_video);
     let mut answer = None;
     let slot = &mut answer;
-    let mut normalize = false;
-    // The level bar block (meter and NORM) in the middle of the bar above the timeline.
+    let mut toggled = None;
+    // The level bar block (meter, NORM and AI) in the middle of the bar above the timeline.
     let header = |ui: &mut Ui| {
         let row = ui.max_rect();
-        normalize = qnc_level_bar::show(ui, row, view.levels, view.normalize, &qnc_theme_styles::timeline(theme));
+        toggled = qnc_level_bar::show(ui, row, view.levels, (view.normalize, view.sound_assist), &qnc_theme_styles::timeline(theme));
         header(ui);
     };
     let mut drawn = instead.map(|instead| move |ui: &mut Ui| *slot = instead(ui));
     let intent = qnc_source_dock::show_timeline_dock_with(ui, rect, style, title, header, timeline, drawn.as_mut().map(|draw| draw as &mut dyn FnMut(&mut Ui)));
     drop(drawn);
-    let norm = normalize.then(|| qnc_action_event::ActionEvent::key(qnc_level_bar::NORMALIZE));
+    let norm = toggled.map(qnc_action_event::ActionEvent::key);
     let asked = view.question.as_ref().and_then(|choice| qnc_choice_box::show(ui.ctx(), theme, choice)).map(qnc_action_event::ActionEvent::key);
     (intent, asked.or(answer).or(norm))
 }

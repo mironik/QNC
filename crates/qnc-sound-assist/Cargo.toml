@@ -1,0 +1,10 @@
+[package]
+name = "qnc-sound-assist"
+version = "0.1.0"
+edition = "2021"
+description = "QNC public piece: the sound assistant. From the loudness measured with every clip wave it proposes level curves for the story: covers ducked under speech, speech evened out between segments. Pure: it reads and writes nothing."
+
+[dependencies]
+qnc-loudness = { workspace = true }
+qnc-program-loudness = { workspace = true }
+qnc-program-waveform = { workspace = true }

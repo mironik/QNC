@@ -27,7 +27,7 @@ pub use panel::*;
 
 /// Actions of the segment panel that also run from the other panels: they use
 /// the source the user marked (v5 dispatches them whatever the focus).
-const SOURCE_TO_PROGRAM: [&str; 8] = [
+const SOURCE_TO_PROGRAM: [&str; 9] = [
     "add_ton_segment",
     // S-Story sends its story on to the Story (user 2026-10-31).
     "story_send_draft",
@@ -39,6 +39,8 @@ const SOURCE_TO_PROGRAM: [&str; 8] = [
     "cover_mode_sync",
     // Normalising the program's loudness in the preview, from any panel (user 2026-10-24).
     "toggle_loudness_normalize",
+    // The sound assistant on or off, from any panel (user 2026-11-06).
+    "toggle_sound_assist",
 ];
 
 #[derive(Debug, Default)]
@@ -158,7 +160,8 @@ impl PanelFocus {
         qnc_segments_keys::dropped(preview, wrap, segments); // another edit took over
         qnc_sync_session::poll(preview, wrap, segments); // an IN pressed while the source plays starts Sync
         preview.normalize_program(segments.normalization()); // the program's A1/A2 to the project's targets
-        self.source.offer_normalize(Some(segments.view().normalize)); // NORM on the source timeline's level bar
+        self.source.offer_normalize(Some(segments.normalizing())); // NORM on the source timeline's level bar
+        self.source.offer_assist(Some(segments.sound_assist_on())); // and the sound assistant (AI)
         self.keyframes.poll(preview, segments, timeline); // a key picture found moves its edit
         let button = (self.panel == Panel::SourceButtons).then(|| self.walk.chosen_in(qnc_focus_walk::SOURCE_BUTTONS).map(str::to_string)).flatten();
         self.side.poll(preview, timeline, clips);

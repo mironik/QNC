@@ -130,6 +130,12 @@ impl ProgramSegments {
                 self.export_alert = Some(running.clone());
                 self.refresh_view(running);
             }
+            SegmentCommand::ToggleSoundAssist => {
+                self.sound_assist = !self.sound_assist;
+                self.write(Operation::SetSoundAssist { on: self.sound_assist });
+                let key = if self.sound_assist { "story.msg.sound_assist_on" } else { "story.msg.sound_assist_off" };
+                self.refresh_view(qnc_ui_text::text(key).into());
+            }
             SegmentCommand::ToggleNormalize => {
                 self.normalize = !self.normalize;
                 let measured = self.loudness.as_ref().map(|(_, measured)| *measured).unwrap_or_default();

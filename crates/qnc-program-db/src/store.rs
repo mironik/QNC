@@ -161,7 +161,13 @@ impl Store {
                 return Err(qnc_ui_text::text("story.invalid_reply_story").into());
             };
             let story_fps = selection.story_fps;
-            Ok(ProgramSnapshot { revision: read_revision(&self.conn)?, segments, covers, story_fps, markers, slots, selection })
+            let sound_assist = self
+                .conn
+                .query_row("SELECT sound_assist FROM story_state WHERE id = 1", [], |row| row.get::<_, i64>(0))
+                .optional()
+                .map_err(err)?
+                .is_some_and(|on| on != 0);
+            Ok(ProgramSnapshot { revision: read_revision(&self.conn)?, segments, covers, story_fps, markers, slots, selection, sound_assist })
         })();
         let _ = self.conn.execute_batch(if read.is_ok() { "COMMIT" } else { "ROLLBACK" });
         read.map(Data::Program)
@@ -318,6 +324,7 @@ impl Store {
                 self.set_cover_overlap(cover_id, *lead_frames, *tail_frames)
             }
             Operation::SetLevelKeys { item_id, keys } => self.set_level_keys(item_id, keys),
+            Operation::SetSoundAssist { on } => self.set_sound_assist(*on),
             Operation::DeleteCover { cover_id } => self.delete_cover(cover_id),
             Operation::SelectCover { cover_id } => self.select_cover(cover_id),
         }

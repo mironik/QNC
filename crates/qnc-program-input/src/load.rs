@@ -76,9 +76,15 @@ pub(crate) fn load(
     };
     let channels = resolver.prepared(&first.clip_id)?.project_audio.channels;
     let mut covers = fit_covers(covers, &mut resolver, story_rate)?;
+    let mut measures = normalize::Measures::open(target);
     // Every cover on its own within the loudness rule (user 2026-10-24), when asked.
     if let Some(rule) = normalize {
-        normalize::normalize_covers(target, &mut covers, &mut resolver, story_rate, rule)?;
+        normalize::normalize_covers(&mut measures, &mut covers, &mut resolver, story_rate, rule)?;
+    }
+    // The sound assistant's curves while the story has it on (user 2026-11-06), after the
+    // normalisation so that it ducks the covers at the level they play.
+    if snapshot.sound_assist {
+        assist::assist_sound(&mut measures, &mut segments, &mut covers, &mut resolver, story_rate)?;
     }
     let mut input = build_input(project_id, story_rate, &segments, &covers, channels)?;
     input.revision = revision;

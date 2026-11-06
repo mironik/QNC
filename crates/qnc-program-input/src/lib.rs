@@ -128,6 +128,7 @@ mod build;
 mod load;
 mod media;
 mod normalize;
+mod assist;
 mod pieces;
 
 pub use qnc_program_loudness::CoverRule;

@@ -15,7 +15,11 @@ pub(crate) const SCHEMA_COLUMNS: &[(&str, &[&str])] = &[
 
 /// Columns of `story_items` added to a story made before them, its rows kept (a story
 /// without one is brought up by its owner, never removed).
-pub(crate) const ADDED_ITEM_COLUMNS: &[(&str, &str)] = &[("level_keys", "TEXT NOT NULL DEFAULT ''")];
+pub(crate) const ADDED_COLUMNS: &[(&str, &str, &str)] = &[
+    ("story_items", "level_keys", "TEXT NOT NULL DEFAULT ''"),
+    // The sound assistant is on (user 2026-11-06).
+    ("story_state", "sound_assist", "INTEGER NOT NULL DEFAULT 0"),
+];
 
 /// The tables of the story before segments and covers shared one table; a project that still
 /// has them is an older story.
@@ -38,8 +42,13 @@ pub(crate) fn schema_outdated(conn: &Connection) -> Result<bool> {
             return Ok(true);
         }
     }
-    let items = table_columns(conn, "story_items")?;
-    Ok(!items.is_empty() && ADDED_ITEM_COLUMNS.iter().any(|(column, _)| !items.iter().any(|have| have == column)))
+    for (table, column, _) in ADDED_COLUMNS {
+        let columns = table_columns(conn, table)?;
+        if !columns.is_empty() && !columns.iter().any(|have| have == column) {
+            return Ok(true);
+        }
+    }
+    Ok(false)
 }
 
 /// The revision of the story: kept apart from the story tables, so Undo never takes it
@@ -124,10 +133,10 @@ pub(crate) fn ensure_story_schema(conn: &Connection) -> Result<()> {
         .map_err(err)?;
     }
     // Columns added to a story made before them; its rows stay (the views below read them).
-    let have = table_columns(conn, "story_items")?;
-    for (column, definition) in ADDED_ITEM_COLUMNS {
+    for (table, column, definition) in ADDED_COLUMNS {
+        let have = table_columns(conn, table)?;
         if !have.is_empty() && !have.iter().any(|name| name == column) {
-            conn.execute_batch(&format!("ALTER TABLE story_items ADD COLUMN {column} {definition};")).map_err(err)?;
+            conn.execute_batch(&format!("ALTER TABLE {table} ADD COLUMN {column} {definition};")).map_err(err)?;
         }
     }
     conn.execute_batch(
@@ -145,7 +154,8 @@ pub(crate) fn ensure_story_schema(conn: &Connection) -> Result<()> {
             committed_at TEXT,
             updated_at TEXT,
             story_fps_num INTEGER NOT NULL DEFAULT 0,
-            story_fps_den INTEGER NOT NULL DEFAULT 1
+            story_fps_den INTEGER NOT NULL DEFAULT 1,
+            sound_assist INTEGER NOT NULL DEFAULT 0
          );
          -- One row is one piece of the story (user 2026-10-30): `role` says what it is. A
          -- segment ('tonovi' / 'offovi') lies in order (`sort_index`) and carries A1; a cover

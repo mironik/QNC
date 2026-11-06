@@ -194,6 +194,8 @@ pub enum SegmentCommand {
     /// The preview normalises A1 and A2 of the program to the project's loudness targets, or
     /// plays them as edited (user 2026-10-24: a key turns it on and off).
     ToggleNormalize,
+    /// The sound assistant on or off (user 2026-11-06).
+    ToggleSoundAssist,
     /// The export box (user 2026-10-24): a line chosen, export with it, or closed.
     ExportChoose(usize),
     /// The PAL (false) or NTSC (true) tab of the export box (user 2026-10-25).
@@ -283,6 +285,7 @@ impl SegmentCommand {
             "redo_selected" => Self::UndoSelected { redo: true },
             "toggle_wrap_video" => Self::ToggleWrapVideo,
             "toggle_loudness_normalize" => Self::ToggleNormalize,
+            "toggle_sound_assist" => Self::ToggleSoundAssist,
             "wrap_zoom" => Self::Zoom { slot: None, frame: None },
             "cover_mode_covers" => Self::CoverMode { sync: false },
             "cover_mode_sync" => Self::CoverMode { sync: true },

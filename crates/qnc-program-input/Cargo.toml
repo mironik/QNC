@@ -20,3 +20,4 @@ qnc-loudness = { workspace = true }
 qnc-program-loudness = { workspace = true }
 qnc-program-waveform = { workspace = true }
 qnc-wave = { workspace = true }
+qnc-sound-assist = { workspace = true }

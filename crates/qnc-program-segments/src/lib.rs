@@ -25,6 +25,7 @@ pub use cut_part::{CutPart, CutSound, SoundEdge};
 mod marker_edit;
 mod part_sound;
 mod level_line;
+mod assist;
 mod sync;
 mod commands;
 mod create;
@@ -195,6 +196,10 @@ pub struct ProgramSegments {
     /// application starts (2026-10-25: the preview hears what the export gives and plays the
     /// prerender, which is normalised as the export).
     normalize: bool,
+    /// The sound assistant is on, as the story keeps it (user 2026-11-06, `qnc-sound-assist`).
+    sound_assist: bool,
+    /// Its last proposals and what they were made of (made again only when that changes).
+    assisted: Option<(assist::AssistKey, Vec<qnc_sound_assist::Proposal>)>,
     /// The open export box (user 2026-10-24).
     export: Option<qnc_export_choice::ExportChoice>,
     /// The export running in the background (`qnc-export`).
@@ -325,6 +330,8 @@ type StoryRead = (
     Vec<ProgramCover>,
     qnc_program_db::StorySelection,
     ClipChannels,
+    // The sound assistant is on (user 2026-11-06).
+    bool,
 );
 
 /// The audio channel count of clips of the story, from their stored media records.
@@ -394,6 +401,16 @@ impl ProgramSegments {
         &self.view
     }
 
+    /// The preview normalises the program (NORM on).
+    pub fn normalizing(&self) -> bool {
+        self.normalize
+    }
+
+    /// The sound assistant is on, as the story keeps it (user 2026-11-06).
+    pub fn sound_assist_on(&self) -> bool {
+        self.sound_assist
+    }
+
     /// The view with its program wave; `clips` gives each clip's length in the frames
     /// its IN/OUT use (a clip wave spans the whole clip).
     /// `clips`: each clip's id, length and poster (shown in a Wrap row until its filmstrip is
@@ -430,6 +447,12 @@ impl ProgramSegments {
             }
         }
         let mut view = self.view.clone();
+        // The sound assistant's curves while it is on (user 2026-11-06): drawn on the rows and
+        // heard in the wave, as the player plays them (`qnc-program-input`).
+        if self.sound_assist {
+            self.assist(&mut view, &mut segments, &mut covers);
+        }
+        view.sound_assist = self.sound_assist;
         view.peaks = self.waves.peaks(view.total_frames, &segments, &covers, |id| durations.get(id).copied());
         view.loudness = self.loudness_of(&view, segments, covers);
         view.normalize = self.normalize;
