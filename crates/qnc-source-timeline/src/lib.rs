@@ -125,6 +125,8 @@ pub struct SourceTimeline {
     assisted: Option<(assist::AssistKey, [Vec<(u64, i16)>; 2])>,
     assist_clip: Option<String>,
     waves: AssistWaves,
+    /// The IN/OUT a pair of words of the transcript marked, until taken.
+    marked_by_text: Option<(u64, u64)>,
 }
 
 impl SourceTimeline {
@@ -304,10 +306,19 @@ impl SourceTimeline {
         self.first_cut = None;
         // The one meaning of two words (`qnc-edit-words`, AGENTS 0.12).
         *timeline = match self.first_word.give((), qnc_edit_words::Word::new(from, to)) {
-            qnc_edit_words::Paired::Range(range) => timeline.clone().with_second_cut(range.from, range.to),
+            qnc_edit_words::Paired::Range(range) => {
+                self.marked_by_text = Some((range.from, range.to));
+                timeline.clone().with_second_cut(range.from, range.to)
+            }
             qnc_edit_words::Paired::First(word) => timeline.clone().with_first_cut_at(word.from),
         };
         true
+    }
+
+    /// The IN/OUT the last pair of words of the transcript marked, once (user 2026-11-08: the
+    /// text chosen is heard again with the Croatian model at once).
+    pub fn take_marked_by_text(&mut self) -> Option<(u64, u64)> {
+        self.marked_by_text.take()
     }
 
     /// A word said over clip frames `[from, to)` with IN or OUT taken: the mark goes to it (IN

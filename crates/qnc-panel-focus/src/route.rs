@@ -125,7 +125,14 @@ impl PanelFocus {
             if let Some(done) = self.source.mark_to_word(from, to, pieces.0, pieces.3) {
                 return Some(done);
             }
-            return Some(self.source.cut_word(pieces.3, from, to));
+            let cut = self.source.cut_word(pieces.3, from, to);
+            // The text chosen (a pair of words marked IN/OUT) is heard again with the Croatian
+            // model at once (user 2026-11-08), where the form has a transcript.
+            if self.source.take_marked_by_text().is_some() {
+                let timecode = self.source.view().timecode;
+                self.side.act(qnc_transcript::REPASS, None, None, pieces.0, pieces.3, timecode.as_ref());
+            }
+            return Some(cut);
         }
         // The Export button and the box it opens (piece `qnc-segments-keys`).
         if let Some(done) = qnc_segments_keys::export(action_id, event.at.is_some(), pieces.0, pieces.2) {

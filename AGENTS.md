@@ -8417,3 +8417,7 @@ hrvatskim jezikom govora; spremljeni prijepis raspona zamjenjuje stari na tom mj
 `qnc-transcript-db`). Gumb "Ponovo (HR)" uz Prijepis ispod poola AI Media Assista (`pool_actions`), katalog, rjecnik.
 Izmjereno kroz ugovor: 7 s govora za 5,9 s s ucitavanjem modela. Testovi, conformance (osim otvorenog C5 za
 `qnc-frame-interp`). Uzivo nije provjereno.
+Dopuna 2026-11-08 (korisnik: "s automatskim pokretanjem wav2vec2 za odabrani tekst"): kad dvoklik na dvije rijeci prijepisa
+oznaci IN/OUT (odabrani tekst), taj dio odmah ide u ponovni prijepis hrvatskim modelom, kao gumb "Ponovo (HR)", u formi koja
+ima prijepis (`qnc-source-timeline` `take_marked_by_text`, `qnc-panel-focus`). Rez skarama i I/O ga ne pokrecu. Uzivo nije
+provjereno.
