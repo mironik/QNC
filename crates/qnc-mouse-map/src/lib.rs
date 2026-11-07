@@ -69,6 +69,8 @@ pub enum Pointer {
     ClickCutEdge,
     /// A drag of a side of the taken cut's sound.
     DragCutEdge,
+    /// A drag along the length strips (user 2026-11-07): the slots it passes are chosen.
+    DragStrip,
     MiddleClick,
     WheelBack,
     WheelForward,
@@ -77,7 +79,7 @@ pub enum Pointer {
 }
 
 impl Pointer {
-    pub const ALL: [Pointer; 36] = [
+    pub const ALL: [Pointer; 37] = [
         Self::Click,
         Self::ClickHolding,
         Self::ClickStrip,
@@ -109,6 +111,7 @@ impl Pointer {
         Self::DragMarker,
         Self::ClickCutEdge,
         Self::DragCutEdge,
+        Self::DragStrip,
         Self::MiddleClick,
         Self::WheelBack,
         Self::WheelForward,
@@ -150,6 +153,7 @@ impl Pointer {
             Self::DragMarker => "drag_marker",
             Self::ClickCutEdge => "click_cut_edge",
             Self::DragCutEdge => "drag_cut_edge",
+            Self::DragStrip => "drag_strip",
             Self::MiddleClick => "middle_click",
             Self::WheelBack => "wheel_back",
             Self::WheelForward => "wheel_forward",

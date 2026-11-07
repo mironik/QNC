@@ -2251,6 +2251,34 @@ fn track_marker_drag(response: &egui::Response, track: Rect, input: &TimelineInp
     Some(intent)
 }
 
+/// A drag that started on a length strip of a row whose strips are always shown (the
+/// SubSegment's parts; user 2026-11-07: "several slots are chosen by dragging over their
+/// strips"): the strip it started on and the frame it reached, while it runs. The row does not
+/// scrub; the owner chooses the slots. Which strip it started on is the gesture's state only.
+fn track_strip_drag(response: &egui::Response, track: Rect, input: &TimelineInput<'_>) -> Option<TimelineIntent> {
+    if !(input.layers.covers && input.layers.covers_shown) {
+        return None;
+    }
+    let (ctx, start, duration) = (&response.ctx, input.state.range_start(), input.state.duration_frames());
+    let active = response.id.with("qnc_timeline_strip_drag");
+    if response.drag_started() {
+        let hit = response
+            .interact_pointer_pos()
+            .and_then(|pos| cover_hit(track, start, duration, pos, input.covers, cover_rows(track, input)))
+            .map(str::to_string);
+        ctx.data_mut(|d| match hit {
+            Some(id) => d.insert_temp(active, id),
+            None => d.remove::<String>(active),
+        });
+    }
+    let id = ctx.data(|d| d.get_temp::<String>(active))?;
+    if response.drag_stopped() {
+        ctx.data_mut(|d| d.remove::<String>(active));
+    }
+    let pos = response.interact_pointer_pos()?;
+    Some(TimelineIntent::DragStrip { id, frame: frame_for_x(track, start, duration, pos.x) })
+}
+
 fn video_intent_from_response(
     response: &egui::Response,
     track: Rect,
@@ -2264,6 +2292,9 @@ fn video_intent_from_response(
     }
     if let Some(take) = take_or_keep_intent(response, track, input) {
         return take;
+    }
+    if let Some(drag) = track_strip_drag(response, track, input) {
+        return drag;
     }
     if !(response.clicked() || response.dragged()) || !input.state.can_cue() {
         return TimelineIntent::None;

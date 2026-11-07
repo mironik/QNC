@@ -4,7 +4,7 @@
 //! SubSegment's axis, says what each of those actions does to its parts. No gesture is mapped
 //! by hand in the panel any more.
 
-use crate::{SubsegmentView, DRAG_EDGE, SUBSEGMENT_CUE, SUBSEGMENT_SELECT, TAKE_EDGE};
+use crate::{SubsegmentView, DRAG_EDGE, SUBSEGMENT_CUE, SUBSEGMENT_SELECT, SUBSEGMENT_SELECT_SLOTS, TAKE_EDGE};
 
 /// The SubSegment's own action of a mouse-map action on its row (`value` the frame of the
 /// SubSegment's axis, `target` what the pointer points at). `holding`: an edge, a cut, a part's
@@ -21,6 +21,13 @@ pub fn own_action(view: &SubsegmentView, action_id: &str, value: Option<i64>, ta
         "timeline_cue_frame" => own(SUBSEGMENT_CUE, Some(frame?.to_string())),
         // A click on a part's length strip chooses the part, as a cover's strip chooses its slot.
         "timeline_select_slot" | "timeline_select_cover" => own(SUBSEGMENT_SELECT, Some(part_at(frame?)?.to_string())),
+        // A drag over the strips (user 2026-11-07): the slots from the strip it started on to the
+        // one under the pointer are chosen.
+        "timeline_select_slots" => {
+            let first = target.and_then(|id| id.strip_prefix("part-")).and_then(|index| index.parse::<usize>().ok())?;
+            let last = frame.and_then(part_at).unwrap_or(first);
+            own(SUBSEGMENT_SELECT_SLOTS, Some(format!("{first}:{last}")))
+        }
         // A right click (or Ctrl + click) on the strip opens the slot's zoom (user 2026-11-05: "a
         // right click on the selected slot in its strip opens the zoom in slot mode, the cuts are
         // the slot's, longer or shorter"): the slot is chosen and its IN or OUT nearer the click
@@ -57,11 +64,12 @@ pub fn own_action(view: &SubsegmentView, action_id: &str, value: Option<i64>, ta
 
 /// The mouse map's row actions the SubSegment takes; any other a row would send (an M marker,
 /// a Wrap zoom, a segment edit) is not the SubSegment's and goes nowhere.
-pub const ROW_ACTIONS: [&str; 17] = [
+pub const ROW_ACTIONS: [&str; 18] = [
     "timeline_cue_frame",
     "segments_keep_edit",
     "timeline_select_slot",
     "timeline_select_cover",
+    "timeline_select_slots",
     "select_current_marker_slot",
     "timeline_take_cover",
     "select_audio_a1",
@@ -176,5 +184,14 @@ mod tests {
         view.chosen = Some(0);
         let taken = own_action(&view, "select_audio_a1", Some(100), None, false).map(|(action, target)| (action, target));
         assert_eq!(taken, Some(("select_audio_a1".to_string(), Some("0".to_string()))));
+    }
+
+    /// A drag over the strips chooses the slots from the one it started on to the one it reached
+    /// (user 2026-11-07).
+    #[test]
+    fn a_drag_over_the_strips_chooses_the_slots_between() {
+        let view = view();
+        let chosen = own_action(&view, "timeline_select_slots", Some(100), Some("part-0"), false);
+        assert_eq!(chosen, Some((SUBSEGMENT_SELECT_SLOTS.to_string(), Some("0:2".to_string()))));
     }
 }

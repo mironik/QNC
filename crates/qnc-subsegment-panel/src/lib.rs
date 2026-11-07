@@ -78,7 +78,7 @@ pub fn show(ui: &mut egui::Ui, view: &SubsegmentView, theme: TimelineTheme, leng
             id,
             start_frame: part.start,
             end_frame: part.end,
-            selected: view.chosen == Some(index) || view.slide == Some(index) || view.trim.is_some_and(|(at, _, _)| at == index) || view.sound == Some(index),
+            selected: view.chosen == Some(index) || view.chosen_slots.contains(&index) || view.slide == Some(index) || view.trim.is_some_and(|(at, _, _)| at == index) || view.sound == Some(index),
             pending: false,
             fill: cover_fill(part.end - part.start, view.rate, lengths),
             label: Some(length.as_str()),

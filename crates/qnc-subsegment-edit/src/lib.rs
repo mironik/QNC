@@ -27,6 +27,10 @@ pub const SUBSEGMENT_CUE: &str = "subsegment_cue";
 /// A part of the open SubSegment chosen, as a slot is (a click on its length strip): `target`
 /// is its index. Ctrl+I / Ctrl+O and Ctrl+1 then take its edges and its A1, Delete takes it out.
 pub const SUBSEGMENT_SELECT: &str = "subsegment_select";
+/// Several parts chosen by a drag over their length strips (user 2026-11-07): `target` is
+/// `first:last` (the strip the drag started on, the one it reached). Ctrl+1 then takes the A1 of
+/// all of them: one change for all.
+pub const SUBSEGMENT_SELECT_SLOTS: &str = "subsegment_select_slots";
 /// A part taken whole, as a slot (a right click on its length strip, as Ctrl+S): `target` is its
 /// index; arrows and the wheel then move it along the statement.
 pub const SUBSEGMENT_TAKE: &str = "subsegment_take";
@@ -197,6 +201,12 @@ pub struct SubsegmentEdit {
     trim: Option<Trim>,
     /// The part of the open SubSegment chosen by a click on its length strip, as a slot is.
     chosen: Option<usize>,
+    /// The other end of slots chosen by a drag over their strips (user 2026-11-07): every part
+    /// from `chosen` to it is chosen; `None` for one slot. Only read while `chosen` is.
+    chosen_to: Option<usize>,
+    /// The other chosen slots whose A1 is taken with `sound` (several slots chosen: one change
+    /// for all of them; one slot: that one alone, user 2026-11-07).
+    sound_also: Vec<usize>,
     /// The sound of a join taken (Ctrl+1 with its whole cut taken, user 2026-11-03), as drafted.
     join_sound: Option<JoinSound>,
     /// The value of the action being handled (the frame of a click in the trim zoom).
@@ -222,7 +232,7 @@ pub struct SubsegmentEdit {
 
 impl Default for SubsegmentEdit {
     fn default() -> Self {
-        Self { view: EditView::default(), blocks: Vec::new(), names: HashMap::new(), project: None, settled: true, writes: Vec::new(), open_subsegment: None, pieces_request: None, trim: None, chosen: None, join_sound: None, value: None, slide: None, slip_part: None, waves: qnc_program_waveform::ProgramWaves::new(), filmstrips: qnc_program_filmstrip::ProgramFilmstrips::new(), waves_project: None, trim_stills: qnc_trim_stills::TrimStills::new(), zoom_follow: Default::default(), sound: None }
+        Self { view: EditView::default(), blocks: Vec::new(), names: HashMap::new(), project: None, settled: true, writes: Vec::new(), open_subsegment: None, pieces_request: None, trim: None, chosen: None, chosen_to: None, sound_also: Vec::new(), join_sound: None, value: None, slide: None, slip_part: None, waves: qnc_program_waveform::ProgramWaves::new(), filmstrips: qnc_program_filmstrip::ProgramFilmstrips::new(), waves_project: None, trim_stills: qnc_trim_stills::TrimStills::new(), zoom_follow: Default::default(), sound: None }
     }
 }
 
@@ -360,6 +370,7 @@ impl SubsegmentEdit {
         });
         shown.roll = self.trim.is_some_and(|trim| trim.roll.is_some());
         shown.chosen = self.chosen.filter(|index| *index < shown.parts.len());
+        shown.chosen_slots = self.chosen_slots().into_iter().chain(self.sound.is_some().then(|| self.sound_also.clone()).unwrap_or_default()).filter(|index| *index < shown.parts.len()).collect();
         shown.join_sound = self.join_sound.map(|join| (join.index, join.side));
         shown.slide = self.slide.map(|(index, _)| index);
         shown.rate = pieces.first().and_then(|piece| names.get(&piece.clip_id)).filter(|(_, frames, seconds)| *seconds > 0.0 && *frames > 0).map(|(_, frames, seconds)| ((*frames as f64 / seconds).round() as u32, 1));
@@ -396,8 +407,12 @@ impl SubsegmentEdit {
             }
         }
         if let Some(sound) = self.sound {
-            if let Some(piece) = block.pieces.get_mut(sound.index) {
-                (piece.a1_channel, piece.a1_level_db, piece.a1_off) = (sound.channel, sound.level_db, sound.off);
+            // The taken slot and the other chosen ones are heard with the drafted sound.
+            for index in std::iter::once(sound.index).chain(self.sound_also.iter().copied()) {
+                if let Some(piece) = block.pieces.get_mut(index) {
+                    let count = self.waves.channels(&piece.clip_id).unwrap_or(2).max(1);
+                    (piece.a1_channel, piece.a1_level_db, piece.a1_off) = (sound.channel.map(|channel| channel.min(count - 1)), sound.level_db, sound.off);
+                }
             }
         }
         block
@@ -421,6 +436,9 @@ impl SubsegmentEdit {
                 let piece = pieces.get(index)?;
                 (self.trim, self.slide) = (None, None);
                 self.sound = Some(PartSound { index, channel: piece.a1_channel, level_db: piece.a1_level_db, off: piece.a1_off });
+                // Several slots chosen and this one among them: the change is for all of them.
+                let chosen = self.chosen_slots();
+                self.sound_also = if chosen.contains(&index) { chosen.into_iter().filter(|other| *other != index && *other < pieces.len()).collect() } else { Vec::new() };
                 return Some(true);
             }
             qnc_lane_choice::LaneKey::Take(_) => return None,
@@ -435,13 +453,29 @@ impl SubsegmentEdit {
             qnc_lane_choice::LaneKey::Level(delta) => sound.level_db = (i16::from(sound.level_db) + i16::from(delta)).clamp(-40, 12) as i8,
             qnc_lane_choice::LaneKey::Keep => {
                 self.sound = None;
-                let mut piece = pieces.get(sound.index)?.clone();
-                (piece.a1_channel, piece.a1_level_db, piece.a1_off) = (sound.channel, sound.level_db, sound.off);
+                // The taken slot and every other chosen one get the same sound (each its channel
+                // within the channels of its own clip).
+                let also = std::mem::take(&mut self.sound_also);
+                let written: Vec<(usize, Piece)> = std::iter::once(sound.index)
+                    .chain(also)
+                    .filter_map(|index| {
+                        let mut piece = pieces.get(index)?.clone();
+                        let count = self.waves.channels(&piece.clip_id).unwrap_or(2).max(1);
+                        (piece.a1_channel, piece.a1_level_db, piece.a1_off) = (sound.channel.map(|channel| channel.min(count - 1)), sound.level_db, sound.off);
+                        Some((index, piece))
+                    })
+                    .collect();
                 let id = block.id;
-                return Some(self.write(preview, move |target| qnc_script_db::set_piece(target, id, sound.index, piece).map(|_| None)));
+                return Some(self.write(preview, move |target| {
+                    for (index, piece) in written {
+                        qnc_script_db::set_piece(target, id, index, piece)?;
+                    }
+                    Ok(None)
+                }));
             }
             qnc_lane_choice::LaneKey::Drop => {
                 self.sound = None;
+                self.sound_also.clear();
                 self.pieces_request = Some((view::piece_inputs(block), at));
                 return Some(true);
             }
@@ -492,7 +526,7 @@ impl SubsegmentEdit {
         match action_id {
             SUBSEGMENT_SELECT => {
                 let index = target.and_then(|index| index.parse::<usize>().ok()).filter(|index| *index < pieces.len())?;
-                self.chosen = Some(index);
+                (self.chosen, self.chosen_to) = (Some(index), None);
                 // In the zoom (a picture clicked): the slot is chosen, the edge taken stays and the
                 // playhead does not move.
                 if self.trim.is_some() || self.join_sound.is_some() {
@@ -500,6 +534,17 @@ impl SubsegmentEdit {
                 }
                 let start = self.view.subsegment.as_ref().and_then(|view| view.parts.get(index)).map_or(0, |part| part.start);
                 self.pieces_request = Some((view::piece_inputs(&block), start));
+                return Some(true);
+            }
+            // A drag over the strips (user 2026-11-07): every slot from the one it started on to
+            // the one it reached is chosen; the playhead stays.
+            SUBSEGMENT_SELECT_SLOTS => {
+                let (from, to) = target?.split_once(':')?;
+                let (from, to) = (from.parse::<usize>().ok()?, to.parse::<usize>().ok()?);
+                if from >= pieces.len() || to >= pieces.len() {
+                    return Some(false);
+                }
+                (self.chosen, self.chosen_to) = (Some(from), (to != from).then_some(to));
                 return Some(true);
             }
             "clear_focus" if self.chosen.is_some() && self.trim.is_none() && self.sound.is_none() => {
@@ -867,6 +912,15 @@ impl SubsegmentEdit {
 
     /// The part Ctrl+I / Ctrl+O and Ctrl+1 work on: the chosen one, else the one under the
     /// playhead (as a slot: the chosen slot, else the slot under the Wrap playhead).
+    /// The chosen slots: one, or every part between the two ends of a drag over the strips.
+    fn chosen_slots(&self) -> Vec<usize> {
+        match (self.chosen, self.chosen_to) {
+            (Some(from), Some(to)) => (from.min(to)..=from.max(to)).collect(),
+            (Some(one), None) => vec![one],
+            _ => Vec::new(),
+        }
+    }
+
     fn part_in_hand(&self) -> usize {
         let view = self.view.subsegment.as_ref();
         let count = view.map_or(0, |view| view.parts.len());

@@ -643,6 +643,9 @@
     "timeline_drag_cut_edge": {
       "label": "Povlacenje J ili L tona reza misem"
     },
+    "timeline_select_slots": {
+      "label": "Povlacenje preko traka trajanja: odabir vise slotova"
+    },
     "source_cut": {
       "label": "Rez (skare) na mjestu playheada na source timelineu: dva reza su IN i OUT, raniji IN, kasniji OUT"
     },

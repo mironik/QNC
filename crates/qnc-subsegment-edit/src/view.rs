@@ -57,6 +57,9 @@ pub struct SubsegmentView {
     pub roll: bool,
     /// The part chosen by a click on its length strip, as a slot is.
     pub chosen: Option<usize>,
+    /// Every chosen slot (several after a drag over their strips) and every slot whose A1 is
+    /// changed with the taken one (user 2026-11-07).
+    pub chosen_slots: Vec<usize>,
     /// The sound of the join before this part taken (Ctrl+1 on a taken cut) and which side moves.
     pub join_sound: Option<(usize, crate::JoinSide)>,
     /// The part taken whole as a slot (Ctrl+S), moved as drafted.
@@ -78,7 +81,7 @@ pub fn subsegment_view(block: &Block, playhead: Option<u64>) -> SubsegmentView {
             part
         })
         .collect();
-    SubsegmentView { block_id: block.id, parts, total_frames: start, playhead, a1: Vec::new(), pictures: Vec::new(), trim: None, zoom: None, sound: None, sound_choice: None, rate: None, roll: false, chosen: None, join_sound: None, slide: None }
+    SubsegmentView { block_id: block.id, parts, total_frames: start, playhead, a1: Vec::new(), pictures: Vec::new(), trim: None, zoom: None, sound: None, sound_choice: None, rate: None, roll: false, chosen: None, chosen_slots: Vec::new(), join_sound: None, slide: None }
 }
 
 /// Where the parts play on the SubSegment's axis, for its wave (channel 1 of each clip: the

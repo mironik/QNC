@@ -50,6 +50,7 @@
       "drag_marker": "timeline_drag_marker",
       "click_cut_edge": "timeline_take_cut_edge",
       "drag_cut_edge": "timeline_drag_cut_edge",
+      "drag_strip": "timeline_select_slots",
       "middle_click": "add_marker",
       "wheel_back": "wheel_segments_back",
       "wheel_forward": "wheel_segments_forward",

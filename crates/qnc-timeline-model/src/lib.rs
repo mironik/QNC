@@ -324,6 +324,9 @@ pub enum TimelineIntent {
     DragMarker { id: String, frame: u64 },
     /// A side of the taken cut's sound dragged to `frame` of the row (user 2026-10-29).
     DragCutEdge { id: String, frame: u64 },
+    /// A drag along the length strips of the parts that started on the strip of `id` and has
+    /// reached `frame` (user 2026-11-07: several slots are chosen by dragging over their strips).
+    DragStrip { id: String, frame: u64 },
     /// A cut (scissors) at the playhead of a source timeline: the middle mouse button, a
     /// touchpad's three-finger tap set to it, a two-finger tap on a touch screen (user
     /// 2026-10-18: two cuts mark IN and OUT, the earlier IN, the later OUT).

@@ -8299,3 +8299,14 @@ A1 dijela uzet timeline slozene izjave pokazuje stupac kanala i razinu kao sourc
 (`pointer.rs`, test `a1_is_taken_of_the_chosen_slot`). Nije izvedeno: izbor vise slotova odjednom (trazi novu gestu
 u zakljucanoj mapi misa), krivulja razine i pomocnik tona u slozenoj izjavi (nikad nisu bili izvedeni). Testovi
 `qnc-subsegment-edit`, `qnc-subsegment-panel`, `qnc-script`, `qnc-panel-focus`, conformance. Uzivo nije provjereno.
+Dopuna 2026-11-07 (korisnik: "treba se moci selektirati vise slotova"; gesta "povlacenje preko traka"; "ako se
+selektira vise slotova, odnosi se na sve slotove, ako jedan, onda samo na taj odabrani"; mapa misa prosirena uz odluku
+korisnika): na timelineu slozene izjave povlacenje lijevom tipkom koje pocne na traci trajanja bira sve slotove od te
+trake do one pod misem (`qnc-timeline` `track_strip_drag`, samo red s uvijek vidljivim trakama; namjera
+`TimelineIntent::DragStrip`, pokazivac `drag_strip` -> `timeline_select_slots` u `contracts/input/mouse.json` i
+katalogu; `qnc-subsegment-edit` `SUBSEGMENT_SELECT_SLOTS`, `chosen_to`, `chosen_slots`). Izabrani slotovi su istaknuti.
+A1 (klik na oznaku, Ctrl+1) uzet na jednom od izabranih vrijedi za sve: kanal (svakom unutar kanala njegova klipa),
+razina i ukljucenost, svi se odmah cuju, Enter upisuje svaki (`sound_also`; svaki upis je svoj korak undoa); jedan
+izabran slot: samo on. Klik na traku bira opet jedan slot, klik izvan traka i Esc puste izbor. Test
+`a_drag_over_the_strips_chooses_the_slots_between`, `cargo check --workspace --all-targets`, conformance. Uzivo nije
+provjereno.
