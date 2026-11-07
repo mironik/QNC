@@ -8276,3 +8276,13 @@ nestaje. (3) Pojam pretrage prijepisa i trenutni nalaz drzi `qnc-transcript` (`s
 `the_term_is_the_transcripts_and_enter_goes_round_its_finds`, testovi dotaknutih kocki (i zlatna tablica tipki),
 `cargo check --workspace --all-targets`, conformance. Debug cache obrisan (`cargo clean --profile dev`, 31,4 GiB;
 disk je bio pun). Uzivo nije provjereno.
+Izvedeno 2026-11-07 (korisnik: "da, pushaj i kreni s korakom 5"; docs/99 korak 5, prvo mjerenje): iz postojeceg
+`player.log` (34 689 sekundi s dijagnostikom, zadnji dani): dok forma crta 20+ puta u sekundi `form-poll` je 161 ms/s
+(3,3 ms po crtanju, p99 9,7 ms), `form-paint` 130 ms/s, cijeli okvir desktopa 346 ms/s; u mirovanju poll 17 ms/s.
+10 995 sporih okvira (p50 33 ms, p99 191 ms) bez podatka o bloku. Poll u vlastitu nit zasad se ne radi (player je
+zaseban proces s visim prioritetom). Dodano samo mjerenje: `qnc-dev-diagnostics::take_frame_blocks` (blokovi jednog
+okvira), `ui-frame-slow` ih pise (`qnc-desktop`), a nemjereni dio polla Story/MA dobio je imena `poll-catalog`,
+`poll-posters`, `poll-sync` (`qnc-editorial-application`) i `poll-side` (`qnc-panel-focus`); ponasanje isto, C10
+isti. Testovi `qnc-dev-diagnostics` (novi `a_frame_gives_its_blocks_once`), `qnc-desktop` (jedan test jednom pao na
+brisanju privremene mape, 4 ponavljanja prolaze), conformance, release build `qnc-app` s libav. Odluka o niti nakon
+zive sesije s novim zapisom.

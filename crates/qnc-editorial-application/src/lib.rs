@@ -182,11 +182,11 @@ impl EditorialApplication {
     /// Applies finished background work and the player state. Returns whether
     /// the view changed.
     pub fn poll(&mut self, pointed: Option<&str>) -> bool {
-        let mut changed = self.poll_catalog();
+        let mut changed = qnc_dev_diagnostics::timed_block("poll-catalog", || self.poll_catalog());
         if qnc_dev_diagnostics::timed_block("poll-preview", || self.preview.poll_pointed(pointed)) {
             changed = true;
         }
-        let (applied, others) = self.posters.poll_into(&mut self.view.clips);
+        let (applied, others) = qnc_dev_diagnostics::timed_block("poll-posters", || self.posters.poll_into(&mut self.view.clips));
         changed |= applied;
         for poster in others {
             changed |= qnc_virtual_short_cards::apply_poster(&mut self.view.shorts, &poster.clip_id, poster.image);
@@ -194,7 +194,7 @@ impl EditorialApplication {
         if self.short_stills.take_published() { self.reload_shorts() } // a poster was written
         changed |= self.pool_shots.take().map(|rows| self.apply_shorts(rows)).is_some();
         changed |= self.short_save.follow(qnc_virtual_short_cards::chosen(&self.view.shorts, self.view.chosen_shot_id.as_deref()),self.view.preview.clip_id.as_deref(), self.view.preview.timeline.visible_source_marks(), self.view.preview.timeline.taken_source_mark().is_some(), self.content_target.as_ref().map(|targets| &targets.1)).map(|saved| self.short_saved(saved)).is_some();
-        self.sync_preview_view();
+        qnc_dev_diagnostics::timed_block("poll-sync", || self.sync_preview_view());
         changed
     }
 
@@ -360,7 +360,7 @@ impl EditorialApplication {
                 }
             }
         };
-        self.sync_preview_view();
+        qnc_dev_diagnostics::timed_block("poll-sync", || self.sync_preview_view());
         changed
     }
 

@@ -161,3 +161,11 @@ zapis u AGENTS.md. Koraci 1-3 ne mijenjaju ponasanje.
   (`SearchView`, `search.rs`; radnje `transcript_search_term`, `transcript_search_next`: Enter stavlja playhead
   na sljedeci nalaz u samoj kocki). U egui memoriji ostaje izbor prikaza (tabovi, otvoren prozor, skrol jednom
   do nalaza ili oznake) i stanje geste (je li povlacenje u tijeku).
+- Korak 5, mjerenje (2026-11-07): iz `player.log` (zadnji dani, 34 689 sekundi s dijagnostikom) u sekundama kad
+  forma crta 20+ puta (prosjek 48,7 crtanja): `form-poll` 161 ms/s (3,3 ms po crtanju, p99 9,7 ms), `form-paint`
+  130 ms/s, cijeli okvir desktopa 346 ms/s (oko trecine jezgre); od polla `poll-focus` 66 ms/s, ostatak (oko
+  85 ms/s) nije bio imenovan. U mirovanju (4,7 crtanja/s) poll 17 ms/s. 10 995 sporih okvira (> 25 ms), p50 33 ms,
+  p90 63 ms, p99 191 ms, bez podatka koji ih je blok uzeo. Zakljucak: poll u vlastitu nit zasad nije opravdan
+  (player je zaseban proces s visim prioritetom; poll je oko 16 % jezgre dok svira). Dodano mjerenje: `ui-frame-slow`
+  nosi blokove tog okvira (`qnc-dev-diagnostics::take_frame_blocks`), a poll je razdijeljen na `poll-catalog`,
+  `poll-posters`, `poll-sync`, `poll-side`. Odluka o niti nakon zive sesije s tim zapisom.

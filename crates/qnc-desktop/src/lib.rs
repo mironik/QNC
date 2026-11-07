@@ -407,10 +407,12 @@ impl eframe::App for QncShell {
         // A frame of the desktop longer than 25 ms is a moment the hand waits: logged with
         // the application on screen, so a slow piece can be found (diagnostics only).
         let spent = started.elapsed();
+        // The blocks of this frame (docs/99 step 5: which block a slow frame spent its time in).
+        let blocks = qnc_dev_diagnostics::take_frame_blocks();
         if spent > Duration::from_millis(25) && qnc_dev_diagnostics::player_diagnostics_enabled() {
             qnc_dev_diagnostics::log_line(
                 qnc_dev_diagnostics::DiagnosticsStream::Player,
-                format!("ui-frame-slow ms={} tab={}", spent.as_millis(), self.active_tab),
+                format!("ui-frame-slow ms={} tab={} blocks=[{blocks}]", spent.as_millis(), self.active_tab),
             );
         }
     }

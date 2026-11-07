@@ -767,7 +767,7 @@ fn unix_ms() -> u64 {
 }
 
 mod block_time;
-pub use block_time::timed_block;
+pub use block_time::{take_frame_blocks, timed_block};
 
 #[cfg(test)]
 mod tests {

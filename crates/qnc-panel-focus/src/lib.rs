@@ -165,7 +165,7 @@ impl PanelFocus {
         self.source.offer_assist(Some(segments.sound_assist_on())); // and the sound assistant (AI)
         self.keyframes.poll(preview, segments, timeline); // a key picture found moves its edit
         let button = (self.panel == Panel::SourceButtons).then(|| self.walk.chosen_in(qnc_focus_walk::SOURCE_BUTTONS).map(str::to_string)).flatten();
-        self.side.poll(preview, timeline, clips);
+        qnc_dev_diagnostics::timed_block("poll-side", || self.side.poll(preview, timeline, clips));
         // A take of a voice record clicked: its clip on the source timeline, A1 on its channel,
         // played from its start.
         if let Some((clip_id, channel)) = self.side.take_voice_request() {
