@@ -88,9 +88,33 @@ pub fn paint_level_curves(
         // The point the keys control: on the playhead line of the taken curve.
         if let Some(playhead) = playhead.filter(|frame| curve.taken && (curve.from..curve.to).contains(frame)) {
             let at = playhead as f64;
-            let center = Pos2::new(x_at(band, start, duration, at), level_y(band, curve.level_at(at)));
+            let level = curve.level_at(at);
+            let center = Pos2::new(x_at(band, start, duration, at), level_y(band, level));
             painter.circle_stroke(center, 3.5, Stroke::new(1.5, point));
+            // How much it is raised or lowered there (user 2026-11-07: it must show).
+            let text = format!("{:+.1} dB", level / 10.0);
+            let galley = painter.layout_no_wrap(text, egui::FontId::proportional(13.0), point);
+            let mut at = egui::pos2(center.x + 7.0, center.y - galley.size().y - 3.0);
+            if at.x + galley.size().x > band.right() {
+                at.x = center.x - 7.0 - galley.size().x;
+            }
+            at.y = at.y.max(band.top() + 1.0);
+            painter.galley(at, galley, point);
         }
+    }
+}
+
+/// The dB scale of a lane's zoom (user 2026-11-07): a faint line and its label at each level, on
+/// the same height a curve is drawn (0 dB at seven tenths), so the line shows what it does.
+pub fn paint_scale(painter: &egui::Painter, band: Rect, color: Color32) {
+    let painter = painter.with_clip_rect(band);
+    let faint = color.gamma_multiply(0.35);
+    for db in [12, 6, 0, -6, -12, -24, -40] {
+        let y = level_y(band, f64::from(db) * 10.0);
+        let stroke = Stroke::new(if db == 0 { 1.0 } else { 0.5 }, faint);
+        painter.line_segment([Pos2::new(band.left(), y), Pos2::new(band.right(), y)], stroke);
+        let text = if db > 0 { format!("+{db}") } else { db.to_string() };
+        painter.text(Pos2::new(band.right() - 3.0, y - 1.0), egui::Align2::RIGHT_BOTTOM, text, egui::FontId::proportional(10.0), faint);
     }
 }
 

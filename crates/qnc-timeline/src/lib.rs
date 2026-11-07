@@ -838,7 +838,7 @@ pub fn show(ui: &mut egui::Ui, input: TimelineInput<'_>) -> TimelineIntent {
                 let own = if lane == AudioLane::A1 { input.a1_peaks } else { input.a2_peaks };
                 Some((lane, lane_peaks(&input, Some(choice), own), level))
             }
-            None => input.wave_over_video.map(|(lane, level)| {
+            None => level_lane(&input).map(|lane| (lane, 1)).or(input.wave_over_video).map(|(lane, level)| {
                 let peaks = match lane {
                     AudioLane::A1 => lane_peaks(&input, input.a1_channel, input.a1_peaks),
                     AudioLane::A2 => lane_peaks(&input, input.a2_channel, input.a2_peaks),
@@ -859,6 +859,17 @@ pub fn show(ui: &mut egui::Ui, input: TimelineInput<'_>) -> TimelineIntent {
                     let (start, duration) = (input.state.range_start(), input.state.duration_frames());
                     paint_markers(ui, track, start, duration, input.markers, &input);
                     paint_a1_splits(ui, track, start, duration, &input);
+                }
+                // The level curve is led here, in the lane's zoom, with its dB scale and the level
+                // at the playhead (user 2026-11-07); a right click on its line takes it.
+                if let Some(index) = lane_index(lane) {
+                    let (_, track) = split_label_track(rect, input.metrics.label_width);
+                    level_lines::paint_scale(ui.painter(), track, input.theme.level_curve);
+                    level_lines::paint(ui, track, index, &input);
+                    let right = ui.input(|i| i.pointer.secondary_clicked().then(|| i.pointer.interact_pos()).flatten());
+                    if let Some(frame) = right.filter(|pos| track.contains(*pos)).and_then(|pos| level_lines::hit(track, index, pos, &input)) {
+                        intent = TimelineIntent::TakeLevelLine { lane, frame };
+                    }
                 }
             }
         }
@@ -1030,10 +1041,7 @@ fn paint_audio_row(
     let gain = lane_gain(input, lane);
     qnc_wave_view::paint_wave_peaks_gain(ui.painter(), track_rect, peaks, gain, wave);
     qnc_wave_view::paint_level_marks(ui.painter(), track_rect, 1.0, input.theme.level_marks);
-    // The lane's level curve, as in a Wrap row's band (user 2026-11-07: the line is universal).
-    if let Some(index) = lane_index(lane) {
-        level_lines::paint(ui, track_rect, index, input);
-    }
+    // No level curve on the narrow lane: it is led only in the lane's zoom (user 2026-11-07).
     paint_lane_level(ui, track_rect, lane, input);
     paint_ranges_and_playhead(ui, track_rect, input);
     if let Some(take) = take_or_keep_intent(&response, track_rect, input) {
@@ -1126,9 +1134,6 @@ fn paint_audio_band(ui: &mut egui::Ui, band: Rect, lane: AudioLane, peaks: &[f32
     let gain = lane_gain(input, lane);
     qnc_wave_view::paint_wave_peaks_gain(ui.painter(), track_rect, peaks, gain, input.theme.audio_wave);
     qnc_wave_view::paint_level_marks(ui.painter(), track_rect, 1.0, input.theme.level_marks);
-    if let Some(index) = lane_index(lane) {
-        level_lines::paint(ui, track_rect, index, input);
-    }
     paint_lane_level(ui, track_rect, lane, input);
     let label_response = ui.interact(
         label_rect,
@@ -1230,18 +1235,9 @@ fn take_lane_intent(responses: &[&egui::Response], track: Rect, lane: AudioLane,
                 return Some(TimelineIntent::TakeMarkerSound { id: id.to_string() });
             }
         }
-        // Near a level curve: the curve (docs/98 2.1, user 2026-11-06), else the sound there.
-        if let Some(frame) = lane_index(lane).and_then(|index| level_lines::hit(track, index, pos, input)) {
-            return Some(TimelineIntent::TakeLevelLine { lane, frame });
-        }
+        // The level curve is taken only in the lane's zoom (user 2026-11-07), not here.
         let frame = frame_for_x(track, start, duration, pos.x);
         return Some(TimelineIntent::TakeSound { lane, frame });
-    }
-    // On a source timeline near the clip's level curve: the curve (user 2026-11-07), else the lane.
-    if let Some(pos) = clicked.interact_pointer_pos() {
-        if let Some(frame) = lane_index(lane).and_then(|index| level_lines::hit(track, index, pos, input)) {
-            return Some(TimelineIntent::TakeLevelLine { lane, frame });
-        }
     }
     Some(TimelineIntent::TakeAudioLane(lane))
 }
@@ -1409,7 +1405,13 @@ fn zoomed_lane(input: &TimelineInput<'_>) -> Option<AudioLane> {
     if input.layers.audio_a2 && open(input.a2_channel) {
         return Some(AudioLane::A2);
     }
-    input.wave_over_video.map(|(lane, _)| lane)
+    level_lane(input).or(input.wave_over_video.map(|(lane, _)| lane))
+}
+
+/// The lane whose level curve is taken: it is led in the lane's zoom (user 2026-11-07: leading
+/// the sound on the narrow lane makes no sense, nothing shows how much it is raised or lowered).
+fn level_lane(input: &TimelineInput<'_>) -> Option<AudioLane> {
+    input.level_curves.iter().find(|curve| curve.taken).map(|curve| if curve.lane == 0 { AudioLane::A1 } else { AudioLane::A2 })
 }
 
 /// The slot field of the A2 zoom on a Wrap row (user 2026-10-22: the sound of one cover is set

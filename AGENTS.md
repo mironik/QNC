@@ -8351,3 +8351,10 @@ ima tocke ili je uzeta, pa bez tocaka nije bilo linije koju bi desni klik uhvati
 tocaka) stoji uvijek: na source timelineu za A1 i A2 prikazanog klipa (`qnc-source-timeline` `drawn_curves`), na Wrap
 redovima za svaki segment i pokrivalicu (`qnc-program-view` `level_curves`) i za svaki dio slozene izjave
 (`qnc-subsegment-edit`). Test prilagoden, conformance. Uzivo nije provjereno.
+Izmjena 2026-11-07 (korisnik: "vodenje tona na uskoj audio traci nema nikakvog smisla, niti se vidi koliko je podignuto ili
+spusteno; ima smisla jedino u expand audio u timeline ili u zumu"): krivulja razine se vise ne crta ni ne uzima na uskoj
+traci A1/A2 (source timeline, pojasevi Wrap reda, slozena izjava). Crta se i uzima samo u prosirenoj traci (zoom trake preko
+videa: uzeta traka Ctrl+1/Ctrl+2 ili klik na A1/A2, uvecani val) i u zoomu reza. Uzeta krivulja (Ctrl+Shift+1/2) sama
+otvara prosirenu traku. U prosirenoj traci je ljestvica u dB (+12, +6, 0, -6, -12, -24, -40) i uz tocku na liniji
+playheada razina u dB (i u zoomu reza); desni klik na liniju je uzima. `qnc-timeline` (`level_lane`, `zoomed_lane`,
+`level_lines::paint_scale`). Testovi, conformance. Uzivo nije provjereno.
