@@ -665,7 +665,7 @@ impl Connection {
         }
         let control_start = Instant::now();
         let mut reply = if self.cached_reply.is_none()
-            || action.is_some_and(action_requires_preflight_state)
+            || action.as_ref().is_some_and(action_requires_preflight_state)
             || self.last_state_poll.elapsed()
                 >= state_poll_interval(self.pending_cue_frame, self.cached_reply.as_ref())
         {
@@ -675,6 +675,8 @@ impl Connection {
         } else {
             self.cached_reply.clone().expect("observed player state")
         };
+        let acted = action.is_some();
+        let logged = qnc_dev_diagnostics::player_diagnostics_enabled().then(|| format!("{action:?}"));
         if let Some(action) = action {
             let command = action_command(&reply, action)?;
             let previous_picture = self
@@ -710,12 +712,13 @@ impl Connection {
         self.video_visible =
             update_video_visible(self.video_visible, picture.is_some(), &reply.events);
         if qnc_dev_diagnostics::player_diagnostics_enabled()
-            && (action.is_some() || self.last_report.elapsed() >= Duration::from_secs(2))
+            && (acted || self.last_report.elapsed() >= Duration::from_secs(2))
         {
             qnc_dev_diagnostics::log_line(
                 qnc_dev_diagnostics::DiagnosticsStream::Player,
                 format!(
-                    "player-client action={action:?} visible={} monitor_frame={:?} control_us={} events={:?}",
+                    "player-client action={} visible={} monitor_frame={:?} control_us={} events={:?}",
+                    logged.as_deref().unwrap_or("None"),
                     self.video_visible,
                     picture.as_ref().map(|p| p.header.frame),
                     control_us,
@@ -834,6 +837,7 @@ fn action_command(reply: &EventEnvelope, action: Action) -> Result<Command> {
         Action::StartSyncBed(source_frame, bed_frame) => return Ok(Command::StartSyncBed { source_frame, bed_frame }),
         Action::StopSyncBed => return Ok(Command::StopSyncBed),
         Action::SetPartLevel(output, from_frame, to_frame, gain_db, off) => return Ok(Command::SetPartLevel { output, from_frame, to_frame, gain_db, off }),
+        Action::SetLaneCurve(output, points) => return Ok(Command::SetLaneCurve { output, points }),
         _ => {}
     }
     let carrier = reply
@@ -870,13 +874,20 @@ fn action_command(reply: &EventEnvelope, action: Action) -> Result<Command> {
         Action::StartSyncBed(source_frame, bed_frame) => Command::StartSyncBed { source_frame, bed_frame },
         Action::StopSyncBed => Command::StopSyncBed,
         Action::SetPartLevel(output, from_frame, to_frame, gain_db, off) => Command::SetPartLevel { output, from_frame, to_frame, gain_db, off },
+        Action::SetLaneCurve(output, points) => Command::SetLaneCurve { output, points },
     })
 }
 
-fn action_requires_preflight_state(action: Action) -> bool {
+fn action_requires_preflight_state(action: &Action) -> bool {
     !matches!(
         action,
-        Action::Cue(_) | Action::SetOutputLevels(_) | Action::SetOutputRoutes(_) | Action::StartSyncBed(..) | Action::StopSyncBed | Action::SetPartLevel(..)
+        Action::Cue(_)
+            | Action::SetOutputLevels(_)
+            | Action::SetOutputRoutes(_)
+            | Action::StartSyncBed(..)
+            | Action::StopSyncBed
+            | Action::SetPartLevel(..)
+            | Action::SetLaneCurve(..)
     )
 }
 
@@ -1009,9 +1020,10 @@ mod tests {
 
     #[test]
     fn cue_command_uses_cached_confirmed_state_without_preflight_state() {
-        assert!(!action_requires_preflight_state(Action::Cue(25)));
-        assert!(action_requires_preflight_state(Action::Step(1)));
-        assert!(action_requires_preflight_state(Action::TogglePlayPause));
+        assert!(!action_requires_preflight_state(&Action::Cue(25)));
+        assert!(action_requires_preflight_state(&Action::Step(1)));
+        assert!(action_requires_preflight_state(&Action::TogglePlayPause));
+        assert!(!action_requires_preflight_state(&Action::SetLaneCurve(1, vec![(0, -60)])), "a curve is heard at once");
     }
 
     #[test]

@@ -128,6 +128,11 @@ impl Session {
                             Err(error) => Err(error),
                         }
                     }
+                    Command::SetLaneCurve { output, points } => match self.player.set_lane_curve(output, &points) {
+                        Ok(true) => Ok(Vec::new()),
+                        Ok(false) => return self.rejected(sequence, envelope.request_id, command_name, "this session plays no clip sound, or A1 and A2 hold other curves".into()),
+                        Err(error) => Err(error),
+                    },
                     Command::SetOutputRoutes { channels } => {
                         if !self.player.set_output_routes(&channels) {
                             return self.rejected(sequence, envelope.request_id, command_name, "output route outside the decoded channels".into());

@@ -141,6 +141,9 @@ pub struct Runtime {
     sync_bed: Option<sync_bed::SyncBed>,
     /// A program's timebase and sample rate: a part of it gets its own level by frames.
     program_clock: Option<(Timebase, u32)>,
+    /// A clip's timebase and sample rate: its A1/A2 level curves are placed by its frames
+    /// (user 2026-11-07).
+    clip_clock: Option<(Timebase, u32)>,
     /// The last rebuffer written to the log (reason, frame): the same one is written once,
     /// not every tick (audit 2026-10-20: 2.7 million lines of one stall a frame).
     rebuffer_logged: Option<(String, u64)>,
@@ -394,6 +397,7 @@ impl Runtime {
             clip,
             sync_bed: None,
             program_clock: None,
+            clip_clock: source.audio_format.as_ref().map(|format| (source.timebase, format.sample_rate_hz)),
             rebuffer_logged: None,
         })
     }
@@ -486,6 +490,7 @@ impl Runtime {
             clip: None,
             sync_bed: None,
             program_clock: source.audio_format.as_ref().map(|format| (source.timebase, format.sample_rate_hz)),
+            clip_clock: None,
             rebuffer_logged: None,
         })
     }
@@ -518,6 +523,16 @@ impl Runtime {
         };
         device.borrow().set_part_gain(part);
         Ok(true)
+    }
+    /// The level curve of output `output` of a clip: (clip frame, tenths of a dB) sorted by frame,
+    /// heard at once in the device (user 2026-11-07: the level line of the source timeline);
+    /// empty clears it. False without a clip's sound.
+    pub fn set_lane_curve(&self, output: u16, points: &[(u64, i16)]) -> Result<bool> {
+        let (Some(device), Some((timebase, rate))) = (&self.audio, self.clip_clock) else {
+            return Ok(false);
+        };
+        let points = points.iter().map(|(frame, db10)| Ok((sample_boundary(*frame, timebase, rate)?, f32::from(*db10) / 10.0))).collect::<Result<Vec<_>>>()?;
+        Ok(device.borrow().set_curve(output, &points))
     }
     /// The source channel each output plays (inventory positions), heard at once; false
     /// when one is not among the decoded channels.

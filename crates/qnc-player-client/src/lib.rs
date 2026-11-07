@@ -165,7 +165,7 @@ fn frame_interval(timebase: Timebase) -> Option<Duration> {
         .div_ceil(u128::try_from(timebase.fps_num).ok()?);
     Some(Duration::from_nanos(u64::try_from(nanos).ok()?))
 }
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub enum Action {
     TogglePlayPause,
     Step(i64),
@@ -181,6 +181,9 @@ pub enum Action {
     /// One part of the program (frames `.1..2` on output `.0`) heard `.3` dB louder than
     /// stored, or silent (`.4`), at once (user 2026-10-22); `.1 == .2` clears it.
     SetPartLevel(u16, u64, u64, i16, bool),
+    /// The level curve of output `.0` of a clip: (clip frame, tenths of a dB) sorted by frame,
+    /// heard at once (user 2026-11-07); empty clears it.
+    SetLaneCurve(u16, Vec<(u64, i16)>),
 }
 type Loader = Box<dyn FnOnce() -> Result<Launch> + Send>;
 /// Generation, first cued frame and loader of the latest selection.

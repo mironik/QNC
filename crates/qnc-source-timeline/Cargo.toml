@@ -20,3 +20,6 @@ qnc-edit-step = { workspace = true }
 qnc-clip-sound = { workspace = true }
 qnc-edit-words = { workspace = true }
 qnc-edit-edge = { workspace = true }
+qnc-level-curve = { workspace = true }
+qnc-program-db = { workspace = true }
+qnc-program-view = { workspace = true }

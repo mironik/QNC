@@ -457,3 +457,24 @@ fn a_part_gain_is_heard_at_once_only_over_its_samples_and_output() {
     assert_eq!(out, [0.5, 1.0, 0.5, 0.5], "sample 12 still in the part, 13 after it");
     q.shared.set_part_gain(None);
 }
+
+/// A level curve of one output (user 2026-11-07): a line in dB between its points, before the
+/// first and after the last theirs, heard at once only on its output.
+#[test]
+fn a_level_curve_is_a_line_in_db_on_its_output_only() {
+    let (mut q, mut c, g) = prepared(2);
+    q.push(g, 10, &[0.5; 8]).unwrap();
+    q.commit(g).unwrap();
+    q.start(g).unwrap();
+    // A2: 0 dB at sample 10, -20 dB at sample 12 (a tenth of the level).
+    assert!(q.shared.curves.set(1, &[(10, 0.0), (12, -20.0)]));
+    let mut out = [0.0; 4];
+    c.render(&mut out, 100, Some(5));
+    assert_eq!(out[0], 0.5, "A1 as recorded");
+    assert!((out[1] - 0.5).abs() < 1e-6, "at its first point: 0 dB");
+    assert!((out[3] - 0.5 * 10f32.powf(-0.5)).abs() < 1e-6, "halfway: -10 dB");
+    c.render(&mut out, 200, Some(5));
+    assert!((out[1] - 0.05).abs() < 1e-6, "at the last point: -20 dB");
+    assert!((out[3] - 0.05).abs() < 1e-6, "after it: its level");
+    assert!(q.shared.curves.set(1, &[]), "cleared");
+}

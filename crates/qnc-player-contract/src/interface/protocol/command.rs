@@ -53,6 +53,14 @@ pub enum BroadcastPlayerProtocolCommand {
         gain_db: i16,
         off: bool,
     },
+    /// The level curve of output `output` of a clip (user 2026-11-07: the level line drawn on the
+    /// source timeline): `points` are (clip frame, tenths of a dB) sorted by frame, the level a
+    /// line between them, before the first and after the last theirs; heard at once in the
+    /// device, nothing prepared again. Empty clears it.
+    SetLaneCurve {
+        output: u16,
+        points: Vec<(FrameNumber, i16)>,
+    },
 
     Play,
     Pause,
@@ -74,6 +82,7 @@ impl BroadcastPlayerProtocolCommand {
             BroadcastPlayerProtocolCommand::StartSyncBed { .. } => "StartSyncBed",
             BroadcastPlayerProtocolCommand::StopSyncBed => "StopSyncBed",
             BroadcastPlayerProtocolCommand::SetPartLevel { .. } => "SetPartLevel",
+            BroadcastPlayerProtocolCommand::SetLaneCurve { .. } => "SetLaneCurve",
             BroadcastPlayerProtocolCommand::Play => "Play",
             BroadcastPlayerProtocolCommand::Pause => "Pause",
             BroadcastPlayerProtocolCommand::Stop => "Stop",
@@ -110,6 +119,13 @@ impl BroadcastPlayerProtocolCommand {
             BroadcastPlayerProtocolCommand::SetPartLevel { output, from_frame, to_frame, gain_db, .. } => {
                 if *output >= 8 || from_frame > to_frame || !(-100..=100).contains(gain_db) {
                     Err("part level: output 0..8, from <= to, -100..100 dB".into())
+                } else {
+                    Ok(())
+                }
+            }
+            BroadcastPlayerProtocolCommand::SetLaneCurve { output, points } => {
+                if *output >= 8 || points.len() > 256 || points.iter().any(|(_, db10)| !(-600..=120).contains(db10)) || points.windows(2).any(|pair| pair[0].0 >= pair[1].0) {
+                    Err("lane curve: output 0..8, at most 256 points sorted by frame, -60..+12 dB".into())
                 } else {
                     Ok(())
                 }

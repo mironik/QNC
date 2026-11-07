@@ -17,6 +17,7 @@ impl ProgramSegments {
             a2_source_channel: segment.a2_source_channel,
             a2_level_db: segment.a2_level_db,
             a2_off: segment.a2_off,
+            level_keys: segment.level_keys,
         });
         if key.is_some() {
             self.pending_create = key;
@@ -44,6 +45,7 @@ impl ProgramSegments {
             a2_source_channel: self.source.lanes[1].channel,
             a2_level_db: self.source.lanes[1].level_db,
             a2_off: self.source.lanes[1].off,
+            level_keys: self.source.curve(0),
         });
     }
 
@@ -79,6 +81,7 @@ impl ProgramSegments {
                 a2_source_channel: self.source.lanes[1].channel,
                 a2_level_db: self.source.lanes[1].level_db,
                 a2_off: self.source.lanes[1].off,
+                level_keys: self.source.curve(1),
             },
             clip_name,
         );

@@ -45,7 +45,9 @@ pub fn show_with(
         .with_timecode(view.timecode)
         .with_a1_channel(view.a1)
         .with_a2_channel(view.a2)
-        .with_wave_over_video(view.wave_over_video);
+        .with_wave_over_video(view.wave_over_video)
+        // The clip's A1/A2 level curves (user 2026-11-07), drawn as on a Wrap row.
+        .with_level_curves(qnc_trim_overlay::timeline_level_curves(&view.level_curves, projection.range_start(), projection.range_start() + projection.duration_frames().max(1), 0));
     let mut answer = None;
     let slot = &mut answer;
     let mut toggled = None;

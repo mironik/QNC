@@ -37,6 +37,13 @@ pub struct ClipSound {
     pub clip_id: String,
     pub a1: LaneSound,
     pub a2: LaneSound,
+    /// The level curves of A1 and A2 drawn on the source timeline (user 2026-11-07: "the level
+    /// line must be universal"): points at frames of the clip, tenths of a dB added to the lane's
+    /// level. A new segment or cover of the clip takes them. Empty: no curve.
+    #[serde(default)]
+    pub a1_keys: Vec<(u64, i16)>,
+    #[serde(default)]
+    pub a2_keys: Vec<(u64, i16)>,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]

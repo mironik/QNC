@@ -6659,7 +6659,10 @@ dependencies = [
  "qnc-edit-step",
  "qnc-edit-words",
  "qnc-lane-choice",
+ "qnc-level-curve",
  "qnc-notice",
+ "qnc-program-db",
+ "qnc-program-view",
  "qnc-source-channels",
  "qnc-source-mark-focus",
  "qnc-source-panel",
@@ -6683,6 +6686,7 @@ dependencies = [
  "qnc-theme-styles",
  "qnc-timeline",
  "qnc-timeline-assets",
+ "qnc-trim-overlay",
  "qnc-ui-kit",
 ]
 

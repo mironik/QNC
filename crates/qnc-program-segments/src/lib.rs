@@ -69,6 +69,8 @@ struct NewCover {
     a2_source_channel: u16,
     a2_level_db: i8,
     a2_off: bool,
+    /// The A2 level curve the clip keeps on the source timeline (user 2026-11-07).
+    level_keys: Vec<qnc_program_db::LevelKey>,
 }
 
 pub const MODULE_ID: &str = "qnc.module.program-segments";
@@ -101,9 +103,23 @@ pub struct SourcePick {
     /// A1 and A2 as the source timeline's lanes show them now (AGENTS 0.12, docs/97 step 3):
     /// its trim zoom shows the same lanes.
     pub lane_choices: [Option<qnc_program_view::ZoomLane>; 2],
+    /// The A1 and A2 level curves the source timeline keeps for the clip (clip frames, tenths of
+    /// a dB; user 2026-11-07): a new segment takes A1's, a new cover A2's.
+    pub curves: [Vec<(u64, i16)>; 2],
 }
 
 impl SourcePick {
+    /// The clip's level curves as the source timeline keeps them.
+    pub fn with_curves(mut self, curves: [Vec<(u64, i16)>; 2]) -> Self {
+        self.curves = curves;
+        self
+    }
+
+    /// A kept curve as the story writes it.
+    pub(crate) fn curve(&self, lane: usize) -> Vec<qnc_program_db::LevelKey> {
+        self.curves[lane.min(1)].iter().map(|(frame, db10)| qnc_program_db::LevelKey { frame: *frame, db10: *db10 }).collect()
+    }
+
     /// The lanes as the source timeline shows them (`SourceTimeline::lanes_shown`: the lane
     /// playing now, its channels and whether it is taken).
     pub fn with_lane_choices(mut self, shown: [Option<(qnc_lane_choice::Lane, u16, bool)>; 2]) -> Self {
@@ -130,6 +146,7 @@ impl SourcePick {
             taken: None,
             playing: None,
             lane_choices: [None, None],
+            curves: [Vec::new(), Vec::new()],
         }
     }
 
@@ -169,6 +186,8 @@ pub struct NewSegment {
     pub a2_source_channel: u16,
     pub a2_level_db: i8,
     pub a2_off: bool,
+    /// The A1 level curve the clip keeps on the source timeline (user 2026-11-07).
+    pub level_keys: Vec<qnc_program_db::LevelKey>,
 }
 
 /// What a measured loudness belongs to: program length, rate, waves read, A1 and A2 parts.

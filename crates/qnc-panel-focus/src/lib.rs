@@ -240,6 +240,10 @@ const LANE_KEYS: &[&str] = &[
     "clear_focus",
 ];
 
+/// The keys a taken level curve of the source timeline takes (user 2026-11-07): its point up or
+/// down a dB, removed, kept or given up; left/right still move the playhead.
+const LEVEL_KEYS: &[&str] = &["step_prev_part", "step_next_part", "lane_level_down", "lane_level_up", "delete_marker", "activate_focused_item", "clear_focus"];
+
 
 /// The next or previous panel of the walk, round; the first one from outside it.
 pub fn cycle(panel: Panel, forward: bool, order: &[Panel]) -> Panel {

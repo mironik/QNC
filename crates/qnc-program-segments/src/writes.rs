@@ -170,6 +170,7 @@ impl ProgramSegments {
                 a2_source_channel: cover.a2_source_channel,
                 a2_level_db: cover.a2_level_db,
                 a2_off: cover.a2_off,
+                level_keys: cover.level_keys,
             });
             match key {
                 Some(key) => self.cover_writes.push((key, shot)),

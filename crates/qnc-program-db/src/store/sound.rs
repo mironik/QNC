@@ -249,6 +249,15 @@ pub(crate) fn join_before(conn: &Connection, segment_id: &str) -> Result<String>
 impl Store {
     /// The level curve of a segment (its A1) or a cover (its A2), the whole curve as it is to
     /// be (docs/98 2.1). A lead has no curve of its own.
+    /// The level curve kept for a clip on the source timeline, taken by the segment or cover
+    /// just made (`made` names it); nothing without a curve.
+    pub(crate) fn take_clip_curve(&mut self, made: &Data, keys: &[LevelKey]) -> Result<()> {
+        if let (Data::Created(item_id), false) = (made, keys.is_empty()) {
+            self.set_level_keys(item_id, keys)?;
+        }
+        Ok(())
+    }
+
     pub(crate) fn set_level_keys(&mut self, item_id: &str, keys: &[LevelKey]) -> Result<Data> {
         let keys = LevelKey::checked(keys.to_vec())?;
         let item_id = item_id.trim();

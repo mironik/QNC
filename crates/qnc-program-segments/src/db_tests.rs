@@ -61,6 +61,7 @@ fn store_in(file: &std::path::Path, target: ProjectDbTarget) -> Vec<String> {
                 a2_source_channel: 1,
                 a2_level_db: 0,
                 a2_off: false,
+                level_keys: Vec::new(),
             })
             .unwrap()
         else {
@@ -234,6 +235,7 @@ fn a_cover_is_deleted_only_after_ctrl_click_took_it() {
             a2_source_channel: 0,
             a2_level_db: 0,
             a2_off: false,
+            level_keys: Vec::new(),
         },
         "C1".into(),
     );
@@ -399,7 +401,7 @@ fn a_refused_cover_leaves_no_b_roll_shot_behind() {
     configure(&mut segments, &file);
     let slot_id = segments.view().slots[0].slot_id.clone();
     segments.cover(
-        NewCover { slot_id, clip_id: "c1".into(), in_frame: 10, out_frame: 120, fps_num: 50, fps_den: 1, a2_source_channel: 0, a2_level_db: 0, a2_off: false },
+        NewCover { slot_id, clip_id: "c1".into(), in_frame: 10, out_frame: 120, fps_num: 50, fps_den: 1, a2_source_channel: 0, a2_level_db: 0, a2_off: false, level_keys: Vec::new() },
         "C1".into(),
     );
     settle(&mut segments);
@@ -453,7 +455,7 @@ fn a_written_cover_confirms_its_b_roll_shot() {
     configure(&mut segments, &file);
     let slot_id = segments.view().slots[0].slot_id.clone();
     segments.cover(
-        NewCover { slot_id, clip_id: "c1".into(), in_frame: 10, out_frame: 30, fps_num: 50, fps_den: 1, a2_source_channel: 0, a2_level_db: 0, a2_off: false },
+        NewCover { slot_id, clip_id: "c1".into(), in_frame: 10, out_frame: 30, fps_num: 50, fps_den: 1, a2_source_channel: 0, a2_level_db: 0, a2_off: false, level_keys: Vec::new() },
         "C1".into(),
     );
     settle(&mut segments);

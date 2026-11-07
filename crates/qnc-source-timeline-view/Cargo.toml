@@ -15,4 +15,5 @@ qnc-source-timeline = { workspace = true }
 qnc-theme-styles = { workspace = true }
 qnc-timeline = { workspace = true }
 qnc-timeline-assets = { workspace = true }
+qnc-trim-overlay = { workspace = true }
 qnc-ui-kit = { workspace = true }

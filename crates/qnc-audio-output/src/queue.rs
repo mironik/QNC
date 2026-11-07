@@ -46,6 +46,8 @@ pub(crate) struct Shared {
     pub anchor: AtomicU64,
     /// A bed under the playout (`bed`): the story's A1 under a Sync (user 2026-10-20).
     pub bed: crate::bed::BedShared,
+    /// The level curves of A1 and A2 (user 2026-11-07).
+    pub curves: crate::curve::CurveShared,
 }
 /// How many output channels the level meter follows.
 pub const METER_CHANNELS: usize = 8;
@@ -84,6 +86,7 @@ impl Shared {
             part_gain: AtomicU32::new(1f32.to_bits()),
             anchor: AtomicU64::new(0),
             bed: crate::bed::BedShared::new(),
+            curves: crate::curve::CurveShared::new(),
         }
     }
     /// The gain of the first `gains.len()` output channels; the others keep theirs.
@@ -594,6 +597,7 @@ impl Callback {
         }
         self.apply_gains(output);
         self.apply_part_gain(&mut output[..needed * self.channels], self.anchor + self.submitted);
+        self.shared.curves.apply(&mut output[..needed * self.channels], self.channels, self.anchor + self.submitted);
         // The bed over its output, in the same samples and clock (after the gains: its level
         // is in its samples).
         let channels = self.channels;

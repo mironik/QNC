@@ -265,6 +265,10 @@ pub enum Operation {
         a2_level_db: i8,
         #[serde(default)]
         a2_off: bool,
+        /// The A1 level curve kept for the clip on the source timeline (user 2026-11-07), taken
+        /// by the new segment; empty: none.
+        #[serde(default)]
+        level_keys: Vec<LevelKey>,
     },
     /// Appends segments at the end of the program in one step (one Undo step): the skeleton
     /// of a story sent from its script (user 2026-10-31). Each source's rate is the one
@@ -396,6 +400,10 @@ pub enum Operation {
         a2_level_db: i8,
         #[serde(default)]
         a2_off: bool,
+        /// The A2 level curve kept for the clip on the source timeline (user 2026-11-07), taken
+        /// by the new cover; empty: none.
+        #[serde(default)]
+        level_keys: Vec<LevelKey>,
     },
     /// The sound of a segment on A1 changed later (user 2026-10-16): its source
     /// channel, level in dB and whether it is off. An UNDO step.

@@ -14,6 +14,8 @@
       "right_click_out": "select_mark_out",
       "right_click_a1": "select_audio_a1",
       "right_click_a2": "select_audio_a2",
+      "right_click_level_a1": "select_level_a1",
+      "right_click_level_a2": "select_level_a2",
       "drag_in": "source_drag_in",
       "drag_out": "source_drag_out",
       "middle_click": "source_cut",

@@ -247,6 +247,12 @@ impl PanelFocus {
             // Monitor Auto | On under the monitor: whatever the focus.
             qnc_source_preview::MONITOR_AUTO | qnc_source_preview::MONITOR_ON => return Some(preview.set_monitor_mode(action_id)),
             // The level curve of a segment or cover (docs/98 2.1): its line is on the segment panel.
+            // On the source timeline (its line right-clicked there, or the keys there): the
+            // clip's own curve (user 2026-11-07: the line is universal).
+            "select_level_a1" | "select_level_a2" if on_source => {
+                self.panel = Panel::SourceTimeline;
+                return self.source.route(action_id, preview, timeline);
+            }
             "select_level_a1" | "select_level_a2" => {
                 self.panel = Panel::Segments;
                 if let ControlFlow::Break(answer) = qnc_segments_keys::level(action_id, (preview, wrap, segments)) {
@@ -262,6 +268,11 @@ impl PanelFocus {
             // The wheel over a panel (user 2026-10-16, piece `qnc-wheel-jog`): that panel takes
             // the keyboard and the wheel is its left/right arrow.
             // Ctrl+wheel is Ctrl+left/right: the level of a taken A1/A2 sound, up louder.
+            // The clip's level curve taken: Ctrl+wheel over the source timeline is its point.
+            wheel if qnc_edit_step::ctrl_frames(wheel).is_some() && wheel.starts_with("wheel_source") && self.source.level_taken() => {
+                self.panel = Panel::SourceTimeline;
+                return self.source.route(wheel, preview, timeline);
+            }
             wheel if qnc_edit_step::ctrl_frames(wheel).is_some() => {
                 self.panel = if wheel.starts_with("wheel_source") { Panel::SourceTimeline } else { Panel::Segments };
                 // On the source timeline with no lane taken, Ctrl+wheel moves the taken IN/OUT or
@@ -318,6 +329,10 @@ impl PanelFocus {
             }
             lane if on_source && self.source.lane_taken() && LANE_KEYS.contains(&lane) => {
                 return self.source.route(lane, preview, timeline);
+            }
+            // The clip's level curve taken: up/down, Ctrl+arrows, Delete, Enter and Esc are its.
+            key if on_source && self.source.level_taken() && LEVEL_KEYS.contains(&key) => {
+                return self.source.route(key, preview, timeline);
             }
             _ => {}
         }

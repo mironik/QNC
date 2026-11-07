@@ -213,17 +213,23 @@ impl Store {
                 a2_source_channel,
                 a2_level_db,
                 a2_off,
-            } => self.create_segment(
-                project_id,
-                kind,
-                clip_id,
-                (*in_frame, *out_frame),
-                (*fps_num, *fps_den),
-                [
-                    (*a1_source_channel, lane_level(*a1_level_db)?, *a1_off),
-                    (*a2_source_channel, lane_level(*a2_level_db)?, *a2_off),
-                ],
-            ),
+                level_keys,
+            } => {
+                let made = self.create_segment(
+                    project_id,
+                    kind,
+                    clip_id,
+                    (*in_frame, *out_frame),
+                    (*fps_num, *fps_den),
+                    [
+                        (*a1_source_channel, lane_level(*a1_level_db)?, *a1_off),
+                        (*a2_source_channel, lane_level(*a2_level_db)?, *a2_off),
+                    ],
+                )?;
+                // The clip's A1 curve from the source timeline, in the same step (user 2026-11-07).
+                self.take_clip_curve(&made, level_keys)?;
+                Ok(made)
+            }
             Operation::AppendSegments { project_id, segments } => self.append_segments(project_id, segments),
             Operation::DeleteSegment { segment_id } => self.delete_segment(segment_id),
             Operation::IncludeSegment { segment_id } => self.include_segment(segment_id),
@@ -306,14 +312,20 @@ impl Store {
                 a2_source_channel,
                 a2_level_db,
                 a2_off,
-            } => self.create_cover(
-                project_id,
-                slot_id,
-                (clip_id, virtual_shot_id),
-                (*in_frame, *out_frame),
-                (*fps_num, *fps_den),
-                (*a2_source_channel, lane_level(*a2_level_db)?, *a2_off),
-            ),
+                level_keys,
+            } => {
+                let made = self.create_cover(
+                    project_id,
+                    slot_id,
+                    (clip_id, virtual_shot_id),
+                    (*in_frame, *out_frame),
+                    (*fps_num, *fps_den),
+                    (*a2_source_channel, lane_level(*a2_level_db)?, *a2_off),
+                )?;
+                // The clip's A2 curve from the source timeline, in the same step (user 2026-11-07).
+                self.take_clip_curve(&made, level_keys)?;
+                Ok(made)
+            }
             Operation::SetSegmentSound { segment_id, channel, level_db, off } => {
                 self.set_sound("segment", "a1", segment_id, (*channel, lane_level(*level_db)?, *off))
             }

@@ -22,6 +22,8 @@ fn sound(clip: &str, a2_channel: u16) -> ClipSound {
         clip_id: clip.into(),
         a1: LaneSound { channel: 0, off: false, level_db: 0 },
         a2: LaneSound { channel: a2_channel, off: false, level_db: -3 },
+        a1_keys: vec![(10, -60), (40, 0)],
+        a2_keys: Vec::new(),
     }
 }
 

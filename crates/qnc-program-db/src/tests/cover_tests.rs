@@ -139,6 +139,7 @@ fn a_cover_needs_a_slot_the_story_rate_and_one_frame() {
             a2_source_channel: 0,
             a2_level_db: 0,
             a2_off: false,
+            level_keys: Vec::new(),
         },
     );
     assert!(mixed.is_err(), "a rate not 2:1 is refused");

@@ -8330,3 +8330,19 @@ njezino stanje (`qnc-side-pieces` `subsegment_assist`, `qnc-panel-focus`); dio s
 ostaje svoj, ostali sviraju, crtaju i u valu imaju krivulju pomocnika (kroz nacrt dijelova, `drafted`). KEEP
 (Ctrl+Shift+N) upisuje prijedlog kao krivulje dijelova (`set_piece`). Test
 `ai_is_the_open_subsegments_and_fills_only_parts_without_a_curve`, conformance. Uzivo nije provjereno.
+Otkljucano i izvedeno 2026-11-07 (isti zahtjev, korak 3; korisnik: "da, otkljucaj player"): krivulja razine A1/A2 na
+source timelineu svake forme (Story, MA, Ingest), isti alat (`qnc-level-curve`): Ctrl+Shift+1/2 ili desni klik na
+liniju (mapa misa source_timeline: `right_click_level_a1/a2` -> `select_level_a1/a2`, uz odluku korisnika), tocka na
+liniji playheada gore/dolje, Ctrl+strelice i Ctrl+kotacic za 1 dB, Delete brise tocku, svaki korak se odmah cuje, Enter
+je pamti za klip, Esc odustaje (`qnc-source-timeline` `level.rs`; `qnc-panel-focus` salje tipke dok je uzeta).
+Pamti se po klipu uz kanal i razinu A1/A2 (`qnc-clip-sound`: stupci `a1_keys`, `a2_keys`, tablici prvog oblika dodaju
+se pri prvom upisu, citac starijeg pogleda cita bez krivulja), a novi segment (A1) i pokrivalica (A2, i Sync) tog
+klipa je preuzimaju u istom koraku (`qnc-program-db` `CreateSegment`/`CreateCover` `level_keys`, `take_clip_curve`;
+`qnc-program-segments` `SourcePick::with_curves`). Player (otkljucan): nova naredba ugovora `SetLaneCurve { output,
+points }` (`qnc-player-contract`), klijent (`Action::SetLaneCurve`; `Action` vise nije `Copy`), runner, engine
+`Runtime::set_lane_curve` (slike klipa u uzorke, `clip_clock`), zvucni uredaj `qnc-audio-output` `curve.rs` (krivulja
+izlaza u pozivu uredaja, bez alokacije i brave, pravac u dB izmedju tocaka; test
+`a_level_curve_is_a_line_in_db_on_its_output_only`); `qnc-source-preview` `hear_curves` salje krivulje i ponovno ih
+salje svakoj novoj sesiji. Crta je `qnc-timeline` u audio traci source timelinea (istom funkcijom kao Wrap retke).
+Nije izvedeno: val source timelinea jos ne prati krivulju. Testovi `the_clips_level_line_is_taken_raised_and_kept`,
+`qnc-program-db` (pokrivalica preuzima krivulju klipa), testovi dotaknutih kocki, conformance. Uzivo nije provjereno.

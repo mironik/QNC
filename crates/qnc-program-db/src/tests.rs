@@ -229,6 +229,7 @@ fn create_cover(store: &mut Story, slot_id: &str, range: (u64, u64)) -> Result<D
             a2_source_channel: 0,
             a2_level_db: 0,
             a2_off: false,
+            level_keys: Vec::new(),
         },
     )?;
     // As the story's writer does: the cover is in, its B-roll shot is kept.
@@ -258,6 +259,7 @@ fn create_segment(
             a2_source_channel: 1,
             a2_level_db: 0,
             a2_off: false,
+            level_keys: Vec::new(),
         },
     )
 }

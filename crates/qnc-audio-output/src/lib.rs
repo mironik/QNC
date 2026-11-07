@@ -1,6 +1,7 @@
 //! Prepared PCM -> device output. No application, database, media decoder or playback clock.
 mod bed;
 mod channel_map;
+mod curve;
 mod device;
 pub use channel_map::ChannelMap;
 mod model;
@@ -121,6 +122,12 @@ impl AudioOutput {
     /// `gain`, heard at once (one part of a program, user 2026-10-22); `None` clears it.
     pub fn set_part_gain(&self, part: Option<(u16, u64, u64, f32)>) {
         self.queue.shared.set_part_gain(part);
+    }
+    /// The level curve of output channel `output`: (absolute sample, dB) sorted by sample, heard
+    /// at once (user 2026-11-07: the level line of the source timeline); empty clears it. False
+    /// when A1 and A2 already hold the curves of other outputs.
+    pub fn set_curve(&self, output: u16, points: &[(u64, f32)]) -> bool {
+        self.queue.shared.curves.set(output, points)
     }
     /// The source channel each of the first `routes.len()` output channels plays, heard at
     /// once (the next device callback); false when a route is outside the queued frame.

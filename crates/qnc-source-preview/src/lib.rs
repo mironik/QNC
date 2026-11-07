@@ -280,6 +280,10 @@ pub struct SourcePreview {
     /// level), and what the player was last given.
     program_levels: [u16; 2],
     levels_sent: Option<[u16; 2]>,
+    /// The level curves of A1 and A2 of the shown clip (user 2026-11-07: the level line of the
+    /// source timeline), and whether the player of this session has them.
+    curves: [Vec<(u64, i16)>; 2],
+    curves_sent: bool,
 }
 
 /// The most a normalising gain gives or takes in dB (the output level holds up to 400 %).
@@ -319,6 +323,8 @@ impl Default for SourcePreview {
             normalize: None,
             program_levels: [100, 100],
             levels_sent: None,
+            curves: [Vec::new(), Vec::new()],
+            curves_sent: true,
         }
     }
 }
@@ -436,6 +442,8 @@ impl SourcePreview {
         self.program = false;
         self.pieces = None;
         self.levels_sent = None;
+        // A new session has no curve: the shown clip's are sent to it again.
+        self.curves_sent = self.curves.iter().all(Vec::is_empty);
         if let Some(player) = &self.player {
             player.close();
         }
@@ -882,6 +890,25 @@ impl SourcePreview {
     /// `gain_db` louder than stored, or silent, at once in the player (user 2026-10-22: the
     /// level of one cover, nothing is prepared again); `None` clears it. False without a
     /// program player.
+    /// The level curves of A1 and A2 of the shown clip (clip frame, tenths of a dB), heard at
+    /// once in the player of the clip (user 2026-11-07); sent again to every new session once it
+    /// is ready. True when they were sent now.
+    pub fn hear_curves(&mut self, curves: [Vec<(u64, i16)>; 2]) -> bool {
+        if self.program {
+            return false;
+        }
+        if self.curves != curves {
+            self.curves_sent = false;
+            self.curves = curves;
+        }
+        if self.curves_sent || self.player_view.confirmed_source_frame().is_none() {
+            return false;
+        }
+        let Some(player) = &self.player else { return false };
+        self.curves_sent = (0..2u16).all(|output| player.send(Action::SetLaneCurve(output, self.curves[usize::from(output)].clone())).is_ok());
+        self.curves_sent
+    }
+
     pub fn hear_part_level(&mut self, part: Option<(u16, u64, u64, i16, bool)>) -> bool {
         if !self.program {
             return false;

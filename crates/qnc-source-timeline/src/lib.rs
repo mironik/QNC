@@ -14,6 +14,8 @@
 
 use std::time::Duration;
 
+mod level;
+
 use qnc_lane_choice::{Lane, LaneChoice};
 use qnc_source_panel::SourcePanel;
 use qnc_source_preview::SourcePreview;
@@ -67,6 +69,8 @@ pub struct SourceTimelineView {
     /// A question about what the source timeline's marks would save (the same statement
     /// already there, user 2026-11-01), shown over everything until answered.
     pub question: Option<qnc_notice::Choice>,
+    /// The clip's A1/A2 level curves on its frames (the taken one as drafted; user 2026-11-07).
+    pub level_curves: Vec<qnc_program_view::LevelCurve>,
 }
 
 impl SourceTimelineView {
@@ -100,6 +104,10 @@ pub struct SourceTimeline {
     first_cut: Option<u64>,
     /// The first double clicked word of a pair (its frames), until the second.
     first_word: qnc_edit_words::WordPair<()>,
+    /// The kept level curves of A1 and A2 of the shown clip (user 2026-11-07), clip frames.
+    curves: [Vec<(u64, i16)>; 2],
+    /// The curve taken (Ctrl+Shift+1/2, a right click on its line), as drafted.
+    level: Option<qnc_level_curve::LevelLine>,
 }
 
 impl SourceTimeline {
@@ -120,13 +128,17 @@ impl SourceTimeline {
             self.sound_known = false;
             self.sound_read = None;
             self.message.clear();
+            (self.curves, self.level) = ([Vec::new(), Vec::new()], None);
         }
         let count = self.channels.for_clip(content, clip_id);
         self.lanes.set_channels(count);
         self.apply_kept_sound(count, preview);
+        // The clip's level curves in its player (sent again to every new session).
+        self.hear_curves(preview);
         let timecode = self.timecodes.for_clip(content, clip_id);
         self.refresh(timecode);
         self.view.levels = preview.view().output_levels;
+        self.view.level_curves = self.drawn_curves(timeline);
         &self.view
     }
 
@@ -140,7 +152,7 @@ impl SourceTimeline {
     /// heard, as a take of a voice record is (user 2026-10-30).
     pub fn want_a1(&mut self, clip_id: &str, channel: u16) {
         let lane = |off| qnc_clip_sound::LaneSound { channel, off, level_db: 0 };
-        self.want_sound(qnc_clip_sound::ClipSound { clip_id: clip_id.into(), a1: lane(false), a2: lane(true) });
+        self.want_sound(qnc_clip_sound::ClipSound { clip_id: clip_id.into(), a1: lane(false), a2: lane(true), a1_keys: Vec::new(), a2_keys: Vec::new() });
     }
 
     /// NORM's state for the level bar (a form with a story gives it; `None`: NORM off).
@@ -167,6 +179,12 @@ impl SourceTimeline {
         [self.kept(0), self.kept(1)]
     }
 
+    /// The A1 and A2 level curves kept for the shown clip (user 2026-11-07): a new segment or
+    /// cover of the clip takes them.
+    pub fn kept_curves(&self) -> [Vec<(u64, i16)>; 2] {
+        self.curves.clone()
+    }
+
     /// A1 and A2 as its lanes show them now: the lane playing, its channels and whether it is
     /// taken (its trim zoom shows the same lanes, AGENTS 0.12).
     pub fn lanes_shown(&self) -> [Option<(Lane, u16, bool)>; 2] {
@@ -183,7 +201,7 @@ impl SourceTimeline {
 
     /// A lane waits for Enter, or this Enter kept it: the same Enter does nothing else.
     pub fn holds_enter(&self) -> bool {
-        self.lane_taken() || self.lanes.committed_within(SAME_ENTER)
+        self.lane_taken() || self.level_taken() || self.lanes.committed_within(SAME_ENTER)
     }
 
     /// IN or OUT is taken: the arrows move it.
@@ -351,6 +369,16 @@ impl SourceTimeline {
     }
 
     fn route_keys(&mut self, action_id: &str, preview: &mut SourcePreview, timeline: &mut TimelineProjection) -> Option<bool> {
+        // The level curve of A1/A2 (user 2026-11-07), the same tool as on a Wrap row.
+        if let Some(changed) = self.level_key(action_id, preview, timeline) {
+            return Some(changed);
+        }
+        // Ctrl+wheel while the curve is taken: its point a dB, as Ctrl+arrows.
+        if self.level_taken() {
+            if let Some(steps) = qnc_edit_step::ctrl_frames(action_id).and_then(|_| qnc_edit_step::level(action_id)) {
+                return self.level_key(qnc_edit_step::level_action(steps), preview, timeline);
+            }
+        }
         if let Some(changed) = self.route_lane(action_id, preview) {
             return Some(changed);
         }
@@ -437,6 +465,10 @@ impl SourceTimeline {
         }
         self.sound_read = Some(kept.clone());
         self.sound_known = true;
+        // The clip's level curves as kept (none when it keeps none); a curve being drawn stays.
+        if !self.level_taken() {
+            self.curves = kept.as_ref().map_or_else(|| [Vec::new(), Vec::new()], |kept| [kept.a1_keys.clone(), kept.a2_keys.clone()]);
+        }
         if let Some(kept) = kept.filter(|kept| kept.a1.channel < count && kept.a2.channel < count) {
             let lane = |sound: qnc_clip_sound::LaneSound| Lane { channel: sound.channel, off: sound.off, level_db: sound.level_db };
             self.lanes.keep(0, lane(kept.a1));
@@ -457,9 +489,11 @@ impl SourceTimeline {
         }
         let lane = |kept: Lane| qnc_clip_sound::LaneSound { channel: kept.channel, off: kept.off, level_db: kept.level_db };
         let [a1, a2] = self.kept_lanes();
-        let sound = qnc_clip_sound::ClipSound { clip_id, a1: lane(a1), a2: lane(a2) };
+        let [a1_keys, a2_keys] = self.curves.clone();
+        let sound = qnc_clip_sound::ClipSound { clip_id, a1: lane(a1), a2: lane(a2), a1_keys, a2_keys };
         let default = |channel: u16| qnc_clip_sound::LaneSound { channel, off: false, level_db: 0 };
-        if sound.a1 == default(0) && sound.a2 == default(1) && self.sounds.for_clip(Some(target), self.clip.as_deref()) == Some(None) {
+        let no_curve = sound.a1_keys.is_empty() && sound.a2_keys.is_empty();
+        if sound.a1 == default(0) && sound.a2 == default(1) && no_curve && self.sounds.for_clip(Some(target), self.clip.as_deref()) == Some(None) {
             return; // the default of a clip that keeps nothing is not written
         }
         self.sounds.keep(target, sound);
@@ -487,6 +521,7 @@ impl SourceTimeline {
             normalize: self.view.normalize,
             sound_assist: self.view.sound_assist,
             question: None,
+            level_curves: std::mem::take(&mut self.view.level_curves),
         };
     }
 }
@@ -507,6 +542,30 @@ mod tests {
         source.lanes.new_clip();
         source.lanes.set_channels(Some(count));
         source
+    }
+
+    /// The level line of the source timeline is a Wrap row's (user 2026-11-07): Ctrl+Shift+2 takes
+    /// A2's curve, up raises the point on the playhead line a dB at the clip's frame there, the
+    /// draft is drawn, Enter keeps it for the clip (a new segment or cover takes it), Esc of a
+    /// new one leaves the kept one.
+    #[test]
+    fn the_clips_level_line_is_taken_raised_and_kept() {
+        let (mut source, mut preview, mut timeline) = (with_channels(4), SourcePreview::default(), TimelineProjection::new(0, 100));
+        source.clip = Some("c".into());
+        timeline.playhead_frame = Some(40);
+        assert_eq!(source.route("select_level_a2", &mut preview, &mut timeline), Some(true));
+        assert!(source.holds_enter(), "Enter is the curve's");
+        source.route("step_prev_part", &mut preview, &mut timeline);
+        source.route("step_prev_part", &mut preview, &mut timeline);
+        assert_eq!(source.heard_curves()[1], vec![(40, 20)], "+2 dB at clip frame 40, heard at once");
+        assert_eq!(source.drawn_curves(&timeline).iter().map(|curve| (curve.lane, curve.taken)).collect::<Vec<_>>(), vec![(1, true)]);
+        source.route("activate_focused_item", &mut preview, &mut timeline);
+        assert!(!source.level_taken());
+        assert_eq!(source.kept_curves(), [Vec::new(), vec![(40, 20)]], "kept for the clip");
+        source.route("select_level_a2", &mut preview, &mut timeline);
+        source.route("step_next_part", &mut preview, &mut timeline);
+        source.route("clear_focus", &mut preview, &mut timeline);
+        assert_eq!(source.kept_curves()[1], vec![(40, 20)], "Esc keeps what was kept");
     }
 
     #[test]

@@ -35,6 +35,8 @@ pub struct SourceTimeline<'a> {
     pub a2_channel: Option<qnc_timeline::ChannelChoice>,
     /// An audio lane drawn over the video row and its display gain level.
     pub wave_over_video: Option<(qnc_timeline::AudioLane, u8)>,
+    /// The clip's A1/A2 level curves (user 2026-11-07), drawn in their lanes.
+    pub level_curves: Vec<qnc_timeline::TimelineLevelCurve>,
 }
 
 impl<'a> SourceTimeline<'a> {
@@ -57,7 +59,14 @@ impl<'a> SourceTimeline<'a> {
             a1_channel: None,
             a2_channel: None,
             wave_over_video: None,
+            level_curves: Vec::new(),
         }
+    }
+
+    /// The clip's level curves drawn in its A1/A2 lanes.
+    pub fn with_level_curves(mut self, curves: Vec<qnc_timeline::TimelineLevelCurve>) -> Self {
+        self.level_curves = curves;
+        self
     }
 
     /// IN, OUT and length in the timecode of the source clip.
@@ -219,5 +228,6 @@ pub fn show_timeline_dock_with(
         timeline.a1_channel,
         timeline.a2_channel,
         timeline.wave_over_video,
+        &timeline.level_curves,
     )
 }

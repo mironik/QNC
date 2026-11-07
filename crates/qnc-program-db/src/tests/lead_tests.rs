@@ -142,6 +142,7 @@ fn every_s_story_version_is_a_story_of_its_own_with_no_leads() {
         a2_source_channel: 1,
         a2_level_db: 0,
         a2_off: false,
+        level_keys: Vec::new(),
     };
     StoryWriter::start(draft.clone()).unwrap().call(&segment("offovi", (300, 400))).unwrap();
     let draft_rows = StoryReader::open(&draft).unwrap().list_segments().unwrap();
@@ -186,6 +187,7 @@ fn in_an_s_story_every_clip_is_a_slot_and_the_slot_edits_write_the_clip() {
                 a2_source_channel: 1,
                 a2_level_db: 0,
                 a2_off: false,
+                level_keys: Vec::new(),
             })
             .unwrap();
     }

@@ -69,6 +69,7 @@ fn a_new_segment_keeps_the_source_channel_chosen_for_a1() {
             a2_source_channel: 1,
             a2_level_db: 0,
             a2_off: false,
+            level_keys: Vec::new(),
         },
     )
     .unwrap();
@@ -121,10 +122,12 @@ fn a_new_cover_keeps_the_source_channel_chosen_for_a2() {
             a2_source_channel: 2,
             a2_level_db: 4,
             a2_off: true,
+            level_keys: vec![crate::LevelKey { frame: 50, db10: -60 }],
         },
     )
     .unwrap();
     let cover = covers(&mut store)[0].clone();
+    assert_eq!(cover.level_keys, vec![crate::LevelKey { frame: 50, db10: -60 }], "the clip's A2 curve from the source timeline (user 2026-11-07)");
     assert_eq!(cover.a2_source_channel, 2, "channel 3 of the source on A2");
     assert_eq!((cover.a2_level_db, cover.a2_off), (4, true));
     run(&mut store, Operation::SetCoverSound { cover_id: cover.cover_id, channel: 1, level_db: -2, off: false }).unwrap();

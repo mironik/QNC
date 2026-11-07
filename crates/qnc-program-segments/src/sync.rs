@@ -356,6 +356,7 @@ impl ProgramSegments {
                 a2_source_channel: self.source.lanes[1].channel,
                 a2_level_db: self.source.lanes[1].level_db,
                 a2_off: self.source.lanes[1].off,
+                level_keys: self.source.curve(1),
             },
             slot.source.clip_name,
         );

@@ -594,7 +594,7 @@ pub fn show_source_player_timeline_with_artifacts(
     a4_peaks: &[f32],
 ) -> TimelineIntent {
     let peaks = [a1_peaks, a2_peaks, a3_peaks, a4_peaks];
-    show_source_player_timeline_with_channel(ui, rect, state, theme, filmstrip_background, peaks, None, None, None)
+    show_source_player_timeline_with_channel(ui, rect, state, theme, filmstrip_background, peaks, None, None, None, &[])
 }
 
 /// The source timeline with the A1 and A2 channel pickers, when the caller has a
@@ -609,6 +609,7 @@ pub fn show_source_player_timeline_with_channel(
     a1_channel: Option<ChannelChoice>,
     a2_channel: Option<ChannelChoice>,
     wave_over_video: Option<(AudioLane, u8)>,
+    level_curves: &[TimelineLevelCurve],
 ) -> TimelineIntent {
     let duration = state.duration_frames();
     let (draft_in, draft_out, in_active, out_active) = match state.visible_source_marks() {
@@ -649,7 +650,7 @@ pub fn show_source_player_timeline_with_channel(
                 wave_over_video,
                 trim_playheads: &[],
                 a1_splits: &[],
-                level_curves: &[],
+                level_curves,
                 pictures: &[],
                 holding: false,
             },
@@ -1029,6 +1030,10 @@ fn paint_audio_row(
     let gain = lane_gain(input, lane);
     qnc_wave_view::paint_wave_peaks_gain(ui.painter(), track_rect, peaks, gain, wave);
     qnc_wave_view::paint_level_marks(ui.painter(), track_rect, 1.0, input.theme.level_marks);
+    // The lane's level curve, as in a Wrap row's band (user 2026-11-07: the line is universal).
+    if let Some(index) = lane_index(lane) {
+        level_lines::paint(ui, track_rect, index, input);
+    }
     paint_lane_level(ui, track_rect, lane, input);
     paint_ranges_and_playhead(ui, track_rect, input);
     if let Some(take) = take_or_keep_intent(&response, track_rect, input) {
@@ -1231,6 +1236,12 @@ fn take_lane_intent(responses: &[&egui::Response], track: Rect, lane: AudioLane,
         }
         let frame = frame_for_x(track, start, duration, pos.x);
         return Some(TimelineIntent::TakeSound { lane, frame });
+    }
+    // On a source timeline near the clip's level curve: the curve (user 2026-11-07), else the lane.
+    if let Some(pos) = clicked.interact_pointer_pos() {
+        if let Some(frame) = lane_index(lane).and_then(|index| level_lines::hit(track, index, pos, input)) {
+            return Some(TimelineIntent::TakeLevelLine { lane, frame });
+        }
     }
     Some(TimelineIntent::TakeAudioLane(lane))
 }
