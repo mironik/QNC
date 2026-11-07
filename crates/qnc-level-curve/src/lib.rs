@@ -149,12 +149,19 @@ impl LevelLine {
         }
     }
 
-    /// Delete: the point on the playhead line goes. False when none is there.
-    pub fn remove_at(&mut self, program: u64) -> bool {
+    /// The point Delete removes at the playhead line: the one on it, else the nearest (user
+    /// 2026-11-07: a point is never hit to the frame with a click, deleting was unsure).
+    pub fn nearest_point(&self, program: u64) -> Option<LevelKey> {
         let frame = self.span.source_at(program);
-        let before = self.draft.len();
-        self.draft.retain(|key| key.frame != frame);
-        self.draft.len() != before
+        self.draft.iter().copied().min_by_key(|key| key.frame.abs_diff(frame))
+    }
+
+    /// Delete: the point on the playhead line goes, else the nearest one. False when the curve
+    /// has none.
+    pub fn remove_at(&mut self, program: u64) -> bool {
+        let Some(gone) = self.nearest_point(program) else { return false };
+        self.draft.retain(|key| key.frame != gone.frame);
+        true
     }
 
     /// Enter: the draft becomes the kept curve; the curve to write when it changed.
@@ -190,7 +197,10 @@ mod tests {
         assert!(line.nudge(120, 1), "a second point at the curve's level, one up");
         assert_eq!(line.point_at(120), Some(LevelKey { frame: 1010, db10: -20 }));
         assert!(line.remove_at(150));
-        assert!(!line.remove_at(150), "nothing there any more");
+        assert_eq!(line.nearest_point(150), Some(LevelKey { frame: 1010, db10: -20 }), "none on the line: the nearest");
+        assert!(line.remove_at(150), "the nearest goes");
+        assert!(!line.remove_at(150), "nothing left");
+        assert!(line.nudge(120, -2), "made again");
         assert!(line.nudge(130, 200), "bounded at +12 dB");
         assert_eq!(line.point_at(130).map(|key| key.db10), Some(LEVEL_KEY_RANGE.1));
         assert!(!line.nudge(130, 1), "the bound stays");

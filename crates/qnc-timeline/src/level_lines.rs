@@ -85,6 +85,15 @@ pub fn paint_level_curves(
             let center = Pos2::new(x_at(band, start, duration, *at), level_y(band, f64::from(*db10)));
             painter.rect_filled(Rect::from_center_size(center, egui::vec2(4.0, 4.0)), 0.0, color);
         }
+        // The point Delete removes (the one on the playhead line, else the nearest; user
+        // 2026-11-07): ringed, so the user sees which goes.
+        if let Some(playhead) = playhead.filter(|_| curve.taken) {
+            let nearest = curve.points.iter().min_by(|a, b| (a.0 - playhead as f64).abs().total_cmp(&(b.0 - playhead as f64).abs()));
+            if let Some((at, db10)) = nearest {
+                let center = Pos2::new(x_at(band, start, duration, *at), level_y(band, f64::from(*db10)));
+                painter.rect_stroke(Rect::from_center_size(center, egui::vec2(9.0, 9.0)), 0.0, Stroke::new(1.5, point), egui::StrokeKind::Middle);
+            }
+        }
         // The point the keys control: on the playhead line of the taken curve.
         if let Some(playhead) = playhead.filter(|frame| curve.taken && (curve.from..curve.to).contains(frame)) {
             let at = playhead as f64;

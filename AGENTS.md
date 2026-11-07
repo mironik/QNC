@@ -8381,3 +8381,8 @@ prici, inace klipu na source timelineu (`qnc-panel-focus` `source_assist`; u Sto
 `qnc-source-timeline` `assist.rs`, rjecnik `source.msg.assist_*`. Testovi (`the_speech_of_one_clip_is_evened_out_within_it`),
 conformance. Uzivo nije provjereno. Usput (prekrsaj pravila): jedna zamjena teksta u `assist.rs` napravljena je PowerShell
 `Replace`/`Set-Content` umjesto Edit alata.
+Popravak 2026-11-07 (korisnik: "brisanje tocaka nivoa tona je nesigurno"; log: Delete na uzetoj krivulji 15 puta, playhead
+klikom nikad tocno na slici tocke, pa se nista nije brisalo): Delete brise tocku na liniji playheada, a kad je tamo nema,
+najblizu tocku krivulje (`qnc-level-curve` `nearest_point`, `remove_at`); vrijedi za source timeline, Wrap redove i slozenu
+izjavu. Tocka koju bi Delete obrisao oznacena je kvadratom oko nje (`qnc-timeline` `paint_level_curves`, i u zoomu). Testovi
+prilagodeni, conformance. Uzivo nije provjereno.

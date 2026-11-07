@@ -1260,7 +1260,8 @@ fn a_taken_level_curve_opens_the_zoom_at_its_point_and_is_drafted_on_the_playhea
     // The playhead moves: the zoom follows the point.
     segments.set_playhead(Some(row.start_frame + 6));
     assert!(segments.view().zoom_sound.as_ref().is_some_and(|zoom| zoom.cut == row.start_frame + 6));
-    assert!(!segments.remove_level_point(row.start_frame + 6), "no point there");
+    assert!(segments.remove_level_point(row.start_frame + 6), "none on the line: the nearest goes (user 2026-11-07)");
+    assert!(!segments.remove_level_point(row.start_frame + 6), "no point left");
     assert!(segments.release_level_line());
     assert!(segments.view().edit_stills.is_empty());
 }
