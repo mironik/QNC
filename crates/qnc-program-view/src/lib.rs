@@ -108,7 +108,7 @@ pub struct PartSoundView {
 /// boundary of a word is seen"): the window `[from, to)` of its axis (the program's frames,
 /// or a clip's own for a source IN/OUT), the cut, the pieces of sound A1 and A2 play there,
 /// and their peaks per column, per mille (empty until read).
-#[derive(Debug, Clone, Default, PartialEq, Eq)]
+#[derive(Debug, Clone, Default, PartialEq)]
 pub struct ZoomSound {
     pub from: u64,
     pub to: u64,
@@ -139,6 +139,10 @@ pub struct ZoomSound {
     /// how many there are, off, the level, and whether the lane is taken (its channel column
     /// open). `None`: the lane shows only its label, as on a timeline without a choice.
     pub lane_choices: [Option<ZoomLane>; 2],
+    /// The level curves on the zoom's axis, given by its owner as its timeline draws them (user
+    /// 2026-11-07: "the zoom is the same timeline, it uses the same code"): the story's, the
+    /// clip's of the source timeline, the parts' of a SubSegment.
+    pub level_curves: Vec<LevelCurve>,
 }
 
 /// A lane of the zoom as the timeline's lane is: what plays on it now.
@@ -217,7 +221,7 @@ pub struct ZoomWord {
 
 /// What a form shows: the program in order, its markers and slots, timebase,
 /// length and the program playhead confirmed by the player.
-#[derive(Debug, Clone, Default, PartialEq, Eq)]
+#[derive(Debug, Clone, Default, PartialEq)]
 pub struct SegmentsView {
     pub rows: Vec<SegmentRow>,
     /// The Segment tab list, deleted segments included.

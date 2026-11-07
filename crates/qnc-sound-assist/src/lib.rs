@@ -192,10 +192,68 @@ pub fn propose<'a>(total: u64, story_rate: (u32, u32), items: &[Item], clip: imp
     proposals
 }
 
+/// The speech of one clip evened out within itself (user 2026-11-07: the assistant on the source
+/// timeline, a single clip): each stretch of speech on `at` goes to the median of its stretches
+/// with a ramp in and out, as an editor rides the fader through an interview. Points on the
+/// placement's source frames (tenths of a dB), sorted; empty when nothing is to be done.
+pub fn level_speech<'a>(total: u64, rate: (u32, u32), at: &Placement, clip: impl Fn(&str) -> Option<ClipMeasure<'a>>) -> Vec<(u64, i16)> {
+    if total == 0 || rate.0 == 0 || rate.1 == 0 || at.off {
+        return Vec::new();
+    }
+    let blocks = Blocks { num: u64::from(rate.0), den: u64::from(rate.1) };
+    let Some(energies) = energies(total, &blocks, at, &clip) else { return Vec::new() };
+    let stretches: Vec<((u64, u64), f64)> = speech(&energies, &blocks, total)
+        .into_iter()
+        .filter_map(|stretch| Some((stretch, loudness(&energies, &blocks, stretch)?)))
+        .collect();
+    if stretches.len() < 2 {
+        return Vec::new();
+    }
+    let mut levels: Vec<f64> = stretches.iter().map(|(_, level)| *level).collect();
+    levels.sort_by(f64::total_cmp);
+    let median = levels[levels.len() / 2];
+    let ramp = blocks.frames(RAMP_MS);
+    let (start, end) = (at.program_start, at.program_end);
+    let mut points: Vec<(u64, i16)> = Vec::new();
+    for ((from, to), level) in stretches {
+        let offset = (median - level).clamp(-EVEN_MOST_DB, EVEN_MOST_DB);
+        if offset.abs() < EVEN_LEAST_DB {
+            continue;
+        }
+        let db10 = (offset * 10.0).round() as i16;
+        if from > start {
+            points.push((source_of(at, from.saturating_sub(ramp).max(start)), 0));
+        }
+        points.push((source_of(at, from), db10));
+        points.push((source_of(at, to), db10));
+        if to < end {
+            points.push((source_of(at, (to + ramp).min(end)), 0));
+        }
+    }
+    points.sort_by_key(|point| point.0);
+    points.dedup_by_key(|point| point.0);
+    points
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
     use qnc_loudness::ChannelLoudness;
+
+    /// One clip: a quiet stretch of speech between two louder ones is raised to their level.
+    #[test]
+    fn the_speech_of_one_clip_is_evened_out_within_it() {
+        let loud = |second: usize| matches!(second, 1..=2 | 7..=8);
+        let quiet = |second: usize| matches!(second, 4..=5);
+        let channels: std::collections::HashMap<&str, Vec<Option<ChannelLoudness>>> = std::collections::HashMap::from([(
+            "voice",
+            vec![Some(channel(10, |second| if loud(second) { -20.0 } else if quiet(second) { -30.0 } else { -70.0 }))],
+        )]);
+        let clip = |id: &str| channels.get(id).map(|channels| ClipMeasure { channels, duration_frames: 500 });
+        let points = level_speech(500, (50, 1), &at("voice", (0, 500)), clip);
+        // Seconds 4 and 5 (frames 200..300) up 10 dB with ramps; the louder ones stay.
+        assert_eq!(points, vec![(190, 0), (200, 100), (300, 100), (310, 0)]);
+    }
 
     fn at(clip: &str, program: (u64, u64)) -> Placement {
         Placement {

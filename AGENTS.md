@@ -8367,3 +8367,17 @@ kao Enter (17. 10.) dok je zoom otvoren. Izlaz: klik na A1/A2 (ili Ctrl+1/Ctrl+2
 slike `confirm`, `qnc-panel-focus`), Esc odustaje i zatvara. Na Wrap retku uzeta krivulja i dalje sprema klikom i ostaje
 uzeta, a klik u zoomu slozene izjave isto. Test `the_taken_lane_taken_again_keeps_its_draft`, test slozene izjave
 prilagoden (svaki dio ima liniju), conformance. Uzivo nije provjereno.
+Popravak i dopuna 2026-11-07 (korisnik: "opet duplikati koda; timeline je svugdje isti, zoom koristi isti kod, a zoom nema
+nivo tona"; "ne vidim sta radi AI tona"; log: AI ukljucen na source timelineu AI Media Assista, bez ikakvog ucinka):
+(1) Zoom reza vise ne uzima krivulje sam iz price (source zoom ih uopce nije imao): `qnc-program-view` `ZoomSound.level_curves`
+puni vlasnik osi istim krivuljama koje crta njegov timeline (prica `SegmentsView::level_curves`, source IN/OUT krivulje klipa
+iz source timelinea i val ih prati, slozena izjava krivulje dijelova); `qnc-trim-overlay` crta samo njih. (2) AI tona na source
+timelineu: za prikazani klip `qnc-sound-assist` `level_speech` (govor A1 unutar klipa na medijan svojih dijelova, rampe 200 ms,
++-10 dB, ispod 1,5 dB nista) i ducking A2 pod govorom A1 kad je A2 drugi kanal (`propose`); iz glasnoce izmjerene s valom
+(`qnc-program-waveform`). Dok je ukljucen, traka bez vlastite krivulje svira i crta prijedlog (u prosirenoj traci i zoomu), a
+status kaze sto je napravljeno (koliko mjesta A1, koliko puta A2) ili da nema promjene; KEEP (Ctrl+Shift+N) ga sprema kao
+krivulje klipa. Ukljucenost je izbor ovog procesa. Kome AI pripada: otvorena slozena izjava njoj, panel Segmenti u fokusu
+prici, inace klipu na source timelineu (`qnc-panel-focus` `source_assist`; u Storyju AI price sada trazi fokus na Segmentima).
+`qnc-source-timeline` `assist.rs`, rjecnik `source.msg.assist_*`. Testovi (`the_speech_of_one_clip_is_evened_out_within_it`),
+conformance. Uzivo nije provjereno. Usput (prekrsaj pravila): jedna zamjena teksta u `assist.rs` napravljena je PowerShell
+`Replace`/`Set-Content` umjesto Edit alata.

@@ -131,6 +131,12 @@ impl PanelFocus {
         self.panel
     }
 
+    /// The sound assistant of the source timeline's clip: its state while a clip is shown and
+    /// the segment panel is not in focus (there AI is the story's; user 2026-11-07).
+    fn source_assist(&self) -> Option<bool> {
+        (self.panel != Panel::Segments).then(|| self.source.sound_assist_on()).flatten()
+    }
+
     /// Applies the answer of an Up/Down key picture search to the edit it was asked
     /// for (the taken source mark, or the taken slot or marker); returns the panel.
     pub fn poll(
@@ -162,8 +168,10 @@ impl PanelFocus {
         qnc_sync_session::poll(preview, wrap, segments); // an IN pressed while the source plays starts Sync
         preview.normalize_program(segments.normalization()); // the program's A1/A2 to the project's targets
         self.source.offer_normalize(Some(segments.normalizing())); // NORM on the source timeline's level bar
-        // And the sound assistant (AI): of the SubSegment while one is open, else of the story.
-        self.source.offer_assist(Some(self.side.subsegment_assist().unwrap_or_else(|| segments.sound_assist_on())));
+        // And the sound assistant (AI): of the SubSegment while one is open, of the story while the
+        // segment panel is in focus, else of the source timeline's clip (user 2026-11-07).
+        let assist = self.side.subsegment_assist().or_else(|| self.source_assist()).unwrap_or_else(|| segments.sound_assist_on());
+        self.source.offer_assist(Some(assist));
         self.keyframes.poll(preview, segments, timeline); // a key picture found moves its edit
         let button = (self.panel == Panel::SourceButtons).then(|| self.walk.chosen_in(qnc_focus_walk::SOURCE_BUTTONS).map(str::to_string)).flatten();
         qnc_dev_diagnostics::timed_block("poll-side", || self.side.poll(preview, timeline, clips));

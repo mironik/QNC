@@ -57,6 +57,11 @@ impl PanelFocus {
         if let Some(done) = self.side.act(action_id, event.value, event.target.as_deref(), pieces.0, pieces.3, self.source.view().timecode.as_ref()) {
             return Some(done);
         }
+        // AI and KEEP: of the source timeline's clip unless the segment panel is in focus (the
+        // story's) or a SubSegment is open (its own, taken above; user 2026-11-07).
+        if matches!(action_id, "toggle_sound_assist" | "sound_assist_keep") && self.source_assist().is_some() {
+            return self.source.assist_key(action_id, pieces.0);
+        }
         // F: match frame (`qnc-match-frame`, docs/98 1.3): from the story to the same picture of
         // its clip on the source timeline, from the source timeline to where the story plays it.
         if action_id == qnc_segments_keys::MATCH_FRAME {

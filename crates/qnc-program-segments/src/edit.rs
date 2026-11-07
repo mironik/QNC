@@ -161,7 +161,20 @@ impl ProgramSegments {
                 off: lane.off,
                 curve: Vec::new(),
             };
-            return Some(qnc_program_view::ZoomSound { from, to, cut, lanes: [vec![lane(&self.source.lanes[0])], vec![lane(&self.source.lanes[1])]], playhead, lane_choices: self.source.lane_choices, ..Default::default() });
+            // The clip's kept level curves, on its own axis as the source timeline has them.
+            let length = self.source.duration_frames.max(to);
+            let span = qnc_level_curve::Span { start: 0, end: length, source_in: 0, source_out: length };
+            let level_curves = (0..2u8)
+                .map(|index| {
+                    let keys = self.source.curve(usize::from(index));
+                    qnc_program_view::LevelCurve { lane: index, id: index.to_string(), span, placed: qnc_level_curve::place(span, &keys), taken: false }
+                })
+                .collect();
+            let mut lanes = [vec![lane(&self.source.lanes[0])], vec![lane(&self.source.lanes[1])]];
+            for (index, placements) in lanes.iter_mut().enumerate() {
+                placements[0].curve = self.source.curves[index].clone();
+            }
+            return Some(qnc_program_view::ZoomSound { from, to, cut, lanes, playhead, lane_choices: self.source.lane_choices, level_curves, ..Default::default() });
         }
         if let Some(zoom) = self.clip_edge_zoom(view) {
             return Some(zoom);
@@ -195,7 +208,7 @@ impl ProgramSegments {
         let near = |placements: Vec<qnc_program_waveform::Placement>| placements.into_iter().filter(|at| at.program_start < reach && from < at.program_end).collect();
         let taken_cut = self.marker_edit.as_ref().map(|(id, _)| id.clone());
         let focus_side = self.zoom_focus();
-        Some(qnc_program_view::ZoomSound { from, to, cut, lanes: [near(segments), near(covers)], cut_sound, picture_taken: taken_cut.is_some() && matches!(self.cut_part, crate::CutPart::Picture), taken_cut, playhead, focus_side, ..Default::default() })
+        Some(qnc_program_view::ZoomSound { from, to, cut, lanes: [near(segments), near(covers)], cut_sound, picture_taken: taken_cut.is_some() && matches!(self.cut_part, crate::CutPart::Picture), taken_cut, playhead, focus_side, level_curves: view.level_curves(), ..Default::default() })
     }
 
     /// The zoom of a taken S-Story clip edge is the zoom of an IN or OUT on the source timeline

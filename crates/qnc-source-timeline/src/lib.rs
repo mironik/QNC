@@ -14,7 +14,18 @@
 
 use std::time::Duration;
 
+mod assist;
 mod level;
+
+/// The clip's wave read for the sound assistant (with its loudness).
+#[derive(Default)]
+struct AssistWaves(qnc_program_waveform::ProgramWaves);
+
+impl std::fmt::Debug for AssistWaves {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str("AssistWaves")
+    }
+}
 
 use qnc_lane_choice::{Lane, LaneChoice};
 use qnc_source_panel::SourcePanel;
@@ -108,6 +119,12 @@ pub struct SourceTimeline {
     curves: [Vec<(u64, i16)>; 2],
     /// The curve taken (Ctrl+Shift+1/2, a right click on its line), as drafted.
     level: Option<qnc_level_curve::LevelLine>,
+    /// The sound assistant (AI) on for the shown clip (user 2026-11-07), its proposal and what
+    /// it was made of, the clip whose wave is read and the wave.
+    assist: bool,
+    assisted: Option<(assist::AssistKey, [Vec<(u64, i16)>; 2])>,
+    assist_clip: Option<String>,
+    waves: AssistWaves,
 }
 
 impl SourceTimeline {
@@ -133,9 +150,11 @@ impl SourceTimeline {
         let count = self.channels.for_clip(content, clip_id);
         self.lanes.set_channels(count);
         self.apply_kept_sound(count, preview);
+        let timecode = self.timecodes.for_clip(content, clip_id);
+        self.view.timecode = timecode;
+        self.poll_assist(preview, timeline);
         // The clip's level curves in its player (sent again to every new session).
         self.hear_curves(preview);
-        let timecode = self.timecodes.for_clip(content, clip_id);
         self.refresh(timecode);
         self.view.levels = preview.view().output_levels;
         self.view.level_curves = self.drawn_curves(timeline);

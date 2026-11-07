@@ -385,6 +385,10 @@ impl SubsegmentEdit {
         shown.roll = self.trim.is_some_and(|trim| trim.roll.is_some());
         shown.chosen = self.chosen.filter(|index| *index < shown.parts.len());
         shown.level_curves = self.level_curves(&shown, &pieces);
+        // The zoom is the same timeline: the parts' level curves on its axis too (user 2026-11-07).
+        if let Some(sound) = shown.zoom.as_mut().and_then(|zoom| zoom.zoom_sound.as_mut()) {
+            sound.level_curves = shown.level_curves.clone();
+        }
         shown.chosen_slots =self.chosen_slots().into_iter().chain(self.sound.is_some().then(|| self.sound_also.clone()).unwrap_or_default()).filter(|index| *index < shown.parts.len()).collect();
         shown.join_sound = self.join_sound.map(|join| (join.index, join.side));
         shown.slide = self.slide.map(|(index, _)| index);

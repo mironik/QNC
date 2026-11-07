@@ -87,6 +87,12 @@ impl SourceTimeline {
     /// The curves the clip is heard with now: the kept ones, the taken one as drafted.
     pub(crate) fn heard_curves(&self) -> [Vec<(u64, i16)>; 2] {
         let mut curves = self.curves.clone();
+        // While AI is on, a lane without a curve of the user's plays the assistant's.
+        for (lane, curve) in curves.iter_mut().enumerate() {
+            if let Some(assisted) = self.assist_curve(lane) {
+                curve.clone_from(assisted);
+            }
+        }
         if let Some(line) = &self.level {
             curves[usize::from(line.lane)] = LevelKey::pairs(line.draft());
         }

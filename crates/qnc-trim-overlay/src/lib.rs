@@ -142,9 +142,9 @@ pub fn show(ctx: &egui::Context, segments: &SegmentsView, theme: &TimelineTheme)
                         ui.painter().rect_stroke(half, 0.0, Stroke::new(2.0, theme.cut), StrokeKind::Inside);
                     }
                 }
-                // The level curves on the program (docs/98 2.1), as the timeline draws them; a source
-                // IN/OUT zoom is on a clip's own axis and has none.
-                let curves = if source { Vec::new() } else { timeline_level_curves(&segments.level_curves(), sound.from, sound.to, 0) };
+                // The level curves of the zoom's owner on its axis, as its timeline draws them
+                // (user 2026-11-07: the zoom is the same timeline).
+                let curves = timeline_level_curves(&sound.level_curves, sound.from, sound.to, 0);
                 let (word, side) = paint_sound(ui, area, sound, gap_at, top.y, (panel, source), (lane_choices(sound, segments), &curves), &visuals, theme);
                 // A word in every zoom (user 2026-11-04): the taken cut goes to it, else a cut.
                 if let Some((from, to)) = word {
