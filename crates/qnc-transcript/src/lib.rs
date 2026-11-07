@@ -30,6 +30,9 @@ pub const TRANSCRIBE: &str = "transcribe_marks";
 /// Fast (on the processor) or Quality (the best engine) for what is queued next.
 pub const FAST: &str = "transcribe_fast";
 pub const BEST: &str = "transcribe_best";
+/// The shown clip's IN/OUT heard again with the best engine of this computer (user 2026-11-07:
+/// "a second pass of a chosen part with wav2vec2"); the new text replaces what was said there.
+pub const REPASS: &str = "transcribe_repass";
 /// A clip's tick in the pool (target: the clip).
 pub const MARK: &str = "transcribe_mark";
 /// A word of the transcript was clicked: the playhead goes to its first frame (value).
@@ -253,6 +256,7 @@ impl Transcript {
             })),
             DELETE_QUOTE => Some(target.and_then(|id| id.parse::<i64>().ok()).is_some_and(|id| self.write(preview, move |target| qnc_transcript_db::delete_quote(target, id)))),
             TRANSCRIBE => Some(self.start(preview, timeline)),
+            REPASS => Some(self.repass(preview, timeline)),
             SEARCH_TERM => {
                 let lines = Arc::clone(&self.view.lines);
                 self.view.search.set_term(target.unwrap_or_default(), &lines);
@@ -350,6 +354,35 @@ impl Transcript {
             self.asking = Some(done);
             self.ticks.clear();
             self.view.message = qnc_ui_text::fill("transcribe.queued", &[("count", &count.to_string())]);
+        }
+        true
+    }
+
+    /// The shown clip's IN/OUT queued again with the best engine (the Croatian wav2vec2 model,
+    /// so only for a Croatian project); the transcript saved for it replaces what was there.
+    fn repass(&mut self, preview: &SourcePreview, timeline: &TimelineProjection) -> bool {
+        let Some(target) = preview.project_target().cloned() else {
+            self.view.message = qnc_ui_text::text("transcribe.choose_clip").into();
+            return true;
+        };
+        let settings = preview.still_locator().map(|locator| locator.settings().clone());
+        if !settings.as_ref().is_some_and(|settings| settings.transcription_enabled().unwrap_or(false)) {
+            self.view.message = qnc_ui_text::text("transcribe.off_in_project").into();
+            return true;
+        }
+        if !settings.as_ref().is_some_and(|settings| settings.speech_language().is_ok_and(|language| language == "hr")) {
+            self.view.message = qnc_ui_text::text("transcribe.repass_croatian").into();
+            return true;
+        }
+        let (Some(clip_id), Some((from_frame, to_frame))) = (preview.view().clip_id.clone(), timeline.visible_source_marks()) else {
+            self.view.message = qnc_ui_text::text("transcribe.repass_marks").into();
+            return true;
+        };
+        let queued = Queued { clip_id, from_frame, to_frame, quality: QueueQuality::Best, state: QueueState::Waiting, error: String::new(), took_ms: 0 };
+        let (send, done) = mpsc::channel();
+        if std::thread::Builder::new().name("qnc-transcript-repass".into()).spawn(move || _ = send.send(qnc_transcript_db::enqueue(&target, vec![queued]))).is_ok() {
+            self.asking = Some(done);
+            self.view.message = qnc_ui_text::text("transcribe.repass_queued").into();
         }
         true
     }

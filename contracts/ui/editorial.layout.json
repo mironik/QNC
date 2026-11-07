@@ -193,6 +193,10 @@
           {
             "label": "@ma.transcribe",
             "action_id": "transcribe_marks"
+          },
+          {
+            "label": "@ma.transcribe_repass",
+            "action_id": "transcribe_repass"
           }
         ]
       }

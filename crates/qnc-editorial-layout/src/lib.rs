@@ -469,7 +469,7 @@ mod tests {
     fn ai_media_assist_has_transcribe_under_its_pool_on_the_all_tab_only() {
         let contracts = EditorialContracts::load("e").expect("the group e layout");
         let bar: Vec<_> = contracts.action_bar(POOL_ACTIONS).map(|action| action.action_id).collect();
-        assert_eq!(bar, ["transcribe_marks"]);
+        assert_eq!(bar, ["transcribe_marks", "transcribe_repass"], "and the Croatian second pass of the marked part (user 2026-11-07)");
         assert_eq!(contracts.action_bar("source-dock").count(), 0, "no bar in any other place");
         let dock = &contracts.composition().source_dock.actions_rtl;
         assert!(dock.iter().all(|action| action.action_id() != Some("transcribe_marks")), "Transcribe moved off the dock");

@@ -5,7 +5,7 @@
     "model": "../../data/models/wav2vec2-parlaspeech-hr"
   },
   "transcribe": {
-    "selected": "whisper.large-v3-turbo.vulkan",
+    "selected": "wav2vec2.parlaspeech-hr.cpu",
     "fast": "parakeet.tdt-0.6b-v3.cpu",
     "engines": [
       {
@@ -23,6 +23,13 @@
         "model": "../../data/models/ggml-large-v3-turbo.bin",
         "vad_model": "../../data/models/ggml-silero-v5.1.2.bin",
         "threads": 6
+      },
+      {
+        "id": "wav2vec2.parlaspeech-hr.cpu",
+        "program": "qnc-transcribe-wav2vec2",
+        "backend": "cpu",
+        "model": "../../data/models/wav2vec2-parlaspeech-hr",
+        "threads": 4
       },
       {
         "id": "parakeet.tdt-0.6b-v3.cpu",

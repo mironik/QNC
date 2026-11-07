@@ -1,0 +1,13 @@
+[package]
+name = "qnc-transcribe-wav2vec2"
+version = "0.1.0"
+edition = "2021"
+description = "QNC transcription plug-in: Croatian speech to text with the wav2vec2 CTC model (ParlaSpeech-HR) in pure Rust (contract qnc.transcribe 1), as its own program; used to hear a chosen part again"
+
+[dependencies]
+qnc-dev-diagnostics = { workspace = true }
+qnc-transcribe-jobs = { workspace = true }
+qnc-wav2vec2 = { workspace = true }
+
+[target.'cfg(windows)'.dependencies]
+windows-sys = { version = "0.59", features = ["Win32_Foundation", "Win32_System_Threading"] }

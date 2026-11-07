@@ -8405,3 +8405,15 @@ trazi zarez, pa se vremena zadaju brojem slika u nacinu mape, model se ucitava j
 ruke s brosurom. `qnc-script-db/examples/pieces.rs` (samo citanje dijelova izjava). Conformance PADA na C5 (kocka jos nema
 korisnika) dok korak 2 ne spoji smooth spoj u slozenu izjavu, player i export. Nije izvedeno: nacin spoja Smooth i njegova
 duljina u bazi, pozadinski render prijelaza, player i export.
+Izvedeno 2026-11-07 (korisnik: prijepis "Kad je jedna tisuca ... sezdeset devet" gdje covjek kaze "tisucu devetsto sezdeset
+devete"; "pricekat cemo noviju verziju Parakeeta, jedino sto bi mogli je ponovni prolaz s wav2vec2 odabranog dijela"):
+izmjereno na tom dijelu (Mironik 3608 CH1): hrvatski wav2vec2 (ParlaSpeech-HR) cuje "kad je 1969. u zagrebu bila
+promocija". Novi program-dodatak `tools/qnc-transcribe-wav2vec2` (ugovor `qnc.transcribe` 1, cisti Rust, procesor, ispod
+normalnog prioriteta; prozori do 30 s na tihom mjestu, segment do stanke dulje od sekunde, prva rijec velikim slovom, bez
+interpunkcije); `qnc-wav2vec2` `greedy_words` (rijeci s prvom i zadnjom slikom i vjerojatnoscu). AI katalog racunala:
+motor `wav2vec2.parlaspeech-hr.cpu`, `transcribe.selected` (Best) pokazuje na njega (whisper ostaje u popisu). Nova radnja
+`transcribe_repass` (`qnc-transcript` `repass`): IN/OUT prikazanog klipa u red prijepisa s motorom Best; samo za projekt s
+hrvatskim jezikom govora; spremljeni prijepis raspona zamjenjuje stari na tom mjestu (postojece pravilo
+`qnc-transcript-db`). Gumb "Ponovo (HR)" uz Prijepis ispod poola AI Media Assista (`pool_actions`), katalog, rjecnik.
+Izmjereno kroz ugovor: 7 s govora za 5,9 s s ucitavanjem modela. Testovi, conformance (osim otvorenog C5 za
+`qnc-frame-interp`). Uzivo nije provjereno.

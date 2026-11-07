@@ -155,6 +155,7 @@ members = [
     "crates/qnc-zoom-words",
     "crates/qnc-word-align",
     "tools/qnc-transcribe-parakeet",
+    "tools/qnc-transcribe-wav2vec2",
     "tools/qnc-transcribe-whisper",
     "tools/qnc-decoder-acceptance",
     "crates/qnc-installed-versions",

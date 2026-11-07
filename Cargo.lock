@@ -6962,6 +6962,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "qnc-transcribe-wav2vec2"
+version = "0.1.0"
+dependencies = [
+ "qnc-dev-diagnostics",
+ "qnc-transcribe-jobs",
+ "qnc-wav2vec2",
+ "windows-sys 0.59.0",
+]
+
+[[package]]
 name = "qnc-transcribe-whisper"
 version = "0.1.0"
 dependencies = [

@@ -18,6 +18,24 @@ pub const SAMPLE_RATE: u32 = 16_000;
 /// One frame of the model's letters: 320 samples at 16 kHz.
 pub const FRAME_SECONDS: f64 = 0.02;
 
+/// A word the model heard: its letters, its first and last frame and the sum of its letters'
+/// probabilities (for its mean).
+#[derive(Debug, Clone, PartialEq)]
+pub struct HeardWord {
+    pub text: String,
+    pub first: usize,
+    pub last: usize,
+    pub p_sum: f64,
+    pub letters: usize,
+}
+
+impl HeardWord {
+    /// The mean probability of its letters.
+    pub fn p(&self) -> f64 {
+        if self.letters == 0 { 0.0 } else { self.p_sum / self.letters as f64 }
+    }
+}
+
 /// The log probabilities of the model's letters, frame by frame.
 #[derive(Debug, Clone)]
 pub struct Emissions {
@@ -217,6 +235,39 @@ impl Wav2Vec2 {
             last = best;
         }
         text
+    }
+
+    /// The words the model hears, each with the first and the last frame of its letters
+    /// (user 2026-11-07: the Croatian model hears a chosen part again): the greedy path, words
+    /// split at the word delimiter `|` (or a space), a word's mean letter probability with it.
+    pub fn greedy_words(&self, emissions: &Emissions) -> Vec<HeardWord> {
+        let blank = self.blank();
+        let mut words: Vec<HeardWord> = Vec::new();
+        let mut current: Option<HeardWord> = None;
+        let mut last = None;
+        for (index, frame) in emissions.frames.iter().enumerate() {
+            let best = frame.iter().enumerate().max_by(|a, b| a.1.total_cmp(b.1)).map(|(id, p)| (id, *p));
+            let id = best.map(|(id, _)| id);
+            if id != last {
+                if let Some((id, log_p)) = best.filter(|(id, _)| Some(*id) != blank) {
+                    let token = self.tokens.get(id).map_or("", String::as_str);
+                    if token == "|" || token == " " {
+                        words.extend(current.take());
+                    } else {
+                        let word = current.get_or_insert_with(|| HeardWord { text: String::new(), first: index, last: index, p_sum: 0.0, letters: 0 });
+                        word.text.push_str(token);
+                        word.last = index;
+                        word.p_sum += f64::from(log_p).exp();
+                        word.letters += 1;
+                    }
+                }
+            } else if let Some(word) = current.as_mut().filter(|_| id.is_some() && id != blank) {
+                word.last = index; // a letter held over several frames
+            }
+            last = id;
+        }
+        words.extend(current);
+        words
     }
 
     /// The CTC blank (`[PAD]`).
