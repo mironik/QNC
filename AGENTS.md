@@ -8386,3 +8386,9 @@ klikom nikad tocno na slici tocke, pa se nista nije brisalo): Delete brise tocku
 najblizu tocku krivulje (`qnc-level-curve` `nearest_point`, `remove_at`); vrijedi za source timeline, Wrap redove i slozenu
 izjavu. Tocka koju bi Delete obrisao oznacena je kvadratom oko nje (`qnc-timeline` `paint_level_curves`, i u zoomu). Testovi
 prilagodeni, conformance. Uzivo nije provjereno.
+Popravak 2026-11-07 (korisnik: "pravilo slotova nije univerzalno; selektirani slot mora se moci obrisati i vratiti s Undo ili
+Backspace"; log: S-Story, slot uzet desnim klikom ili Ctrl+S, Delete: "Ovaj slot nema pokrivalicu za uklanjanje"): u S-Storyju
+je svaki klip slot, pa Delete na izabranom ili uzetom slotu (i uzetom rubu slota) bez pokrivalice izbacuje taj klip iz price
+(`DeleteSegment`, jedan korak Undo; Backspace ga vraca). Slot s pokrivalicom i dalje gubi pokrivalicu. `qnc-program-segments`
+`delete.rs` (`clip_of_slot`). U Storyju prazan slot (izmedu dva M markera) i dalje nema sto obrisati. Test
+`in_an_s_story_a_chosen_slot_is_deleted_and_undo_brings_it_back`, conformance. Uzivo nije provjereno.

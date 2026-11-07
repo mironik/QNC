@@ -27,18 +27,41 @@ impl ProgramSegments {
         }
         // A taken or chosen slot (Ctrl+S, a click on its colour strip): its B-roll; the slot and
         // its M markers stay (user 2026-10-17).
-        if let Some(slot_id) = self.slot_move.take().map(|taken| taken.slot_id).or_else(|| self.selected_slot.clone()) {
+        let taken = self.slot_move.take().map(|taken| taken.slot_id).or_else(|| self.slot_trim.as_ref().map(|trim| trim.slot_id.clone()));
+        if let Some(slot_id) = taken.or_else(|| self.selected_slot.clone()) {
             let cover = self.stored_covers.iter().find(|cover| cover.slot_id == slot_id).map(|cover| cover.cover_id.clone());
-            return match cover {
-                Some(cover_id) => {
+            // In an S-Story every clip is a slot (user 2026-11-07: "a chosen slot must be
+            // deleted and brought back with Undo or Backspace"): its clip goes from the story,
+            // one undo step.
+            let clip = self.is_s_story().then(|| self.clip_of_slot(&slot_id)).flatten();
+            return match (cover, clip) {
+                (Some(cover_id), _) => {
                     self.selected_cover = None;
+                    self.slot_trim = None;
                     self.write(Operation::DeleteCover { cover_id })
                 }
-                None => self.refresh_view(qnc_ui_text::text("story.msg.slot_has_no_broll").into()),
+                (None, Some(segment_id)) => {
+                    self.slot_trim = None;
+                    self.selected_slot = None;
+                    self.end_edit();
+                    self.write(Operation::DeleteSegment { segment_id })
+                }
+                (None, None) => self.refresh_view(qnc_ui_text::text("story.msg.slot_has_no_broll").into()),
             };
         }
         // Delete takes only what is taken (rule 2026-09-25): a click alone does not arm it.
         self.refresh_view(qnc_ui_text::text("story.msg.take_before_delete").into());
+    }
+
+    /// The clip (segment) that is the slot `slot_id` of an S-Story: the one inside its span.
+    fn clip_of_slot(&self, slot_id: &str) -> Option<String> {
+        let slot = self.view.slots.iter().find(|slot| slot.slot_id == slot_id)?;
+        self.view
+            .rows
+            .iter()
+            .filter(|row| !row.lead)
+            .find(|row| row.start_frame < slot.end_frame && slot.start_frame < row.end_frame)
+            .map(|row| row.segment_id.clone())
     }
 
     /// Ctrl+Delete: the chosen segment, when excluded, removed for good.

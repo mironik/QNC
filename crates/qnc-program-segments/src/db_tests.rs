@@ -497,6 +497,30 @@ fn normalising_is_on_at_start_and_opening_a_project_keeps_what_the_user_chose() 
 /// makes the clip longer and the story with it, also on the last clip; Ctrl+I at a clip's start
 /// shortens it and the story; the trim pictures follow the clip as they follow a cover; a double
 /// click enlarges the clip's slot with 15 % of its neighbours.
+/// User 2026-11-07: a chosen slot of an S-Story (its clip) is deleted with Delete and brought
+/// back with Backspace (Undo).
+#[test]
+fn in_an_s_story_a_chosen_slot_is_deleted_and_undo_brings_it_back() {
+    let dir = tempfile::tempdir().unwrap();
+    let file = dir.path().join("project.db");
+    let draft = story_target(&file).draft_story(1);
+    store_in(&file, draft.clone());
+    let mut segments = ProgramSegments::new();
+    segments.configure(draft, "p1", None, None);
+    settle(&mut segments);
+    let spans = |segments: &ProgramSegments| segments.view().slots.iter().map(|slot| (slot.start_frame, slot.end_frame)).collect::<Vec<_>>();
+    assert_eq!(spans(&segments).len(), 3);
+    let middle = segments.view().slots[1].slot_id.clone();
+    segments.apply(SegmentCommand::SelectSlot { slot_id: middle, frame: 60 });
+    settle(&mut segments);
+    segments.apply_action("delete_marker");
+    settle(&mut segments);
+    assert_eq!(spans(&segments), vec![(0, 50), (50, 100)], "the middle clip went");
+    segments.apply_action("undo_object");
+    settle(&mut segments);
+    assert_eq!(spans(&segments), vec![(0, 50), (50, 100), (100, 150)], "Backspace brings it back");
+}
+
 #[test]
 fn in_an_s_story_the_slot_tools_make_the_clip_and_the_story_longer_or_shorter() {
     let dir = tempfile::tempdir().unwrap();
