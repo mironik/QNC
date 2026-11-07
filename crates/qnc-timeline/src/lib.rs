@@ -1307,6 +1307,11 @@ fn lane_taken(input: &TimelineInput<'_>) -> bool {
 /// Whether something is taken on this timeline: IN/OUT or A1/A2 of a source timeline, what
 /// the host holds on a row with markers.
 fn holding(input: &TimelineInput<'_>) -> bool {
+    // In a lane's zoom a left click only places the playhead (user 2026-11-07: the sound levels
+    // are led there); it is left by a click on A1/A2 again or by Esc.
+    if lane_zoomed(input) {
+        return false;
+    }
     if input.layers.markers {
         input.holding
     } else {

@@ -423,9 +423,10 @@ impl SourceTimeline {
         if !matches!(key, LaneKey::Take(_)) && !self.lane_taken() {
             return None;
         }
+        let again = matches!(key, LaneKey::Take(lane) if self.lanes.taken().is_some_and(|(taken, _)| taken == lane));
         let changed = lane_key(&mut self.lanes, key);
         self.message = match (key, changed) {
-            (LaneKey::Take(_), false) => qnc_ui_text::text("story.msg.no_audio_channels").into(),
+            (LaneKey::Take(_), false) if !again => qnc_ui_text::text("story.msg.no_audio_channels").into(),
             _ => lane_message(&self.lanes),
         };
         Some(self.after_lane(changed, preview))

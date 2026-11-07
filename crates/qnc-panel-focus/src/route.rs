@@ -172,7 +172,12 @@ impl PanelFocus {
             if event.action_id == "segments_keep_edit" {
                 // A taken level curve is saved and stays taken: the playhead the click places is
                 // its next point (user 2026-11-06).
-                let kept = qnc_segments_keys::keep_level_on_click(preview, segments) || qnc_segments_keys::confirm(preview, segments);
+                // A click on the A1/A2 button (no frame) keeps it and closes the zoom, as Enter
+                // (user 2026-11-07: the way out of the zoom is the button again or Esc).
+                let kept = match event.unsigned() {
+                    Some(_) => qnc_segments_keys::keep_level_on_click(preview, segments) || qnc_segments_keys::confirm(preview, segments),
+                    None => qnc_segments_keys::confirm(preview, segments),
+                };
                 let cued = event.unsigned().is_some_and(|frame| segments.apply(qnc_program_segments::SegmentCommand::Cue(frame)));
                 return Some(Some(kept || cued));
             }

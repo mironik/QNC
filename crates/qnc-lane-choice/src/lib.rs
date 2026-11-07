@@ -240,6 +240,22 @@ impl LaneChoice {
 mod tests {
     use super::*;
 
+    /// The taken lane taken again (its A1/A2 button, Ctrl+1/Ctrl+2) keeps the draft and closes
+    /// its zoom (user 2026-11-07); the other lane is taken as before.
+    #[test]
+    fn the_taken_lane_taken_again_keeps_its_draft() {
+        let mut lanes = LaneChoice::default();
+        lanes.new_clip();
+        lanes.set_channels(Some(4));
+        assert!(lane_key(&mut lanes, LaneKey::Take(0)));
+        lane_key(&mut lanes, LaneKey::Channel(2));
+        assert!(lane_key(&mut lanes, LaneKey::Take(0)), "kept");
+        assert_eq!((lanes.taken(), lanes.choice(0)), (None, Some((2, 4))), "closed, channel 3 kept");
+        assert!(lane_key(&mut lanes, LaneKey::Take(1)));
+        assert!(lane_key(&mut lanes, LaneKey::Take(0)), "the other lane is taken");
+        assert_eq!(lanes.taken().map(|(lane, _)| lane), Some(0));
+    }
+
     #[test]
     fn a_new_clip_hears_channel_1_on_a1_and_2_on_a2_and_a_lane_drafts_within_its_channels() {
         let mut lanes = LaneChoice::default();

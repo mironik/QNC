@@ -46,6 +46,9 @@ impl LaneKey {
 /// moment (the same Enter does nothing else).
 pub fn lane_key(lanes: &mut LaneChoice, key: LaneKey) -> bool {
     match key {
+        // The taken lane taken again (a click on its A1/A2 button, Ctrl+1/Ctrl+2) keeps it and
+        // closes its zoom (user 2026-11-07: the way out of the zoom is the button again or Esc).
+        LaneKey::Take(lane) if lanes.taken().is_some_and(|(taken, _)| taken == lane) => lane_key(lanes, LaneKey::Keep),
         LaneKey::Take(lane) => lanes.take(lane),
         LaneKey::Channel(delta) => lanes.draft(delta),
         LaneKey::Pick(channel) => lanes.taken().is_some_and(|(lane, _)| lanes.set_draft(lane, channel)),

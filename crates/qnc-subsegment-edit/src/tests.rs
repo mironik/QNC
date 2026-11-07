@@ -46,7 +46,7 @@ fn a_parts_level_curve_is_taken_and_raised_at_the_playhead_line() {
     assert_eq!(edit.level_draft(), Some((1, vec![(20, 20)])), "part b plays its frame 20 at the playhead: +2 dB there");
     let shown = edit.view.subsegment.clone().unwrap();
     let curves = edit.level_curves(&shown, &pieces);
-    assert_eq!(curves.iter().map(|curve| (curve.id.as_str(), curve.taken)).collect::<Vec<_>>(), vec![("1", true)], "only the taken part draws a curve");
+    assert_eq!(curves.iter().map(|curve| (curve.id.as_str(), curve.taken)).collect::<Vec<_>>(), vec![("0", false), ("1", true)], "every part has its line, the taken one as drafted");
     assert_eq!(edit.drafted(block.clone()).pieces[1].level_keys, vec![(20, 20)], "the draft is what plays");
     edit.value = Some(80);
     assert_eq!(edit.own("timeline_cue_frame", None), Some((crate::LEVEL_KEEP_AT.to_string(), Some("80".to_string()))), "a click keeps it and places the playhead");

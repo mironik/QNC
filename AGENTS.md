@@ -8358,3 +8358,12 @@ videa: uzeta traka Ctrl+1/Ctrl+2 ili klik na A1/A2, uvecani val) i u zoomu reza.
 otvara prosirenu traku. U prosirenoj traci je ljestvica u dB (+12, +6, 0, -6, -12, -24, -40) i uz tocku na liniji
 playheada razina u dB (i u zoomu reza); desni klik na liniju je uzima. `qnc-timeline` (`level_lane`, `zoomed_lane`,
 `level_lines::paint_scale`). Testovi, conformance. Uzivo nije provjereno.
+Izmjena 2026-11-07 (korisnik: "ako smo ukljucili expand audio kanala, klik lijevim misem vraca prikaz filmstripa; to
+otezava upravljanje nivoima tona; izlaz treba biti ponovni klik na audio dugme ili ESC"): dok je prosirena traka (zoom trake
+preko videa) otvorena, lijevi klik na timelineu samo postavlja playhead i nista ne sprema ni ne zatvara (`qnc-timeline`
+`holding`); vrijedi za source timeline, Wrap redove i slozenu izjavu. Zamjenjuje pravilo da lijevi klik sprema uzetu traku
+kao Enter (17. 10.) dok je zoom otvoren. Izlaz: klik na A1/A2 (ili Ctrl+1/Ctrl+2) uzete trake sprema i zatvara kao Enter
+(`qnc-lane-choice` `lane_key`; uzeta krivulja razine `qnc-source-timeline` `level_key`; na Wrap retku klik na oznaku bez
+slike `confirm`, `qnc-panel-focus`), Esc odustaje i zatvara. Na Wrap retku uzeta krivulja i dalje sprema klikom i ostaje
+uzeta, a klik u zoomu slozene izjave isto. Test `the_taken_lane_taken_again_keeps_its_draft`, test slozene izjave
+prilagoden (svaki dio ima liniju), conformance. Uzivo nije provjereno.

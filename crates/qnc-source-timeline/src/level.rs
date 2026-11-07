@@ -31,7 +31,12 @@ impl SourceTimeline {
     /// The level keys; `None` for a key that is not the curve's.
     pub(crate) fn level_key(&mut self, action_id: &str, preview: &mut SourcePreview, timeline: &TimelineProjection) -> Option<bool> {
         let at = timeline.playhead_frame.unwrap_or(0);
-        // A lane taken lets the curve go (one thing is taken at a time).
+        // A click on the A1/A2 button of the taken curve's lane keeps it and closes the zoom, as
+        // Enter (user 2026-11-07); the other lane taken lets the curve go (one thing at a time).
+        let same = |line: &LevelLine| (action_id == "select_audio_a1" && line.lane == 0) || (action_id == "select_audio_a2" && line.lane == 1);
+        if self.level.as_ref().is_some_and(same) {
+            return self.level_key("activate_focused_item", preview, timeline);
+        }
         if matches!(action_id, "select_audio_a1" | "select_audio_a2") && self.level.take().is_some() {
             self.message.clear();
             self.hear_curves(preview);
