@@ -15,6 +15,7 @@ use qnc_db_broker::ProjectDbTarget;
 use qnc_script_db::{Block, Piece};
 use qnc_source_preview::SourcePreview;
 
+mod assist;
 mod level;
 mod pointer;
 mod view;
@@ -232,11 +233,18 @@ pub struct SubsegmentEdit {
     sound: Option<PartSound>,
     /// The level curve of a part's A1 taken (Ctrl+Shift+1, a right click on its line), as drafted.
     level: Option<qnc_level_curve::LevelLine>,
+    /// AI on (Shift+N while a SubSegment is open): its parts evened out. A choice of this
+    /// process, as NORM in the preview; KEEP writes the proposal.
+    assist: bool,
+    /// The assistant's curves of the open SubSegment now (part, points on its clip's frames).
+    assist_curves: Vec<(usize, Vec<(u64, i16)>)>,
+    /// The last proposal and what it was made of.
+    assisted: Option<(assist::AssistKey, Vec<(usize, Vec<(u64, i16)>)>)>,
 }
 
 impl Default for SubsegmentEdit {
     fn default() -> Self {
-        Self { view: EditView::default(), blocks: Vec::new(), names: HashMap::new(), project: None, settled: true, writes: Vec::new(), open_subsegment: None, pieces_request: None, trim: None, chosen: None, chosen_to: None, sound_also: Vec::new(), join_sound: None, value: None, slide: None, slip_part: None, waves: qnc_program_waveform::ProgramWaves::new(), filmstrips: qnc_program_filmstrip::ProgramFilmstrips::new(), waves_project: None, trim_stills: qnc_trim_stills::TrimStills::new(), zoom_follow: Default::default(), sound: None, level: None }
+        Self { view: EditView::default(), blocks: Vec::new(), names: HashMap::new(), project: None, settled: true, writes: Vec::new(), open_subsegment: None, pieces_request: None, trim: None, chosen: None, chosen_to: None, sound_also: Vec::new(), join_sound: None, value: None, slide: None, slip_part: None, waves: qnc_program_waveform::ProgramWaves::new(), filmstrips: qnc_program_filmstrip::ProgramFilmstrips::new(), waves_project: None, trim_stills: qnc_trim_stills::TrimStills::new(), zoom_follow: Default::default(), sound: None, level: None, assist: false, assist_curves: Vec::new(), assisted: None }
     }
 }
 
@@ -267,6 +275,8 @@ impl SubsegmentEdit {
             return;
         }
         let stored = block.clone();
+        // The assistant's curves of the stored parts (AI on), played and drawn with the draft.
+        self.assist_curves = self.propose(&block);
         let block = self.drafted(block);
         let inputs = view::piece_inputs(&block);
         if playing.is_some_and(|playing| playing != inputs.as_slice()) && self.pieces_request.is_none() {
@@ -421,13 +431,22 @@ impl SubsegmentEdit {
                 }
             }
         }
-        // The drafted level curve of the taken part (a statement of one range is its own part).
-        if let Some((index, keys)) = self.level_draft() {
+        // The drafted level curve of the taken part and the assistant's curves of the parts without
+        // one of their own (a statement of one range is its own part).
+        let drafted_level = self.level_draft();
+        if drafted_level.is_some() || !self.assist_curves.is_empty() {
             if block.pieces.is_empty() {
                 block.pieces = vec![Piece::of(&block)];
             }
-            if let Some(piece) = block.pieces.get_mut(index) {
-                piece.level_keys = keys;
+            for (index, keys) in &self.assist_curves {
+                if let Some(piece) = block.pieces.get_mut(*index).filter(|piece| piece.level_keys.is_empty()) {
+                    piece.level_keys.clone_from(keys);
+                }
+            }
+            if let Some((index, keys)) = drafted_level {
+                if let Some(piece) = block.pieces.get_mut(index) {
+                    piece.level_keys = keys;
+                }
             }
         }
         block
@@ -509,6 +528,9 @@ impl SubsegmentEdit {
         let block = self.block(self.open_subsegment)?.clone();
         let pieces = view::block_pieces(&block);
         let take = |index: usize, out: bool| pieces.get(index).map(|piece| Trim { index, out, from: piece.from_frame, to: piece.to_frame, roll: None });
+        if let Some(done) = self.assist_key(action_id, &block, &pieces, preview) {
+            return Some(done);
+        }
         if let Some(done) = self.level_key(action_id, target, &block, &pieces, preview) {
             return Some(done);
         }

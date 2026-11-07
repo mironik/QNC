@@ -128,7 +128,13 @@ impl SubsegmentEdit {
             .filter_map(|(index, (part, piece))| {
                 let span = Span { start: part.start, end: part.end, source_in: piece.from_frame, source_out: piece.to_frame };
                 let taken = self.level.as_ref().filter(|line| line.id == index.to_string());
-                let keys = taken.map_or_else(|| keys_of(piece), |line| line.draft().to_vec());
+                // The taken curve as drafted, else the part's own, else the assistant's (AI on).
+                let assisted = || self.assist_curves.iter().find(|(at, _)| *at == index).map(|(_, keys)| keys.iter().map(|(frame, db10)| LevelKey { frame: *frame, db10: *db10 }).collect());
+                let keys = match taken {
+                    Some(line) => line.draft().to_vec(),
+                    None if !piece.level_keys.is_empty() => keys_of(piece),
+                    None => assisted().unwrap_or_default(),
+                };
                 // A part without a curve draws none unless it is the taken one.
                 (taken.is_some() || !keys.is_empty()).then(|| qnc_program_view::LevelCurve { lane: 0, id: index.to_string(), span, placed: qnc_level_curve::place(span, &keys), taken: taken.is_some() })
             })

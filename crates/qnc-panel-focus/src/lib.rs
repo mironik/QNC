@@ -162,7 +162,8 @@ impl PanelFocus {
         qnc_sync_session::poll(preview, wrap, segments); // an IN pressed while the source plays starts Sync
         preview.normalize_program(segments.normalization()); // the program's A1/A2 to the project's targets
         self.source.offer_normalize(Some(segments.normalizing())); // NORM on the source timeline's level bar
-        self.source.offer_assist(Some(segments.sound_assist_on())); // and the sound assistant (AI)
+        // And the sound assistant (AI): of the SubSegment while one is open, else of the story.
+        self.source.offer_assist(Some(self.side.subsegment_assist().unwrap_or_else(|| segments.sound_assist_on())));
         self.keyframes.poll(preview, segments, timeline); // a key picture found moves its edit
         let button = (self.panel == Panel::SourceButtons).then(|| self.walk.chosen_in(qnc_focus_walk::SOURCE_BUTTONS).map(str::to_string)).flatten();
         qnc_dev_diagnostics::timed_block("poll-side", || self.side.poll(preview, timeline, clips));

@@ -54,6 +54,31 @@ fn a_parts_level_curve_is_taken_and_raised_at_the_playhead_line() {
     assert!(!edit.level_taken(), "Esc gives it up");
 }
 
+/// AI on the SubSegment (user 2026-11-07): Shift+N turns it on and off for the open SubSegment;
+/// a part with a curve of its own keeps it, the assistant's curves fill only the others; KEEP
+/// without a proposal writes nothing.
+#[test]
+fn ai_is_the_open_subsegments_and_fills_only_parts_without_a_curve() {
+    let mut pieces = vec![part("a", 100, 150, 0), part("b", 10, 60, 0)];
+    pieces[0].level_keys = vec![(110, -30)];
+    let block = Block::of_pieces("sot", pieces.clone());
+    let preview = qnc_source_preview::SourcePreview::default();
+    let mut edit = SubsegmentEdit::default();
+    assert_eq!(edit.sound_assist_on(), None, "nothing open: the story's AI");
+    edit.open_subsegment = Some(block.id);
+    edit.view.subsegment = Some(subsegment_view(&block, Some(0)));
+    assert_eq!(edit.assist_key("toggle_sound_assist", &block, &pieces, &preview), Some(true));
+    assert_eq!(edit.sound_assist_on(), Some(true));
+    edit.assist_curves = vec![(0, vec![(100, -50)]), (1, vec![(20, -40)])];
+    let drafted = edit.drafted(block.clone());
+    assert_eq!(drafted.pieces[0].level_keys, vec![(110, -30)], "the part's own curve stays");
+    assert_eq!(drafted.pieces[1].level_keys, vec![(20, -40)], "the other plays the assistant's");
+    edit.assist_curves.clear();
+    assert_eq!(edit.assist_key("sound_assist_keep", &block, &pieces, &preview), Some(false), "no proposal: nothing kept");
+    edit.assist_key("toggle_sound_assist", &block, &pieces, &preview);
+    assert_eq!(edit.sound_assist_on(), Some(false));
+}
+
 fn part(clip: &str, from: u64, to: u64, gap: u64) -> Piece {
     Piece { clip_id: clip.into(), clip_name: clip.into(), from_frame: from, to_frame: to, start_tc: String::new(), end_tc: String::new(), length: String::new(), seconds: 1.0, text: String::new(), gap_before: gap, cut: false, a1_channel: None, a1_level_db: 0, a1_off: false, a1_lead_frames: 0, a1_tail_frames: 0, v_lead_frames: 0, v_tail_frames: 0, level_keys: Vec::new() }
 }

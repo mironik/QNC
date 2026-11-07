@@ -209,6 +209,11 @@ impl Script {
         self.edit.set_value(value);
     }
 
+    /// AI of the open SubSegment; `None` while none is open.
+    pub fn subsegment_assist(&self) -> Option<bool> {
+        self.edit.sound_assist_on()
+    }
+
     /// What the SubSegment did: its writes go to the script's database in one write, in order;
     /// its message and its view are the panel's.
     fn take_edit(&mut self, preview: &SourcePreview) {

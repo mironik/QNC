@@ -95,6 +95,12 @@ impl SidePieces {
         &self.views
     }
 
+    /// AI of the SubSegment open in place of the source timeline (user 2026-11-07); `None`
+    /// while none is open (the AI of the story then).
+    pub fn subsegment_assist(&self) -> Option<bool> {
+        self.script.as_ref()?.subsegment_assist()
+    }
+
     /// Polls the pieces; a view is renewed only when its piece changed it.
     pub fn poll(&mut self, preview: &mut SourcePreview, timeline: &TimelineProjection, clips: &mut [ClipRow]) {
         // The transcripts the pieces show, read once for all of them.

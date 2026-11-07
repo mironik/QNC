@@ -8322,3 +8322,11 @@ Enter upisuje, klik upisuje i stavlja playhead (krivulja ostaje uzeta, `LEVEL_KE
 `qnc-subsegment-panel` istom funkcijom kao Wrap retke (`qnc_trim_overlay::timeline_level_curves`). Test
 `a_parts_level_curve_is_taken_and_raised_at_the_playhead_line`, testovi dotaknutih kocki, conformance. Uzivo nije
 provjereno.
+Izvedeno 2026-11-07 (isti zahtjev, korak 2): AI pomocnik tona u slozenoj izjavi (`qnc-subsegment-edit` `assist.rs`):
+isti `qnc-sound-assist` kao Story nad dijelovima na A1 (nema pokrivalica: izjednacuje govor dijelova), glasnoca iz
+odsjecaka spremljenih s valom (`ProgramWaves::clip_loudness`). Dok je slozena izjava otvorena, AI (Shift+N, dugme AI u
+traci razine) ukljucuje i iskljucuje pomocnika za nju (izbor ovog procesa, kao NORM u previewu), a dugme pokazuje
+njezino stanje (`qnc-side-pieces` `subsegment_assist`, `qnc-panel-focus`); dio s vlastitom krivuljom (ili uzetom)
+ostaje svoj, ostali sviraju, crtaju i u valu imaju krivulju pomocnika (kroz nacrt dijelova, `drafted`). KEEP
+(Ctrl+Shift+N) upisuje prijedlog kao krivulje dijelova (`set_piece`). Test
+`ai_is_the_open_subsegments_and_fills_only_parts_without_a_curve`, conformance. Uzivo nije provjereno.

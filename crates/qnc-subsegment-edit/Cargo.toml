@@ -21,6 +21,8 @@ qnc-source-preview = { workspace = true }
 qnc-source-timecode = { workspace = true }
 qnc-lane-choice = { workspace = true }
 qnc-level-curve = { workspace = true }
+qnc-program-loudness = { workspace = true }
+qnc-sound-assist = { workspace = true }
 qnc-program-db = { workspace = true }
 qnc-trim-stills = { workspace = true }
 qnc-ui-text = { workspace = true }
