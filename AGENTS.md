@@ -8346,3 +8346,8 @@ izlaza u pozivu uredaja, bez alokacije i brave, pravac u dB izmedju tocaka; test
 salje svakoj novoj sesiji. Crta je `qnc-timeline` u audio traci source timelinea (istom funkcijom kao Wrap retke).
 Nije izvedeno: val source timelinea jos ne prati krivulju. Testovi `the_clips_level_line_is_taken_raised_and_kept`,
 `qnc-program-db` (pokrivalica preuzima krivulju klipa), testovi dotaknutih kocki, conformance. Uzivo nije provjereno.
+Popravak 2026-11-07 (korisnik: "ne vidim liniju razine tona"; log: nijedno uzimanje linije): krivulja se crtala samo kad
+ima tocke ili je uzeta, pa bez tocaka nije bilo linije koju bi desni klik uhvatio. Sada linija razine (ravna 0 dB bez
+tocaka) stoji uvijek: na source timelineu za A1 i A2 prikazanog klipa (`qnc-source-timeline` `drawn_curves`), na Wrap
+redovima za svaki segment i pokrivalicu (`qnc-program-view` `level_curves`) i za svaki dio slozene izjave
+(`qnc-subsegment-edit`). Test prilagoden, conformance. Uzivo nije provjereno.

@@ -135,8 +135,8 @@ impl SubsegmentEdit {
                     None if !piece.level_keys.is_empty() => keys_of(piece),
                     None => assisted().unwrap_or_default(),
                 };
-                // A part without a curve draws none unless it is the taken one.
-                (taken.is_some() || !keys.is_empty()).then(|| qnc_program_view::LevelCurve { lane: 0, id: index.to_string(), span, placed: qnc_level_curve::place(span, &keys), taken: taken.is_some() })
+                // A part without a curve draws its flat line (0 dB), so a right click can take it.
+                Some(qnc_program_view::LevelCurve { lane: 0, id: index.to_string(), span, placed: qnc_level_curve::place(span, &keys), taken: taken.is_some() })
             })
             .collect()
     }

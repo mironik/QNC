@@ -558,7 +558,7 @@ mod tests {
         source.route("step_prev_part", &mut preview, &mut timeline);
         source.route("step_prev_part", &mut preview, &mut timeline);
         assert_eq!(source.heard_curves()[1], vec![(40, 20)], "+2 dB at clip frame 40, heard at once");
-        assert_eq!(source.drawn_curves(&timeline).iter().map(|curve| (curve.lane, curve.taken)).collect::<Vec<_>>(), vec![(1, true)]);
+        assert_eq!(source.drawn_curves(&timeline).iter().map(|curve| (curve.lane, curve.taken)).collect::<Vec<_>>(), vec![(0, false), (1, true)], "both lines are drawn, A1 flat");
         source.route("activate_focused_item", &mut preview, &mut timeline);
         assert!(!source.level_taken());
         assert_eq!(source.kept_curves(), [Vec::new(), vec![(40, 20)]], "kept for the clip");

@@ -325,13 +325,14 @@ impl SegmentsView {
 
     /// Where each clip sounds in the program: segments on A1, covers on A2.
     /// Every level curve on the program (docs/98 2.1): segments on A1, covers on A2, the
-    /// taken one as drafted; an item without points has none.
+    /// taken one as drafted; an item without points has its flat line (0 dB), always drawn so a
+    /// right click can take it (user 2026-11-07: "ne vidim liniju razine tona").
     pub fn level_curves(&self) -> Vec<LevelCurve> {
         let taken = |lane: u8, id: &str| self.level_line.as_ref().filter(|(at, taken, _)| *at == lane && taken == id).map(|(_, _, keys)| keys);
         let curve = |lane: u8, id: &str, span: qnc_level_curve::Span, keys: &[qnc_program_db::LevelKey]| {
             let drafted = taken(lane, id);
             let keys = drafted.map_or(keys, Vec::as_slice);
-            (drafted.is_some() || !keys.is_empty()).then(|| LevelCurve {
+            Some(LevelCurve {
                 lane,
                 id: id.to_string(),
                 span,

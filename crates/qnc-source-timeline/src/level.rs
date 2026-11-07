@@ -96,12 +96,17 @@ impl SourceTimeline {
     pub(crate) fn drawn_curves(&self, timeline: &TimelineProjection) -> Vec<qnc_program_view::LevelCurve> {
         let span = Self::clip_span(timeline);
         let taken = self.level.as_ref().map(|line| line.lane);
+        // Without a clip there is no line; with one both lanes have theirs (flat 0 dB without
+        // points), always drawn so a right click can take it.
+        if self.clip.is_none() {
+            return Vec::new();
+        }
         self.heard_curves()
             .iter()
             .enumerate()
-            .filter_map(|(lane, pairs)| {
+            .map(|(lane, pairs)| {
                 let lane = lane as u8;
-                (!pairs.is_empty() || taken == Some(lane)).then(|| qnc_program_view::LevelCurve { lane, id: lane.to_string(), span, placed: qnc_level_curve::place(span, &keys_of(pairs)), taken: taken == Some(lane) })
+                qnc_program_view::LevelCurve { lane, id: lane.to_string(), span, placed: qnc_level_curve::place(span, &keys_of(pairs)), taken: taken == Some(lane) }
             })
             .collect()
     }
