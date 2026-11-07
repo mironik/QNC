@@ -26,6 +26,9 @@ pub struct PieceInput {
     /// `picture_tail` after it; the sound stays. Nothing after a pause.
     pub picture_lead: u64,
     pub picture_tail: u64,
+    /// The level curve of the part's A1 (user 2026-11-07, as a segment's): points at frames of
+    /// its clip, tenths of a dB added to its level.
+    pub level_keys: Vec<(u64, i16)>,
 }
 
 /// The program of a SubSegment: its parts one after another on V1 and A1 (a pause is black
@@ -118,7 +121,12 @@ pub fn load_pieces(
             a2_off: false,
             a2_lead_frames: 0,
             a2_tail_frames: 0,
-            a1_points: Vec::new(),
+            // The part's level curve, on the story's frames (as a segment's points).
+            a1_points: piece
+                .level_keys
+                .iter()
+                .map(|(at, db10)| qnc_program_playlist::LevelPoint { source_frame: i64::try_from(*at).unwrap_or(i64::MAX / 4) * num / den, db10: *db10 })
+                .collect(),
         });
         start = record_range.out_frame;
     }

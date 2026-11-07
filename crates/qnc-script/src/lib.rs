@@ -522,6 +522,7 @@ impl Script {
             a1_tail_frames: 0,
             v_lead_frames: 0,
             v_tail_frames: 0,
+            level_keys: Vec::new(),
         })
     }
 

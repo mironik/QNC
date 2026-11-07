@@ -46,6 +46,8 @@ pub fn own_action(view: &SubsegmentView, action_id: &str, value: Option<i64>, ta
             let index = view.chosen.filter(|index| *index < view.parts.len()).or_else(|| frame.and_then(part_at))?;
             own("select_audio_a1", Some(index.to_string()))
         }
+        // A right click on a part's level line (user 2026-11-07, as on a Wrap row): its curve taken.
+        "select_level_a1" if target.is_none_or(|target| target.parse::<usize>().is_err()) => own("select_level_a1", Some(part_at(frame?)?.to_string())),
         // A right click near an edge takes the IN or OUT nearest to it; at a join the whole cut.
         "select_marker" | "select_mark_in" if target.is_some_and(|id| id.starts_with("edge-")) => {
             let at = frame.or_else(|| edge_frame(view, target?))?;
@@ -64,8 +66,9 @@ pub fn own_action(view: &SubsegmentView, action_id: &str, value: Option<i64>, ta
 
 /// The mouse map's row actions the SubSegment takes; any other a row would send (an M marker,
 /// a Wrap zoom, a segment edit) is not the SubSegment's and goes nowhere.
-pub const ROW_ACTIONS: [&str; 18] = [
+pub const ROW_ACTIONS: [&str; 19] = [
     "timeline_cue_frame",
+    "select_level_a1",
     "segments_keep_edit",
     "timeline_select_slot",
     "timeline_select_cover",

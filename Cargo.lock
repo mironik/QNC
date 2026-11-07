@@ -6747,6 +6747,8 @@ dependencies = [
  "qnc-edit-verbs",
  "qnc-edit-words",
  "qnc-lane-choice",
+ "qnc-level-curve",
+ "qnc-program-db",
  "qnc-program-filmstrip",
  "qnc-program-view",
  "qnc-program-waveform",
@@ -6768,6 +6770,7 @@ dependencies = [
  "qnc-script",
  "qnc-segment-panel",
  "qnc-timeline",
+ "qnc-trim-overlay",
  "qnc-ui-kit",
  "qnc-ui-text",
 ]

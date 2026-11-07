@@ -122,6 +122,8 @@ pub fn show(ui: &mut egui::Ui, view: &SubsegmentView, theme: TimelineTheme, leng
     if let Some(part) = view.slide.and_then(|index| view.parts.get(index)) {
         trim.extend([(part.start, trim_label), (part.end.saturating_sub(1), trim_label)]);
     }
+    // The parts' level curves in the A1 band, as on a Wrap row (user 2026-11-07).
+    let level_curves = qnc_trim_overlay::timeline_level_curves(&view.level_curves, 0, duration, 0);
     // The parts' filmstrip on V1, as a Wrap row shows its segments (user 2026-10-29).
     let pictures: Vec<TimelinePicture<'_>> = view
         .pictures
@@ -164,9 +166,9 @@ pub fn show(ui: &mut egui::Ui, view: &SubsegmentView, theme: TimelineTheme, leng
                     wave_over_video: None,
                     trim_playheads: &trim,
                     a1_splits: &[],
-                    level_curves: &[],
+                    level_curves: &level_curves,
                     pictures: &pictures,
-                    holding: view.trim.is_some() || view.sound.is_some() || view.join_sound.is_some() || view.slide.is_some(),
+                    holding: view.trim.is_some() || view.sound.is_some() || view.join_sound.is_some() || view.slide.is_some() || view.level_curves.iter().any(|curve| curve.taken),
                 },
             )
         })

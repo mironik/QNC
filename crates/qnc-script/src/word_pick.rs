@@ -179,7 +179,7 @@ mod tests {
     use super::*;
 
     fn piece(from: u64, to: u64) -> Piece {
-        Piece { clip_id: "c".into(), clip_name: "c".into(), from_frame: from, to_frame: to, start_tc: String::new(), end_tc: String::new(), length: String::new(), seconds: 0.0, text: String::new(), gap_before: 0, cut: false, a1_channel: None, a1_level_db: 0, a1_off: false, a1_lead_frames: 0, a1_tail_frames: 0, v_lead_frames: 0, v_tail_frames: 0 }
+        Piece { clip_id: "c".into(), clip_name: "c".into(), from_frame: from, to_frame: to, start_tc: String::new(), end_tc: String::new(), length: String::new(), seconds: 0.0, text: String::new(), gap_before: 0, cut: false, a1_channel: None, a1_level_db: 0, a1_off: false, a1_lead_frames: 0, a1_tail_frames: 0, v_lead_frames: 0, v_tail_frames: 0, level_keys: Vec::new() }
     }
 
     #[test]

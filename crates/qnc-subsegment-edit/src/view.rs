@@ -60,6 +60,9 @@ pub struct SubsegmentView {
     /// Every chosen slot (several after a drag over their strips) and every slot whose A1 is
     /// changed with the taken one (user 2026-11-07).
     pub chosen_slots: Vec<usize>,
+    /// The level curves of the parts' A1 on the axis (the taken one as drafted; user 2026-11-07,
+    /// as a segment's on a Wrap row).
+    pub level_curves: Vec<qnc_program_view::LevelCurve>,
     /// The sound of the join before this part taken (Ctrl+1 on a taken cut) and which side moves.
     pub join_sound: Option<(usize, crate::JoinSide)>,
     /// The part taken whole as a slot (Ctrl+S), moved as drafted.
@@ -81,7 +84,7 @@ pub fn subsegment_view(block: &Block, playhead: Option<u64>) -> SubsegmentView {
             part
         })
         .collect();
-    SubsegmentView { block_id: block.id, parts, total_frames: start, playhead, a1: Vec::new(), pictures: Vec::new(), trim: None, zoom: None, sound: None, sound_choice: None, rate: None, roll: false, chosen: None, chosen_slots: Vec::new(), join_sound: None, slide: None }
+    SubsegmentView { block_id: block.id, parts, total_frames: start, playhead, a1: Vec::new(), pictures: Vec::new(), trim: None, zoom: None, sound: None, sound_choice: None, rate: None, roll: false, chosen: None, chosen_slots: Vec::new(), level_curves: Vec::new(), join_sound: None, slide: None }
 }
 
 /// Where the parts play on the SubSegment's axis, for its wave (channel 1 of each clip: the
@@ -99,7 +102,8 @@ pub fn subsegment_placements(view: &SubsegmentView, pieces: &[Piece]) -> Vec<qnc
             source_out: piece.to_frame,
             level_db: piece.a1_level_db,
             off: piece.a1_off,
-            curve: Vec::new(),
+            // The wave follows the part's level curve, as a segment's does.
+            curve: piece.level_keys.clone(),
         })
         .collect()
 }

@@ -8310,3 +8310,15 @@ razina i ukljucenost, svi se odmah cuju, Enter upisuje svaki (`sound_also`; svak
 izabran slot: samo on. Klik na traku bira opet jedan slot, klik izvan traka i Esc puste izbor. Test
 `a_drag_over_the_strips_chooses_the_slots_between`, `cargo check --workspace --all-targets`, conformance. Uzivo nije
 provjereno.
+Izvedeno 2026-11-07 (korisnik: "linija razine i AI pomocnik tona trebaju biti univerzalni bez obzira na formu";
+odluke: slozena izjava i source timeline, a AI u slozenoj izjavi izjednacuje govor dijelova; korak 1): krivulja razine
+A1 u slozenoj izjavi, isti alat kao na Wrap retku (`qnc-level-curve`). Dio pamti krivulju u scenariju
+(`qnc-script-db` `Piece.level_keys`, parovi slika klipa i desetinke dB, zapis kroz `set_piece`), program je pusta
+(`qnc-program-input` `PieceInput.level_keys` -> `a1_points`, `qnc-script-draft`), val je prati
+(`subsegment_placements`). Uredivanje (`qnc-subsegment-edit` `level.rs`): Ctrl+Shift+1 ili desni klik na liniju
+(`select_level_a1` u `ROW_ACTIONS`) uzima krivulju dijela (izabrani slot, inace dio u ruci), gore/dolje,
+Ctrl+strelice i Ctrl+kotacic tocka na liniji playheada za 1 dB, Delete brise tocku, svaki korak se odmah cuje,
+Enter upisuje, klik upisuje i stavlja playhead (krivulja ostaje uzeta, `LEVEL_KEEP_AT`), Esc odustaje. Crta je
+`qnc-subsegment-panel` istom funkcijom kao Wrap retke (`qnc_trim_overlay::timeline_level_curves`). Test
+`a_parts_level_curve_is_taken_and_raised_at_the_playhead_line`, testovi dotaknutih kocki, conformance. Uzivo nije
+provjereno.

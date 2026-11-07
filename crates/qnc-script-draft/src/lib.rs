@@ -42,6 +42,7 @@ pub fn piece_inputs(block: &Block) -> Vec<PieceInput> {
             sound_tail: if index == 0 { 0 } else { piece.a1_tail_frames },
             picture_lead: if index == 0 { 0 } else { piece.v_lead_frames },
             picture_tail: if index == 0 { 0 } else { piece.v_tail_frames },
+            level_keys: piece.level_keys,
         })
         .collect()
 }
@@ -95,6 +96,7 @@ pub fn draft_pieces(blocks: &[Block], voices: &[Voice], profile: &ScriptProfile,
                         sound_tail: 0,
                         picture_lead: 0,
                         picture_tail: 0,
+                        level_keys: Vec::new(),
                     });
                     pause = 0;
                 }

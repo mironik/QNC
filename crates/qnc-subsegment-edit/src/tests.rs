@@ -29,8 +29,33 @@ fn the_sound_of_a_join_moves_as_a_storys_cut() {
     assert_eq!(join(0, 0, JoinSide::Tail).moved(-100, room), join(0, -40, JoinSide::Tail));
 }
 
+/// The level curve of a part's A1 is a segment's (user 2026-11-07): taken on its part, the point
+/// on the playhead line goes up a dB per key at the clip frame playing there, the draft is heard
+/// and drawn, a click while it is taken keeps it and places the playhead.
+#[test]
+fn a_parts_level_curve_is_taken_and_raised_at_the_playhead_line() {
+    let pieces = vec![part("a", 100, 150, 0), part("b", 10, 60, 0)];
+    let block = Block::of_pieces("sot", pieces.clone());
+    let mut edit = SubsegmentEdit::default();
+    edit.open_subsegment = Some(block.id);
+    edit.view.subsegment = Some(subsegment_view(&block, Some(60)));
+    let preview = qnc_source_preview::SourcePreview::default();
+    assert_eq!(edit.level_key("select_level_a1", Some("1"), &block, &pieces, &preview), Some(true));
+    edit.level_key("step_prev_part", None, &block, &pieces, &preview);
+    edit.level_key("step_prev_part", None, &block, &pieces, &preview);
+    assert_eq!(edit.level_draft(), Some((1, vec![(20, 20)])), "part b plays its frame 20 at the playhead: +2 dB there");
+    let shown = edit.view.subsegment.clone().unwrap();
+    let curves = edit.level_curves(&shown, &pieces);
+    assert_eq!(curves.iter().map(|curve| (curve.id.as_str(), curve.taken)).collect::<Vec<_>>(), vec![("1", true)], "only the taken part draws a curve");
+    assert_eq!(edit.drafted(block.clone()).pieces[1].level_keys, vec![(20, 20)], "the draft is what plays");
+    edit.value = Some(80);
+    assert_eq!(edit.own("timeline_cue_frame", None), Some((crate::LEVEL_KEEP_AT.to_string(), Some("80".to_string()))), "a click keeps it and places the playhead");
+    assert_eq!(edit.level_key("clear_focus", None, &block, &pieces, &preview), Some(true));
+    assert!(!edit.level_taken(), "Esc gives it up");
+}
+
 fn part(clip: &str, from: u64, to: u64, gap: u64) -> Piece {
-    Piece { clip_id: clip.into(), clip_name: clip.into(), from_frame: from, to_frame: to, start_tc: String::new(), end_tc: String::new(), length: String::new(), seconds: 1.0, text: String::new(), gap_before: gap, cut: false, a1_channel: None, a1_level_db: 0, a1_off: false, a1_lead_frames: 0, a1_tail_frames: 0, v_lead_frames: 0, v_tail_frames: 0 }
+    Piece { clip_id: clip.into(), clip_name: clip.into(), from_frame: from, to_frame: to, start_tc: String::new(), end_tc: String::new(), length: String::new(), seconds: 1.0, text: String::new(), gap_before: gap, cut: false, a1_channel: None, a1_level_db: 0, a1_off: false, a1_lead_frames: 0, a1_tail_frames: 0, v_lead_frames: 0, v_tail_frames: 0, level_keys: Vec::new() }
 }
 
 #[test]

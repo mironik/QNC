@@ -157,12 +157,17 @@ pub struct Piece {
     pub v_lead_frames: u64,
     #[serde(default)]
     pub v_tail_frames: u64,
+    /// The level curve of the part's A1 (user 2026-11-07, as a segment's in a story): points
+    /// at frames of its clip (so it stays on its sound when the part is trimmed) and the level
+    /// there in tenths of a dB, added to the part's level. Empty: no curve.
+    #[serde(default)]
+    pub level_keys: Vec<(u64, i16)>,
 }
 
 impl Piece {
     /// The block's own range as its first part (a clip block that had one range).
     pub fn of(block: &Block) -> Self {
-        Self { clip_id: block.clip_id.clone(), clip_name: block.clip_name.clone(), from_frame: block.from_frame, to_frame: block.to_frame, start_tc: block.start_tc.clone(), end_tc: block.end_tc.clone(), length: block.length.clone(), seconds: block.seconds, text: block.text.clone(), gap_before: 0, cut: false, a1_channel: None, a1_level_db: 0, a1_off: false, a1_lead_frames: 0, a1_tail_frames: 0, v_lead_frames: 0, v_tail_frames: 0 }
+        Self { clip_id: block.clip_id.clone(), clip_name: block.clip_name.clone(), from_frame: block.from_frame, to_frame: block.to_frame, start_tc: block.start_tc.clone(), end_tc: block.end_tc.clone(), length: block.length.clone(), seconds: block.seconds, text: block.text.clone(), gap_before: 0, cut: false, a1_channel: None, a1_level_db: 0, a1_off: false, a1_lead_frames: 0, a1_tail_frames: 0, v_lead_frames: 0, v_tail_frames: 0, level_keys: Vec::new() }
     }
 }
 

@@ -12,4 +12,5 @@ qnc-program-view = { workspace = true }
 qnc-script = { workspace = true }
 qnc-segment-panel = { workspace = true }
 qnc-timeline = { workspace = true }
+qnc-trim-overlay = { workspace = true }
 qnc-ui-text = { workspace = true }

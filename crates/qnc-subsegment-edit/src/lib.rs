@@ -15,8 +15,10 @@ use qnc_db_broker::ProjectDbTarget;
 use qnc_script_db::{Block, Piece};
 use qnc_source_preview::SourcePreview;
 
+mod level;
 mod pointer;
 mod view;
+pub use level::LEVEL_KEEP_AT;
 pub use pointer::{drag_target, nearest_edge, own_action, ROW_ACTIONS};
 pub use view::*;
 
@@ -228,11 +230,13 @@ pub struct SubsegmentEdit {
     zoom_follow: qnc_program_view::ZoomFollow,
     /// The A1 of a part taken with Ctrl+1, as drafted.
     sound: Option<PartSound>,
+    /// The level curve of a part's A1 taken (Ctrl+Shift+1, a right click on its line), as drafted.
+    level: Option<qnc_level_curve::LevelLine>,
 }
 
 impl Default for SubsegmentEdit {
     fn default() -> Self {
-        Self { view: EditView::default(), blocks: Vec::new(), names: HashMap::new(), project: None, settled: true, writes: Vec::new(), open_subsegment: None, pieces_request: None, trim: None, chosen: None, chosen_to: None, sound_also: Vec::new(), join_sound: None, value: None, slide: None, slip_part: None, waves: qnc_program_waveform::ProgramWaves::new(), filmstrips: qnc_program_filmstrip::ProgramFilmstrips::new(), waves_project: None, trim_stills: qnc_trim_stills::TrimStills::new(), zoom_follow: Default::default(), sound: None }
+        Self { view: EditView::default(), blocks: Vec::new(), names: HashMap::new(), project: None, settled: true, writes: Vec::new(), open_subsegment: None, pieces_request: None, trim: None, chosen: None, chosen_to: None, sound_also: Vec::new(), join_sound: None, value: None, slide: None, slip_part: None, waves: qnc_program_waveform::ProgramWaves::new(), filmstrips: qnc_program_filmstrip::ProgramFilmstrips::new(), waves_project: None, trim_stills: qnc_trim_stills::TrimStills::new(), zoom_follow: Default::default(), sound: None, level: None }
     }
 }
 
@@ -370,7 +374,8 @@ impl SubsegmentEdit {
         });
         shown.roll = self.trim.is_some_and(|trim| trim.roll.is_some());
         shown.chosen = self.chosen.filter(|index| *index < shown.parts.len());
-        shown.chosen_slots = self.chosen_slots().into_iter().chain(self.sound.is_some().then(|| self.sound_also.clone()).unwrap_or_default()).filter(|index| *index < shown.parts.len()).collect();
+        shown.level_curves = self.level_curves(&shown, &pieces);
+        shown.chosen_slots =self.chosen_slots().into_iter().chain(self.sound.is_some().then(|| self.sound_also.clone()).unwrap_or_default()).filter(|index| *index < shown.parts.len()).collect();
         shown.join_sound = self.join_sound.map(|join| (join.index, join.side));
         shown.slide = self.slide.map(|(index, _)| index);
         shown.rate = pieces.first().and_then(|piece| names.get(&piece.clip_id)).filter(|(_, frames, seconds)| *seconds > 0.0 && *frames > 0).map(|(_, frames, seconds)| ((*frames as f64 / seconds).round() as u32, 1));
@@ -408,11 +413,21 @@ impl SubsegmentEdit {
         }
         if let Some(sound) = self.sound {
             // The taken slot and the other chosen ones are heard with the drafted sound.
+            // (The drafted level curve is applied below.)
             for index in std::iter::once(sound.index).chain(self.sound_also.iter().copied()) {
                 if let Some(piece) = block.pieces.get_mut(index) {
                     let count = self.waves.channels(&piece.clip_id).unwrap_or(2).max(1);
                     (piece.a1_channel, piece.a1_level_db, piece.a1_off) = (sound.channel.map(|channel| channel.min(count - 1)), sound.level_db, sound.off);
                 }
+            }
+        }
+        // The drafted level curve of the taken part (a statement of one range is its own part).
+        if let Some((index, keys)) = self.level_draft() {
+            if block.pieces.is_empty() {
+                block.pieces = vec![Piece::of(&block)];
+            }
+            if let Some(piece) = block.pieces.get_mut(index) {
+                piece.level_keys = keys;
             }
         }
         block
@@ -494,6 +509,9 @@ impl SubsegmentEdit {
         let block = self.block(self.open_subsegment)?.clone();
         let pieces = view::block_pieces(&block);
         let take = |index: usize, out: bool| pieces.get(index).map(|piece| Trim { index, out, from: piece.from_frame, to: piece.to_frame, roll: None });
+        if let Some(done) = self.level_key(action_id, target, &block, &pieces, preview) {
+            return Some(done);
+        }
         if let Some(done) = self.slip_key(action_id, &block, &pieces, preview) {
             return Some(done);
         }
@@ -696,6 +714,7 @@ impl SubsegmentEdit {
     fn open_as_subsegment(&mut self, block: &Block, at: u64) {
         self.open_subsegment = Some(block.id);
         (self.chosen, self.join_sound, self.trim, self.sound, self.slide, self.slip_part) = (None, None, None, None, None, None);
+        self.level = None;
         self.pieces_request = Some((view::piece_inputs(block), at));
         self.view.subsegment = Some(view::subsegment_view(block, None));
     }
@@ -1172,13 +1191,20 @@ impl SubsegmentEdit {
     /// What is taken is let go (the statement's text was cut, its parts may have moved).
     pub fn let_go(&mut self) {
         (self.trim, self.sound, self.chosen, self.join_sound, self.slide) = (None, None, None, None, None);
+        self.level = None;
     }
 
     /// A pointer on the SubSegment's timeline comes as the mouse map's row action (AGENTS 0.12):
     /// the SubSegment's own action of it, with the frame or part it points at.
     pub fn own(&self, action_id: &str, target: Option<&str>) -> Option<(String, Option<String>)> {
-        let holding = self.trim.is_some() || self.sound.is_some() || self.join_sound.is_some() || self.slide.is_some();
-        self.open_subsegment.and(self.view.subsegment.as_ref()).and_then(|view| own_action(view, action_id, self.value, target, holding))
+        let view = self.open_subsegment.and(self.view.subsegment.as_ref())?;
+        // A click while the level curve is taken writes it and places the playhead: the curve
+        // stays taken, the next point is there (as on a Wrap row).
+        if self.level_taken() && matches!(action_id, "timeline_cue_frame" | "segments_keep_edit") {
+            return Some((LEVEL_KEEP_AT.to_string(), self.value.map(|frame| frame.to_string())));
+        }
+        let holding = self.trim.is_some() || self.sound.is_some() || self.join_sound.is_some() || self.slide.is_some() || self.level_taken();
+        own_action(view, action_id, self.value, target, holding)
     }
 
     /// The keys of the open SubSegment (its trim, slide, slip, join and sound keys); `None` for
