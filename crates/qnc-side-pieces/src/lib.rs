@@ -131,6 +131,8 @@ impl SidePieces {
     pub fn act(&mut self, action_id: &str, value: Option<i64>, target: Option<&str>, preview: &mut SourcePreview, timeline: &TimelineProjection, timecode: Option<&SourceTimecode>) -> Option<bool> {
         if let Some(transcript) = &mut self.transcript {
             if let Some(done) = transcript.act(action_id, value, target, preview, timeline, timecode) {
+                // What the action changed (the search) is seen at once.
+                self.views.transcript = Arc::new(transcript.view().clone());
                 return Some(done);
             }
         }

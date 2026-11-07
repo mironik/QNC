@@ -182,7 +182,11 @@ pub fn show(ui: &mut egui::Ui, view: &SubsegmentView, theme: TimelineTheme, leng
     // The mouse map of a program's row (AGENTS 0.12, docs/97 step 2): the SubSegment's timeline
     // sends what a Wrap row sends; the script, the owner of its axis, says what it does.
     let axis = |frame: u64| frame;
-    let dragged = qnc_timeline::take_marker_drag_event(ui.ctx(), ROW_PANEL, &axis).map(|event| match event.target.clone() {
+    let dragged = match &intent {
+        qnc_timeline::TimelineIntent::DragMarker { .. } | qnc_timeline::TimelineIntent::DragCutEdge { .. } => qnc_timeline::event(&intent, ROW_PANEL, &axis),
+        _ => None,
+    }
+    .map(|event| match event.target.clone() {
         Some(id) if event.action_id == "timeline_drag_marker" => ActionEvent { target: Some(rolled(id)), ..event },
         _ => event,
     });

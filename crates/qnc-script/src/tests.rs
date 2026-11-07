@@ -119,3 +119,25 @@ fn a_subsegment_is_a_card_of_the_pool_with_its_first_clips_poster() {
     assert_eq!(qnc_clip_row::PoolItem::card_poster(&cards[0]).0, Some("qnc://poster"));
 }
 
+
+/// docs/99 step 4: the text of a statement's part edited before Enter is the script's (not egui
+/// memory): typed it is kept, Esc gives it back, and a draft of words said differently is gone.
+#[test]
+fn the_edited_text_of_a_statement_is_the_scripts_until_enter_or_esc() {
+    let mut statement = sot("Rekao je danas.");
+    statement.id = 4;
+    let word = |text: &str, from: u64| TimedWord { from, to: from + 10, text: text.into(), tc: String::new(), line: false, letters: Vec::new() };
+    let mut script = Script::new();
+    script.view.blocks = rows(&[statement], Some(&general_tv()), 2.5);
+    script.view.blocks[0].words = vec![vec![word("Rekao", 0), word("je", 10), word("danas.", 20)]];
+    let preview = SourcePreview::default();
+    let said = "Rekao je danas.";
+    assert_eq!(script.pick_key(TEXT_DRAFT, Some("4:0:Rekao danas."), &preview), Some(true));
+    assert_eq!(script.view.text_draft(4, 0, said), Some("Rekao danas."), "what is typed is kept");
+    assert_eq!(script.view.text_draft(4, 0, "Rekao je."), None, "words said differently: no draft");
+    script.pick_key(TEXT_DRAFT, Some(&format!("4:0:{said}")), &preview);
+    assert_eq!(script.view.text_draft(4, 0, said), None, "typed back as said: no draft");
+    script.pick_key(TEXT_DRAFT, Some("4:0:Rekao."), &preview);
+    script.pick_key(TEXT_REVERT, Some("4:0"), &preview);
+    assert_eq!(script.view.text_draft(4, 0, said), None, "Esc gives the text back");
+}

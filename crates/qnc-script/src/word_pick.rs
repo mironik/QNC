@@ -19,6 +19,11 @@ pub const WORD_TAKE: &str = "script_word_take";
 /// The edited text of a statement's part applied (user 2026-11-06: "what is deleted in the
 /// text is deleted in the sound"): `target` is `block:part:text`.
 pub const TEXT_CUT: &str = "script_text_cut";
+/// The text of a statement's part typed (`target` is `block:part:text`): the script keeps it
+/// as the draft until Enter or Esc (docs/99 step 4: not egui memory).
+pub const TEXT_DRAFT: &str = "script_text_draft";
+/// The edited text of a statement's part given back as said (Esc; `target` is `block:part`).
+pub const TEXT_REVERT: &str = "script_text_revert";
 
 /// Words picked in one part: clip frames `[from, to)` from the first word's start to the last
 /// one's end.
@@ -107,10 +112,29 @@ impl Script {
                     if done { Ok(None) } else { Err(qnc_ui_text::text(if undo { "script.nothing_to_undo" } else { "script.nothing_to_redo" }).to_string()) }
                 }))
             }
+            TEXT_DRAFT => {
+                let mut parts = target?.splitn(3, ':');
+                let (id, index) = (parts.next()?.parse::<i64>().ok()?, parts.next()?.parse::<usize>().ok()?);
+                let edited = parts.next().unwrap_or_default().to_string();
+                let said = crate::text_of(self.view.blocks.iter().find(|row| row.block.id == id).and_then(|row| row.words.get(index)).map_or(&[][..], Vec::as_slice));
+                if edited == said {
+                    self.view.text_drafts.remove(&(id, index));
+                } else {
+                    self.view.text_drafts.insert((id, index), (said, edited));
+                }
+                Some(true)
+            }
+            TEXT_REVERT => {
+                let mut parts = target?.splitn(2, ':');
+                let (id, index) = (parts.next()?.parse::<i64>().ok()?, parts.next()?.parse::<usize>().ok()?);
+                self.view.text_drafts.remove(&(id, index));
+                Some(true)
+            }
             TEXT_CUT => {
                 let mut parts = target?.splitn(3, ':');
                 let (id, index) = (parts.next()?.parse::<i64>().ok()?, parts.next()?.parse::<usize>().ok()?);
                 let edited = parts.next().unwrap_or_default().to_string();
+                self.view.text_drafts.remove(&(id, index));
                 (self.word_pick, self.view.picked) = (None, None);
                 Some(self.text_cut(id, index, &edited, preview))
             }

@@ -183,6 +183,9 @@ pub struct ScriptView {
     pub record_busy: bool,
     /// Field values typed and not yet in the script, by block and field code.
     pub field_drafts: BTreeMap<(i64, String), String>,
+    /// The text of a statement's part as the user edits it before Enter (docs/99 step 4: the
+    /// script holds it, not egui memory), by block and part: the text as said and as edited.
+    pub text_drafts: BTreeMap<(i64, usize), (String, String)>,
     /// The A/V script written last (its file), shown as a link.
     pub exported: Option<String>,
     /// An export is being written.
@@ -259,6 +262,12 @@ impl ScriptView {
     pub fn kind_of(&self, id: i64) -> Option<&KindSpec> {
         let block = self.blocks.iter().find(|row| row.block.id == id)?;
         self.profile.as_ref()?.kind(&block.block.kind)
+    }
+
+    /// The edited text of part `index` of block `id` while its words are still `said` (the
+    /// draft of a text that was said differently is gone).
+    pub fn text_draft(&self, id: i64, index: usize, said: &str) -> Option<&str> {
+        self.text_drafts.get(&(id, index)).filter(|(was, _)| was == said).map(|(_, edited)| edited.as_str())
     }
 
     /// The value of field `code` of block `id` as shown: the draft while it is typed, else the

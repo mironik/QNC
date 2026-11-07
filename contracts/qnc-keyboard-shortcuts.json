@@ -232,6 +232,9 @@
     "script_text_revert": {
       "label": "Uredeni tekst izjave vraca se kakav je bio (Esc)"
     },
+    "script_text_draft": {
+      "label": "Tekst izjave dok se ureduje: drzi ga scenarij do Entera ili Esc"
+    },
     "subsegment_join_gap": {
       "label": "Razmak prije dijela SubSegmenta (slika vise ili manje)"
     },
@@ -426,6 +429,9 @@
     },
     "transcript_search_next": {
       "label": "Sljedeći nađeni pojam u prijepisu"
+    },
+    "transcript_search_term": {
+      "label": "Pojam koji se trazi u prijepisu (drzi ga prijepis)"
     },
     "project_open_row": {
       "label": "Otvori projekt iz popisa"

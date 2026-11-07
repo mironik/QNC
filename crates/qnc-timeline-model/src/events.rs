@@ -41,6 +41,8 @@ pub fn event(intent: &TimelineIntent, panel: &str, frame: &dyn Fn(u64) -> u64) -
         TimelineIntent::TakeLevelLine { lane, frame: at } => (if a2(lane) { Pointer::RightClickLevelA2 } else { Pointer::RightClickLevelA1 }, Some(frame(*at)), None),
         // IN or OUT dragged: the clip's own frame, never mapped.
         TimelineIntent::DragMark { in_mark, frame: at } => (if *in_mark { Pointer::DragIn } else { Pointer::DragOut }, Some(*at), None),
+        TimelineIntent::DragMarker { id, frame: at } => (Pointer::DragMarker, Some(frame(*at)), Some(id)),
+        TimelineIntent::DragCutEdge { id, frame: at } => (Pointer::DragCutEdge, Some(frame(*at)), Some(id)),
         TimelineIntent::Cut => (Pointer::MiddleClick, None, None),
         TimelineIntent::CutAt(at) => (Pointer::DoubleClickFrame, Some(frame(*at)), None),
         TimelineIntent::Wheel(turn) => (

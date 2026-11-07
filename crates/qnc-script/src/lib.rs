@@ -34,7 +34,7 @@ mod read;
 mod view;
 mod text_edit;
 mod word_pick;
-pub use word_pick::{WordPick, TEXT_CUT, WORD_PICK, WORD_TAKE};
+pub use word_pick::{WordPick, TEXT_CUT, TEXT_DRAFT, TEXT_REVERT, WORD_PICK, WORD_TAKE};
 pub use text_edit::text_of;
 pub use qnc_subsegment_edit::{
     drag_target, nearest_edge, own_action, subsegment_pictures, subsegment_placements, subsegment_view, subsegment_zoom, JoinSide, JoinSound, SubsegmentPart, SubsegmentView, DRAG_EDGE, JOIN_CUT, JOIN_GAP, PART_CHANNEL, PART_LEVEL, PART_MOVE, PART_OFF, PART_REMOVE, ROW_ACTIONS, SLIP, SUBSEGMENT_CLOSE, SUBSEGMENT_CUE, SUBSEGMENT_SELECT, SUBSEGMENT_TAKE, TAKE_EDGE, ZOOM_WORD,

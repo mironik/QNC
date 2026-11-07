@@ -6,12 +6,13 @@
 use eframe::egui::{self, RichText, Sense};
 use qnc_action_event::ActionEvent;
 use qnc_source_timecode::SourceTimecode;
-use qnc_transcript::{Line, QueueQuality, QueueState, TranscriptView, CUE_WORD, CUT_WORD, OPEN_CLIP, PANEL};
+use qnc_transcript::{line_words, Line, QueueQuality, QueueState, TranscriptView, CUE_WORD, CUT_WORD, OPEN_CLIP, PANEL};
 
 mod quotes;
 mod search;
 
 pub use search::search_field;
+pub use qnc_transcript::SearchView;
 
 pub const MODULE_ID: &str = "qnc.module.transcript-panel";
 
@@ -56,8 +57,7 @@ fn paint(ui: &mut egui::Ui, view: &TranscriptView, theme: &qnc_desktop_theme::Th
     let found = if statements {
         None
     } else {
-        let words: Vec<(&str, u64, u64)> = view.lines.iter().flat_map(line_words).collect();
-        Some(search::shown(ui.ctx(), &words))
+        Some(search::shown(ui.ctx(), &view.search))
     };
     // New IN/OUT (a statement opened, a cut made): its text is brought into view once.
     let seen = egui::Id::new("qnc-transcript-panel-marks");
@@ -86,10 +86,6 @@ fn paint(ui: &mut egui::Ui, view: &TranscriptView, theme: &qnc_desktop_theme::Th
             paint_silence(ui, &at(*from), &at(*to), theme);
         }
     });
-    if let Some((from, to)) = found.as_ref().and_then(|found| found.cue) {
-        // Enter in the search field: the playhead to the next find.
-        asked = Some((from, to, false));
-    }
     asked.map(|(from, to, double)| match double {
         // A double click on a word is a cut there (user 2026-10-26); its first click cued it.
         true => ActionEvent::key(CUT_WORD).with_value(from).with_target(to.to_string()).at(PANEL),
@@ -237,14 +233,6 @@ fn paint_line(ui: &mut egui::Ui, line: &Line, view: &TranscriptView, ends: Optio
 }
 
 /// The words of a line with their frames (a line without words is one word).
-fn line_words(line: &Line) -> Vec<(&str, u64, u64)> {
-    if line.words.is_empty() {
-        vec![(line.text.as_str(), line.from, line.to)]
-    } else {
-        line.words.iter().map(|w| (w.text.as_str(), w.from, w.to.max(w.from + 1))).collect()
-    }
-}
-
 /// The first and the last word between IN and OUT, by the middle of the word.
 fn marked_ends(view: &TranscriptView) -> Option<((u64, u64), (u64, u64))> {
     let (a, b) = view.marks?;

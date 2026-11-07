@@ -286,7 +286,7 @@ pub fn paint_block(ui: &mut egui::Ui, row: &qnc_script::BlockRow, view: &ScriptV
                 // text edit: what is deleted in the text is deleted in the sound"): Enter cuts out
                 // what the text no longer says, Esc gives the text back; a click puts the playhead
                 // on the word clicked.
-                if let Some(event) = text_editor::show(ui, theme, (block.id, index), words, heard, (part_chosen, bring)) {
+                if let Some(event) = text_editor::show(ui, theme, (block.id, index), words, view.text_draft(block.id, index, &qnc_script::text_of(words)), heard, (part_chosen, bring)) {
                     asked = Some(event);
                 }
                 continue;

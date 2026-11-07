@@ -318,6 +318,12 @@ pub enum TimelineIntent {
     /// A left click over A2 on a side of the taken marker's sound (user 2026-10-29): that side
     /// (the nearer to `frame`) moves alone.
     TakeCutEdge { id: String, frame: u64 },
+    /// An M marker of a row dragged with the left button to `frame` of the row (a draft; the
+    /// owner moves nothing until it keeps it). Returned by the row, not passed through egui
+    /// memory (docs/99 step 4).
+    DragMarker { id: String, frame: u64 },
+    /// A side of the taken cut's sound dragged to `frame` of the row (user 2026-10-29).
+    DragCutEdge { id: String, frame: u64 },
     /// A cut (scissors) at the playhead of a source timeline: the middle mouse button, a
     /// touchpad's three-finger tap set to it, a two-finger tap on a touch screen (user
     /// 2026-10-18: two cuts mark IN and OUT, the earlier IN, the later OUT).

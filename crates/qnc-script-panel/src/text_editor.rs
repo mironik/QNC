@@ -7,26 +7,20 @@
 
 use eframe::egui::{self, text::LayoutJob, TextFormat};
 use qnc_action_event::ActionEvent;
-use qnc_script::{TimedWord, PANEL, TEXT_CUT, WORD_CUE};
+use qnc_script::{TimedWord, PANEL, TEXT_CUT, TEXT_DRAFT, TEXT_REVERT, WORD_CUE};
 
 /// The catalog's keys of the editor: Enter applies, Esc gives the text back.
 const SCOPE: &str = "script_text";
-const APPLY: &str = "script_text_cut";
-const REVERT: &str = "script_text_revert";
+const APPLY: &str = TEXT_CUT;
+const REVERT: &str = TEXT_REVERT;
 
 fn catalog() -> Option<&'static qnc_keyboard_shortcut::ShortcutCatalog> {
     static CATALOG: std::sync::OnceLock<Option<qnc_keyboard_shortcut::ShortcutCatalog>> = std::sync::OnceLock::new();
     CATALOG.get_or_init(|| qnc_keyboard_shortcut::ShortcutCatalog::from_json_str(include_str!("../../../contracts/qnc-keyboard-shortcuts.json")).ok()).as_ref()
 }
 
-/// The text as said and as edited (kept while the part's words stay the same).
-#[derive(Clone, Default)]
-struct Draft {
-    said: String,
-    edited: String,
-}
-
-/// The editor of part `index` of block `id`; `heard` the clip frame under the playhead (its word
+/// The editor of part `index` of block `id`; `drafted` the text as the user edits it, held by
+/// the script (docs/99 step 4: not egui memory); `heard` the clip frame under the playhead (its word
 /// lit while the text is as said), `chosen` the part is the open SubSegment's chosen slot and
 /// `bring` brings it into sight once.
 pub(crate) fn show(
@@ -34,12 +28,13 @@ pub(crate) fn show(
     theme: &qnc_desktop_theme::Theme,
     (id, index): (i64, usize),
     words: &[TimedWord],
+    drafted: Option<&str>,
     heard: Option<u64>,
     (chosen, bring): (bool, bool),
 ) -> Option<ActionEvent> {
     let said = qnc_script::text_of(words);
     let key = egui::Id::new(("qnc_script_text", id, index));
-    let mut draft = ui.ctx().data(|data| data.get_temp::<Draft>(key)).filter(|draft| draft.said == said).unwrap_or_else(|| Draft { said: said.clone(), edited: said.clone() });
+    let mut edited = drafted.unwrap_or(&said).to_string();
     // The words' places in the text, for the word under the playhead and the one clicked.
     let mut places = Vec::with_capacity(words.len());
     let mut at = 0;
@@ -50,7 +45,7 @@ pub(crate) fn show(
     }
     let lit = heard.and_then(|frame| words.iter().position(|word| (word.from..word.to.max(word.from + 1)).contains(&frame)));
     let font = egui::FontId::proportional(theme.font_ui + 1.0);
-    let as_said = draft.edited == said;
+    let as_said = edited == said;
     let (text_color, focus, surface, bg) = (theme.text, theme.focus, theme.surface_alt, theme.bg);
     let mut layouter = |ui: &egui::Ui, text: &str, width: f32| {
         let mut job = LayoutJob::default();
@@ -72,7 +67,8 @@ pub(crate) fn show(
     let has_focus = ui.ctx().memory(|memory| memory.has_focus(editor_id));
     let pressed = |action: &str| has_focus && catalog().is_some_and(|catalog| qnc_keyboard_shortcut::pressed_while_typing(ui.ctx(), catalog, SCOPE, action));
     let (apply, revert) = (pressed(APPLY), pressed(REVERT));
-    let output = qnc_ui_kit::text_area(&mut draft.edited)
+    let before = edited.clone();
+    let output = qnc_ui_kit::text_area(&mut edited)
         .id(editor_id)
         .desired_width(f32::INFINITY)
         .desired_rows(1)
@@ -85,10 +81,10 @@ pub(crate) fn show(
     }
     let mut asked = None;
     if revert {
-        draft.edited = said.clone();
-    } else if apply && draft.edited != said {
-        asked = Some(ActionEvent::key(TEXT_CUT).with_target(format!("{id}:{index}:{}", draft.edited)).at(PANEL));
-    } else if output.response.clicked() && draft.edited == said {
+        asked = Some(ActionEvent::key(TEXT_REVERT).with_target(format!("{id}:{index}")).at(PANEL));
+    } else if apply && edited != said {
+        asked = Some(ActionEvent::key(TEXT_CUT).with_target(format!("{id}:{index}:{}", edited)).at(PANEL));
+    } else if output.response.clicked() && edited == said {
         // A click on a word, the text as said: the playhead on it.
         let cursor = output.cursor_range.map(|range| range.primary.ccursor.index);
         let word = cursor.and_then(|at| places.iter().position(|(from, to)| (*from..=*to).contains(&at)));
@@ -96,11 +92,14 @@ pub(crate) fn show(
             asked = Some(ActionEvent::key(WORD_CUE).with_target(format!("{id}:{index}:{}:{}", word.from, word.to)).at(PANEL));
         }
     }
-    if draft.edited != said {
+    if edited != said {
         ui.label(egui::RichText::new(qnc_ui_text::text("script.text_edit_hint")).color(theme.text_muted).size(theme.font_ui - 1.0));
     } else if output.response.hovered() {
         output.response.on_hover_text(qnc_ui_text::text("script.word_hint"));
     }
-    ui.ctx().data_mut(|data| data.insert_temp(key, draft));
+    // What was typed goes to the script, which keeps it until Enter or Esc.
+    if asked.is_none() && edited != before {
+        asked = Some(ActionEvent::key(TEXT_DRAFT).with_target(format!("{id}:{index}:{edited}")).at(PANEL));
+    }
     asked
 }

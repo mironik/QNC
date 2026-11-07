@@ -64,7 +64,7 @@ pub fn show(ui: &mut egui::Ui, kind: &str, theme: &qnc_desktop_theme::Theme, sho
         VIDEO_AI_PANEL => (qnc_shot_panel::show(ui, shown.shots, theme, shown.timecode, shown.cover_lengths), false),
         SCRIPT_PANEL => (qnc_script_panel::show(ui, shown.script, shown.transcript, theme), false),
         SCRIPT_WRITER_PANEL => (qnc_script_writer_panel::show(ui, shown.script, theme), false),
-        SCRIPT_CLIP_BAR => (qnc_script_writer_panel::show_clip_bar(ui, shown.script, theme), false),
+        SCRIPT_CLIP_BAR => (qnc_script_writer_panel::show_clip_bar(ui, shown.script, &shown.transcript.search, theme), false),
         _ => (None, false),
     }
 }

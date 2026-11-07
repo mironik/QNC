@@ -8258,3 +8258,21 @@ korisnik) premjesteno iz gui-kita u `qnc-location-field`, s testovima. Conforman
 `qnc-location-field`, a pravilo preglednika Project ploce trazi `qnc_location_field_view::show_browser`. Ponasanje isto.
 C14 4 -> 0. Testovi, `cargo check --workspace --all-targets`, conformance. Uzivo nije provjereno. Project je ponovno
 zamrznut.
+Izvedeno 2026-11-07 (korisnik: "da, pushaj i kreni s korakom 4"; docs/99 korak 4): stanje rada iz egui memorije
+vlasnicima. (1) Povlacenje M markera i strane J/L tona: `qnc-timeline` ga vraca kao svoju namjeru
+(`qnc-timeline-model` `TimelineIntent::DragMarker`, `DragCutEdge`, radnje mape misa `drag_marker`, `drag_cut_edge`;
+zlatna tablica pravila 0.12 dobila je povlacenje J/L linije); skriveni kanal kroz egui kontekst
+(`take_marker_drag`, `take_cut_edge_drag`, `take_marker_drag_event`) uklonjen, `qnc-segment-panel` i
+`qnc-subsegment-panel` uzimaju namjeru reda. (2) Nacrt teksta izjave prije Entera drzi `qnc-script`
+(`ScriptView.text_drafts`, `text_draft`; radnje kataloga bez tipke `script_text_draft`, Esc `script_text_revert`
+sada ide scenariju); `qnc-script-panel` pokazuje nacrt i salje sto je natipkano; nacrt rijeci izgovorenih drukcije
+nestaje. (3) Pojam pretrage prijepisa i trenutni nalaz drzi `qnc-transcript` (`search.rs`, `SearchView`,
+`TranscriptView.search`; nalazi se racunaju iznova kad se redci promijene; radnja `transcript_search_term`, a
+`transcript_search_next` (Enter) sama stavlja playhead na sljedeci nalaz); polje pretrage (`qnc-transcript-panel`
+`search_field`) i traka "Dodaj u pricu" (`qnc-script-writer-panel` `show_clip_bar`) dobivaju `SearchView`;
+`qnc-side-pieces` osvjezava prikaz prijepisa odmah nakon njegove radnje. U egui memoriji ostaje izbor prikaza
+(tabovi, otvoren prozor, skrol jednom do nalaza ili oznake) i stanje geste. Testovi
+`the_edited_text_of_a_statement_is_the_scripts_until_enter_or_esc`,
+`the_term_is_the_transcripts_and_enter_goes_round_its_finds`, testovi dotaknutih kocki (i zlatna tablica tipki),
+`cargo check --workspace --all-targets`, conformance. Debug cache obrisan (`cargo clean --profile dev`, 31,4 GiB;
+disk je bio pun). Uzivo nije provjereno.

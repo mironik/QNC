@@ -20,6 +20,8 @@ use qnc_timeline_model::TimelineProjection;
 use qnc_transcribe_queue::{Heard, Progress, QueueRunner, Queued};
 pub use qnc_transcribe_queue::{QueueQuality, QueueState};
 pub use qnc_transcript_db::{ClipTranscript, Line, Quote, Word};
+mod search;
+pub use search::{finds, line_words, SearchView, SEARCH_NEXT, SEARCH_TERM};
 use qnc_source_timecode::SourceTimecode;
 
 pub const MODULE_ID: &str = "qnc.module.transcript";
@@ -106,6 +108,8 @@ pub struct TranscriptView {
     pub transcribed: Arc<BTreeSet<String>>,
     /// True on the poll the whole queue asked was transcribed: the Transcript tab opens.
     pub all_done: bool,
+    /// The term searched in the lines and the find that is current (docs/99 step 4).
+    pub search: SearchView,
 }
 
 impl TranscriptView {
@@ -249,6 +253,15 @@ impl Transcript {
             })),
             DELETE_QUOTE => Some(target.and_then(|id| id.parse::<i64>().ok()).is_some_and(|id| self.write(preview, move |target| qnc_transcript_db::delete_quote(target, id)))),
             TRANSCRIBE => Some(self.start(preview, timeline)),
+            SEARCH_TERM => {
+                let lines = Arc::clone(&self.view.lines);
+                self.view.search.set_term(target.unwrap_or_default(), &lines);
+                Some(true)
+            }
+            SEARCH_NEXT => {
+                let lines = Arc::clone(&self.view.lines);
+                Some(self.view.search.next(&lines).is_some_and(|(from, _)| preview.cue(from)))
+            }
             FAST | BEST => {
                 self.quality = if action_id == FAST { QueueQuality::Fast } else { QueueQuality::Best };
                 Some(true)
@@ -391,6 +404,7 @@ impl Transcript {
         }
         self.built = Some(key);
         self.view.lines = Arc::new(lines(kept, running.map(|run| (run.range, run.lines.as_slice()))));
+        self.view.search.found(&self.view.lines);
         let fps = clip_id.as_ref().and_then(|clip| self.names.get(clip)).and_then(|(_, frames, seconds)| (*seconds > 0.0).then(|| *frames as f64 / seconds));
         self.view.silences = Arc::new(fps.map_or_else(Vec::new, |fps| {
             let mut heard: Vec<(u64, u64)> = kept.iter().map(|t| (t.from_frame, t.to_frame)).collect();

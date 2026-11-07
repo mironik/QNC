@@ -257,7 +257,7 @@ fn clip_row(ui: &mut Ui, kind: &KindSpec, view: &ScriptView, theme: &qnc_desktop
 /// The bar in the media window (user 2026-11-02: "Dodaj u priču" belongs where the IN-OUT is
 /// marked): a button per clip kind of the profile, the kind opened by its story button strong.
 /// Adding closes the media window and the kind, back to the script.
-pub fn show_clip_bar(ui: &mut Ui, view: &ScriptView, theme: &qnc_desktop_theme::Theme) -> Option<ActionEvent> {
+pub fn show_clip_bar(ui: &mut Ui, view: &ScriptView, search: &qnc_transcript_panel::SearchView, theme: &qnc_desktop_theme::Theme) -> Option<ActionEvent> {
     let rect = ui.available_rect_before_wrap();
     ui.painter().rect_filled(rect, 0.0, theme.surface);
     let style = qnc_ui_kit::ChromeButtonStyle { text: theme.text, border: theme.border, focus: theme.focus, height: theme.chrome_control_height };
@@ -265,7 +265,7 @@ pub fn show_clip_bar(ui: &mut Ui, view: &ScriptView, theme: &qnc_desktop_theme::
     let mut asked = None;
     let mut bar = ui.new_child(UiBuilder::new().max_rect(rect.shrink2(Vec2::new(12.0, 0.0))).layout(Layout::left_to_right(Align::Center)));
     // The search of the transcript above (user 2026-11-05: "Potraži: and a field").
-    qnc_transcript_panel::search_field(&mut bar, theme);
+    let searched = qnc_transcript_panel::search_field(&mut bar, search, theme);
     bar.with_layout(Layout::right_to_left(Align::Center), |ui| {
         ui.spacing_mut().item_spacing.x = STORY_GAP;
         for kind in view.profile.iter().flat_map(|profile| &profile.kinds).filter(|kind| kind.role == Role::Clip).collect::<Vec<_>>().into_iter().rev() {
@@ -286,7 +286,7 @@ pub fn show_clip_bar(ui: &mut Ui, view: &ScriptView, theme: &qnc_desktop_theme::
         qnc_media_overlay::set_open(ui.ctx(), false);
     }
     ui.allocate_rect(rect, Sense::hover());
-    asked
+    asked.or(searched)
 }
 
 /// The mark the next block of `kind` gets: its numbered cue (`OFF 3`) or its short mark.

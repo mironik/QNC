@@ -5,24 +5,8 @@
 //! cover) the pointer gives. Frames are the row's own; `frame` maps them where the row stands
 //! (a Wrap row's program frames).
 
-use qnc_action_event::ActionEvent;
-use qnc_mouse_map::Pointer;
-
-#[allow(unused_imports)]
+#[cfg(test)]
 use crate::{event, AudioLane, TimelineIntent};
-
-/// The M marker dragged on a row this frame, as the action of the mouse map (`drag_marker`)
-/// with the marker and the frame it is dragged to (`frame` maps the row's frame).
-pub fn take_marker_drag_event(ctx: &eframe::egui::Context, panel: &str, frame: &dyn Fn(u64) -> u64) -> Option<ActionEvent> {
-    // A side of the taken cut's sound dragged (user 2026-10-29).
-    if let Some((marker_id, at)) = crate::take_cut_edge_drag(ctx) {
-        let action = qnc_mouse_map::action(panel, Pointer::DragCutEdge)?;
-        return Some(ActionEvent::key(action).with_target(marker_id).with_value(frame(at)).at(panel));
-    }
-    let (marker_id, at) = crate::take_marker_drag(ctx)?;
-    let action = qnc_mouse_map::action(panel, Pointer::DragMarker)?;
-    Some(ActionEvent::key(action).with_target(marker_id).with_value(frame(at)).at(panel))
-}
 
 #[cfg(test)]
 mod tests {
@@ -64,7 +48,7 @@ mod tests {
         use qnc_edit_verbs::{Lane, Verb};
         let row = |frame: u64| 100 + frame;
         let cut = || "m1".to_string();
-        let golden: [(TimelineIntent, &str, Verb, &str); 11] = [
+        let golden: [(TimelineIntent, &str, Verb, &str); 12] = [
             (TimelineIntent::LaneLabel { lane: AudioLane::A1, frame: Some(5) }, "segments", Verb::TakeLane { lane: Lane::A1, frame: Some(105) }, "the A1 label on a program row: the sound at the playhead (zoom: its A1 label)"),
             (TimelineIntent::LaneLabel { lane: AudioLane::A2, frame: None }, "source_timeline", Verb::TakeLane { lane: Lane::A2, frame: None }, "the A2 label on a source timeline: its lane (zoom: its A2 label)"),
             (TimelineIntent::ChooseA1Channel(2), "source_timeline", Verb::PickChannel { lane: Lane::A1, channel: 2 }, "a channel of the taken lane's column (zoom: the same column)"),
@@ -76,15 +60,12 @@ mod tests {
             (TimelineIntent::TakeMarkerPicture { id: cut() }, "segments", Verb::TakePicture { cut: cut() }, "a second right click on the taken cut's picture (zoom: V)"),
             (TimelineIntent::TakeMarkerSound { id: cut() }, "segments", Verb::TakeSound { cut: cut(), lane: Lane::A2 }, "a right click on the taken cut's A2 (zoom: A2, a right click on its lane)"),
             (TimelineIntent::TakeCutEdge { id: cut(), frame: 3 }, "segments", Verb::TakeSoundSide { cut: cut(), frame: 103 }, "a click on a J/L line (zoom: the same line)"),
+            (TimelineIntent::DragCutEdge { id: cut(), frame: 4 }, "segments", Verb::DragSoundSide { cut: cut(), frame: 104 }, "dragging a J/L line (the row returns it, docs/99 step 4)"),
         ];
         for (intent, panel, verb, why) in golden {
             let sent = event(&intent, panel, &row).unwrap_or_else(|| panic!("{why}: nothing sent"));
             assert_eq!(qnc_edit_verbs::Verb::of(&sent), Some(verb.clone()), "{why}");
             assert_eq!(sent.at.as_deref(), Some(panel), "{why}: on the owner's panel");
         }
-        // The drag of a J/L line is the zoom's DragSoundSide (the drag goes through egui memory
-        // on the timeline, so its action is checked against the map directly).
-        let drag = qnc_mouse_map::action("segments", qnc_mouse_map::Pointer::DragCutEdge);
-        assert_eq!(drag.as_deref(), Some(qnc_edit_verbs::DRAG_SOUND_SIDE), "dragging a J/L line");
     }
 }

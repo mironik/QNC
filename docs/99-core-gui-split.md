@@ -152,3 +152,12 @@ zapis u AGENTS.md. Koraci 1-3 ne mijenjaju ponasanje.
   `event`, `ChannelChoice` i opseg tipki source timelinea u core kockama. C14: 11 -> 0, nijedna logicka kocka ne
   povlaci egui. Ostaje `qnc-keyboard-shortcut` (katalog i pretvorba egui dogadaja u istoj kocki; nijedna logicka
   kocka ga danas ne treba) i korak 4.
+- Korak 4 (2026-11-07): stanje rada iz egui memorije vlasnicima. (1) Povlacenje M markera i strane J/L:
+  `qnc-timeline` ga vraca kao svoju namjeru (`TimelineIntent::DragMarker`, `DragCutEdge` u
+  `qnc-timeline-model`, radnje mape misa `drag_marker`, `drag_cut_edge`); kanal kroz egui kontekst
+  (`take_marker_drag`, `take_cut_edge_drag`, `take_marker_drag_event`) uklonjen. (2) Nacrt teksta izjave drzi
+  `qnc-script` (`ScriptView.text_drafts`, `text_draft`; radnje `script_text_draft`, `script_text_revert`), panel
+  ga samo pokazuje i salje sto je natipkano. (3) Pojam pretrage prijepisa i trenutni nalaz drzi `qnc-transcript`
+  (`SearchView`, `search.rs`; radnje `transcript_search_term`, `transcript_search_next`: Enter stavlja playhead
+  na sljedeci nalaz u samoj kocki). U egui memoriji ostaje izbor prikaza (tabovi, otvoren prozor, skrol jednom
+  do nalaza ili oznake) i stanje geste (je li povlacenje u tijeku).

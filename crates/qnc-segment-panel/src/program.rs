@@ -238,5 +238,5 @@ pub(crate) fn paint_program(
     // `qnc-mouse-map`, contracts/input/mouse.json; user rule 2026-10-20): the panel decides
     // no click itself.
     let row_frame = |frame: u64| start + frame.min(duration);
-    qnc_timeline::take_marker_drag_event(ui.ctx(), PANEL, &row_frame).or_else(|| qnc_timeline::event(&intent, PANEL, &row_frame))
+    qnc_timeline::event(&intent, PANEL, &row_frame)
 }

@@ -11,7 +11,6 @@ pub use qnc_channel_picker::ChannelChoice;
 mod events;
 mod marker_reach;
 use marker_reach::{marker_for_right_click, marker_to_drag, source_mark_in_reach, taken_marker_for_right_click};
-pub use events::take_marker_drag_event;
 mod lanes;
 mod level_lines;
 pub use level_lines::{level_curve_hit, paint_level_curves, TimelineLevelCurve};
@@ -2199,11 +2198,12 @@ const MARKER_DRAG: &str = "qnc_timeline_marker_drag";
 
 /// A drag that started on an M marker of a row with markers (Story segment rows,
 /// never the source timeline): the marker follows the pointer as a draft. The
-/// timeline only reports it (`take_marker_drag`); it moves nothing and writes
-/// nothing. Returns whether such a drag runs, so the row does not scrub.
-fn track_marker_drag(response: &egui::Response, track: Rect, input: &TimelineInput<'_>) -> bool {
+/// timeline only reports it, as its intent (`DragMarker`, `DragCutEdge`; docs/99 step 4: no
+/// channel through egui memory); it moves nothing and writes nothing. `None` while no such
+/// drag runs; `Some` while one runs (the row does not scrub), with the frame it reached.
+fn track_marker_drag(response: &egui::Response, track: Rect, input: &TimelineInput<'_>) -> Option<TimelineIntent> {
     if !(input.layers.covers && input.layers.markers) {
-        return false;
+        return None;
     }
     let (ctx, start, duration) = (
         &response.ctx,
@@ -2234,9 +2234,8 @@ fn track_marker_drag(response: &egui::Response, track: Rect, input: &TimelineInp
             None => d.remove::<String>(active),
         });
     }
-    let Some(id) = ctx.data(|d| d.get_temp::<String>(active)) else {
-        return false;
-    };
+    let id = ctx.data(|d| d.get_temp::<String>(active))?;
+    let mut intent = TimelineIntent::None;
     if let Some(pos) = response
         .interact_pointer_pos()
         .filter(|_| response.dragged())
@@ -2244,27 +2243,12 @@ fn track_marker_drag(response: &egui::Response, track: Rect, input: &TimelineInp
         // Snapping (`qnc-snap`): a dragged marker or side sticks to a cut, marker or the playhead.
         let frame = qnc_snap::snapped(frame_for_x(track, start, duration, pos.x), snap_targets(input, Some(&id)), qnc_snap::reach_frames(track.width(), duration));
         let edge = ctx.data(|d| d.get_temp::<bool>(active.with("cut_edge"))).unwrap_or(false);
-        let key = if edge { CUT_EDGE_DRAG } else { MARKER_DRAG };
-        ctx.data_mut(|d| d.insert_temp(egui::Id::new(key), (id, frame)));
+        intent = if edge { TimelineIntent::DragCutEdge { id, frame } } else { TimelineIntent::DragMarker { id, frame } };
     }
     if response.drag_stopped() {
         ctx.data_mut(|d| d.remove::<String>(active));
     }
-    true
-}
-
-/// The marker a drag moved during the last painted row: its id and the frame on
-/// that row (`None` when no marker is dragged). Read right after the row.
-pub fn take_marker_drag(ctx: &egui::Context) -> Option<(String, u64)> {
-    ctx.data_mut(|d| d.remove_temp::<(String, u64)>(egui::Id::new(MARKER_DRAG)))
-}
-
-const CUT_EDGE_DRAG: &str = "qnc_timeline_cut_edge_drag";
-
-/// A side of a taken cut's A2 sound a drag moved during the last painted row (user
-/// 2026-10-29): the marker and the frame on that row.
-pub fn take_cut_edge_drag(ctx: &egui::Context) -> Option<(String, u64)> {
-    ctx.data_mut(|d| d.remove_temp::<(String, u64)>(egui::Id::new(CUT_EDGE_DRAG)))
+    Some(intent)
 }
 
 fn video_intent_from_response(
@@ -2272,8 +2256,8 @@ fn video_intent_from_response(
     track: Rect,
     input: &TimelineInput<'_>,
 ) -> TimelineIntent {
-    if track_marker_drag(response, track, input) {
-        return TimelineIntent::None;
+    if let Some(drag) = track_marker_drag(response, track, input) {
+        return drag;
     }
     if let Some(drag) = mark_drag_intent(response, track, input) {
         return drag;
