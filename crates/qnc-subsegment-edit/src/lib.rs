@@ -350,6 +350,14 @@ impl SubsegmentEdit {
             Box::new(zoom)
         });
         shown.sound = self.sound.map(|sound| sound.index);
+        // The column of the taken A1 on the timeline, as on the source timeline (AGENTS 0.12):
+        // the drafted channel among its clip's channels, the wave already drawn at the stored level.
+        shown.sound_choice = self.sound.and_then(|sound| {
+            let piece = pieces.get(sound.index)?;
+            let count = self.waves.channels(&piece.clip_id).unwrap_or(2).max(1);
+            let now = qnc_lane_choice::Lane { channel: sound.channel.unwrap_or(0), off: sound.off, level_db: sound.level_db };
+            Some(qnc_lane_choice::drafted_choice(now, count, true, piece.a1_level_db))
+        });
         shown.roll = self.trim.is_some_and(|trim| trim.roll.is_some());
         shown.chosen = self.chosen.filter(|index| *index < shown.parts.len());
         shown.join_sound = self.join_sound.map(|join| (join.index, join.side));

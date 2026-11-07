@@ -159,7 +159,7 @@ pub fn show(ui: &mut egui::Ui, view: &SubsegmentView, theme: TimelineTheme, leng
                     base_video_blank: false,
                     filmstrip_background: None,
                     video_background: None,
-                    a1_channel: None,
+                    a1_channel: view.sound_choice,
                     a2_channel: None,
                     wave_over_video: None,
                     trim_playheads: &trim,

@@ -47,6 +47,9 @@ pub struct SubsegmentView {
     pub zoom: Option<Box<qnc_program_view::SegmentsView>>,
     /// The part whose A1 is taken (Ctrl+1), as drafted.
     pub sound: Option<usize>,
+    /// The channel column and level of the taken A1 (as the source timeline shows its lane,
+    /// AGENTS 0.12): drafted, open while it is taken.
+    pub sound_choice: Option<qnc_lane_choice::ChannelChoice>,
     /// The frame rate of the parts (of the first part's clip), once known: a part's length in
     /// seconds and its colour as a cover's (user 2026-11-03).
     pub rate: Option<(u32, u32)>,
@@ -75,7 +78,7 @@ pub fn subsegment_view(block: &Block, playhead: Option<u64>) -> SubsegmentView {
             part
         })
         .collect();
-    SubsegmentView { block_id: block.id, parts, total_frames: start, playhead, a1: Vec::new(), pictures: Vec::new(), trim: None, zoom: None, sound: None, rate: None, roll: false, chosen: None, join_sound: None, slide: None }
+    SubsegmentView { block_id: block.id, parts, total_frames: start, playhead, a1: Vec::new(), pictures: Vec::new(), trim: None, zoom: None, sound: None, sound_choice: None, rate: None, roll: false, chosen: None, join_sound: None, slide: None }
 }
 
 /// Where the parts play on the SubSegment's axis, for its wave (channel 1 of each clip: the

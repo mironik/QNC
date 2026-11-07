@@ -32,8 +32,13 @@ pub fn own_action(view: &SubsegmentView, action_id: &str, value: Option<i64>, ta
             own(TAKE_EDGE, Some(format!("{index}:{}:slot", if out { "out" } else { "in" })))
         }
         // A right click on A1 (or a click on its label): the sound of the part there, as Ctrl+1.
-        // (Only a pointer gives a frame: Ctrl+1 has none and stays the part in hand.)
-        "select_audio_a1" if target.is_none_or(|target| target.parse::<usize>().is_err()) => own("select_audio_a1", Some(part_at(frame?)?.to_string())),
+        // (Only a pointer gives a frame: Ctrl+1 has none and stays the part in hand.) A slot chosen
+        // on the timeline is the one the sound is of (user 2026-11-07: "the slot is selected on
+        // the timeline, so the change of channel is its").
+        "select_audio_a1" if target.is_none_or(|target| target.parse::<usize>().is_err()) => {
+            let index = view.chosen.filter(|index| *index < view.parts.len()).or_else(|| frame.and_then(part_at))?;
+            own("select_audio_a1", Some(index.to_string()))
+        }
         // A right click near an edge takes the IN or OUT nearest to it; at a join the whole cut.
         "select_marker" | "select_mark_in" if target.is_some_and(|id| id.starts_with("edge-")) => {
             let at = frame.or_else(|| edge_frame(view, target?))?;
@@ -52,7 +57,7 @@ pub fn own_action(view: &SubsegmentView, action_id: &str, value: Option<i64>, ta
 
 /// The mouse map's row actions the SubSegment takes; any other a row would send (an M marker,
 /// a Wrap zoom, a segment edit) is not the SubSegment's and goes nowhere.
-pub const ROW_ACTIONS: [&str; 16] = [
+pub const ROW_ACTIONS: [&str; 17] = [
     "timeline_cue_frame",
     "segments_keep_edit",
     "timeline_select_slot",
@@ -60,6 +65,7 @@ pub const ROW_ACTIONS: [&str; 16] = [
     "select_current_marker_slot",
     "timeline_take_cover",
     "select_audio_a1",
+    "source_choose_a1_channel",
     "select_marker",
     "select_mark_in",
     "timeline_drag_marker",
@@ -160,5 +166,15 @@ mod tests {
         assert_eq!(own("select_marker", Some(140), Some("edge-2-out"), false), some(TAKE_EDGE, Some("2:out")));
         assert_eq!(own("timeline_drag_marker", Some(120), Some("edge-2-out"), true), some(DRAG_EDGE, Some("2:out:120")), "a drag of the taken edge");
         assert_eq!(own("export_open", None, None, false), None, "not a pointer action");
+    }
+
+    /// A slot chosen on the timeline is the one A1 is taken of, wherever the click or playhead is
+    /// (user 2026-11-07).
+    #[test]
+    fn a1_is_taken_of_the_chosen_slot() {
+        let mut view = view();
+        view.chosen = Some(0);
+        let taken = own_action(&view, "select_audio_a1", Some(100), None, false).map(|(action, target)| (action, target));
+        assert_eq!(taken, Some(("select_audio_a1".to_string(), Some("0".to_string()))));
     }
 }

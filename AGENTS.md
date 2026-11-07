@@ -8286,3 +8286,16 @@ okvira), `ui-frame-slow` ih pise (`qnc-desktop`), a nemjereni dio polla Story/MA
 isti. Testovi `qnc-dev-diagnostics` (novi `a_frame_gives_its_blocks_once`), `qnc-desktop` (jedan test jednom pao na
 brisanju privremene mape, 4 ponavljanja prolaze), conformance, release build `qnc-app` s libav. Odluka o niti nakon
 zive sesije s novim zapisom.
+Popravak 2026-11-07 (korisnik: "kliknuo sam A1, nista se ne dogada, na slozenoj izjavi"; "ne vidim liniju za
+podesavanje nivoa"; "bitno je da se selektira slot u timeline, tako da se promjena kanala odnosi na njega"): log je
+pokazao da klik na A1 u slozenoj izjavi uzima A1 dijela (`subsegment-key select_audio_a1`), ali timeline slozene
+izjave nikad nije dobio stupac kanala ni razinu uz oznaku A1 (izbor je bio samo u retku dijela ispod timelinea, koji
+u prozoru medija MA Scripta nije vidljiv). Usporedba sa stanjem prije odvajanja logike od crtanja (`872b83cb`):
+source timeline, mapa misa, `lane_choice`/`ChannelChoice` i boje teme samo su premjesteni, bez promjene. Sada dok je
+A1 dijela uzet timeline slozene izjave pokazuje stupac kanala i razinu kao source timeline (`qnc-subsegment-edit`
+`SubsegmentView.sound_choice` kroz `qnc_lane_choice::drafted_choice`, `qnc-subsegment-panel` ga predaje kao
+`a1_channel`), a klik na kanal u stupcu ide dijelu (`source_choose_a1_channel` u `ROW_ACTIONS`). Kad je slot izabran
+(klik na traku trajanja), A1 (klik na oznaku, desni klik na A1) uzima zvuk tog slota, ne dijela pod playheadom
+(`pointer.rs`, test `a1_is_taken_of_the_chosen_slot`). Nije izvedeno: izbor vise slotova odjednom (trazi novu gestu
+u zakljucanoj mapi misa), krivulja razine i pomocnik tona u slozenoj izjavi (nikad nisu bili izvedeni). Testovi
+`qnc-subsegment-edit`, `qnc-subsegment-panel`, `qnc-script`, `qnc-panel-focus`, conformance. Uzivo nije provjereno.
