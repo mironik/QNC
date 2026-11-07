@@ -302,6 +302,7 @@ members = [
     "crates/qnc-part-sound",
     "crates/qnc-level-curve",
     "crates/qnc-sound-assist",
+    "crates/qnc-frame-interp",
     "crates/qnc-wheel-jog",
     "crates/qnc-source-panel",
     "crates/qnc-source-timeline",

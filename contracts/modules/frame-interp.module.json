@@ -1,0 +1,20 @@
+{
+  "module_id": "qnc.module.frame-interp",
+  "module_name": "Frame interpolation (smooth cut)",
+  "module_version": "0.1.0",
+  "module_kind": "library",
+  "capabilities": ["picture.cut.smooth"],
+  "input_contract_version": "0.1.0",
+  "output_contract_version": "0.1.0",
+  "supported_os": ["windows", "linux", "macos"],
+  "supported_cpu": ["x86_64", "aarch64"],
+  "transport_protocol_version": "0.1.0",
+  "forbidden_calls": ["ffprobe", "media.decode", "database.read", "database.write", "player.command", "business.workflow"],
+  "forbidden_dependencies": ["qnc.module.media-probe", "qnc.module.content-store"],
+  "state_policy": "stateless",
+  "database_write_policy": "no_db_writes",
+  "runtime_crate": "qnc-frame-interp",
+  "input": "The picture before a smooth cut and the picture after it (PNG files of the same size), how many pictures go between them, the program that runs the model and the model's folder (this computer's, given by the caller).",
+  "output": "The pictures between them (PNG) in the folder it is given, in order; the span of pictures around the cut they replace, so the length and the sound stay.",
+  "specification": "User 2026-11-07: joining a composite statement with AI generated in-between pictures (docs/97 3.6 smooth cut). RIFE 4.x through rife-ncnn-vulkan (MIT, nihui) on the graphics card through Vulkan. The model runs as a program of its own; nothing in QNC links it."
+}

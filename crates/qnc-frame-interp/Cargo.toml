@@ -1,0 +1,7 @@
+[package]
+name = "qnc-frame-interp"
+version = "0.1.0"
+edition = "2021"
+description = "QNC public piece: AI in-between pictures of a cut (RIFE through rife-ncnn-vulkan, MIT). From the picture before a cut and the one after it, it makes the pictures between them; it decodes nothing and writes only in the folder it is given."
+
+[dependencies]

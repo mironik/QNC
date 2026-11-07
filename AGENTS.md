@@ -8392,3 +8392,16 @@ je svaki klip slot, pa Delete na izabranom ili uzetom slotu (i uzetom rubu slota
 (`DeleteSegment`, jedan korak Undo; Backspace ga vraca). Slot s pokrivalicom i dalje gubi pokrivalicu. `qnc-program-segments`
 `delete.rs` (`clip_of_slot`). U Storyju prazan slot (izmedu dva M markera) i dalje nema sto obrisati. Test
 `in_an_s_story_a_chosen_slot_is_deleted_and_undo_brings_it_back`, conformance. Uzivo nije provjereno.
+Izvedeno 2026-11-07 (korisnik: "idemo isprobati spajanje slozene izjave pomocu AI generiranja meduslika"; odluke: medjuslike
+zamijene slike oko reza (kao Morph Cut, trajanje i ton ostaju), duljina je postavka po spoju, zadano 8 slika; motor
+rife-ncnn-vulkan (MIT, nihui) jer gotovi RIFE ONNX dolazi iz projekta pod CC BY-NC-SA 4.0): korak 1, proba. Preuzet
+rife-ncnn-vulkan 20221029 (Windows, GitHub nihui) u `C:\Users\miron\tools\rife-ncnn-vulkan` (program, vcomp140.dll,
+LICENSE, modeli rife-v4 i rife-v4.6; ostalo obrisano; izvan gita). Nova javna kocka `crates/qnc-frame-interp` (+ ugovor
+`contracts/modules/frame-interp.module.json`): `span` (koje slike oko reza zamijene medjuslike: polovica prije, polovica
+poslije), `Interpolator::between` (n slika izmedju dviju PNG slika u zadanu mapu; program ovog racunala na decimalni broj
+trazi zarez, pa se vremena zadaju brojem slika u nacinu mape, model se ucitava jednom). Primjer `examples/smooth_probe.rs`
+(original samo citan, sve u zadanu mapu): na spoju slozene izjave aktivnog projekta (Mironik 3608, 5269 -> 5374, skok 2 s)
+8 medjuslika 1080p za 9 s na Iris Xe, cut.mp4 i smooth.mp4 iste duljine i list prijelaza; slike ciste, malo zamucenja oko
+ruke s brosurom. `qnc-script-db/examples/pieces.rs` (samo citanje dijelova izjava). Conformance PADA na C5 (kocka jos nema
+korisnika) dok korak 2 ne spoji smooth spoj u slozenu izjavu, player i export. Nije izvedeno: nacin spoja Smooth i njegova
+duljina u bazi, pozadinski render prijelaza, player i export.
