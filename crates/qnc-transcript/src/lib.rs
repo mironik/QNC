@@ -397,8 +397,8 @@ impl Transcript {
             return true;
         };
         let queued = Queued { clip_id, from_frame, to_frame, quality: QueueQuality::Best, state: QueueState::Waiting, error: String::new(), took_ms: 0 };
+        // Quietly (user 2026-11-08): the panel does not change for a repass, nothing is said.
         self.ask(target, Box::new(move |target| qnc_transcript_db::enqueue(target, vec![queued])));
-        self.view.message = qnc_ui_text::text("transcribe.repass_queued").into();
         true
     }
 
@@ -443,7 +443,9 @@ impl Transcript {
         self.view.fast = self.quality == QueueQuality::Fast;
         self.view.ticked = self.ticks.len();
         self.view.marks = timeline.visible_source_marks();
-        self.view.queue = self.queue.iter().map(|q| self.queue_row(q)).collect();
+        // A repass (the Croatian model, Best) runs in the background and goes to the database only
+        // (user 2026-11-08): its row is not in the panel's list, which would move the text below.
+        self.view.queue = self.queue.iter().filter(|q| q.quality != QueueQuality::Best).map(|q| self.queue_row(q)).collect();
         let kept = clip_id.as_deref().and_then(|clip| transcripts.of(clip)).map(|kept| kept.as_slice()).unwrap_or_default();
         // A held clip (its statement transcribed again, user 2026-11-08) shows no running lines:
         // the new transcript goes to the database only.

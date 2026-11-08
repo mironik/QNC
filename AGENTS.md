@@ -8467,3 +8467,7 @@ Klip koji vise nije trazen (drugi klip u AI Media Assistu) takoder se pusti. Pon
 Prijepis kad zavrsi (`qnc-transcript`: samo kad je zavrsio prvi prijepis, Fast). Test
 `a_held_clip_keeps_what_it_shows_until_it_is_let_go`, conformance (osim otvorenog C5 `qnc-frame-interp`). Uzivo nije
 provjereno.
+Popravak 2026-11-08 (korisnik: "i dalje osvjezava formu prilikom zapisa u bazu"; log: AI Media Assist, Dodaj izjavu
+3879..4163, ponovni prijepis gotov za 21 s): red ponovnog prijepisa pojavljivao se i nestajao u popisu reda iznad teksta
+prijepisa (i poruka "queued"), pa se tekst pomicao. Ponovni prijepisi (Best) nisu u popisu reda panela i ne pisu poruku
+(`qnc-transcript`); u bazi i u logu su kao i prije. Uzivo nije provjereno.
