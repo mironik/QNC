@@ -8438,3 +8438,7 @@ zadanu vrijednost; `qnc-script-db` `undo.rs`). (#18) Nova verzija S-Storyja dobi
 `story-draft-<n>.db` uz projekt (`qnc-db-broker` `highest_draft`). Testovi `qnc-script-db` (2 nova), `qnc-transcript-db`
 (novi), `qnc-skeleton-db` (novi), dotaknute kocke, `cargo check --workspace --all-targets`, conformance (osim otvorenog
 C5 `qnc-frame-interp`). Uzivo nije provjereno.
+Dopuna 2026-11-08 (korisnik: "omoguciti prikaz prijepisa bez cekanja kraja prepisa"; log: prijepis Mironik 3608 trajao je
+165 s, a klip je otvoren tek nakon njega): klip koji se prepisuje je u redu panela prijepisa poveznica kao i gotov
+(`qnc-transcript-panel`); klik ga otvara i pokazuje retke kako nastaju. Spremljeni dijelovi (korak 1, #3) stavljaju klip u
+tab Prijepis vec nakon prvog komada, a druge forme ga citaju iz baze. Uzivo nije provjereno.
