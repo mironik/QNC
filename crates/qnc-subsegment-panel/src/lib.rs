@@ -215,14 +215,16 @@ pub fn show(ui: &mut egui::Ui, view: &SubsegmentView, theme: TimelineTheme, leng
         _ => event,
     });
     answer = answer.or(zoomed);
-    // Every part: the pause and join before it (after the first) and its own A1, the camera
-    // channel, level and on/off (user 2026-10-29).
-    for (index, part) in view.parts.iter().enumerate() {
+    // The part in hand: its pause and join before it (after the first) and its own A1, the
+    // camera channel, level and on/off (user 2026-10-29). The dock has room only for the
+    // timeline (user 2026-11-08: "I see no new buttons"), so the one row floats just above it.
+    if let Some((index, part)) = part_in_hand(view).and_then(|index| view.parts.get(index).map(|part| (index, part))) {
         let target = |step: Option<i64>| match step {
             Some(step) => format!("{}:{index}:{step}", view.block_id),
             None => format!("{}:{index}", view.block_id),
         };
-        ui.horizontal(|ui| {
+        let over = ui.max_rect().left_top();
+        egui::Area::new(egui::Id::new("qnc_subsegment_part_row")).order(egui::Order::Foreground).pivot(egui::Align2::LEFT_BOTTOM).fixed_pos(over).show(ui.ctx(), |ui| egui::Frame::popup(ui.style()).show(ui, |ui| ui.horizontal(|ui| {
             // The part whose A1 is taken (Ctrl+1) is marked as a taken lane is.
             let taken = view.sound == Some(index);
             let name = RichText::new(qnc_ui_text::fill("subsegment.part", &[("n", &(index + 1).to_string()), ("clip", &part.clip_name)]));
@@ -292,9 +294,17 @@ pub fn show(ui: &mut egui::Ui, view: &SubsegmentView, theme: TimelineTheme, leng
             if ui.small_button(off).clicked() {
                 answer = Some(ActionEvent::key(PART_OFF).with_target(target(None)));
             }
-        });
+        })));
     }
     answer
+}
+
+/// The part the row above the timeline is about: the one chosen or taken, else the part after
+/// the join nearest the playhead (the first part has no join; a click on its strip chooses it).
+fn part_in_hand(view: &SubsegmentView) -> Option<usize> {
+    let taken = view.chosen.or(view.sound).or(view.slide).or(view.trim.map(|(at, _, _)| at));
+    let at = view.playhead.unwrap_or(0);
+    taken.or_else(|| (1..view.parts.len()).min_by_key(|index| view.parts[*index].start.abs_diff(at))).or((!view.parts.is_empty()).then_some(0))
 }
 
 /// The mouse map's panel of a program's row: the SubSegment's timeline is one (AGENTS 0.12).
