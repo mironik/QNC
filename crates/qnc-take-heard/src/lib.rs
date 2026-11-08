@@ -67,10 +67,17 @@ impl TakeHeard {
             }
         }
         if self.job.is_none() && idle {
-            if let Some(take) = takes.iter().find(|take| !self.failed.contains(&(take.block_id, take.take))) {
+            // Every open form with a script polls: a take is heard by one of them only.
+            if let Some(take) = takes.iter().find(|take| !self.failed.contains(&(take.block_id, take.take)) && claimed().insert(claim(locator, take))) {
                 let (send, done) = mpsc::channel();
                 let (locator, work) = (locator.clone(), take.clone());
-                let spawned = std::thread::Builder::new().name("qnc-take-heard".into()).spawn(move || _ = send.send(hear(&locator, &work)));
+                let spawned = std::thread::Builder::new()
+                    .name("qnc-take-heard".into())
+                    .spawn(move || {
+                        let heard = hear(&locator, &work);
+                        claimed().remove(&claim(&locator, &work));
+                        _ = send.send(heard);
+                    });
                 if spawned.is_ok() {
                     self.job = Some((take.clone(), done));
                 }
@@ -102,6 +109,17 @@ impl TakeHeard {
             Err(mpsc::TryRecvError::Empty) => false,
         }
     }
+}
+
+/// The takes being heard in this process (a helper within one process; what was heard is in the
+/// database).
+fn claimed() -> std::sync::MutexGuard<'static, HashSet<(String, i64, u16)>> {
+    static CLAIMED: std::sync::OnceLock<std::sync::Mutex<HashSet<(String, i64, u16)>>> = std::sync::OnceLock::new();
+    CLAIMED.get_or_init(Default::default).lock().unwrap_or_else(|e| e.into_inner())
+}
+
+fn claim(locator: &StillLocator, take: &Wanted) -> (String, i64, u16) {
+    (locator.project_id().to_string(), take.block_id, take.take)
 }
 
 /// Why this project's takes cannot be heard: it does not transcribe, or its speech is not the

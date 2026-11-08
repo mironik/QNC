@@ -177,13 +177,20 @@ impl PanelFocus {
         qnc_dev_diagnostics::timed_block("poll-side", || self.side.poll(preview, timeline, clips));
         // A take of a voice record clicked: its clip on the source timeline, A1 on its channel,
         // played from its start.
-        if let Some((clip_id, channel)) = self.side.take_voice_request() {
+        if let Some((clip_id, channel, fresh)) = self.side.take_voice_request() {
             self.source.want_a1(&clip_id, channel);
-            if !preview.open(&clip_id) {
-                preview.cue(0);
-            }
-            if !preview.view().playing {
+            // A record that got a take since it was opened has one more channel: prepared anew.
+            // A take of the clip already open plays from its start once the cue landed (log
+            // 2026-11-08: a Play sent behind the cue was refused as not ready).
+            if fresh {
+                preview.open_again(&clip_id);
                 preview.toggle_play();
+            } else if preview.open(&clip_id) {
+                preview.toggle_play();
+            } else if preview.view().playing {
+                preview.cue(0);
+            } else {
+                preview.play_from(0);
             }
         }
         let side = self.side.views().clone();

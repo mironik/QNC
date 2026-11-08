@@ -520,6 +520,12 @@ impl SourcePreview {
         self.prepare_clip(clip_id, first_frame)
     }
 
+    /// `clip_id` prepared anew even when it is open (its file changed: a voice record that got
+    /// one more take).
+    pub fn open_again(&mut self, clip_id: &str) -> bool {
+        self.prepare_clip(clip_id, 0)
+    }
+
     /// The channels of the shown clip heard on output 1 (A1) and 2 (A2) (user rule
     /// 2026-10-01) and their levels (1: as recorded, 0: level 0; user 2026-10-14): the
     /// clip is prepared again on its confirmed frame. In a story program the choice waits

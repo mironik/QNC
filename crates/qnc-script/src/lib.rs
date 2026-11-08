@@ -162,9 +162,12 @@ pub struct Script {
     /// The voice records of the blocks as read, and whether their files are there.
     voices: Vec<(Voice, bool)>,
     /// A take to hear: its record's clip and the channel (zero based), once.
-    voice_request: Option<(String, u16)>,
+    voice_request: Option<(String, u16, bool)>,
     /// The take to hear once the write in progress is done.
-    voice_after_write: Option<(String, u16)>,
+    voice_after_write: Option<(String, u16, bool)>,
+    /// How many takes each record had when it was last heard here: one with more was made
+    /// again and is prepared anew.
+    heard_takes: HashMap<String, usize>,
     /// What the panel says once the write in progress is done.
     message_after_write: Option<String>,
     /// The editor is emptied once the write in progress is done (a saved text).
@@ -174,7 +177,7 @@ pub struct Script {
 
 impl Default for Script {
     fn default() -> Self {
-        Self { view: ScriptView::default(), blocks: Vec::new(), project: None, reading: None, read_at: None, writing: None, queued: std::collections::VecDeque::new(), source_request: None, names: HashMap::new(), words_per_second: Ok(0.0), take: None, taking: None, exporting: None, draft: Default::default(), edit: Default::default(), letters: HashMap::new(), letter_times: qnc_letter_times::LetterTimes::new(), smooth_joins: qnc_smooth_joins::SmoothJoins::new(), take_heard: qnc_take_heard::TakeHeard::new(), read_checks: HashMap::new(), word_cut: qnc_edit_words::WordPair::new(), word_pick: None, voices: Vec::new(), voice_request: None, voice_after_write: None, message_after_write: None, clear_after_write: false }
+        Self { view: ScriptView::default(), blocks: Vec::new(), project: None, reading: None, read_at: None, writing: None, queued: std::collections::VecDeque::new(), source_request: None, names: HashMap::new(), words_per_second: Ok(0.0), take: None, taking: None, exporting: None, draft: Default::default(), edit: Default::default(), letters: HashMap::new(), letter_times: qnc_letter_times::LetterTimes::new(), smooth_joins: qnc_smooth_joins::SmoothJoins::new(), take_heard: qnc_take_heard::TakeHeard::new(), read_checks: HashMap::new(), word_cut: qnc_edit_words::WordPair::new(), word_pick: None, voices: Vec::new(), voice_request: None, voice_after_write: None, heard_takes: HashMap::new(), message_after_write: None, clear_after_write: false }
     }
 }
 
@@ -204,7 +207,7 @@ impl Script {
     }
 
     /// The take to hear (its record's clip in the catalog and its channel), once.
-    pub fn take_voice_request(&mut self) -> Option<(String, u16)> {
+    pub fn take_voice_request(&mut self) -> Option<(String, u16, bool)> {
         self.voice_request.take()
     }
 
@@ -394,7 +397,9 @@ impl Script {
                 // voice clips is written there now), then the take used is kept.
                 let voice = self.voices.iter().find(|(voice, _)| voice.block_id == block).map(|(voice, _)| voice.clone());
                 let (Some(voice), Some(locator)) = (voice, preview.still_locator()) else { return Some(false) };
-                self.voice_after_write = Some((qnc_voice_take::clip_id(&voice.name), take.saturating_sub(1)));
+                let clip = qnc_voice_take::clip_id(&voice.name);
+                let fresh = self.heard_takes.insert(clip.clone(), voice.takes.len()) != Some(voice.takes.len());
+                self.voice_after_write = Some((clip, take.saturating_sub(1), fresh));
                 self.write(preview, move |target| {
                     let takes: Vec<f64> = voice.takes.iter().map(|take| take.seconds).collect();
                     let first_tc = voice.takes.first().map(|take| take.tc.clone()).unwrap_or_default();
