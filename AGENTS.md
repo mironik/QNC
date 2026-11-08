@@ -8537,3 +8537,7 @@ izvedeno: posao se ne prekida kad player krene (10-25 s, dijeli graficku), Send 
 isprepletene slike se odbija, ulazne slike su JPEG (q 3). Provjereno: testovi `qnc-smooth-joins`, `qnc-script-db` i
 dotaknutih kocki, conformance (C5 `qnc-frame-interp` rijesen), model cita JPEG ulaz, klip iz niza slika ima tocan broj slika.
 Uzivo nije provjereno.
+Popravak 2026-11-08 (korisnik: "ne vidim nikakve nove gumbe"): redci dijelova slozene izjave crtali su se ispod timelinea, a
+dock ima mjesta samo za timeline, pa ih nikad nije bilo vidjeti (ni pauzu, spoj i A1 dijela). Sada jedan redak pluta odmah iznad
+timelinea (`qnc-subsegment-panel`): za izabrani ili uzeti dio, inace za dio iza spoja najblizeg playheadu; prvi dio klikom na
+njegovu traku. Layout nije diran. Uzivo nije provjereno.
