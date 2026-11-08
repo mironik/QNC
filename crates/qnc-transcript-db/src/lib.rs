@@ -38,6 +38,44 @@ pub struct Line {
     pub words: Vec<Word>,
 }
 
+/// The lines of `lines` cut to what lies inside clip frames `[from, to)` (`inside`) or outside
+/// them: a word belongs where its middle is (user 2026-11-08: a statement transcribed again
+/// kept the old line that ran past it, so its words were there twice). A line with words keeps
+/// those on the asked side, one line for each run of them (before and after the range); its
+/// text is those words when some went. A line without words goes by its middle.
+pub fn lines_cut(lines: &[Line], from: u64, to: u64, inside: bool) -> Vec<Line> {
+    let wanted = |a: u64, b: u64| (from..to).contains(&((a + b) / 2)) == inside;
+    let mut cut = Vec::new();
+    for line in lines {
+        if line.words.is_empty() {
+            if wanted(line.from, line.to) {
+                cut.push(line.clone());
+            }
+            continue;
+        }
+        if line.words.iter().all(|word| wanted(word.from, word.to)) {
+            cut.push(line.clone());
+            continue;
+        }
+        let mut run: Vec<Word> = Vec::new();
+        let mut flush = |run: &mut Vec<Word>| {
+            if let (Some(first), Some(last)) = (run.first(), run.last()) {
+                let text = run.iter().map(|word| word.text.as_str()).collect::<Vec<_>>().join(" ");
+                cut.push(Line { from: first.from, to: last.to, text, words: std::mem::take(run) });
+            }
+        };
+        for word in &line.words {
+            if wanted(word.from, word.to) {
+                run.push(word.clone());
+            } else {
+                flush(&mut run);
+            }
+        }
+        flush(&mut run);
+    }
+    cut
+}
+
 /// What was said in clip frames `[from_frame, to_frame)` of a clip.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]

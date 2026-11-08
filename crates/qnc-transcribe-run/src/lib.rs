@@ -89,7 +89,22 @@ pub fn transcribe(locator: &StillLocator, ask: &Ask, quality: Quality, pace: Pac
     };
     let (lines, language, made_by) = match pace {
         Pace::Now => job.piece(ask.from, ask.to, cancel, on_line)?,
-        Pace::YieldToPlayer => background(&job, ask, cancel, on_line, on_progress)?,
+        Pace::YieldToPlayer => {
+            // A second of sound either side (user 2026-11-08: a statement transcribed again lost
+            // its first word, "O je" for "Ovo je"): the engine hears the words at the edges whole;
+            // only those whose middle is inside the range are kept.
+            let padded = padded(ask, &place);
+            if padded == *ask {
+                background(&job, ask, cancel, on_line, on_progress)?
+            } else {
+                let (lines, language, made_by) = background(&job, &padded, cancel, &mut |_| {}, on_progress)?;
+                let lines = qnc_transcript_db::lines_cut(&lines, ask.from, ask.to, true);
+                for line in &lines {
+                    on_line(line);
+                }
+                (lines, language, made_by)
+            }
+        }
     };
     let model = engine.model.file_name().map(|name| name.to_string_lossy().into_owned()).unwrap_or_default();
     Ok(ClipTranscript {
@@ -100,6 +115,21 @@ pub fn transcribe(locator: &StillLocator, ask: &Ask, quality: Quality, pace: Pac
         engine: format!("{made_by} {model}"),
         lines,
     })
+}
+
+/// `ask` with a second of the clip either side (within the clip's saved frames; a range from the
+/// start or to the end of the clip stays there).
+fn padded(ask: &Ask, place: &qnc_still_locator::LocatedSound) -> Ask {
+    let second = u64::from(place.fps.0 / place.fps.1.max(1)).max(1);
+    let frames = place.media.streams.iter().find_map(|stream| match &stream.details {
+        qnc_media_metadata::StreamDetails::Video(video) => video.exact_frame_count(),
+        _ => None,
+    });
+    let to = match frames {
+        Some(frames) => (ask.to + second).min(frames).max(ask.to),
+        None => ask.to,
+    };
+    Ask { clip_id: ask.clip_id.clone(), from: ask.from.saturating_sub(second), to }
 }
 
 /// A background range: its sound read once from the start of the media (sound only where the

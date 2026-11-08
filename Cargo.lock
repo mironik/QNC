@@ -6954,6 +6954,7 @@ dependencies = [
  "qnc-ai-catalog",
  "qnc-content-store",
  "qnc-dev-diagnostics",
+ "qnc-media-metadata",
  "qnc-playback-activity",
  "qnc-sound-range",
  "qnc-still-locator",

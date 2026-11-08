@@ -71,6 +71,29 @@ fn queued_clips_are_read_in_order_and_asking_a_clip_again_waits_it_again() {
     assert_eq!((again.state, again.quality, again.error.as_str()), (QueueState::Waiting, QueueQuality::Fast, ""));
 }
 
+/// A statement transcribed again (live 2026-11-08, Mironik 3609 992..1072): the old line
+/// 992..1168 ran past it and stayed whole, its words there twice. Now only its words outside
+/// the new range stay.
+#[test]
+fn a_newer_transcript_takes_the_words_of_an_old_line_that_runs_past_it() {
+    let (_dir, target) = project();
+    let word = |from: u64, to: u64, text: &str| Word { from, to, text: text.into() };
+    let mut old = transcript(0, 2000, "");
+    old.lines = vec![Line {
+        from: 992,
+        to: 1168,
+        text: "Ovo je prije brkova, a onda".into(),
+        words: vec![word(992, 1000, "Ovo"), word(1001, 1010, "je"), word(1011, 1040, "prije"), word(1041, 1070, "brkova,"), word(1100, 1120, "a"), word(1130, 1168, "onda")],
+    }];
+    save(&target, old).unwrap();
+    let mut new = transcript(992, 1072, "");
+    new.lines = vec![Line { from: 993, to: 1070, text: "Ovo je prije brkova".into(), words: vec![word(993, 1070, "Ovo je prije brkova")] }];
+    save(&target, new).unwrap();
+    let kept = read_clip(&target, "c1").unwrap();
+    let old = kept.iter().find(|t| t.from_frame == 0).unwrap();
+    assert_eq!(old.lines.iter().map(|l| (l.from, l.to, l.text.as_str())).collect::<Vec<_>>(), [(1100, 1168, "a onda")], "only the old words after the statement stay");
+}
+
 #[test]
 fn a_clip_asked_again_while_it_runs_is_not_marked_done_by_the_old_run() {
     let (_dir, target) = project();

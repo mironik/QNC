@@ -8471,3 +8471,13 @@ Popravak 2026-11-08 (korisnik: "i dalje osvjezava formu prilikom zapisa u bazu";
 3879..4163, ponovni prijepis gotov za 21 s): red ponovnog prijepisa pojavljivao se i nestajao u popisu reda iznad teksta
 prijepisa (i poruka "queued"), pa se tekst pomicao. Ponovni prijepisi (Best) nisu u popisu reda panela i ne pisu poruku
 (`qnc-transcript`); u bazi i u logu su kao i prije. Uzivo nije provjereno.
+Popravak 2026-11-08 (korisnik: "ponovljeni prijepis nije ispravio greske, a ono sto je ispravio je duplicirao"; baza
+aktivnog projekta, samo citanje: Mironik 3609 stari redak 992..1168 "Ovo je ovo je prije brkova, a onda..." ostao je cijeli
+uz novi "O je ovo je prije brkova" 997..1048, jer je stari redak brisan samo kad mu je sredina u novom rasponu): (1)
+noviji prijepis uzima starom prijepisu rijeci po rijec: rijec pripada gdje joj je sredina, redak koji prelazi novi raspon
+zadrzava samo svoje rijeci izvan njega (jedan redak prije i jedan poslije), tekst su te rijeci (`qnc-transcript-db`
+`lines_cut`, `save`). (2) Ponovni prijepis u pozadini slusa sekundu prije i poslije raspona (unutar spremljenih slika
+klipa) i zadrzava samo rijeci cija je sredina u rasponu, istim pravilom (`qnc-transcribe-run` `padded`), pa prva i zadnja
+rijec nisu odrezane ("O je" umjesto "Ovo je"). Greske koje hrvatski model sam cuje krivo ("eksttih") ovo ne ispravlja.
+Postojeci dvostruki redci ostaju dok se ta izjava ponovno ne prepise. Test
+`a_newer_transcript_takes_the_words_of_an_old_line_that_runs_past_it`. Uzivo nije provjereno.

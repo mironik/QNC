@@ -197,7 +197,8 @@ impl Store {
                 continue;
             }
             let lines: Vec<Line> = serde_json::from_str(&lines_json).map_err(err)?;
-            let kept: Vec<Line> = lines.into_iter().filter(|line| !(transcript.from_frame..transcript.to_frame).contains(&((line.from + line.to) / 2))).collect();
+            // Word by word: a line running past the new range keeps only its words outside it.
+            let kept: Vec<Line> = crate::lines_cut(&lines, transcript.from_frame, transcript.to_frame, false);
             let text = kept.iter().map(|line| line.text.as_str()).collect::<Vec<_>>().join(" ");
             tx.execute(
                 "UPDATE clip_transcripts SET lines_json = ?4, text = ?5 WHERE clip_id = ?1 AND from_frame = ?2 AND to_frame = ?3",

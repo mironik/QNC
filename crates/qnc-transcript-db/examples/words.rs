@@ -9,6 +9,9 @@ fn main() -> Result<(), String> {
     let target = qnc_db_broker::ProjectDbTarget::for_project(reader.settings_reader(), &snapshot.settings)?;
     for transcript in qnc_transcript_db::read_clip(&target, clip)? {
         println!("[{}..{}] {} {}", transcript.from_frame, transcript.to_frame, transcript.engine, transcript.language);
+        for line in transcript.lines.iter().filter(|l| l.to >= from && l.from <= to) {
+            println!("  line {}-{} {:?}", line.from, line.to, line.text);
+        }
         for word in transcript.lines.iter().flat_map(|l| l.words.iter()).filter(|w| w.to >= from && w.from <= to) {
             println!("{:6}-{:6} {}", word.from, word.to, word.text);
         }

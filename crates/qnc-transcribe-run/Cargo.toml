@@ -11,6 +11,7 @@ qnc-dev-diagnostics = { workspace = true }
 qnc-playback-activity = { workspace = true }
 qnc-sound-range = { workspace = true }
 qnc-still-locator = { workspace = true }
+qnc-media-metadata = { workspace = true }
 qnc-transcribe-jobs = { workspace = true }
 qnc-transcript-db = { workspace = true }
 qnc-ui-text = { workspace = true }
