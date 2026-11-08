@@ -8566,3 +8566,6 @@ kroz pisca scenarija (na zahtjev korisnika). Uzivo nije provjereno.
 Popravak isti dan (korisnik: "ne radi tekstualno editiranje izjave"; log: Delete i Backspace isli su scenariju, nijedan nacrt
 teksta): ista izjava crta se u scenariju i preko njega u prozoru medija s istim egui id-em, pa polje sprijeda nije dobivalo klik ni
 tipkovnicu. Svaki prikaz ima svoj id (`qnc-script-panel` `paint_block(.., place, ..)`). Uzivo nije provjereno.
+Popravak isti dan (korisnik: "iz rijeci pa izbrisao slovo p, ostavio a; reproducira se uredno, ali u tekstu se ne prikazuje a"):
+rijec se u tekstu dijela birala po svojoj sredini, pa je ostatak rijeci nestajao. Rijec s poravnatim slovima sada pokazuje slova
+koja dio jos izgovara (`qnc-script` `timed_words`; pojedino slovo po svojoj sredini, znak bez vremena ide s prethodnim). Test.

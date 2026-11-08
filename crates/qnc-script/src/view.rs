@@ -84,37 +84,57 @@ pub struct TimedWord {
 
 /// The words said in `[piece.from_frame, piece.to_frame)` of its clip, in order, from every
 /// transcript of the clip (where two overlap, the word that starts first is kept). `tc` gives
-/// the timecode of a clip frame.
-pub fn timed_words(transcripts: &[qnc_transcript_db::ClipTranscript], piece: &Piece, tc: impl Fn(u64) -> String) -> Vec<TimedWord> {
-    let mut words: Vec<(u64, u64, String, bool)> = Vec::new();
+/// the timecode of a clip frame. A word whose letters are laid (`letters`, as `qnc-letter-db` says
+/// each lasts) shows what of it the part still says, letter by letter (user 2026-11-08: of "pa"
+/// the p was cut and the a stayed, heard but not shown); one without shows whole if its middle is
+/// in the part.
+pub fn timed_words(transcripts: &[qnc_transcript_db::ClipTranscript], piece: &Piece, letters: &[qnc_letter_db::WordLetters], tc: impl Fn(u64) -> String) -> Vec<TimedWord> {
+    let range = piece.from_frame..piece.to_frame;
+    let mut words: Vec<(u64, u64, String, bool, Vec<(char, Option<(u64, u64)>)>)> = Vec::new();
     for line in transcripts.iter().flat_map(|transcript| &transcript.lines) {
         for (index, word) in line.words.iter().enumerate() {
-            let middle = (word.from + word.to) / 2;
-            if (piece.from_frame..piece.to_frame).contains(&middle) && !word.text.trim().is_empty() {
-                words.push((word.from, word.to, word.text.trim().to_string(), index == 0));
+            let text = word.text.trim();
+            if text.is_empty() {
+                continue;
+            }
+            let spans = qnc_letter_db::letters_of(letters, word.from, text).map_or_else(Vec::new, |found| found.spans());
+            if spans.is_empty() {
+                if range.contains(&((word.from + word.to) / 2)) {
+                    words.push((word.from, word.to, text.to_string(), index == 0, Vec::new()));
+                }
+                continue;
+            }
+            // A letter counts by its own middle; a sign without a time goes with the letter before.
+            let mut inside = false;
+            let flags: Vec<bool> = spans
+                .iter()
+                .map(|(_, span)| {
+                    if let Some((from, to)) = span {
+                        inside = range.contains(&((from + to) / 2));
+                    }
+                    inside
+                })
+                .collect();
+            if flags.iter().all(|flag| *flag) {
+                words.push((word.from, word.to, text.to_string(), index == 0, spans));
+            } else if flags.iter().any(|flag| *flag) {
+                let said: Vec<(char, Option<(u64, u64)>)> = spans.into_iter().zip(flags).filter_map(|(letter, flag)| flag.then_some(letter)).collect();
+                let times: Vec<(u64, u64)> = said.iter().filter_map(|(_, span)| *span).collect();
+                let (Some(first), Some(last)) = (times.first(), times.last()) else { continue };
+                words.push((first.0, last.1, said.iter().map(|(letter, _)| *letter).collect(), index == 0, said));
             }
         }
     }
     words.sort_by_key(|word| word.0);
     let mut kept: Vec<TimedWord> = Vec::new();
-    for (from, to, text, line) in words {
+    for (from, to, text, line, letters) in words {
         if kept.last().is_some_and(|last| from < last.to) {
             continue;
         }
         let line = line || kept.is_empty();
-        kept.push(TimedWord { from, to, tc: tc(from), text, line, letters: Vec::new() });
+        kept.push(TimedWord { from, to, tc: tc(from), text, line, letters });
     }
     kept
-}
-
-/// Puts on every word the letters kept for it (its start frame and text), as `qnc-letter-db`
-/// says each lasts.
-pub fn put_letters(words: &mut [TimedWord], kept: &[qnc_letter_db::WordLetters]) {
-    for word in words {
-        if let Some(found) = qnc_letter_db::letters_of(kept, word.from, &word.text) {
-            word.letters = found.spans();
-        }
-    }
 }
 
 /// The words the script shows without letters, clip by clip in the order shown.

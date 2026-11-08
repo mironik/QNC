@@ -803,9 +803,7 @@ impl Script {
                         let fps = names.get(&piece.clip_id).filter(|(_, frames, seconds)| *frames > 0 && *seconds > 0.0).map_or(0, |(_, frames, seconds)| (*frames as f64 / seconds).round() as u32);
                         let start = qnc_source_timecode::parse_timecode(&piece.start_tc, fps).filter(|_| fps > 0);
                         let tc = |frame: u64| start.map_or_else(String::new, |start| qnc_source_timecode::format_frames(start + frame.saturating_sub(piece.from_frame), fps));
-                        let mut words = transcripts.of(&piece.clip_id).map_or_else(Vec::new, |transcripts| view::timed_words(transcripts, piece, tc));
-                        view::put_letters(&mut words, self.letters.get(&piece.clip_id).map_or(&[][..], Vec::as_slice));
-                        words
+                        transcripts.of(&piece.clip_id).map_or_else(Vec::new, |transcripts| view::timed_words(transcripts, piece, self.letters.get(&piece.clip_id).map_or(&[][..], Vec::as_slice), tc))
                     })
                     .collect();
             }
