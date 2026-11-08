@@ -121,7 +121,7 @@ fn paint_script(ui: &mut egui::Ui, view: &ScriptView, transcript: &TranscriptVie
             ui.label(muted(qnc_ui_text::text("script.empty")));
         }
         for row in &view.blocks {
-            if let Some(event) = paint_block(ui, row, view, theme, style) {
+            if let Some(event) = paint_block(ui, "script", row, view, theme, style) {
                 asked = Some(event);
             }
             ui.add_space(3.0);
@@ -154,7 +154,7 @@ pub fn show_open_statement(ui: &mut egui::Ui, view: &ScriptView, theme: &qnc_des
     let style = qnc_ui_kit::ChromeButtonStyle { text: theme.text, border: theme.border, focus: theme.focus, height: theme.chrome_control_height };
     let mut asked = None;
     egui::ScrollArea::vertical().id_salt("qnc_script_open_statement").auto_shrink([false, false]).show(ui, |ui| {
-        asked = paint_block(ui, row, view, theme, style);
+        asked = paint_block(ui, "open", row, view, theme, style);
     });
     Some(asked)
 }
@@ -162,7 +162,7 @@ pub fn show_open_statement(ui: &mut egui::Ui, view: &ScriptView, theme: &qnc_des
 /// One block: its mark, length and buttons on top, its text below; a click chooses it (a text
 /// block's text goes into the editor), a clip block can open its clip. Public: every panel of
 /// the script draws its blocks with it (MA Audio's and MA Script's).
-pub fn paint_block(ui: &mut egui::Ui, row: &qnc_script::BlockRow, view: &ScriptView, theme: &qnc_desktop_theme::Theme, style: qnc_ui_kit::ChromeButtonStyle) -> Option<ActionEvent> {
+pub fn paint_block(ui: &mut egui::Ui, place: &'static str, row: &qnc_script::BlockRow, view: &ScriptView, theme: &qnc_desktop_theme::Theme, style: qnc_ui_kit::ChromeButtonStyle) -> Option<ActionEvent> {
     let mut asked = None;
     let block = &row.block;
     let id = block.id.to_string();
@@ -283,7 +283,7 @@ pub fn paint_block(ui: &mut egui::Ui, row: &qnc_script::BlockRow, view: &ScriptV
                 // text edit: what is deleted in the text is deleted in the sound"): Enter cuts out
                 // what the text no longer says, Esc gives the text back; a click puts the playhead
                 // on the word clicked.
-                if let Some(event) = text_editor::show(ui, theme, (block.id, index), words, view.text_draft(block.id, index, &qnc_script::text_of(words)), heard, (part_chosen, bring)) {
+                if let Some(event) = text_editor::show(ui, theme, place, (block.id, index), words, view.text_draft(block.id, index, &qnc_script::text_of(words)), heard, (part_chosen, bring)) {
                     asked = Some(event);
                 }
                 return (asked, false);

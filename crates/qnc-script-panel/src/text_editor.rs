@@ -26,6 +26,7 @@ fn catalog() -> Option<&'static qnc_keyboard_shortcut::ShortcutCatalog> {
 pub(crate) fn show(
     ui: &mut egui::Ui,
     theme: &qnc_desktop_theme::Theme,
+    place: &'static str,
     (id, index): (i64, usize),
     words: &[TimedWord],
     drafted: Option<&str>,
@@ -33,7 +34,9 @@ pub(crate) fn show(
     (chosen, bring): (bool, bool),
 ) -> Option<ActionEvent> {
     let said = qnc_script::text_of(words);
-    let key = egui::Id::new(("qnc_script_text", id, index));
+    // The same statement is drawn in the script and over it in the media window: each editor
+    // its own id, or the one behind takes the clicks and the keyboard of the one in front.
+    let key = egui::Id::new(("qnc_script_text", place, id, index));
     let mut edited = drafted.unwrap_or(&said).to_string();
     // The words' places in the text, for the word under the playhead and the one clicked.
     let mut places = Vec::with_capacity(words.len());

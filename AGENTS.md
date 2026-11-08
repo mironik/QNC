@@ -8563,3 +8563,6 @@ Dopuna isti dan (korisnik: "zasto se ne cuje ton"; A1 sva tri dijela bio je iskl
 dio slozene izjave s iskljucenim A1 ima crvenu oznaku A1 na pocetku svoje trake na timelineu (`qnc-timeline`
 `TimelineCoverSpan.a1_off`, boja `lane_silent`). A1 ukljucen u aktivnom projektu primjerom `qnc-script-db/examples/a1_on.rs`
 kroz pisca scenarija (na zahtjev korisnika). Uzivo nije provjereno.
+Popravak isti dan (korisnik: "ne radi tekstualno editiranje izjave"; log: Delete i Backspace isli su scenariju, nijedan nacrt
+teksta): ista izjava crta se u scenariju i preko njega u prozoru medija s istim egui id-em, pa polje sprijeda nije dobivalo klik ni
+tipkovnicu. Svaki prikaz ima svoj id (`qnc-script-panel` `paint_block(.., place, ..)`). Uzivo nije provjereno.
