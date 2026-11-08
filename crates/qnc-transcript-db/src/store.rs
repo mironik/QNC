@@ -276,7 +276,31 @@ impl Store {
             let lines = serde_json::from_str(&lines).map_err(err)?;
             transcripts.push(ClipTranscript { clip_id, from_frame: u64::try_from(from).unwrap_or(0), to_frame: u64::try_from(to).unwrap_or(0), language, engine, lines });
         }
+        // The same rule as a save (user 2026-11-08: words still twice in a statement): what an
+        // older transcript says over a newer one's range is not read, word by word
+        // (`lines_cut`). Rows kept before that rule are read right without being written again.
+        let newer = self.made_order(clip_id)?;
+        let made = |t: &ClipTranscript| newer.iter().position(|(from, to)| (*from, *to) == (t.from_frame, t.to_frame)).unwrap_or(0);
+        let ranges: Vec<(usize, u64, u64)> = transcripts.iter().map(|t| (made(t), t.from_frame, t.to_frame)).collect();
+        for transcript in &mut transcripts {
+            let mine = made(transcript);
+            for &(order, from, to) in &ranges {
+                if order > mine {
+                    transcript.lines = crate::lines_cut(&transcript.lines, from, to, false);
+                }
+            }
+        }
         Ok(Data::Transcripts(transcripts))
+    }
+
+    /// The ranges of a clip's transcripts from the oldest made to the newest.
+    fn made_order(&self, clip_id: &str) -> Result<Vec<(u64, u64)>> {
+        let mut statement = self
+            .conn
+            .prepare("SELECT from_frame, to_frame FROM public_clip_transcripts WHERE clip_id = ?1 ORDER BY made_at_utc, from_frame, to_frame")
+            .map_err(err)?;
+        let rows = statement.query_map(params![clip_id], |row| Ok((row.get::<_, i64>(0)?, row.get::<_, i64>(1)?))).map_err(err)?;
+        rows.map(|row| row.map(|(from, to)| (u64::try_from(from).unwrap_or(0), u64::try_from(to).unwrap_or(0))).map_err(err)).collect()
     }
 
     /// The connection the intermediary opens a leased write's transaction on.

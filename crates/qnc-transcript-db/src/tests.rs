@@ -92,6 +92,21 @@ fn a_newer_transcript_takes_the_words_of_an_old_line_that_runs_past_it() {
     let kept = read_clip(&target, "c1").unwrap();
     let old = kept.iter().find(|t| t.from_frame == 0).unwrap();
     assert_eq!(old.lines.iter().map(|l| (l.from, l.to, l.text.as_str())).collect::<Vec<_>>(), [(1100, 1168, "a onda")], "only the old words after the statement stay");
+    // A row kept before that rule (its old line whole again) is read right all the same.
+    let conn = rusqlite::Connection::open(_dir.path().join("project.db")).unwrap();
+    let whole = serde_json::to_string(&vec![Line {
+        from: 992,
+        to: 1168,
+        text: "Ovo je prije brkova, a onda".into(),
+        words: vec![word(992, 1000, "Ovo"), word(1001, 1010, "je"), word(1011, 1040, "prije"), word(1041, 1070, "brkova,"), word(1100, 1120, "a"), word(1130, 1168, "onda")],
+    }])
+    .unwrap();
+    conn.execute("UPDATE clip_transcripts SET lines_json = ?1 WHERE from_frame = 0", [whole]).unwrap();
+    drop(conn);
+    let read = read_clip(&target, "c1").unwrap();
+    let mut words: Vec<(u64, String)> = read.iter().flat_map(|t| &t.lines).flat_map(|l| &l.words).map(|w| (w.from, w.text.clone())).collect();
+    words.sort();
+    assert_eq!(words.into_iter().map(|(_, text)| text).collect::<Vec<_>>(), ["Ovo je prije brkova", "a", "onda"], "no word twice");
 }
 
 #[test]

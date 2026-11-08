@@ -8481,3 +8481,11 @@ klipa) i zadrzava samo rijeci cija je sredina u rasponu, istim pravilom (`qnc-tr
 rijec nisu odrezane ("O je" umjesto "Ovo je"). Greske koje hrvatski model sam cuje krivo ("eksttih") ovo ne ispravlja.
 Postojeci dvostruki redci ostaju dok se ta izjava ponovno ne prepise. Test
 `a_newer_transcript_takes_the_words_of_an_old_line_that_runs_past_it`. Uzivo nije provjereno.
+Popravak 2026-11-08 (korisnik: "jos uvijek isti problem, ponavljanje... ovaj problem smo vec bili rijesili, ali ne
+postujes pravila da koristis postojece kocke"; log: scenarij, izjava blok 2 dio 992..1072 klipa Mironik 3609): redci
+upisani prije pravila po rijecima ostali su u bazi i tekst izjave (`qnc-script` `timed_words`) ih je citao dvaput.
+Pravilo "noviji prijepis vrijedi preko svog raspona" sada vrijedi i pri citanju, na jednom mjestu: jedini citac
+`qnc-transcript-db` `read_clip` reze starije prijepise po rijecima rasponom svakog novijeg (redoslijed `made_at_utc`,
+ista `lines_cut` kao pri upisu), pa ga dobivaju panel prijepisa, scenarij i rijeci zooma bez ijedne izmjene kod njih.
+Provjereno citanjem aktivnog projekta: Mironik 3609 vise nema "ovo je" dvaput. Test (stari redak upisan cijeli cita se
+bez ponavljanja). Uzivo nije provjereno.
