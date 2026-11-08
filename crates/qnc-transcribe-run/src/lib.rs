@@ -503,43 +503,54 @@ impl Job<'_> {
     /// clip frames within `range`, the language and the program.
     fn transcribe(&self, samples: &[f32], start: f64, range: (u64, u64), cancel: &AtomicBool, on_line: &mut dyn FnMut(&Line)) -> Result<(Vec<Line>, String, String), String> {
         let place = self.place;
-        let folder = std::env::temp_dir().join(format!("qnc-transcribe-{}-{}", std::process::id(), unique()));
-        std::fs::create_dir_all(&folder).map_err(|e| e.to_string())?;
-        let wav = folder.join("sound.wav");
-        // The engine hears the sound at the level of speech (user 2026-11-03).
-        let heard = qnc_transcribe_jobs::at_speech_level(samples, qnc_transcribe_jobs::WHISPER_RATE as usize);
-        let result = qnc_transcribe_jobs::write_wav(&wav, &heard).and_then(|()| {
-            let job = Transcribe {
-                model: self.engine.model.clone(),
-                vad_model: self.engine.vad_model.clone(),
-                backend: if self.engine.backend == "vulkan" { Backend::Vulkan } else { Backend::Cpu },
-                wav,
-                language: self.language.clone(),
-                threads: self.engine.threads,
-            };
-            // Seconds of the WAV as clip frames: the WAV starts at `start`.
-            let fps = f64::from(place.fps.0) / f64::from(place.fps.1.max(1));
-            let frame = |seconds: f64| {
-                let at = ((start + seconds - place.frame_zero_seconds) * fps).round().max(0.0) as u64;
-                at.clamp(range.0, range.1)
-            };
-            let to_line = |segment: &qnc_transcribe_jobs::Segment| Line {
-                from: frame(segment.start),
-                to: frame(segment.end),
-                text: segment.text.clone(),
-                words: segment
-                    .words
-                    .iter()
-                    .map(|word| Word { from: frame(word.start), to: frame(word.end).max(frame(word.start)), text: word.text.clone() })
-                    .collect(),
-            };
-            let transcriber = transcriber(&self.engine.program)?;
-            let transcript = transcriber.transcribe(&job, cancel, &mut |segment| on_line(&to_line(segment)))?;
-            Ok((transcript.segments.iter().map(to_line).collect(), transcript.language, transcript.engine))
-        });
-        let _ = std::fs::remove_dir_all(&folder);
-        result
+        // Seconds of the WAV as clip frames: the WAV starts at `start`.
+        let fps = f64::from(place.fps.0) / f64::from(place.fps.1.max(1));
+        let frame = |seconds: f64| {
+            let at = ((start + seconds - place.frame_zero_seconds) * fps).round().max(0.0) as u64;
+            at.clamp(range.0, range.1)
+        };
+        let to_line = |segment: &qnc_transcribe_jobs::Segment| Line {
+            from: frame(segment.start),
+            to: frame(segment.end),
+            text: segment.text.clone(),
+            words: segment
+                .words
+                .iter()
+                .map(|word| Word { from: frame(word.start), to: frame(word.end).max(frame(word.start)), text: word.text.clone() })
+                .collect(),
+        };
+        let transcript = run_engine(self.engine, &self.language, samples, cancel, &mut |segment| on_line(&to_line(segment)))?;
+        Ok((transcript.segments.iter().map(to_line).collect(), transcript.language, transcript.engine))
     }
+}
+
+/// `samples` (16 kHz) through `engine`, written for it into an empty temporary folder.
+fn run_engine(engine: &qnc_ai_catalog::Transcriber, language: &str, samples: &[f32], cancel: &AtomicBool, on_segment: &mut dyn FnMut(&qnc_transcribe_jobs::Segment)) -> Result<qnc_transcribe_jobs::Transcript, String> {
+    let folder = std::env::temp_dir().join(format!("qnc-transcribe-{}-{}", std::process::id(), unique()));
+    std::fs::create_dir_all(&folder).map_err(|e| e.to_string())?;
+    let wav = folder.join("sound.wav");
+    // The engine hears the sound at the level of speech (user 2026-11-03).
+    let heard = qnc_transcribe_jobs::at_speech_level(samples, qnc_transcribe_jobs::WHISPER_RATE as usize);
+    let result = qnc_transcribe_jobs::write_wav(&wav, &heard).and_then(|()| {
+        let job = Transcribe {
+            model: engine.model.clone(),
+            vad_model: engine.vad_model.clone(),
+            backend: if engine.backend == "vulkan" { Backend::Vulkan } else { Backend::Cpu },
+            wav,
+            language: language.to_string(),
+            threads: engine.threads,
+        };
+        transcriber(&engine.program)?.transcribe(&job, cancel, on_segment)
+    });
+    let _ = std::fs::remove_dir_all(&folder);
+    result
+}
+
+/// What the Best engine of this computer hears in `samples` (16 kHz) that are not of a clip: a
+/// take of the voice-over (user 2026-11-08). Its words are seconds of `samples`.
+pub fn hear_samples(samples: &[f32], language: &str, cancel: &AtomicBool) -> Result<qnc_transcribe_jobs::Transcript, String> {
+    let engine = qnc_ai_catalog::installed_transcriber_for(Quality::Best)?;
+    run_engine(&engine, language, samples, cancel, &mut |_| {}).inspect_err(|_| forget_transcriber(&engine.program))
 }
 
 fn kept() -> std::sync::MutexGuard<'static, HashMap<String, Arc<Transcriber>>> {

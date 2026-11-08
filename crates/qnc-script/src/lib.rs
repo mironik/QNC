@@ -150,6 +150,11 @@ pub struct Script {
     letter_times: qnc_letter_times::LetterTimes,
     /// The in-between pictures of the smooth cuts, made in the background (user 2026-11-08).
     smooth_joins: qnc_smooth_joins::SmoothJoins,
+    /// The words heard in the takes, in the background (user 2026-11-08: the check of what was
+    /// read).
+    take_heard: qnc_take_heard::TakeHeard,
+    /// The check of a take against the text it was made with (it is made once per text).
+    read_checks: HashMap<(i64, u16), (String, std::sync::Arc<ReadCheck>)>,
     /// The first word of a cut by text (a double click on a word): its block, part and frames.
     word_cut: qnc_edit_words::WordPair<(i64, usize)>,
     /// Words picked in the text of a statement, to be cut out of its video with Delete.
@@ -169,7 +174,7 @@ pub struct Script {
 
 impl Default for Script {
     fn default() -> Self {
-        Self { view: ScriptView::default(), blocks: Vec::new(), project: None, reading: None, read_at: None, writing: None, queued: std::collections::VecDeque::new(), source_request: None, names: HashMap::new(), words_per_second: Ok(0.0), take: None, taking: None, exporting: None, draft: Default::default(), edit: Default::default(), letters: HashMap::new(), letter_times: qnc_letter_times::LetterTimes::new(), smooth_joins: qnc_smooth_joins::SmoothJoins::new(), word_cut: qnc_edit_words::WordPair::new(), word_pick: None, voices: Vec::new(), voice_request: None, voice_after_write: None, message_after_write: None, clear_after_write: false }
+        Self { view: ScriptView::default(), blocks: Vec::new(), project: None, reading: None, read_at: None, writing: None, queued: std::collections::VecDeque::new(), source_request: None, names: HashMap::new(), words_per_second: Ok(0.0), take: None, taking: None, exporting: None, draft: Default::default(), edit: Default::default(), letters: HashMap::new(), letter_times: qnc_letter_times::LetterTimes::new(), smooth_joins: qnc_smooth_joins::SmoothJoins::new(), take_heard: qnc_take_heard::TakeHeard::new(), read_checks: HashMap::new(), word_cut: qnc_edit_words::WordPair::new(), word_pick: None, voices: Vec::new(), voice_request: None, voice_after_write: None, message_after_write: None, clear_after_write: false }
     }
 }
 
@@ -793,7 +798,24 @@ impl Script {
         }
         self.view.blocks = rows(&self.blocks, self.view.profile.as_ref(), self.reading_speed());
         for row in &mut self.view.blocks {
-            row.voice = self.voices.iter().find(|(voice, _)| voice.block_id == row.block.id).map(|(voice, present)| VoiceRow::of(voice, *present, &row.block.text));
+            row.voice = self.voices.iter().find(|(voice, _)| voice.block_id == row.block.id).map(|(voice, present)| {
+                let mut shown = VoiceRow::of(voice, *present, &row.block.text);
+                // What was read against the text as it stands (user 2026-11-08).
+                shown.checks = voice
+                    .takes
+                    .iter()
+                    .filter_map(|take| {
+                        let heard = take.heard.as_ref()?;
+                        let key = (voice.block_id, take.take);
+                        if self.read_checks.get(&key).is_none_or(|(text, _)| *text != row.block.text) {
+                            let words: Vec<&str> = heard.iter().map(|word| word.text.as_str()).collect();
+                            self.read_checks.insert(key, (row.block.text.clone(), std::sync::Arc::new(qnc_read_check::check(&row.block.text, &words))));
+                        }
+                        Some((take.take, self.read_checks[&key].1.clone()))
+                    })
+                    .collect();
+                shown
+            });
             // The words of a statement with their times (user 2026-11-04: edited by its text).
             if row.is_clip() {
                 let names = &self.names;
@@ -821,6 +843,13 @@ impl Script {
             if self.smooth_joins.poll(&locator, &joins, !preview.player_view().playing()) {
                 self.read_at = None;
             }
+            // The words of a finished take are heard while nothing plays or records.
+            let takes = qnc_take_heard::wanted(self.voices.iter().map(|(voice, _)| voice));
+            let idle = !preview.player_view().playing() && self.take.is_none() && self.taking.is_none();
+            if self.take_heard.poll(&locator, &takes, idle) {
+                self.read_at = None;
+            }
+            self.view.read_note = self.take_heard.note().map(str::to_string);
         }
         let profile = self.view.profile.as_ref();
         let counts = |row: &BlockRow| profile.and_then(|profile| profile.kind(&row.block.kind)).map(|kind| kind.counts);
@@ -854,7 +883,7 @@ impl Script {
                             self.message_after_write = Some(qnc_ui_text::fill("script.take_silent", &[("take", &number.to_string())]));
                         }
                         let text = self.view.blocks.iter().find(|row| row.block.id == id).map(|row| row.block.text.clone()).unwrap_or_default();
-                        let take = qnc_script_db::VoiceTake { take: number, wav_uri, seconds, tc: timecode, text };
+                        let take = qnc_script_db::VoiceTake { take: number, wav_uri, seconds, tc: timecode, text, heard: None };
                         self.write(preview, move |target| qnc_script_db::add_voice_take(target, id, name, clip_uri, take).map(|_| None));
                     }
                     TakeAnswer::Finished(Err(error)) => self.view.message = error,

@@ -5,6 +5,7 @@ use std::collections::{BTreeMap, HashMap};
 
 use qnc_subsegment_edit::SubsegmentView;
 
+pub use qnc_read_check::{ReadCheck, Verdict};
 pub use qnc_script_db::{Block, Counts, KindSpec, Piece, Role, ScriptProfile, Voice, VoiceTake};
 
 /// What the voice record of a recorded block is (user 2026-10-30: the application knows
@@ -27,6 +28,8 @@ pub struct VoiceRow {
     pub takes: Vec<VoiceTake>,
     pub chosen: u16,
     pub status: VoiceStatus,
+    /// What was read in each take already heard, against the block's text.
+    pub checks: Vec<(u16, std::sync::Arc<ReadCheck>)>,
 }
 
 impl VoiceRow {
@@ -39,7 +42,12 @@ impl VoiceRow {
         } else {
             VoiceStatus::Recorded
         };
-        Self { name: voice.name.clone(), takes: voice.takes.clone(), chosen: voice.chosen, status }
+        Self { name: voice.name.clone(), takes: voice.takes.clone(), chosen: voice.chosen, status, checks: Vec::new() }
+    }
+
+    /// What was read in take `take`, once it is heard.
+    pub fn check_of(&self, take: u16) -> Option<&ReadCheck> {
+        self.checks.iter().find(|(number, _)| *number == take).map(|(_, check)| check.as_ref())
     }
 }
 
@@ -210,6 +218,8 @@ pub struct ScriptView {
     pub exported: Option<String>,
     /// An export is being written.
     pub exporting: bool,
+    /// Why the takes are not being checked against their text, if they are not.
+    pub read_note: Option<String>,
     /// The SubSegment open in place of the source timeline.
     pub subsegment: Option<SubsegmentView>,
     /// Words picked in the text of a statement (Delete cuts them out of its video).

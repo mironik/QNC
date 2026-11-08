@@ -210,6 +210,19 @@ pub struct VoiceTake {
     pub tc: String,
     /// The block's text as it was when the take was recorded.
     pub text: String,
+    /// The words heard in it (user 2026-11-08: the check of what was read); none until the
+    /// background has heard it, empty when nothing was said.
+    #[serde(default)]
+    pub heard: Option<Vec<HeardWord>>,
+}
+
+/// A word heard in a take: its text and its seconds in the take.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct HeardWord {
+    pub text: String,
+    pub start: f64,
+    pub end: f64,
 }
 
 impl Voice {
@@ -229,6 +242,8 @@ pub enum Operation {
     AddVoiceTake { id: i64, name: String, clip_uri: String, take: VoiceTake },
     /// Take `take` of block `id`'s voice record becomes the one used (its channel of the clip).
     SetVoiceChosen { id: i64, take: u16 },
+    /// The words heard in take `take` of block `id`'s voice record.
+    SetTakeHeard { id: i64, take: u16, heard: Vec<HeardWord> },
     /// The blocks in reading order.
     Read,
     /// The profile the project's script is written with (none yet: the script was never
@@ -411,6 +426,11 @@ pub fn add_voice_take(target: &ProjectDbTarget, id: i64, name: String, clip_uri:
 /// Take `take` of block `id` becomes the one used.
 pub fn set_voice_chosen(target: &ProjectDbTarget, id: i64, take: u16) -> Result<()> {
     write(target, Operation::SetVoiceChosen { id, take }).map(drop)
+}
+
+/// The words heard in take `take` of block `id`.
+pub fn set_take_heard(target: &ProjectDbTarget, id: i64, take: u16, heard: Vec<HeardWord>) -> Result<()> {
+    write(target, Operation::SetTakeHeard { id, take, heard }).map(drop)
 }
 
 /// The fields of block `id` become `fields`.

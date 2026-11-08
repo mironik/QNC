@@ -12,6 +12,7 @@ use qnc_action_event::ActionEvent;
 use qnc_script::{seconds_label, FieldEdit, DRAFT, EXPORT, SEND_STORY, OPEN_EXPORT, Role, FIELD_COMMIT, FIELD_SET, FIELD_TEXT, ScriptView, ADD_CLIP, ADD_QUOTE, ADD_TEXT, CLEAR_EDITOR, EDITOR_TEXT, MOVE_DOWN, MOVE_UP, OPEN, PANEL, RECORD, REMOVE, REPLACE_TEXT, SELECT, VOICE_TAKE};
 
 mod part_controls;
+mod read_marks;
 mod text_editor;
 use qnc_text_source_editor::{Answer, Editor, EditorButton};
 use qnc_transcript::TranscriptView;
@@ -231,9 +232,18 @@ pub fn paint_block(ui: &mut egui::Ui, place: &'static str, row: &qnc_script::Blo
                 for take in row.voice.iter().flat_map(|voice| voice.takes.iter().map(move |take| (voice.chosen, take))) {
                     let (chosen, take) = take;
                     let hint = qnc_ui_text::fill("script.voice_take_hint", &[("take", &take.take.to_string()), ("length", &seconds_label(take.seconds)), ("tc", &take.tc), ("text", &take.text)]);
-                    if qnc_ui_kit::chrome_button(ui, &format!("T{}", take.take), view.recording.is_none(), take.take == chosen, style).on_hover_text(hint).clicked() && take.take != chosen {
+                    // How much of the text the take read; ".." while it is being heard.
+                    let label = match row.voice.as_ref().and_then(|voice| voice.check_of(take.take)) {
+                        Some(check) => format!("T{} {}%", take.take, check.percent),
+                        None if view.read_note.is_none() => format!("T{} ..", take.take),
+                        None => format!("T{}", take.take),
+                    };
+                    if qnc_ui_kit::chrome_button(ui, &label, view.recording.is_none(), take.take == chosen, style).on_hover_text(hint).clicked() && take.take != chosen {
                         asked = Some(ActionEvent::key(VOICE_TAKE).with_target(format!("{}:{}", block.id, take.take)).at(PANEL));
                     }
+                }
+                if let Some(note) = view.read_note.as_ref().filter(|_| row.voice.is_some()) {
+                    ui.label(RichText::new(note).color(theme.text_muted).size(theme.font_ui));
                 }
             });
         }
@@ -287,6 +297,11 @@ pub fn paint_block(ui: &mut egui::Ui, place: &'static str, row: &qnc_script::Blo
                     asked = Some(event);
                 }
                 return (asked, false);
+            }
+            // A recorded text shows how the take used was read (user 2026-11-08).
+            let recording_here = view.recording.is_some_and(|(recording, _, _)| recording == block.id);
+            if let Some(check) = row.voice.as_ref().filter(|_| row.recorded && !text.is_empty() && !recording_here).and_then(|voice| voice.check_of(voice.chosen)) {
+                return (asked, read_marks::show(ui, text, check, theme));
             }
             let shown = if text.is_empty() { qnc_ui_text::text("script.no_words").to_string() } else { text.to_string() };
             let color = if text.is_empty() { theme.text_muted } else { theme.text };

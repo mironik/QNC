@@ -16,7 +16,7 @@ fn sot(id: i64, clip: &str, from: u64, to: u64) -> Block {
 
 #[test]
 fn a_draft_is_the_script_in_reading_order_with_its_recorded_takes_and_pauses_for_the_rest() {
-    let take = |take: u16, seconds: f64| VoiceTake { take, wav_uri: String::new(), seconds, tc: String::new(), text: String::new() };
+    let take = |take: u16, seconds: f64| VoiceTake { take, wav_uri: String::new(), seconds, tc: String::new(), text: String::new(), heard: None };
     let voices = [Voice { block_id: 2, name: "P_OFF1".into(), clip_uri: String::new(), chosen: 2, takes: vec![take(1, 4.0), take(2, 3.0)] }];
     let blocks = [
         block(1, "intro", "Najava se ne broji u prilog."),
@@ -42,7 +42,7 @@ fn a_script_with_nothing_for_the_draft_says_so() {
 
 #[test]
 fn the_skeleton_is_the_script_as_story_segments_without_the_offs_not_recorded() {
-    let take = |take: u16, seconds: f64| VoiceTake { take, wav_uri: String::new(), seconds, tc: String::new(), text: String::new() };
+    let take = |take: u16, seconds: f64| VoiceTake { take, wav_uri: String::new(), seconds, tc: String::new(), text: String::new(), heard: None };
     let voices = [Voice { block_id: 2, name: "P_OFF1".into(), clip_uri: String::new(), chosen: 2, takes: vec![take(1, 4.0), take(2, 3.0)] }];
     let blocks = [
         block(1, "intro", "Najava se ne broji u prilog."),

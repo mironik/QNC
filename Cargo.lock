@@ -5951,6 +5951,10 @@ dependencies = [
 ]
 
 [[package]]
+name = "qnc-read-check"
+version = "0.1.0"
+
+[[package]]
 name = "qnc-read-pace"
 version = "0.1.0"
 
@@ -6095,6 +6099,7 @@ dependencies = [
  "qnc-letter-times",
  "qnc-newsroom-sheet-db",
  "qnc-program-db",
+ "qnc-read-check",
  "qnc-script-db",
  "qnc-script-draft",
  "qnc-script-export",
@@ -6106,6 +6111,7 @@ dependencies = [
  "qnc-source-timecode",
  "qnc-status-line",
  "qnc-subsegment-edit",
+ "qnc-take-heard",
  "qnc-timeline-model",
  "qnc-transcript",
  "qnc-transcript-db",
@@ -6828,6 +6834,21 @@ dependencies = [
  "qnc-program-segments",
  "qnc-source-preview",
  "qnc-wrap-session",
+]
+
+[[package]]
+name = "qnc-take-heard"
+version = "0.1.0"
+dependencies = [
+ "qnc-db-broker",
+ "qnc-dev-diagnostics",
+ "qnc-script-db",
+ "qnc-still-locator",
+ "qnc-transcribe-jobs",
+ "qnc-transcribe-run",
+ "qnc-ui-text",
+ "qnc-voice-record",
+ "qnc-voice-take",
 ]
 
 [[package]]

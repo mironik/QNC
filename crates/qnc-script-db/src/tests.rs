@@ -113,7 +113,20 @@ fn only_a_block_of_a_recorded_kind_takes_a_recording() {
 }
 
 fn take(number: u16, seconds: f64, tc: &str, text: &str) -> VoiceTake {
-    VoiceTake { take: number, wav_uri: format!("qnc://local/source/project-p1/file/products/voice/P_OFF1_T{number}.wav"), seconds, tc: tc.into(), text: text.into() }
+    VoiceTake { take: number, wav_uri: format!("qnc://local/source/project-p1/file/products/voice/P_OFF1_T{number}.wav"), seconds, tc: tc.into(), text: text.into(), heard: None }
+}
+
+#[test]
+fn the_words_heard_are_kept_with_their_take_and_no_step_of_undo() {
+    let (_dir, target) = written();
+    let id = add(&target, None, off("Prvi off.")).unwrap();
+    let clip = "qnc://local/source/project-p1/file/products/voice/P_OFF1.mxf".to_string();
+    add_voice_take(&target, id, "P_OFF1".into(), clip, take(1, 2.0, "18:00:00:00", "Prvi off.")).unwrap();
+    assert_eq!(read_voice(&target, id).unwrap().unwrap().takes[0].heard, None);
+    let words = vec![HeardWord { text: "prvi".into(), start: 0.1, end: 0.4 }];
+    set_take_heard(&target, id, 1, words.clone()).unwrap();
+    assert_eq!(read_voice(&target, id).unwrap().unwrap().takes[0].heard, Some(words.clone()));
+    assert!(set_take_heard(&target, id, 2, words).is_err(), "only a take the record has");
 }
 
 #[test]

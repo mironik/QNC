@@ -1,0 +1,16 @@
+[package]
+name = "qnc-take-heard"
+version = "0.1.0"
+edition = "2021"
+description = "QNC public piece: the words heard in the takes of a script's voice records, transcribed in the background while the player is idle and kept with the take in the project database"
+
+[dependencies]
+qnc-db-broker = { workspace = true }
+qnc-dev-diagnostics = { workspace = true }
+qnc-script-db = { workspace = true }
+qnc-still-locator = { workspace = true }
+qnc-transcribe-jobs = { workspace = true }
+qnc-transcribe-run = { workspace = true }
+qnc-ui-text = { workspace = true }
+qnc-voice-record = { workspace = true }
+qnc-voice-take = { workspace = true }

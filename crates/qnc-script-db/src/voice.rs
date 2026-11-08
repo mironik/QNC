@@ -25,13 +25,29 @@ pub(crate) fn ensure_schema(conn: &Connection) -> Result<()> {
             tc TEXT NOT NULL,
             text TEXT NOT NULL,
             recorded_at_utc TEXT NOT NULL,
+            heard_json TEXT,
             PRIMARY KEY (block_id, take));
         CREATE VIEW IF NOT EXISTS public_script_voice AS
-            SELECT block_id, name, clip_uri, chosen, updated_at_utc FROM script_voice;
-        CREATE VIEW IF NOT EXISTS public_script_voice_takes AS
-            SELECT block_id, take, wav_uri, seconds, tc, text, recorded_at_utc FROM script_voice_takes;",
+            SELECT block_id, name, clip_uri, chosen, updated_at_utc FROM script_voice;",
+    )
+    .map_err(err)?;
+    // Takes recorded before the words heard in them are kept: they get the column, empty.
+    if !has_column_of(conn, "script_voice_takes", "heard_json")? {
+        conn.execute_batch("ALTER TABLE script_voice_takes ADD COLUMN heard_json TEXT").map_err(err)?;
+    }
+    if view_exists(conn, "public_script_voice_takes")? && !has_column_of(conn, "public_script_voice_takes", "heard_json")? {
+        conn.execute_batch("DROP VIEW public_script_voice_takes").map_err(err)?;
+    }
+    conn.execute_batch(
+        "CREATE VIEW IF NOT EXISTS public_script_voice_takes AS
+            SELECT block_id, take, wav_uri, seconds, tc, text, recorded_at_utc, heard_json FROM script_voice_takes;",
     )
     .map_err(err)
+}
+
+fn has_column_of(conn: &Connection, table: &str, column: &str) -> Result<bool> {
+    let sql: Option<String> = conn.query_row("SELECT sql FROM sqlite_master WHERE name = ?1", params![table], |r| r.get(0)).optional().map_err(err)?;
+    Ok(sql.is_some_and(|sql| sql.contains(column)))
 }
 
 /// A removed block takes its voice record with it (its files stay: the project folder lets
@@ -55,12 +71,15 @@ impl Store {
                 .map_err(err)?;
             rows.collect::<std::result::Result<Vec<_>, _>>().map_err(err)?
         };
-        let mut statement = conn.prepare("SELECT block_id, take, wav_uri, seconds, tc, text FROM public_script_voice_takes ORDER BY block_id, take").map_err(err)?;
+        // A view made before the words heard reads without them until the owner brings it up.
+        let heard = if has_column_of(conn, "public_script_voice_takes", "heard_json")? { "heard_json" } else { "NULL" };
+        let mut statement = conn.prepare(&format!("SELECT block_id, take, wav_uri, seconds, tc, text, {heard} FROM public_script_voice_takes ORDER BY block_id, take")).map_err(err)?;
         let rows = statement
-            .query_map([], |r| Ok((r.get::<_, i64>(0)?, VoiceTake { take: r.get::<_, i64>(1)?.clamp(1, u16::MAX as i64) as u16, wav_uri: r.get(2)?, seconds: r.get(3)?, tc: r.get(4)?, text: r.get(5)? })))
+            .query_map([], |r| Ok((r.get::<_, i64>(0)?, VoiceTake { take: r.get::<_, i64>(1)?.clamp(1, u16::MAX as i64) as u16, wav_uri: r.get(2)?, seconds: r.get(3)?, tc: r.get(4)?, text: r.get(5)?, heard: None }, r.get::<_, Option<String>>(6)?)))
             .map_err(err)?;
         for row in rows {
-            let (block, take) = row.map_err(err)?;
+            let (block, mut take, heard) = row.map_err(err)?;
+            take.heard = heard.map(|heard| serde_json::from_str(&heard).map_err(err)).transpose()?;
             if let Some(voice) = voices.iter_mut().find(|voice| voice.block_id == block) {
                 voice.takes.push(take);
             }
@@ -112,6 +131,16 @@ impl Store {
         )
         .map_err(err)?;
         tx.commit().map_err(err)?;
+        Ok(Data::Changed)
+    }
+
+    /// The words heard in take `take` of block `id` (no step of undo: the background made them).
+    pub(crate) fn set_take_heard(&mut self, id: i64, take: u16, heard: &[HeardWord]) -> Result<Data> {
+        let json = serde_json::to_string(heard).map_err(err)?;
+        let changed = self.connection().execute("UPDATE script_voice_takes SET heard_json = ?3 WHERE block_id = ?1 AND take = ?2", params![id, take, json]).map_err(err)?;
+        if changed == 0 {
+            return Err(qnc_ui_text::fill("db.script_voice_no_take", &[("take", &take.to_string())]));
+        }
         Ok(Data::Changed)
     }
 

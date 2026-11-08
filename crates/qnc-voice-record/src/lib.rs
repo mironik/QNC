@@ -242,6 +242,18 @@ fn record(path: PathBuf, device_name: Option<String>, sample_rate: u32, fps: f64
     Ok(Recording { path, seconds: written as f64 / sample_rate as f64, timecode: time_of_day_timecode(started, fps), silent: loudest_of_take.get() < SILENT_PEAK })
 }
 
+/// The samples of a recording this piece wrote and its sample rate.
+pub fn read_take(path: &Path) -> Result<(Vec<f32>, u32)> {
+    let bytes = std::fs::read(path).map_err(|e| format!("{}: {e}", path.display()))?;
+    let field16 = |at: usize| u16::from_le_bytes([bytes[at], bytes[at + 1]]);
+    if bytes.len() < 44 || &bytes[0..4] != b"RIFF" || &bytes[36..40] != b"data" || field16(22) != 1 || field16(34) != 24 {
+        return Err(qnc_ui_text::fill("voice.take_unreadable", &[("file", &path.display().to_string())]));
+    }
+    let rate = u32::from_le_bytes([bytes[24], bytes[25], bytes[26], bytes[27]]);
+    let samples = bytes[44..].chunks_exact(3).map(|b| (i32::from_le_bytes([0, b[0], b[1], b[2]]) >> 8) as f32 / 8_388_608.0).collect();
+    Ok((samples, rate))
+}
+
 /// The header of a mono 24-bit PCM WAV file of `samples` samples.
 fn write_header(out: &mut impl Write, sample_rate: u32, samples: u64) -> Result<()> {
     let data = (samples * 3).min(u32::MAX as u64 - 36) as u32;
@@ -280,6 +292,21 @@ mod tests {
         assert_eq!(&out[0..4], b"RIFF");
         assert_eq!(u32::from_le_bytes(out[40..44].try_into().unwrap()), 144_000);
         assert_eq!(u16::from_le_bytes(out[34..36].try_into().unwrap()), 24);
+    }
+
+    #[test]
+    fn a_take_written_here_is_read_back() {
+        let dir = tempfile::tempdir().unwrap();
+        let file = dir.path().join("t.wav");
+        let mut out = Vec::new();
+        write_header(&mut out, 48_000, 2).unwrap();
+        out.extend_from_slice(&4_194_304i32.to_le_bytes()[..3]);
+        out.extend_from_slice(&(-4_194_304i32).to_le_bytes()[..3]);
+        std::fs::write(&file, out).unwrap();
+        let (samples, rate) = read_take(&file).unwrap();
+        assert_eq!((samples, rate), (vec![0.5, -0.5], 48_000));
+        std::fs::write(&file, b"nothing").unwrap();
+        assert!(read_take(&file).is_err());
     }
 
     #[test]

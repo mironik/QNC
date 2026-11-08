@@ -1,0 +1,7 @@
+[package]
+name = "qnc-read-check"
+version = "0.1.0"
+edition = "2021"
+description = "QNC public piece: a written text against the words heard in a recording of it - which words were read, read wrong or missed, what was said beyond the text and how much was read; it reads and writes nothing"
+
+[dependencies]
