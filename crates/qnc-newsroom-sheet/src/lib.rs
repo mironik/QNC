@@ -274,14 +274,16 @@ fn fill(ui: &mut egui::Ui, overlay: &mut SheetOverlay, theme: &Theme, at: Option
     ui.add_space(ROW_GAP);
     // Row 1, the project name.
     let name_id = egui::Id::new(NAME_ID);
-    if at == Some((1, true)) {
-        ui.memory_mut(|memory| memory.request_focus(name_id));
-    }
     let name_row = ui.horizontal(|ui| {
         label(ui, theme, qnc_ui_text::text("project.project_name"));
         let edit = qnc_ui_kit::row_field(&mut overlay.name, field_w, ROW_HEIGHT).id(name_id);
         ui.add_enabled(overlay.name_editable, edit.hint_text(qnc_ui_text::text("project.name_new_project")));
     });
+    // The keyboard is given after the box is drawn: given before, the box itself takes the Enter
+    // that brought it there and a one-line box lets the keyboard go at Enter (the cursor gone).
+    if at == Some((1, true)) {
+        ui.memory_mut(|memory| memory.request_focus(name_id));
+    }
     qnc_ui_kit::paint_focus(ui, name_row.response.rect.expand(2.0), at.is_some_and(|(row, _)| row == 1), theme.focus);
     let mut typed = ui.memory(|memory| memory.has_focus(name_id)).then_some(1);
     ui.add_space(ROW_GAP / 2.0);
