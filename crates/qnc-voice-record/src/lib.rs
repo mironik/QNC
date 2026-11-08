@@ -37,7 +37,13 @@ pub struct Recording {
     pub seconds: f64,
     /// The time of day it started, as `HH:MM:SS:FF` at the project's frame rate.
     pub timecode: String,
+    /// Nothing came from the microphone (user 2026-11-08): its loudest sample is under
+    /// `SILENT_PEAK`, far below the noise of a room heard by a working microphone.
+    pub silent: bool,
 }
+
+/// The loudest sample of a take that heard nothing (-60 dBFS).
+const SILENT_PEAK: f32 = 0.001;
 
 /// A recording that runs; stop it to get the file.
 pub struct Recorder {
@@ -204,11 +210,13 @@ fn record(path: PathBuf, device_name: Option<String>, sample_rate: u32, fps: f64
     let started = chrono::Local::now().time();
     let _ = ready.send(Ok(()));
     let mut written: u64 = 0;
+    let loudest_of_take = std::cell::Cell::new(0f32);
     let mut write_block = |block: Vec<f32>, written: &mut u64| -> Result<()> {
         let mut loudest = f32::from_bits(peak.load(Ordering::Relaxed));
         for sample in block {
             let clamped = sample.clamp(-1.0, 1.0);
             loudest = loudest.max(clamped.abs());
+            loudest_of_take.set(loudest_of_take.get().max(clamped.abs()));
             let value = (clamped * 8_388_607.0).round() as i32;
             wav.write_all(&value.to_le_bytes()[..3]).map_err(|e| e.to_string())?;
             *written += 1;
@@ -231,7 +239,7 @@ fn record(path: PathBuf, device_name: Option<String>, sample_rate: u32, fps: f64
     file.seek(SeekFrom::Start(0)).map_err(|e| e.to_string())?;
     write_header(&mut file, sample_rate, written)?;
     file.sync_all().map_err(|e| e.to_string())?;
-    Ok(Recording { path, seconds: written as f64 / sample_rate as f64, timecode: time_of_day_timecode(started, fps) })
+    Ok(Recording { path, seconds: written as f64 / sample_rate as f64, timecode: time_of_day_timecode(started, fps), silent: loudest_of_take.get() < SILENT_PEAK })
 }
 
 /// The header of a mono 24-bit PCM WAV file of `samples` samples.

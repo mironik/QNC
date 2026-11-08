@@ -61,6 +61,8 @@ pub struct Recorded {
     pub wav_uri: String,
     pub seconds: f64,
     pub timecode: String,
+    /// The microphone gave no signal in this take.
+    pub silent: bool,
     /// The record's clip as the catalog keeps it, every take one channel (piece
     /// `qnc-voice-clip`, what it asked the encoder for).
     pub record: qnc_media_metadata::ClipMetadata,
@@ -152,7 +154,7 @@ impl Take {
         qnc_voice_clip::make(&clip)?;
         let clip_uri = format!("{}/{}.mxf", self.base, self.name);
         let record = qnc_voice_clip::describe(&clip, &clip_id(&self.name), &canonical(&clip_uri)?)?;
-        Ok(Recorded { clip_uri, name: self.name, number: self.number, wav_uri: self.wav_uri, seconds: recording.seconds, timecode: recording.timecode, record })
+        Ok(Recorded { silent: recording.silent, clip_uri, name: self.name, number: self.number, wav_uri: self.wav_uri, seconds: recording.seconds, timecode: recording.timecode, record })
     }
 
     /// Stops the take and throws it away (its file is left empty for the next take).

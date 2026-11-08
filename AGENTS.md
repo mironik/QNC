@@ -8571,3 +8571,6 @@ rijec se u tekstu dijela birala po svojoj sredini, pa je ostatak rijeci nestajao
 koja dio jos izgovara (`qnc-script` `timed_words`; pojedino slovo po svojoj sredini, znak bez vremena ide s prethodnim). Test.
 Izmjena isti dan (korisnik: "u ljevoj koloni sve timecode stavi u jedan red"): lijeva kolona tablice izjave u jednom je redu
 (pocetak - kraj, duljina), kolona siroka 310.
+Dopuna isti dan (korisnik: "cini se da ne radi snimanje offa"; snimke postoje, ali ulaz racunala daje tisinu, -91 dB i izvan QNC-a;
+"da, dodaj upozorenje"): snimka ciji je najglasniji uzorak ispod -60 dBFS ostaje zapisana, a poruka scenarija kaze da je tiha
+(`qnc-voice-record` `Recording.silent`, `qnc-voice-take`, `qnc-script`, rjecnik `script.take_silent`). Uzivo nije provjereno.

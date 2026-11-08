@@ -5,7 +5,13 @@ fn main() -> Result<(), String> {
     let reader = qnc_active_project_read::ActiveProjectReader::from_root(std::path::Path::new(&root)).map_err(|e| e.to_string())?;
     let snapshot = reader.read().map_err(|e| e.to_string())?;
     let target = qnc_db_broker::ProjectDbTarget::for_project(reader.settings_reader(), &snapshot.settings)?;
+    println!("dir={:?}", reader.settings_reader().local_workspace_dir(&snapshot.settings).map_err(|e| e.to_string())?);
     for block in qnc_script_db::read(&target)? {
+        if let Some(voice) = qnc_script_db::read_voice(&target, block.id)? {
+            println!("[{}] voice {} {} takes={:?} chosen={}", block.id, voice.name, voice.clip_uri, voice.takes.iter().map(|take| (take.take, take.seconds, take.wav_uri.clone())).collect::<Vec<_>>(), voice.chosen);
+        } else {
+            println!("[{}] kind={} no voice voice_uri={}", block.id, block.kind, block.voice_uri);
+        }
         for (index, piece) in block.pieces.iter().enumerate() {
             println!("[{}:{index}] clip={} {}..{} gap={} cut={} a1_channel={:?} a1_db={} a1_off={} smooth={}", block.id, piece.clip_id, piece.from_frame, piece.to_frame, piece.gap_before, piece.cut, piece.a1_channel, piece.a1_level_db, piece.a1_off, piece.smooth_frames);
         }

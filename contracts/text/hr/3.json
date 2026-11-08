@@ -62,6 +62,7 @@
     "script.voice_local_only": "Snimanje traži mapu projekta na ovom računalu.",
     "script.record_starting": "Otvaram mikrofon...",
     "script.recording": "Snimanje. Pritisnite Stop kad je tekst pročitan.",
+    "script.take_silent": "Snimka {take} je TIHA: mikrofon nije dao signal. Provjerite mikrofon u postavkama zvuka Windowsa i snimite ponovno.",
     "script.making_clip": "Izrađujem klip offa...",
     "script.record": "Snimi",
     "script.stop": "Zaustavi",

@@ -700,6 +700,7 @@
     "script.voice_local_only": "Recording needs the project folder on this computer.",
     "script.record_starting": "Opening the microphone...",
     "script.recording": "Recording. Press Stop when the text is read.",
+    "script.take_silent": "Take {take} is SILENT: the microphone gave no signal. Check the microphone in the Windows sound settings and record again.",
     "script.making_clip": "Making the voice-over clip...",
     "script.record": "Rec",
     "script.stop": "Stop",

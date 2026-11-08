@@ -848,7 +848,11 @@ impl Script {
                         self.view.message = qnc_ui_text::text("script.recording").into();
                     }
                     // A finished take goes into its block's record as its next channel, the one used.
-                    TakeAnswer::Finished(Ok(Recorded { name, clip_uri, number, wav_uri, seconds, timecode, .. })) => {
+                    TakeAnswer::Finished(Ok(Recorded { name, clip_uri, number, wav_uri, seconds, timecode, silent, .. })) => {
+                        // A take that heard nothing is kept, and said at once (user 2026-11-08).
+                        if silent {
+                            self.message_after_write = Some(qnc_ui_text::fill("script.take_silent", &[("take", &number.to_string())]));
+                        }
                         let text = self.view.blocks.iter().find(|row| row.block.id == id).map(|row| row.block.text.clone()).unwrap_or_default();
                         let take = qnc_script_db::VoiceTake { take: number, wav_uri, seconds, tc: timecode, text };
                         self.write(preview, move |target| qnc_script_db::add_voice_take(target, id, name, clip_uri, take).map(|_| None));
