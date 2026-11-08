@@ -80,7 +80,7 @@ impl ProgramSegments {
     /// new first one, the end its new last one and the first picture after the segment.
     /// They follow the IN/OUT on the source timeline of the segment's clip.
     pub(crate) fn edge_stills(&self) -> Vec<qnc_program_view::EditStill> {
-        use qnc_program_view::{program_picture, EditStill, StillPicture};
+        use qnc_program_view::{program_picture, CutPictures, StillPicture};
         let (Some(edge), Some(segment_id)) = (self.edge.as_ref(), self.editing.as_ref()) else {
             return Vec::new();
         };
@@ -92,26 +92,29 @@ impl ProgramSegments {
             return Vec::new();
         };
         let own = |frame: u64| row.kind.has_base_video().then(|| StillPicture { clip_id: row.clip_id.clone(), source_frame: frame });
-        let mut stills = Vec::new();
-        if edge.start {
-            if row.start_frame > 0 {
-                stills.push(EditStill::new(in_frame, false, program_picture(&self.view, row.start_frame - 1)).labelled(qnc_ui_text::text("story.still.before_segment_last")));
+        let pictures: CutPictures<'_> = if edge.start {
+            CutPictures {
+                cut: in_frame,
+                before: (row.start_frame > 0).then(|| (program_picture(&self.view, row.start_frame - 1), qnc_ui_text::text("story.still.before_segment_last"))),
+                after: Some((own(in_frame), qnc_ui_text::text("story.still.segment_new_first"))),
+                moving_after: true,
             }
-            stills.push(EditStill::new(in_frame, true, own(in_frame)).labelled(qnc_ui_text::text("story.still.segment_new_first")).at_cut());
         } else {
-            stills.push(EditStill::new(out_frame, false, own(out_frame.saturating_sub(1))).labelled(qnc_ui_text::text("story.still.segment_new_last")).at_cut());
-            if row.end_frame < self.view.total_frames {
-                stills.push(EditStill::new(out_frame, true, program_picture(&self.view, row.end_frame)).labelled(qnc_ui_text::text("story.still.after_segment_first")));
+            CutPictures {
+                cut: out_frame,
+                before: Some((own(out_frame.saturating_sub(1)), qnc_ui_text::text("story.still.segment_new_last"))),
+                after: (row.end_frame < self.view.total_frames).then(|| (program_picture(&self.view, row.end_frame), qnc_ui_text::text("story.still.after_segment_first"))),
+                moving_after: false,
             }
-        }
-        stills
+        };
+        pictures.stills()
     }
 
     /// The pictures of the source timeline's trim zoom: a segment edge's, else those of the
     /// taken IN or OUT (user 2026-10-25: as an M marker's, the picture before the cut and the
     /// one after it, the cut between them).
     pub(crate) fn source_stills(&self) -> Vec<qnc_program_view::EditStill> {
-        use qnc_program_view::{EditStill, StillPicture};
+        use qnc_program_view::{CutPictures, StillPicture};
         let edge = self.edge_stills();
         if !edge.is_empty() {
             return edge;
@@ -120,19 +123,11 @@ impl ProgramSegments {
             return Vec::new();
         };
         let picture = |frame: u64| Some(StillPicture { clip_id: clip_id.clone(), source_frame: frame });
-        let mut stills = Vec::new();
         if taken {
-            if in_frame > 0 {
-                stills.push(EditStill::new(in_frame, false, picture(in_frame - 1)).labelled(qnc_ui_text::text("story.still.before_in")));
-            }
-            stills.push(EditStill::new(in_frame, true, picture(in_frame)).labelled(qnc_ui_text::text("story.still.in_first")).at_cut());
+            CutPictures { cut: in_frame, before: (in_frame > 0).then(|| (picture(in_frame - 1), qnc_ui_text::text("story.still.before_in"))), after: Some((picture(in_frame), qnc_ui_text::text("story.still.in_first"))), moving_after: true }.stills()
         } else {
-            stills.push(EditStill::new(out_frame, false, picture(out_frame.saturating_sub(1))).labelled(qnc_ui_text::text("story.still.out_last")).at_cut());
-            if out_frame < self.source.duration_frames {
-                stills.push(EditStill::new(out_frame, true, picture(out_frame)).labelled(qnc_ui_text::text("story.still.after_out")));
-            }
+            CutPictures { cut: out_frame, before: Some((picture(out_frame.saturating_sub(1)), qnc_ui_text::text("story.still.out_last"))), after: (out_frame < self.source.duration_frames).then(|| (picture(out_frame), qnc_ui_text::text("story.still.after_out"))), moving_after: false }.stills()
         }
-        stills
     }
 
     /// The sound around the cut of the trim zoom (user 2026-10-25: "zoom the audio so the
@@ -147,22 +142,20 @@ impl ProgramSegments {
             let (num, den) = self.source.timebase?;
             let half = second((num.max(0) as u64, den.max(1) as u64));
             let position = self.source.playing.filter(|(program, _, _)| !program).map(|(_, frame, playing)| (frame, playing));
-            let playhead = self.zoom_follow.playhead(cut, position);
-            let (from, to) = qnc_program_view::zoom_window(cut, cut, half, self.source.duration_frames, playhead);
             // The whole clip, so a played window can read its sound ahead.
+            let length = self.source.duration_frames.max(cut + 1);
             let lane = |lane: &qnc_lane_choice::Lane| qnc_program_waveform::Placement {
                 clip_id: clip_id.clone(),
                 channel: lane.channel,
                 program_start: 0,
-                program_end: self.source.duration_frames.max(to),
+                program_end: length,
                 source_in: 0,
-                source_out: self.source.duration_frames.max(to),
+                source_out: length,
                 level_db: lane.level_db,
                 off: lane.off,
                 curve: Vec::new(),
             };
             // The clip's kept level curves, on its own axis as the source timeline has them.
-            let length = self.source.duration_frames.max(to);
             let span = qnc_level_curve::Span { start: 0, end: length, source_in: 0, source_out: length };
             let level_curves = (0..2u8)
                 .map(|index| {
@@ -174,7 +167,8 @@ impl ProgramSegments {
             for (index, placements) in lanes.iter_mut().enumerate() {
                 placements[0].curve = self.source.curves[index].clone();
             }
-            return Some(qnc_program_view::ZoomSound { from, to, cut, lanes, playhead, lane_choices: self.source.lane_choices, level_curves, ..Default::default() });
+            let axis = qnc_program_view::ZoomAxis { cut, holds: (cut, cut), half, total: self.source.duration_frames, position, follow: &self.zoom_follow, lanes };
+            return Some(qnc_program_view::ZoomSound { lane_choices: self.source.lane_choices, level_curves, ..axis.sound() });
         }
         if let Some(zoom) = self.clip_edge_zoom(view) {
             return Some(zoom);
@@ -189,8 +183,6 @@ impl ProgramSegments {
             (sound.lead.unwrap_or(cut).min(cut), sound.tail.unwrap_or(cut).max(cut))
         });
         let position = self.source.playing.filter(|(program, _, _)| *program).map(|(_, frame, playing)| (frame, playing));
-        let playhead = self.zoom_follow.playhead(cut, position);
-        let (from, to) = qnc_program_view::zoom_window(earliest, latest, half, view.total_frames, playhead);
         let (mut segments, mut covers) = view.wave_placements();
         // A taken level curve (docs/98 2.1): its wave is its draft and the curve is drawn over it.
         let level_curve = view.level_curves().into_iter().find(|curve| curve.taken);
@@ -204,11 +196,10 @@ impl ProgramSegments {
                 placement.curve = qnc_program_db::LevelKey::pairs(keys);
             }
         }
-        let reach = qnc_program_view::zoom_reach(from, to, playhead);
-        let near = |placements: Vec<qnc_program_waveform::Placement>| placements.into_iter().filter(|at| at.program_start < reach && from < at.program_end).collect();
         let taken_cut = self.marker_edit.as_ref().map(|(id, _)| id.clone());
         let focus_side = self.zoom_focus();
-        Some(qnc_program_view::ZoomSound { from, to, cut, lanes: [near(segments), near(covers)], cut_sound, picture_taken: taken_cut.is_some() && matches!(self.cut_part, crate::CutPart::Picture), taken_cut, playhead, focus_side, level_curves: view.level_curves(), ..Default::default() })
+        let axis = qnc_program_view::ZoomAxis { cut, holds: (earliest, latest), half, total: view.total_frames, position, follow: &self.zoom_follow, lanes: [segments, covers] };
+        Some(qnc_program_view::ZoomSound { cut_sound, picture_taken: taken_cut.is_some() && matches!(self.cut_part, crate::CutPart::Picture), taken_cut, focus_side, level_curves: view.level_curves(), ..axis.sound() })
     }
 
     /// The zoom of a taken S-Story clip edge is the zoom of an IN or OUT on the source timeline
@@ -227,16 +218,13 @@ impl ProgramSegments {
         let duration = self.clip_frames.get(&at.clip_id).copied().unwrap_or(at.source_out).max(cut);
         let (num, den) = view.timebase?;
         let half = ((f64::from(num) / f64::from(den.max(1))) * source as f64 / program as f64).round().max(1.0) as u64;
-        let playhead = self.zoom_follow.playhead(cut, None);
-        let (from, to) = qnc_program_view::zoom_window(cut, cut, half, duration, playhead);
-        let whole = qnc_program_waveform::Placement {
-            program_start: 0,
-            program_end: duration.max(to),
-            source_in: 0,
-            source_out: duration.max(to),
-            ..at
-        };
-        Some(qnc_program_view::ZoomSound { from, to, cut, lanes: [vec![whole], Vec::new()], playhead, ..Default::default() })
+        // The player plays the story: its frame inside this clip, on the clip's axis.
+        let (slot_start, slot_end, source_in) = (at.program_start, at.program_end, at.source_in);
+        let position = self.source.playing.filter(|(program, frame, _)| *program && (slot_start..slot_end).contains(frame)).map(|(_, frame, playing)| (source_in + (frame - slot_start) * source as u64 / program as u64, playing));
+        let length = duration.max(cut + 1);
+        let whole = qnc_program_waveform::Placement { program_start: 0, program_end: length, source_in: 0, source_out: length, ..at };
+        let axis = qnc_program_view::ZoomAxis { cut, holds: (cut, cut), half, total: duration, position, follow: &self.zoom_follow, lanes: [vec![whole], Vec::new()] };
+        Some(axis.sound())
     }
 
     /// Whether a segment edge taken from the segment panel waits for Enter or Escape.

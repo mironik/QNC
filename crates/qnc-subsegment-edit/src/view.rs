@@ -144,27 +144,22 @@ pub fn subsegment_zoom(
     use qnc_program_view::{EditStill, StillPicture};
     let (part, piece) = (view.parts.get(index)?, pieces.get(index)?);
     let picture = |piece: &Piece, frame: u64| Some(StillPicture { clip_id: piece.clip_id.clone(), source_frame: frame });
-    let bounded = |still: EditStill, piece: &Piece| EditStill { clip_frames: clip_frames(&piece.clip_id), ..still };
-    let (cut, before, after) = if out {
+    let pictures = if out {
         // The next part's IN on the right, also after a pause (user 2026-10-29: left the OUT of
         // the part before, right the IN of the next); after the last part what lies past its OUT.
-        let next = pieces.get(index + 1);
-        let after = match next {
-            Some(next) => bounded(EditStill::new(part.end, true, picture(next, next.from_frame)), next),
-            None => bounded(EditStill::new(part.end, true, picture(piece, piece.to_frame)), piece),
-        };
-        let before = bounded(EditStill::new(part.end, false, picture(piece, piece.to_frame.saturating_sub(1))), piece).at_cut();
-        (part.end, before.labelled(qnc_ui_text::text("story.still.out_last")), after.labelled(qnc_ui_text::text("story.still.after_out")))
+        let after = pieces.get(index + 1).map_or_else(|| picture(piece, piece.to_frame), |next| picture(next, next.from_frame));
+        qnc_program_view::CutPictures { cut: part.end, before: Some((picture(piece, piece.to_frame.saturating_sub(1)), qnc_ui_text::text("story.still.out_last"))), after: Some((after, qnc_ui_text::text("story.still.after_out"))), moving_after: false }
     } else {
         // The previous part's OUT on the left; before the first part what lies before its IN.
-        let previous = index.checked_sub(1).and_then(|i| pieces.get(i));
-        let before = match previous {
-            Some(previous) => bounded(EditStill::new(part.start, false, picture(previous, previous.to_frame.saturating_sub(1))), previous),
-            None => bounded(EditStill::new(part.start, false, (piece.from_frame > 0).then(|| picture(piece, piece.from_frame - 1)).flatten()), piece),
+        let before = match index.checked_sub(1).and_then(|i| pieces.get(i)) {
+            Some(previous) => picture(previous, previous.to_frame.saturating_sub(1)),
+            None => (piece.from_frame > 0).then(|| picture(piece, piece.from_frame - 1)).flatten(),
         };
-        let after = bounded(EditStill::new(part.start, true, picture(piece, piece.from_frame)), piece).at_cut();
-        (part.start, before.labelled(qnc_ui_text::text("story.still.before_in")), after.labelled(qnc_ui_text::text("story.still.in_first")))
+        qnc_program_view::CutPictures { cut: part.start, before: Some((before, qnc_ui_text::text("story.still.before_in"))), after: Some((picture(piece, piece.from_frame), qnc_ui_text::text("story.still.in_first"))), moving_after: true }
     };
+    let cut = pictures.cut;
+    let mut sides = pictures.stills().into_iter().map(|still| EditStill { clip_frames: still.picture.as_ref().and_then(|picture| clip_frames(&picture.clip_id)), ..still });
+    let (before, after) = (sides.next()?, sides.next()?);
     // The zoom is the timeline enlarged (AGENTS 0.12, user 2026-11-05: "one action works the same
     // in every situation, a right click is Ctrl+"): each picture stands on a frame of the
     // SubSegment's axis and a right click on it, or on its slot's length strip under it, sends
@@ -203,14 +198,12 @@ pub fn subsegment_zoom(
         }
     };
     let (before, after) = (still(before, left, true), still(after, right, false));
-    let half = rate.max(1);
-    let playhead = follow.and_then(|(follow, position)| follow.playhead(cut, position));
-    let (from, to) = qnc_program_view::zoom_window(cut, cut, half, view.total_frames, playhead);
-    let reach = qnc_program_view::zoom_reach(from, to, playhead);
-    let lane = subsegment_placements(view, pieces).into_iter().filter(|at| at.program_start < reach && from < at.program_end).collect();
+    let idle = qnc_program_view::ZoomFollow::default();
+    let (follow, position) = follow.unwrap_or((&idle, None));
+    let axis = qnc_program_view::ZoomAxis { cut, holds: (cut, cut), half: rate.max(1), total: view.total_frames, position, follow, lanes: [subsegment_placements(view, pieces), Vec::new()] };
     Some(qnc_program_view::SegmentsView {
         source_edit_stills: vec![before, after],
-        zoom_sound: Some(qnc_program_view::ZoomSound { from, to, cut, lanes: [lane, Vec::new()], playhead, ..Default::default() }),
+        zoom_sound: Some(axis.sound()),
         ..Default::default()
     })
 }

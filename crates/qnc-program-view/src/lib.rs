@@ -4,6 +4,8 @@
 //! (`qnc-program-segments`) gives it the stored rows (split out of it, audit 2026-10-10).
 
 mod edit_stills;
+mod zoom_axis;
+pub use zoom_axis::{CutPictures, ZoomAxis};
 mod markers;
 mod program;
 pub use program::*;

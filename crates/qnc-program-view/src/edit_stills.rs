@@ -111,16 +111,16 @@ pub fn edit_stills(view: &SegmentsView, slots: &[Slot], moves: &[(u64, u64)]) ->
     let mut stills = Vec::new();
     let slot = moves.len() == 2;
     for (index, (&(_, new), [before, after])) in moves.iter().zip(labels.iter().chain(std::iter::repeat(&labels[0]))).enumerate() {
-        // The cut: the picture after a marker; of a slot its own first and last.
-        let (cut_before, cut_after) = if slot { (index == 1, index == 0) } else { (false, true) };
-        if new > 0 {
-            let still = still(view, slots, &moved, new, false).labelled(before);
-            stills.push(if cut_before { still.at_cut() } else { still });
-        }
-        if new < view.total_frames {
-            let still = still(view, slots, &moved, new, true).labelled(after);
-            stills.push(if cut_after { still.at_cut() } else { still });
-        }
+        stills.extend(
+            crate::CutPictures {
+                cut: new,
+                before: (new > 0).then(|| (side_picture(view, slots, &moved, new, false), *before)),
+                after: (new < view.total_frames).then(|| (side_picture(view, slots, &moved, new, true), *after)),
+                // The cut: the picture after a marker; of a slot its own first and last.
+                moving_after: !(slot && index == 1),
+            }
+            .stills(),
+        );
     }
     stills
 }
@@ -137,11 +137,7 @@ pub fn trim_stills(view: &SegmentsView, slots: &[Slot], slot_id: &str, start: bo
     let new_end = slot.end_frame.saturating_add_signed(frames);
     // In the S-Story the story ends with its last clip: the end moves with it.
     let moved = |frame: u64| if frame >= slot.end_frame && (frame < total || view.clips_are_slots) { frame.saturating_add_signed(frames) } else { frame };
-    let mut stills = Vec::new();
     if start {
-        if slot.start_frame > 0 {
-            stills.push(still(view, slots, &|frame| frame, slot.start_frame, false).labelled(qnc_ui_text::text("story.still.previous_slot_last")));
-        }
         let clips = clip_covers(view, slots);
         let cover = view.covers.iter().chain(&clips).find(|cover| cover.slot_id == slot.slot_id);
         let first = match cover {
@@ -153,16 +149,22 @@ pub fn trim_stills(view: &SegmentsView, slots: &[Slot], slot_id: &str, start: bo
             }
             None => picture_at(view, &[], &|frame| frame, slot.start_frame),
         };
-        stills.push(EditStill::new(slot.start_frame, true, first).labelled(qnc_ui_text::text("story.still.slot_new_first")).at_cut());
+        crate::CutPictures {
+            cut: slot.start_frame,
+            before: (slot.start_frame > 0).then(|| (side_picture(view, slots, &|frame| frame, slot.start_frame, false), qnc_ui_text::text("story.still.previous_slot_last"))),
+            after: Some((first, qnc_ui_text::text("story.still.slot_new_first"))),
+            moving_after: true,
+        }
+        .stills()
     } else {
-        if new_end > 0 {
-            stills.push(still(view, slots, &moved, new_end, false).labelled(qnc_ui_text::text("story.still.slot_new_last")).at_cut());
+        crate::CutPictures {
+            cut: new_end,
+            before: (new_end > 0).then(|| (side_picture(view, slots, &moved, new_end, false), qnc_ui_text::text("story.still.slot_new_last"))),
+            after: (new_end < total).then(|| (side_picture(view, slots, &moved, new_end, true), qnc_ui_text::text("story.still.next_slot_first"))),
+            moving_after: false,
         }
-        if new_end < total {
-            stills.push(still(view, slots, &moved, new_end, true).labelled(qnc_ui_text::text("story.still.next_slot_first")));
-        }
+        .stills()
     }
-    stills
 }
 
 impl EditStill {
@@ -193,9 +195,9 @@ pub fn program_picture(view: &SegmentsView, frame: u64) -> Option<StillPicture> 
     (frame < view.total_frames).then(|| picture_at(view, &view.slots, &|frame| frame, frame)).flatten()
 }
 
-fn still(view: &SegmentsView, slots: &[Slot], moved: &dyn Fn(u64) -> u64, marker: u64, after: bool) -> EditStill {
-    let frame = if after { marker } else { marker - 1 };
-    EditStill::new(marker, after, picture_at(view, slots, moved, frame))
+/// The picture on one side of the cut at `marker` of the draft.
+fn side_picture(view: &SegmentsView, slots: &[Slot], moved: &dyn Fn(u64) -> u64, marker: u64, after: bool) -> Option<StillPicture> {
+    picture_at(view, slots, moved, if after { marker } else { marker - 1 })
 }
 
 /// The picture at a program frame of the draft: a cover there, else the segment.
@@ -425,12 +427,11 @@ mod zoom_click_tests {
 /// The pictures at the point of a taken level curve (docs/98 2.1, the zoom is the timeline
 /// enlarged around the playhead): the last picture before the playhead line and the one on it.
 pub fn point_stills(view: &SegmentsView, slots: &[Slot], frame: u64) -> Vec<EditStill> {
-    let mut stills = Vec::new();
-    if frame > 0 {
-        stills.push(still(view, slots, &|frame| frame, frame, false).labelled(qnc_ui_text::text("story.still.before_point")));
+    crate::CutPictures {
+        cut: frame,
+        before: (frame > 0).then(|| (side_picture(view, slots, &|frame| frame, frame, false), qnc_ui_text::text("story.still.before_point"))),
+        after: (frame < view.total_frames).then(|| (side_picture(view, slots, &|frame| frame, frame, true), qnc_ui_text::text("story.still.at_point"))),
+        moving_after: true,
     }
-    if frame < view.total_frames {
-        stills.push(still(view, slots, &|frame| frame, frame, true).labelled(qnc_ui_text::text("story.still.at_point")).at_cut());
-    }
-    stills
+    .stills()
 }
