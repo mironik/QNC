@@ -376,9 +376,9 @@ fn the_markers_of_an_off_text_are_m_markers_in_the_story_and_kept_with_the_segme
     let mut store = imported_store(&path);
     let off = AppendSegment { kind: "offovi".into(), clip_id: "c1".into(), in_frame: 100, out_frame: 150, a1: (0, 0, false), a2: (1, 0, true), origin: "script:2:0".into(), marks: vec![120] };
     run(&mut store, Operation::AppendSegments { project_id: "p1".into(), segments: vec![off] }).unwrap();
-    assert_eq!(segments(&mut store)[0].text_marks, [120]);
+    assert_eq!(segments(&mut store).iter().find(|row| row.lead.is_empty()).unwrap().text_marks, [120]);
     let conn = Connection::open(&path).unwrap();
-    let local: i64 = conn.query_row("SELECT origin_local_frame FROM story_markers WHERE origin_part_id <> ''", [], |row| row.get(0)).unwrap();
+    let local: i64 = conn.query_row("SELECT origin_local_frame FROM story_markers WHERE system_role = ''", [], |row| row.get(0)).unwrap();
     assert_eq!(local, 20);
 }
 
