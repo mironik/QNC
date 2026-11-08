@@ -278,7 +278,9 @@ fn fill(ui: &mut egui::Ui, overlay: &mut SheetOverlay, theme: &Theme, at: Option
     ui.horizontal(|ui| {
         label(ui, theme, qnc_ui_text::text("project.project_name"));
         let edit = qnc_ui_kit::row_field(&mut overlay.name, field_w, ROW_HEIGHT).id(name_id);
-        ui.add_enabled(overlay.name_editable, edit.hint_text(qnc_ui_text::text("project.name_new_project")));
+        let name = ui.add_enabled(overlay.name_editable, edit.hint_text(qnc_ui_text::text("project.name_new_project")));
+        // The one focus frame of the row the keyboard is on: around its box, not its label.
+        qnc_ui_kit::paint_focus(ui, name.rect.expand(2.0), at.is_some_and(|(row, _)| row == 1), theme.focus);
     });
     // The keyboard is given after the box is drawn: given before, the box itself takes the Enter
     // that brought it there and a one-line box lets the keyboard go at Enter (the cursor gone).

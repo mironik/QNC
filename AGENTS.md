@@ -8515,3 +8515,7 @@ nepotrebna je zelena boja dugmeta Kreiraj projekt, moze ostati zeleno jedino ako
 dugme Odustani"): red za upis vise nema okvir oko cijelog reda (svoj okvir i kursor pokazuje polje); red s izborom ima
 okvir samo oko izbornika, ne oko naziva (`qnc-settings-form`, `qnc-newsroom-sheet`). Gumb na kojem je tipkovnica je
 zelen, drugi je obican (`sheet_button`); Kreiraj projekt je zelen samo dok je u fokusu. Uzivo nije provjereno.
+Popravak 2026-11-08 (korisnik: "enter vodi na novi red, ali ne prikazuje fokus okvir nigdje osim polja koja su
+dropdown"): vlastiti okvir polja za upis u temi se ne vidi, pa i red za upis dobiva okvir boje fokusa, samo oko polja
+(ne oko naziva), isti kao izbornik: naziv projekta i polja lista (`qnc-newsroom-sheet`, `qnc-settings-form`). Jedan
+okvir po redu. Uzivo nije provjereno.
