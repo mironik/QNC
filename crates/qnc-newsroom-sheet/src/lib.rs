@@ -251,21 +251,22 @@ fn fill(ui: &mut egui::Ui, overlay: &mut SheetOverlay, theme: &Theme, at: Option
             chosen = row.choose(back).and_then(|index| index.parse::<usize>().ok()).filter(|index| *index != overlay.sheets.chosen);
         }
     }
-    let sheet_row = ui.horizontal(|ui| {
+    ui.horizontal(|ui| {
         label(ui, theme, qnc_ui_text::text("sheet.sheet"));
         let shown = overlay.sheets.current().map_or("—".to_string(), |sheet| sheet.name.clone());
-        egui::ComboBox::from_id_salt("qnc_story_sheet_choice").selected_text(shown).width(field_w * 0.6).show_ui(ui, |ui| {
+        let combo = egui::ComboBox::from_id_salt("qnc_story_sheet_choice").selected_text(shown).width(field_w * 0.6).show_ui(ui, |ui| {
             for (index, (sheet, _)) in overlay.sheets.list.iter().enumerate() {
                 if ui.selectable_label(index == overlay.sheets.chosen, &sheet.name).clicked() {
                     chosen = Some(index);
                 }
             }
         });
+        // Its choice is framed while the keyboard is on the row, not its label.
+        qnc_ui_kit::paint_focus(ui, combo.response.rect.expand(2.0), at.is_some_and(|(row, _)| row == 0), theme.focus);
         if button(ui, qnc_ui_text::text("sheet.edit"), overlay.sheets.current().is_some(), theme) {
             overlay.editing = overlay.sheets.current().cloned();
         }
     });
-    qnc_ui_kit::paint_focus(ui, sheet_row.response.rect.expand(2.0), at.is_some_and(|(row, _)| row == 0), theme.focus);
     if let Some(index) = chosen {
         if let Err(error) = overlay.sheets.choose(index) {
             overlay.message = error;
@@ -274,7 +275,7 @@ fn fill(ui: &mut egui::Ui, overlay: &mut SheetOverlay, theme: &Theme, at: Option
     ui.add_space(ROW_GAP);
     // Row 1, the project name.
     let name_id = egui::Id::new(NAME_ID);
-    let name_row = ui.horizontal(|ui| {
+    ui.horizontal(|ui| {
         label(ui, theme, qnc_ui_text::text("project.project_name"));
         let edit = qnc_ui_kit::row_field(&mut overlay.name, field_w, ROW_HEIGHT).id(name_id);
         ui.add_enabled(overlay.name_editable, edit.hint_text(qnc_ui_text::text("project.name_new_project")));
@@ -284,7 +285,6 @@ fn fill(ui: &mut egui::Ui, overlay: &mut SheetOverlay, theme: &Theme, at: Option
     if at == Some((1, true)) {
         ui.memory_mut(|memory| memory.request_focus(name_id));
     }
-    qnc_ui_kit::paint_focus(ui, name_row.response.rect.expand(2.0), at.is_some_and(|(row, _)| row == 1), theme.focus);
     let mut typed = ui.memory(|memory| memory.has_focus(name_id)).then_some(1);
     ui.add_space(ROW_GAP / 2.0);
     // Rows 2.., the sheet's fields.
@@ -299,22 +299,27 @@ fn fill(ui: &mut egui::Ui, overlay: &mut SheetOverlay, theme: &Theme, at: Option
     typed
 }
 
-/// Confirm (rightmost) and Cancel of the filled sheet; the one the keyboard is on is framed.
+/// Confirm (rightmost) and Cancel of the filled sheet. The one the keyboard is on is the strong
+/// (green) button, the other a plain one (user 2026-11-08: green only while it has the focus).
 fn fill_buttons(ui: &mut egui::Ui, overlay: &SheetOverlay, theme: &Theme, on_button: Option<&str>) -> Option<Answer> {
     let mut answer = None;
     right_row(ui, |ui| {
-        let confirm = qnc_ui_kit::strong_button(ui, &overlay.confirm_label, ready(overlay), theme.accent, theme.chrome_control_height);
-        if confirm.clicked() {
+        if sheet_button(ui, theme, &overlay.confirm_label, ready(overlay), on_button == Some(CONFIRM)) {
             answer = Some(Answer::Confirm);
         }
-        let cancel = qnc_ui_kit::chrome_button(ui, qnc_ui_text::text("common.cancel"), true, false, qnc_theme_styles::button(theme));
-        if cancel.clicked() {
+        if sheet_button(ui, theme, qnc_ui_text::text("common.cancel"), true, on_button == Some(CANCEL)) {
             answer = Some(Answer::Cancel);
         }
-        qnc_ui_kit::paint_focus(ui, confirm.rect.expand(2.0), on_button == Some(CONFIRM), theme.focus);
-        qnc_ui_kit::paint_focus(ui, cancel.rect.expand(2.0), on_button == Some(CANCEL), theme.focus);
     });
     answer
+}
+
+/// A button of the sheet: green while the keyboard is on it, plain otherwise.
+fn sheet_button(ui: &mut egui::Ui, theme: &Theme, label: &str, enabled: bool, focused: bool) -> bool {
+    match focused {
+        true => qnc_ui_kit::strong_button(ui, label, enabled, theme.accent, theme.chrome_control_height).clicked(),
+        false => qnc_ui_kit::chrome_button(ui, label, enabled, false, qnc_theme_styles::button(theme)).clicked(),
+    }
 }
 
 const KINDS: [(FieldKind, &str); 4] = [

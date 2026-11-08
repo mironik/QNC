@@ -8510,3 +8510,8 @@ nije vidio"): okvir reda na kojem je tipkovnica crta se i na redovima za upis (n
 projekta dobivao je tipkovnicu prije nego je nacrtan, pa je isti Enter koji ga je doveo obradilo i samo polje i pustilo
 tipkovnicu (kursor nestao); sada je dobiva nakon crtanja, kao i polja lista (`qnc-newsroom-sheet`). Uzivo nije
 provjereno.
+Ispravak 2026-11-08 (korisnik, snimka obrasca: "nepotrebno crtas dva fokus okvira, nepotreban je okvir na nazivu kolone;
+nepotrebna je zelena boja dugmeta Kreiraj projekt, moze ostati zeleno jedino ako je trenutno u fokusu, inace bude kao
+dugme Odustani"): red za upis vise nema okvir oko cijelog reda (svoj okvir i kursor pokazuje polje); red s izborom ima
+okvir samo oko izbornika, ne oko naziva (`qnc-settings-form`, `qnc-newsroom-sheet`). Gumb na kojem je tipkovnica je
+zelen, drugi je obican (`sheet_button`); Kreiraj projekt je zelen samo dok je u fokusu. Uzivo nije provjereno.
