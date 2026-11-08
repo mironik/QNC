@@ -238,7 +238,7 @@ pub fn paint_block(ui: &mut egui::Ui, place: &'static str, row: &qnc_script::Blo
                         None if view.read_note.is_none() => format!("T{} ..", take.take),
                         None => format!("T{}", take.take),
                     };
-                    if qnc_ui_kit::chrome_button(ui, &label, view.recording.is_none(), take.take == chosen, style).on_hover_text(hint).clicked() && take.take != chosen {
+                    if qnc_ui_kit::chrome_button(ui, &label, view.recording.is_none(), take.take == chosen, style).on_hover_text(hint).clicked() {
                         asked = Some(ActionEvent::key(VOICE_TAKE).with_target(format!("{}:{}", block.id, take.take)).at(PANEL));
                     }
                 }
