@@ -6101,6 +6101,7 @@ dependencies = [
  "qnc-script-files",
  "qnc-script-profile",
  "qnc-skeleton-db",
+ "qnc-smooth-joins",
  "qnc-source-preview",
  "qnc-source-timecode",
  "qnc-status-line",
@@ -6136,6 +6137,7 @@ dependencies = [
 name = "qnc-script-draft"
 version = "0.1.0"
 dependencies = [
+ "qnc-frame-interp",
  "qnc-program-input",
  "qnc-script-db",
  "qnc-script-profile",
@@ -6437,6 +6439,27 @@ dependencies = [
  "qnc-skeleton-db",
  "qnc-source-preview",
  "qnc-ui-text",
+]
+
+[[package]]
+name = "qnc-smooth-joins"
+version = "0.1.0"
+dependencies = [
+ "qnc-ai-catalog",
+ "qnc-db-broker",
+ "qnc-decoder-catalog",
+ "qnc-dev-diagnostics",
+ "qnc-frame-interp",
+ "qnc-media-metadata",
+ "qnc-plugin-process",
+ "qnc-script-db",
+ "qnc-script-draft",
+ "qnc-still-locator",
+ "qnc-transcribe-jobs",
+ "qnc-ui-text",
+ "qnc-voice-catalog",
+ "qnc-voice-clip",
+ "qnc-voice-take",
 ]
 
 [[package]]

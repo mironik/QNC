@@ -304,6 +304,7 @@ members = [
     "crates/qnc-level-curve",
     "crates/qnc-sound-assist",
     "crates/qnc-frame-interp",
+    "crates/qnc-smooth-joins",
     "crates/qnc-wheel-jog",
     "crates/qnc-source-panel",
     "crates/qnc-source-timeline",
@@ -588,6 +589,8 @@ qnc-ctc-align = { path = "crates/qnc-ctc-align" }
 qnc-letter-align = { path = "crates/qnc-letter-align" }
 qnc-letter-db = { path = "crates/qnc-letter-db" }
 qnc-letter-times = { path = "crates/qnc-letter-times" }
+qnc-frame-interp = { path = "crates/qnc-frame-interp" }
+qnc-smooth-joins = { path = "crates/qnc-smooth-joins" }
 qnc-match-frame = { path = "crates/qnc-match-frame" }
 qnc-segments-keys = { path = "crates/qnc-segments-keys" }
 qnc-sync-session = { path = "crates/qnc-sync-session" }

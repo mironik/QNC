@@ -37,7 +37,7 @@ mod word_pick;
 pub use word_pick::{WordPick, TEXT_CUT, TEXT_DRAFT, TEXT_REVERT, WORD_PICK, WORD_TAKE};
 pub use text_edit::text_of;
 pub use qnc_subsegment_edit::{
-    drag_target, nearest_edge, own_action, subsegment_pictures, subsegment_placements, subsegment_view, subsegment_zoom, JoinSide, JoinSound, SubsegmentPart, SubsegmentView, DRAG_EDGE, JOIN_CUT, JOIN_GAP, PART_CHANNEL, PART_LEVEL, PART_MOVE, PART_OFF, PART_REMOVE, ROW_ACTIONS, SLIP, SUBSEGMENT_CLOSE, SUBSEGMENT_CUE, SUBSEGMENT_SELECT, SUBSEGMENT_TAKE, TAKE_EDGE, ZOOM_WORD,
+    drag_target, nearest_edge, own_action, subsegment_pictures, subsegment_placements, subsegment_view, subsegment_zoom, JoinSide, JoinSound, SubsegmentPart, SubsegmentView, DRAG_EDGE, JOIN_CUT, JOIN_GAP, JOIN_SMOOTH, PART_CHANNEL, PART_LEVEL, PART_MOVE, PART_OFF, PART_REMOVE, ROW_ACTIONS, SLIP, SUBSEGMENT_CLOSE, SUBSEGMENT_CUE, SUBSEGMENT_SELECT, SUBSEGMENT_TAKE, TAKE_EDGE, ZOOM_WORD,
 };
 
 pub use view::*;
@@ -148,6 +148,8 @@ pub struct Script {
     /// lays the letters of the words shown without them (user 2026-11-05).
     letters: HashMap<String, Vec<qnc_letter_db::WordLetters>>,
     letter_times: qnc_letter_times::LetterTimes,
+    /// The in-between pictures of the smooth cuts, made in the background (user 2026-11-08).
+    smooth_joins: qnc_smooth_joins::SmoothJoins,
     /// The first word of a cut by text (a double click on a word): its block, part and frames.
     word_cut: qnc_edit_words::WordPair<(i64, usize)>,
     /// Words picked in the text of a statement, to be cut out of its video with Delete.
@@ -167,7 +169,7 @@ pub struct Script {
 
 impl Default for Script {
     fn default() -> Self {
-        Self { view: ScriptView::default(), blocks: Vec::new(), project: None, reading: None, read_at: None, writing: None, queued: std::collections::VecDeque::new(), source_request: None, names: HashMap::new(), words_per_second: Ok(0.0), take: None, taking: None, exporting: None, draft: Default::default(), edit: Default::default(), letters: HashMap::new(), letter_times: qnc_letter_times::LetterTimes::new(), word_cut: qnc_edit_words::WordPair::new(), word_pick: None, voices: Vec::new(), voice_request: None, voice_after_write: None, message_after_write: None, clear_after_write: false }
+        Self { view: ScriptView::default(), blocks: Vec::new(), project: None, reading: None, read_at: None, writing: None, queued: std::collections::VecDeque::new(), source_request: None, names: HashMap::new(), words_per_second: Ok(0.0), take: None, taking: None, exporting: None, draft: Default::default(), edit: Default::default(), letters: HashMap::new(), letter_times: qnc_letter_times::LetterTimes::new(), smooth_joins: qnc_smooth_joins::SmoothJoins::new(), word_cut: qnc_edit_words::WordPair::new(), word_pick: None, voices: Vec::new(), voice_request: None, voice_after_write: None, message_after_write: None, clear_after_write: false }
     }
 }
 
@@ -514,6 +516,8 @@ impl Script {
         };
         let at = |frame: u64| timecode.map_or_else(|| frame.to_string(), |tc| tc.label(frame));
         Some(Piece {
+            smooth_frames: 0,
+            smooth_clip: String::new(),
             clip_name: self.names.get(&clip_id).map_or_else(|| clip_id.clone(), |(name, _, _)| name.clone()),
             seconds: self.seconds_of(&clip_id, to - from),
             text: if transcript.clip_id.as_deref() == Some(clip_id.as_str()) { transcript.said(from, to) } else { String::new() },
@@ -812,6 +816,12 @@ impl Script {
             let needs = view::letter_needs(&self.view.blocks, &self.names);
             if self.letter_times.poll(&locator, &needs, !preview.player_view().playing()) {
                 self.read_at = None; // the letters kept are read now
+            }
+            // A smooth cut made is on the join in the database: read it, and the open
+            // SubSegment plays it.
+            let joins = qnc_smooth_joins::wanted(&self.blocks);
+            if self.smooth_joins.poll(&locator, &joins, !preview.player_view().playing()) {
+                self.read_at = None;
             }
         }
         let profile = self.view.profile.as_ref();

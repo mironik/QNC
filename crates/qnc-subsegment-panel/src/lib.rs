@@ -8,7 +8,7 @@
 use eframe::egui::{self, RichText};
 use qnc_action_event::ActionEvent;
 use qnc_segment_panel::{cover_fill, CoverLengthBand};
-use qnc_script::{SubsegmentView, JOIN_CUT, JOIN_GAP, PART_CHANNEL, PART_LEVEL, PART_MOVE, PART_OFF, PART_REMOVE};
+use qnc_script::{SubsegmentView, JOIN_CUT, JOIN_GAP, JOIN_SMOOTH, PART_CHANNEL, PART_LEVEL, PART_MOVE, PART_OFF, PART_REMOVE};
 use qnc_timeline::{
     AudioLane, TimelineCoverSpan, TimelineFocusPaint, TimelineInput, TimelineLayerFlags, TimelineMarkerPart, TimelineMarkerPin,
     TimelineMetrics, TimelinePicture, TimelineProjection, TimelineTheme, TimelineVirtualSpan,
@@ -250,6 +250,27 @@ pub fn show(ui: &mut egui::Ui, view: &SubsegmentView, theme: TimelineTheme, leng
                 let kind = qnc_ui_text::text(if part.cut { "subsegment.cut" } else { "subsegment.crossfade" });
                 if ui.small_button(kind).on_hover_text(qnc_ui_text::text("subsegment.join_hint")).clicked() {
                     answer = Some(ActionEvent::key(JOIN_CUT).with_target(target(None)));
+                }
+                // The smooth cut of the join: AI in-between pictures around it, its pictures
+                // two more or fewer; what it is doing is said beside it.
+                let on = part.smooth_frames > 0;
+                let label = if on { qnc_ui_text::fill("subsegment.smooth_on", &[("frames", &part.smooth_frames.to_string())]) } else { qnc_ui_text::text("subsegment.smooth").to_string() };
+                if qnc_ui_kit::small_button(ui, &label, true, on).on_hover_text(qnc_ui_text::text("subsegment.smooth_hint")).clicked() {
+                    answer = Some(ActionEvent::key(JOIN_SMOOTH).with_target(target(None)));
+                }
+                if on {
+                    if ui.small_button("-").clicked() {
+                        answer = Some(ActionEvent::key(JOIN_SMOOTH).with_target(target(Some(-1))));
+                    }
+                    if ui.small_button("+").clicked() {
+                        answer = Some(ActionEvent::key(JOIN_SMOOTH).with_target(target(Some(1))));
+                    }
+                    let state = match part.smooth_ready {
+                        Some(true) => "subsegment.smooth_ready",
+                        Some(false) => "subsegment.smooth_making",
+                        None => "subsegment.smooth_cannot",
+                    };
+                    ui.label(RichText::new(qnc_ui_text::text(state)).color(theme.text));
                 }
                 ui.separator();
             }

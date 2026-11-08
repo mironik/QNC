@@ -22,6 +22,35 @@ struct File {
     /// the script); a host without it has none.
     #[serde(default)]
     letters: Option<LettersJob>,
+    /// The in-between pictures of a smooth cut (user 2026-11-08); a host without it has none.
+    #[serde(default)]
+    smooth: Option<LettersJob>,
+}
+
+/// The engine that makes the in-between pictures of a smooth cut on this host.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct FrameInterpolator {
+    /// The program's name beside the application.
+    pub program: String,
+    /// The model's folder.
+    pub model: PathBuf,
+}
+
+/// The frame interpolator of this host's catalog; its model must be there.
+pub fn installed_frame_interpolator() -> Result<FrameInterpolator, String> {
+    frame_interpolator(&installed_path()?)
+}
+
+/// The frame interpolator of the catalog at `path`.
+pub fn frame_interpolator(path: &Path) -> Result<FrameInterpolator, String> {
+    let text = std::fs::read_to_string(path).map_err(|e| format!("{}: {e}", path.display()))?;
+    let file: File = serde_json::from_str(&text).map_err(|e| format!("{}: {e}", path.display()))?;
+    let job = file.smooth.ok_or("the AI catalog of this host has no frame interpolator")?;
+    let model = path.parent().ok_or("the AI catalog has no folder")?.join(&job.model);
+    if !model.exists() {
+        return Err(format!("frame interpolator: the model {} is not on this host", model.display()));
+    }
+    Ok(FrameInterpolator { program: job.program, model })
 }
 
 #[derive(Debug, Clone, Deserialize)]

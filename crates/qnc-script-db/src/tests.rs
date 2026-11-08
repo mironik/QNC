@@ -231,7 +231,32 @@ fn a_block_keeps_only_the_fields_of_its_kind_and_a_choice_only_one_of_its_choice
 }
 
 fn piece(clip: &str, from: u64, to: u64, text: &str) -> Piece {
-    Piece { clip_id: clip.into(), clip_name: clip.into(), from_frame: from, to_frame: to, start_tc: format!("tc{from}"), end_tc: format!("tc{to}"), length: "1:00".into(), seconds: 1.0, text: text.into(), gap_before: 0, cut: false, a1_channel: None, a1_level_db: 0, a1_off: false, a1_lead_frames: 0, a1_tail_frames: 0, v_lead_frames: 0, v_tail_frames: 0, level_keys: Vec::new() }
+    Piece { clip_id: clip.into(), clip_name: clip.into(), from_frame: from, to_frame: to, start_tc: format!("tc{from}"), end_tc: format!("tc{to}"), length: "1:00".into(), seconds: 1.0, text: text.into(), gap_before: 0, cut: false, a1_channel: None, a1_level_db: 0, a1_off: false, a1_lead_frames: 0, a1_tail_frames: 0, v_lead_frames: 0, v_tail_frames: 0, level_keys: Vec::new(), smooth_frames: 0, smooth_clip: String::new() }
+}
+
+#[test]
+fn a_smooth_cut_is_the_joins_and_its_clip_is_no_step_of_undo() {
+    let (_dir, target) = written();
+    let id = add(&target, None, sot("2002")).unwrap();
+    add_piece(&target, id, piece("2002", 500, 550, "drugi")).unwrap();
+    add_piece(&target, id, piece("2679", 10, 60, "treci")).unwrap();
+    set_smooth(&target, id, 1, 8).unwrap();
+    set_smooth_clip(&target, id, 1, "smooth-1".into()).unwrap();
+    let pieces = read(&target).unwrap().remove(0).pieces;
+    assert_eq!((pieces[1].smooth_frames, pieces[1].smooth_clip.as_str(), pieces[2].smooth_frames), (8, "smooth-1", 0));
+    assert!(set_smooth(&target, id, 0, 8).is_err(), "the first part has no join");
+    // A trim leaves the join its smooth cut, a move leaves it between the same places.
+    let mut trimmed = pieces[1].clone();
+    trimmed.to_frame = 540;
+    set_piece(&target, id, 1, trimmed).unwrap();
+    assert_eq!(read(&target).unwrap().remove(0).pieces[1].smooth_frames, 8);
+    move_piece(&target, id, 2, true).unwrap();
+    let pieces = read(&target).unwrap().remove(0).pieces;
+    assert_eq!((pieces[1].clip_id.as_str(), pieces[1].smooth_frames), ("2679", 8));
+    // The clip the background made is not a step: undo takes back the last change of the story.
+    undo(&target).unwrap();
+    let pieces = read(&target).unwrap().remove(0).pieces;
+    assert_eq!(pieces[1].clip_id.as_str(), "2002", "the move is taken back");
 }
 
 #[test]

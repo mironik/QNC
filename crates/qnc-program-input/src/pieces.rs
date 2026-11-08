@@ -29,6 +29,10 @@ pub struct PieceInput {
     /// The level curve of the part's A1 (user 2026-11-07, as a segment's): points at frames of
     /// its clip, tenths of a dB added to its level.
     pub level_keys: Vec<(u64, i16)>,
+    /// The smooth cut of the join before it (user 2026-11-08): the clip of its in-between
+    /// pictures and their count. They overwrite the picture around the cut as a cover does (half
+    /// before it, half after), with no sound of their own: the length and the sound stay.
+    pub smooth: Option<(String, u64)>,
 }
 
 /// The program of a SubSegment: its parts one after another on V1 and A1 (a pause is black
@@ -100,6 +104,17 @@ pub fn load_pieces(
             let shaped = piece.sound_lead != 0 || piece.sound_tail != 0;
             joins.push(qnc_program_playlist::A1Join { end: start, start: start + gap, frames: if piece.crossfade && !shaped { crossfade } else { 0 } });
         }
+        // The in-between pictures of a smooth cut: what falls before the join on the part
+        // before, the rest on this one (only between parts at the story's own rate).
+        let mut covers = Vec::new();
+        if let Some((clip, n)) = piece.smooth.as_ref().filter(|_| joined && (num, den) == (1, 1) && before_scale == (1, 1)) {
+            let n = frame(*n)?;
+            let half = n / 2;
+            if let Some(before) = segments.last_mut() {
+                before.covers.push(smooth_cover(index, "before", clip, (start - half, start), (0, half), program_timebase)?);
+            }
+            covers.push(smooth_cover(index, "after", clip, (start, start + n - half), (half, n), program_timebase)?);
+        }
         before_scale = (num, den);
         segments.push(ProgramSegmentInput {
             segment_id: format!("piece-{index}"),
@@ -111,7 +126,7 @@ pub fn load_pieces(
             a1_source_channel: sound.map_or(0, |sound| sound.0),
             a1_level_db: sound.map_or(0, |sound| sound.1),
             a1_off: sound.is_some_and(|sound| sound.2),
-            covers: Vec::new(),
+            covers,
             v_lead_frames: picture_lead.try_into().unwrap_or_default(),
             v_tail_frames: 0,
             a1_lead_frames: lead,
@@ -144,6 +159,24 @@ pub fn load_pieces(
     qnc_program_playlist::join_a1(&mut playlist.items, &joins)?;
     playlist.validate().map_err(|error| error.message)?;
     ProgramInput::new(playlist, resolver.prepared).map_err(|error| error.to_string())
+}
+
+/// A part of the in-between pictures of a smooth cut as a cover without sound.
+fn smooth_cover(index: usize, side: &str, clip_id: &str, (from, to): (i64, i64), (source_in, source_out): (i64, i64), timebase: FrameTimebase) -> Result<qnc_program_playlist::ProgramCoverInput, String> {
+    Ok(qnc_program_playlist::ProgramCoverInput {
+        cover_id: format!("smooth-{index}-{side}"),
+        clip_id: clip_id.to_string(),
+        virtual_shot_id: String::new(),
+        record_range: ProgramFrameRange::new(from, to).map_err(|error| error.message)?,
+        source_range: FrameRange { source_in, source_out, timebase },
+        a2_source_channel: 0,
+        a2_level_db: 0,
+        a2_off: true,
+        active: true,
+        a2_lead_frames: 0,
+        a2_tail_frames: 0,
+        a2_points: Vec::new(),
+    })
 }
 
 fn gap_segment(index: usize, clip_id: &str, (from, to): (i64, i64), timebase: FrameTimebase) -> Result<ProgramSegmentInput, String> {

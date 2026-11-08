@@ -40,6 +40,10 @@ pub struct VoiceClip<'a> {
     /// The text on its picture and the small line above it.
     pub text: &'a str,
     pub heading: &'a str,
+    /// The picture is this numbered sequence of files (as ffmpeg names them, `dir/p_%02d.png`,
+    /// from 1) instead of a title card: pictures QNC made itself (user 2026-11-08: the
+    /// in-between pictures of a smooth cut).
+    pub sequence: Option<&'a Path>,
     /// The project picture: its size and frame rate.
     pub width: u32,
     pub height: u32,
@@ -77,7 +81,9 @@ pub fn make(clip: &VoiceClip<'_>) -> Result<PathBuf> {
     let stem = format!("qnc-voice-{}-{}", std::process::id(), clip.out.file_stem().and_then(|s| s.to_str()).unwrap_or("clip"));
     let card = std::env::temp_dir().join(format!("{stem}.png"));
     let made = std::env::temp_dir().join(format!("{stem}.mxf"));
-    qnc_title_card::write_png(&card, clip.text, clip.heading, clip.width, clip.height)?;
+    if clip.sequence.is_none() {
+        qnc_title_card::write_png(&card, clip.text, clip.heading, clip.width, clip.height)?;
+    }
     let result = run(&ffmpeg, clip, &card, &made).and_then(|()| std::fs::copy(&made, clip.out).map(drop).map_err(|e| format!("{}: {e}", clip.out.display())));
     let _ = std::fs::remove_file(&card);
     let _ = std::fs::remove_file(&made);
@@ -170,7 +176,11 @@ fn run(ffmpeg: &Path, clip: &VoiceClip<'_>, card: &Path, out: &Path) -> Result<(
     let frames = frames(clip.seconds, clip.fps);
     let length = format!("{:.6}", frames as f64 / clip.fps);
     let mut command = Command::new(ffmpeg);
-    command.args(["-hide_banner", "-loglevel", "error", "-nostdin", "-y"]).args(["-loop", "1", "-framerate", &rate]).arg("-i").arg(card);
+    command.args(["-hide_banner", "-loglevel", "error", "-nostdin", "-y"]);
+    match clip.sequence {
+        Some(pattern) => command.args(["-start_number", "1", "-framerate", &rate]).arg("-i").arg(pattern),
+        None => command.args(["-loop", "1", "-framerate", &rate]).arg("-i").arg(card),
+    };
     for sound in clip.sounds {
         command.arg("-i").arg(sound);
     }
@@ -226,7 +236,7 @@ mod tests {
     use super::*;
 
     fn clip<'a>(sounds: &'a [PathBuf], out: &'a Path, project_dir: &'a Path) -> VoiceClip<'a> {
-        VoiceClip { sounds, seconds: 2.0, text: "x", heading: "", width: 1920, height: 1080, fps: 50.0, fields: None, sample_rate: 48_000, timecode: "10:00:00:00", out, project_dir }
+        VoiceClip { sounds, seconds: 2.0, text: "x", heading: "", sequence: None, width: 1920, height: 1080, fps: 50.0, fields: None, sample_rate: 48_000, timecode: "10:00:00:00", out, project_dir }
     }
 
     #[test]

@@ -134,7 +134,7 @@ mod tests {
     use crate::SubsegmentPart;
 
     fn part(start: u64, end: u64) -> SubsegmentPart {
-        SubsegmentPart { start, end, clip_name: String::new(), length: String::new(), gap_before: 0, cut: false, a1_channel: None, a1_level_db: 0, a1_off: false, channels: None, a1_lead: 0, a1_tail: 0 }
+        SubsegmentPart { start, end, clip_name: String::new(), length: String::new(), gap_before: 0, cut: false, a1_channel: None, a1_level_db: 0, a1_off: false, channels: None, a1_lead: 0, a1_tail: 0, smooth_frames: 0, smooth_ready: None }
     }
 
     fn view() -> SubsegmentView {

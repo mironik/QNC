@@ -25,12 +25,31 @@ pub fn block_pieces(block: &Block) -> Vec<Piece> {
     if block.pieces.is_empty() { vec![Piece::of(block)] } else { block.pieces.clone() }
 }
 
+/// The smooth cut of the join between `before` and `after` as they are now: the id of the clip
+/// of its in-between pictures and their count. `None` without a smooth cut or where one cannot
+/// be: a pause or a J/L of the picture at the join, or parts too short for the pictures it
+/// replaces.
+pub fn smooth_of(before: &Piece, after: &Piece) -> Option<(String, u64)> {
+    let n = after.smooth_frames;
+    if n == 0 || after.gap_before > 0 || after.v_lead_frames > 0 || after.v_tail_frames > 0 {
+        return None;
+    }
+    let out_last = before.to_frame.checked_sub(1)?;
+    let span = qnc_frame_interp::span(out_last, after.from_frame, n);
+    (out_last >= span.before && span.from_picture >= before.from_frame && span.to_picture < after.to_frame).then(|| (qnc_frame_interp::clip_id(&before.clip_id, &after.clip_id, out_last, after.from_frame, n), n))
+}
+
 /// The parts as the player's program takes them.
 pub fn piece_inputs(block: &Block) -> Vec<PieceInput> {
-    block_pieces(block)
+    let pieces = block_pieces(block);
+    // A smooth cut plays once its in-between pictures are made for the join as it is now.
+    let smooth: Vec<Option<(String, u64)>> = (0..pieces.len()).map(|index| index.checked_sub(1).and_then(|before| smooth_of(&pieces[before], &pieces[index])).filter(|(id, _)| *id == pieces[index].smooth_clip)).collect();
+    pieces
         .into_iter()
+        .zip(smooth)
         .enumerate()
-        .map(|(index, piece)| PieceInput {
+        .map(|(index, (piece, smooth))| PieceInput {
+            smooth,
             clip_id: piece.clip_id,
             from_frame: piece.from_frame,
             to_frame: piece.to_frame,
@@ -85,6 +104,7 @@ pub fn draft_pieces(blocks: &[Block], voices: &[Voice], profile: &ScriptProfile,
             Role::Spoken => match voices.iter().find(|voice| voice.block_id == block.id).and_then(|voice| Some((voice, voice.chosen_take()?))) {
                 Some((voice, take)) => {
                     pieces.push(PieceInput {
+                        smooth: None,
                         clip_id: (rates.clip_id)(&voice.name),
                         from_frame: 0,
                         to_frame: frames(take.seconds).max(1),

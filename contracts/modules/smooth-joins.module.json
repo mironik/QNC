@@ -1,0 +1,34 @@
+{
+  "module_id": "qnc.module.smooth-joins",
+  "module_name": "Smooth joins",
+  "module_version": "0.1.0",
+  "module_kind": "library",
+  "capabilities": [
+    "script.smooth_joins"
+  ],
+  "input_contract_version": "0.1.0",
+  "output_contract_version": "0.1.0",
+  "supported_os": [
+    "windows",
+    "linux",
+    "macos"
+  ],
+  "supported_cpu": [
+    "x86_64",
+    "aarch64"
+  ],
+  "transport_protocol_version": "0.1.0",
+  "forbidden_calls": [
+    "ffprobe",
+    "business.workflow"
+  ],
+  "forbidden_dependencies": [
+    "qnc.module.media-probe"
+  ],
+  "state_policy": "session_local",
+  "database_write_policy": "public_db_owner_write_adapter_only",
+  "runtime_crate": "qnc-smooth-joins",
+  "input": "The script's blocks and the player's state.",
+  "output": "For every join that asks for a smooth cut, a short clip of its in-between pictures in the project and its catalog, and its id on the join in the script.",
+  "specification": "AGENTS.md 2026-11-08 (user: smooth cut of a composite statement). Background: the picture before and after decoded from the originals through the decoder catalog, the pictures between them by the frame interpolator of the AI catalog (qnc-frame-interp), the clip through qnc-voice-clip and qnc-voice-catalog, its id through qnc-script-db; only started while the player is idle."
+}

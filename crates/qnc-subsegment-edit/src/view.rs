@@ -25,6 +25,10 @@ pub struct SubsegmentPart {
     /// The J and L of the join before it (frames), as drafted.
     pub a1_lead: i64,
     pub a1_tail: i64,
+    /// The pictures the smooth cut of the join before it replaces (0: none) and its state:
+    /// `Some(true)` playing, `Some(false)` being made, `None` it cannot be at this join.
+    pub smooth_frames: u64,
+    pub smooth_ready: Option<bool>,
 }
 
 /// The SubSegment open in place of the source timeline (user 2026-10-29): its parts one after
@@ -72,14 +76,17 @@ pub struct SubsegmentView {
 /// The parts on the SubSegment's axis (a pause before a part moves it on).
 pub fn subsegment_view(block: &Block, playhead: Option<u64>) -> SubsegmentView {
     let mut start = 0;
-    let parts = block_pieces(block)
+    let pieces = block_pieces(block);
+    let smooth: Vec<Option<bool>> = (0..pieces.len()).map(|index| index.checked_sub(1).and_then(|before| qnc_script_draft::smooth_of(&pieces[before], &pieces[index])).map(|(id, _)| id == pieces[index].smooth_clip)).collect();
+    let parts = pieces
         .into_iter()
+        .zip(smooth)
         .enumerate()
-        .map(|(index, piece)| {
+        .map(|(index, (piece, smooth_ready))| {
             let gap = if index == 0 { 0 } else { piece.gap_before };
             start += gap;
             let end = start + piece.to_frame.saturating_sub(piece.from_frame);
-            let part = SubsegmentPart { start, end, clip_name: piece.clip_name, length: piece.length, gap_before: gap, cut: piece.cut, a1_channel: piece.a1_channel, a1_level_db: piece.a1_level_db, a1_off: piece.a1_off, channels: None, a1_lead: if index == 0 || gap > 0 { 0 } else { piece.a1_lead_frames }, a1_tail: if index == 0 || gap > 0 { 0 } else { piece.a1_tail_frames } };
+            let part = SubsegmentPart { start, end, clip_name: piece.clip_name, length: piece.length, gap_before: gap, cut: piece.cut, a1_channel: piece.a1_channel, a1_level_db: piece.a1_level_db, a1_off: piece.a1_off, channels: None, a1_lead: if index == 0 || gap > 0 { 0 } else { piece.a1_lead_frames }, a1_tail: if index == 0 || gap > 0 { 0 } else { piece.a1_tail_frames }, smooth_frames: if index == 0 { 0 } else { piece.smooth_frames }, smooth_ready };
             start = end;
             part
         })

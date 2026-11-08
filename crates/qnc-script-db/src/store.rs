@@ -88,6 +88,8 @@ impl Store {
             Operation::SetFields { id, fields } => self.set_fields(*id, fields),
             Operation::AddPiece { id, piece } => self.add_piece(*id, piece),
             Operation::SetJoin { id, index, gap_before, cut } => self.set_join(*id, *index, *gap_before, *cut),
+            Operation::SetSmooth { id, index, frames } => self.set_smooth(*id, *index, *frames),
+            Operation::SetSmoothClip { id, index, clip_id } => self.set_smooth_clip(*id, *index, clip_id),
             Operation::SetPiece { id, index, piece } => self.set_piece(*id, *index, piece),
             Operation::SetJoinSound { id, index, lead, tail } => self.set_join_sound(*id, *index, *lead, *tail),
             Operation::SetJoinPicture { id, index, lead, tail } => self.set_join_picture(*id, *index, *lead, *tail),
@@ -339,6 +341,26 @@ impl Store {
         self.store_pieces(id, block)
     }
 
+    /// The pictures the smooth cut of the join before part `index` replaces; the first part
+    /// has no join.
+    fn set_smooth(&mut self, id: i64, index: usize, frames: u64) -> Result<Data> {
+        let mut block = self.read()?.into_iter().find(|block| block.id == id).ok_or_else(|| qnc_ui_text::text("db.script_no_block").to_string())?;
+        let Some(piece) = block.pieces.get_mut(index).filter(|_| index > 0) else {
+            return Err(qnc_ui_text::text("db.script_no_join").into());
+        };
+        piece.smooth_frames = frames;
+        self.store_pieces(id, block)
+    }
+
+    fn set_smooth_clip(&mut self, id: i64, index: usize, clip_id: &str) -> Result<Data> {
+        let mut block = self.read()?.into_iter().find(|block| block.id == id).ok_or_else(|| qnc_ui_text::text("db.script_no_block").to_string())?;
+        let Some(piece) = block.pieces.get_mut(index).filter(|_| index > 0) else {
+            return Err(qnc_ui_text::text("db.script_no_join").into());
+        };
+        piece.smooth_clip = clip_id.to_string();
+        self.store_pieces(id, block)
+    }
+
     /// Part `index` with its new range (an edge trimmed on the SubSegment timeline): the same
     /// clip, a range of at least one frame; its pause and join stay.
     fn set_piece(&mut self, id: i64, index: usize, piece: &Piece) -> Result<Data> {
@@ -353,7 +375,7 @@ impl Store {
         if piece.clip_id != stored.clip_id || piece.to_frame <= piece.from_frame {
             return Err(qnc_ui_text::fill("db.script_clip_range", &[("kind", &block.kind)]));
         }
-        *stored = Piece { gap_before: stored.gap_before, cut: stored.cut, a1_lead_frames: stored.a1_lead_frames, a1_tail_frames: stored.a1_tail_frames, v_lead_frames: stored.v_lead_frames, v_tail_frames: stored.v_tail_frames, ..piece.clone() };
+        *stored = Piece { gap_before: stored.gap_before, cut: stored.cut, a1_lead_frames: stored.a1_lead_frames, a1_tail_frames: stored.a1_tail_frames, v_lead_frames: stored.v_lead_frames, v_tail_frames: stored.v_tail_frames, smooth_frames: stored.smooth_frames, smooth_clip: stored.smooth_clip.clone(), ..piece.clone() };
         self.store_pieces(id, block)
     }
 
@@ -385,10 +407,10 @@ impl Store {
         let Some(other) = other.filter(|other| index < block.pieces.len() && *other < block.pieces.len()) else {
             return Err(qnc_ui_text::text("db.script_no_join").into());
         };
-        let joins: Vec<(u64, bool, i64, i64, u64, u64)> = block.pieces.iter().map(|piece| (piece.gap_before, piece.cut, piece.a1_lead_frames, piece.a1_tail_frames, piece.v_lead_frames, piece.v_tail_frames)).collect();
+        let joins: Vec<(u64, bool, i64, i64, u64, u64, u64)> = block.pieces.iter().map(|piece| (piece.gap_before, piece.cut, piece.a1_lead_frames, piece.a1_tail_frames, piece.v_lead_frames, piece.v_tail_frames, piece.smooth_frames)).collect();
         block.pieces.swap(index, other);
-        for (piece, (gap, cut, lead, tail, v_lead, v_tail)) in block.pieces.iter_mut().zip(joins) {
-            (piece.gap_before, piece.cut, piece.a1_lead_frames, piece.a1_tail_frames, piece.v_lead_frames, piece.v_tail_frames) = (gap, cut, lead, tail, v_lead, v_tail);
+        for (piece, (gap, cut, lead, tail, v_lead, v_tail, smooth)) in block.pieces.iter_mut().zip(joins) {
+            (piece.gap_before, piece.cut, piece.a1_lead_frames, piece.a1_tail_frames, piece.v_lead_frames, piece.v_tail_frames, piece.smooth_frames) = (gap, cut, lead, tail, v_lead, v_tail, smooth);
         }
         self.store_pieces(id, block)
     }
@@ -405,7 +427,7 @@ impl Store {
         }
         block.pieces.remove(index);
         if let Some(first) = block.pieces.first_mut() {
-            (first.gap_before, first.cut, first.a1_lead_frames, first.a1_tail_frames, first.v_lead_frames, first.v_tail_frames) = (0, false, 0, 0, 0, 0);
+            (first.gap_before, first.cut, first.a1_lead_frames, first.a1_tail_frames, first.v_lead_frames, first.v_tail_frames, first.smooth_frames) = (0, false, 0, 0, 0, 0, 0);
         }
         self.store_pieces(id, block)
     }
@@ -436,7 +458,7 @@ impl Store {
         if !kept.iter().all(fits) || kept.windows(2).any(|pair| pair[0].to_frame > pair[1].from_frame) {
             return Err(qnc_ui_text::fill("db.script_clip_range", &[("kind", &block.kind)]));
         }
-        let joined = |piece: &Piece| Piece { gap_before: stored.gap_before, cut: stored.cut, a1_lead_frames: stored.a1_lead_frames, a1_tail_frames: stored.a1_tail_frames, v_lead_frames: stored.v_lead_frames, v_tail_frames: stored.v_tail_frames, ..piece.clone() };
+        let joined = |piece: &Piece| Piece { gap_before: stored.gap_before, cut: stored.cut, a1_lead_frames: stored.a1_lead_frames, a1_tail_frames: stored.a1_tail_frames, v_lead_frames: stored.v_lead_frames, v_tail_frames: stored.v_tail_frames, smooth_frames: stored.smooth_frames, smooth_clip: stored.smooth_clip.clone(), ..piece.clone() };
         let fresh = |piece: &Piece| Piece { gap_before: 0, cut: true, a1_lead_frames: 0, a1_tail_frames: 0, v_lead_frames: 0, v_tail_frames: 0, ..piece.clone() };
         let new: Vec<Piece> = kept.iter().enumerate().map(|(at, piece)| if at == 0 { joined(piece) } else { fresh(piece) }).collect();
         block.pieces.splice(index..=index, new);
@@ -613,6 +635,7 @@ fn undoable(operation: &Operation) -> bool {
             | Operation::SetFields { .. }
             | Operation::AddPiece { .. }
             | Operation::SetJoin { .. }
+            | Operation::SetSmooth { .. }
             | Operation::SetPiece { .. }
             | Operation::SetJoinSound { .. }
             | Operation::SetJoinPicture { .. }

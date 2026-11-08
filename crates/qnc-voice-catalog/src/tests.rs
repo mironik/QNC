@@ -7,7 +7,7 @@ const DB: &str = "qnc://local/db/ingest_content/p1";
 
 fn record(takes: usize) -> ClipMetadata {
     let sounds = vec![PathBuf::from("t.wav"); takes];
-    let clip = qnc_voice_clip::VoiceClip { sounds: &sounds, seconds: 7.11, text: "OFF 1", heading: "", width: 1920, height: 1080, fps: 50.0, fields: None, sample_rate: 48_000, timecode: "21:16:48:45", out: std::path::Path::new("x.mxf"), project_dir: std::path::Path::new(".") };
+    let clip = qnc_voice_clip::VoiceClip { sounds: &sounds, seconds: 7.11, text: "OFF 1", heading: "", sequence: None, width: 1920, height: 1080, fps: 50.0, fields: None, sample_rate: 48_000, timecode: "21:16:48:45", out: std::path::Path::new("x.mxf"), project_dir: std::path::Path::new(".") };
     qnc_voice_clip::describe(&clip, "voice-P_OFF1", &format!("{SOURCE}/file/products/voice/P_OFF1.mxf")).unwrap()
 }
 

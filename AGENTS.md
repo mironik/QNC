@@ -8519,3 +8519,21 @@ Popravak 2026-11-08 (korisnik: "enter vodi na novi red, ali ne prikazuje fokus o
 dropdown"): vlastiti okvir polja za upis u temi se ne vidi, pa i red za upis dobiva okvir boje fokusa, samo oko polja
 (ne oko naziva), isti kao izbornik: naziv projekta i polja lista (`qnc-newsroom-sheet`, `qnc-settings-form`). Jedan
 okvir po redu. Uzivo nije provjereno.
+Otkljucano i izvedeno 2026-11-08 (korisnik: "da, otkljucaj i kreni sa smooth spojem"; odluke od 7. 11.: medjuslike zamijene
+slike oko reza, trajanje i ton ostaju, duljina po spoju, zadano 8): Smooth spoj slozene izjave, korak 2. Spoj dobiva
+`qnc-script-db` `Piece.smooth_frames` (operacija `SetSmooth`, korak undoa; pripada spoju kao pauza) i `smooth_clip`
+(`SetSmoothClip`, bez koraka undoa: to je napravila pozadina). `qnc-script-draft` `smooth_of`: id klipa medjuslika iz dva
+klipa, slika reza i broja (`qnc-frame-interp` `clip_id`); bez smootha uz pauzu, J/L slike ili prekratak dio; smooth svira samo
+dok je `smooth_clip` klip spoja kakav je sada (pomaknut rub: obican rez dok se ne napravi novi). Nova javna kocka
+`crates/qnc-smooth-joins` (+ ugovor): pozadina kroz `qnc-script` poll, posao krece samo dok player ne svira; dvije slike iz
+originala kroz katalog dekodera (bez probea, kartica samo citana), medjuslike `qnc-frame-interp` (AI katalog `smooth`:
+`qnc-ai-catalog` `installed_frame_interpolator`), kratki MXF u mapi glasa projekta (`qnc-voice-clip` `sequence`, jedan tihi
+kanal) i klip kataloga kroz `qnc-voice-catalog` (pool ga ne pokazuje). `qnc-program-input`: medjuslike prepisuju sliku oko reza
+kao pokrivalica bez tona, pola prije i pola poslije reza (`PieceInput.smooth`), pa ih player i Draft XML (V2) dobivaju bez
+vlastitog koda; samo dijelovi u stopi izjave. Panel (`qnc-subsegment-panel`): uz Rez/Pretapanje dugme Smooth, - i + (po 2, 2-24
+slike) i stanje (izraduje se, spremno, ne na ovom spoju); radnja kataloga `subsegment_join_smooth` bez tipke. Program i model
+izvan gita: `target/release/rife-ncnn-vulkan.exe` + `vcomp140.dll`, `data/models/rife-v4.6` (MIT, uci u beta paket). Nije
+izvedeno: posao se ne prekida kad player krene (10-25 s, dijeli graficku), Send to S-Story ne prenosi smooth u pricu, izvor
+isprepletene slike se odbija, ulazne slike su JPEG (q 3). Provjereno: testovi `qnc-smooth-joins`, `qnc-script-db` i
+dotaknutih kocki, conformance (C5 `qnc-frame-interp` rijesen), model cita JPEG ulaz, klip iz niza slika ima tocan broj slika.
+Uzivo nije provjereno.

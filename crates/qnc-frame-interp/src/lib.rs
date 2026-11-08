@@ -39,6 +39,14 @@ pub fn span(out_last: u64, in_first: u64, n: u64) -> Span {
     Span { from_picture: out_last.saturating_sub(before), to_picture: in_first + after, before, after }
 }
 
+/// The id of the clip of the in-between pictures of one cut: the same two parts cut at the
+/// same pictures with the same count are the same clip, whenever they are asked for.
+pub fn clip_id(before_clip: &str, after_clip: &str, out_last: u64, in_first: u64, n: u64) -> String {
+    let text = format!("{before_clip}|{after_clip}|{out_last}|{in_first}|{n}");
+    let hash = text.bytes().fold(0xcbf2_9ce4_8422_2325u64, |hash, byte| (hash ^ u64::from(byte)).wrapping_mul(0x0100_0000_01b3));
+    format!("smooth-{hash:016x}")
+}
+
 /// The times between the two pictures of the `n` in-between ones, `k / (n + 1)`.
 pub fn times(n: u64) -> Vec<f64> {
     (1..=n).map(|k| k as f64 / (n + 1) as f64).collect()

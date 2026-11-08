@@ -46,6 +46,12 @@ pub const SLIP: &str = "select_slip";
 pub const JOIN_GAP: &str = "subsegment_join_gap";
 /// The join before a part a cut or a crossfade: `target` is `block:part`.
 pub const JOIN_CUT: &str = "subsegment_join_cut";
+/// The smooth cut of a join (user 2026-11-08): on or off, or its pictures two more or fewer.
+pub const JOIN_SMOOTH: &str = "subsegment_join_smooth";
+/// The pictures a smooth cut replaces when it is turned on (user 2026-11-07).
+const SMOOTH_DEFAULT: u64 = 8;
+/// The most pictures a smooth cut replaces.
+const SMOOTH_MOST: u64 = 24;
 /// The SubSegment closes; the source timeline is back.
 pub const SUBSEGMENT_CLOSE: &str = "subsegment_close";
 /// An edge of a part is taken for trimming (a right click on its timeline): `target` is
@@ -1353,6 +1359,17 @@ impl SubsegmentEdit {
                 }
                 let earlier = parts.next().and_then(|step| step.parse::<i64>().ok()).unwrap_or(0) < 0;
                 self.write(preview, move |target| qnc_script_db::move_piece(target, id, index, earlier).map(|_| None))
+            }
+            JOIN_SMOOTH => {
+                let mut parts = target.unwrap_or_default().split(':');
+                let (Some(id), Some(index)) = (parts.next().and_then(|id| id.parse::<i64>().ok()), parts.next().and_then(|index| index.parse::<usize>().ok())) else { return Some(false) };
+                let Some(piece) = self.block(Some(id)).and_then(|block| block.pieces.get(index)).cloned() else { return Some(false) };
+                let frames = match parts.next().and_then(|step| step.parse::<i64>().ok()) {
+                    Some(step) => piece.smooth_frames.saturating_add_signed(step * 2).clamp(2, SMOOTH_MOST),
+                    None if piece.smooth_frames > 0 => 0,
+                    None => SMOOTH_DEFAULT,
+                };
+                self.write(preview, move |target| qnc_script_db::set_smooth(target, id, index, frames).map(|_| None))
             }
             JOIN_GAP | JOIN_CUT => {
                 let mut parts = target.unwrap_or_default().split(':');

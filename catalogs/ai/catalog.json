@@ -1,5 +1,9 @@
 {
   "version": "1",
+  "smooth": {
+    "program": "rife-ncnn-vulkan",
+    "model": "../../data/models/rife-v4.6"
+  },
   "letters": {
     "program": "qnc-align-wav2vec2",
     "model": "../../data/models/wav2vec2-parlaspeech-hr"

@@ -1,0 +1,22 @@
+[package]
+name = "qnc-smooth-joins"
+version = "0.1.0"
+edition = "2021"
+description = "QNC public piece: the in-between pictures of the smooth cuts of a script's statements, made in the background while the player is idle and kept as short clips of the project's catalog"
+
+[dependencies]
+qnc-ai-catalog = { workspace = true }
+qnc-db-broker = { workspace = true }
+qnc-decoder-catalog = { workspace = true }
+qnc-dev-diagnostics = { workspace = true }
+qnc-frame-interp = { workspace = true }
+qnc-media-metadata = { workspace = true }
+qnc-plugin-process = { workspace = true }
+qnc-script-db = { workspace = true }
+qnc-script-draft = { workspace = true }
+qnc-still-locator = { workspace = true }
+qnc-transcribe-jobs = { workspace = true }
+qnc-ui-text = { workspace = true }
+qnc-voice-catalog = { workspace = true }
+qnc-voice-clip = { workspace = true }
+qnc-voice-take = { workspace = true }

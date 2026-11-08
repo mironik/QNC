@@ -5,6 +5,7 @@ edition = "2021"
 description = "QNC public piece: the draft of a story from its script (user 2026-10-30) - the blocks that count in the story in reading order as parts of one program: a recorded OFF its voice record's clip with the take used on A1, an OFF not recorded a pause of its reading time, a statement its clip's range or SubSegment parts; it reads and writes nothing"
 
 [dependencies]
+qnc-frame-interp = { workspace = true }
 qnc-program-input = { workspace = true }
 qnc-script-db = { workspace = true }
 qnc-script-profile = { workspace = true }

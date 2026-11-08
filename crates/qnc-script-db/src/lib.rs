@@ -162,12 +162,21 @@ pub struct Piece {
     /// there in tenths of a dB, added to the part's level. Empty: no curve.
     #[serde(default)]
     pub level_keys: Vec<(u64, i16)>,
+    /// The smooth cut of the join before this part (user 2026-11-08): how many pictures around
+    /// the cut AI in-between pictures replace (0: none). The length and the sound stay. It
+    /// belongs to the join, as the pause does.
+    #[serde(default)]
+    pub smooth_frames: u64,
+    /// The clip of the in-between pictures last made for this join; it counts only while it
+    /// is the clip of the join as it is now.
+    #[serde(default)]
+    pub smooth_clip: String,
 }
 
 impl Piece {
     /// The block's own range as its first part (a clip block that had one range).
     pub fn of(block: &Block) -> Self {
-        Self { clip_id: block.clip_id.clone(), clip_name: block.clip_name.clone(), from_frame: block.from_frame, to_frame: block.to_frame, start_tc: block.start_tc.clone(), end_tc: block.end_tc.clone(), length: block.length.clone(), seconds: block.seconds, text: block.text.clone(), gap_before: 0, cut: false, a1_channel: None, a1_level_db: 0, a1_off: false, a1_lead_frames: 0, a1_tail_frames: 0, v_lead_frames: 0, v_tail_frames: 0, level_keys: Vec::new() }
+        Self { clip_id: block.clip_id.clone(), clip_name: block.clip_name.clone(), from_frame: block.from_frame, to_frame: block.to_frame, start_tc: block.start_tc.clone(), end_tc: block.end_tc.clone(), length: block.length.clone(), seconds: block.seconds, text: block.text.clone(), gap_before: 0, cut: false, a1_channel: None, a1_level_db: 0, a1_off: false, a1_lead_frames: 0, a1_tail_frames: 0, v_lead_frames: 0, v_tail_frames: 0, level_keys: Vec::new(), smooth_frames: 0, smooth_clip: String::new() }
     }
 }
 
@@ -245,6 +254,11 @@ pub enum Operation {
     AddPiece { id: i64, piece: Piece },
     /// The pause before part `index` (frames) and whether its sound is cut (else crossed).
     SetJoin { id: i64, index: usize, gap_before: u64, cut: bool },
+    /// How many pictures the smooth cut of the join before part `index` replaces (0: none).
+    SetSmooth { id: i64, index: usize, frames: u64 },
+    /// The clip of the in-between pictures of that join is made (no step of undo: it is what
+    /// the background made, not a change of the story).
+    SetSmoothClip { id: i64, index: usize, clip_id: String },
     /// Part `index` with a new range (its pause and join stay).
     SetPiece { id: i64, index: usize, piece: Piece },
     /// The J and L of the join before part `index` (frames; the first part has no join).
@@ -446,6 +460,16 @@ pub fn cut_out(target: &ProjectDbTarget, id: i64, index: usize, before: Option<P
 /// Part `index` of block `id` with a new range (an edge trimmed on the SubSegment timeline).
 pub fn set_piece(target: &ProjectDbTarget, id: i64, index: usize, piece: Piece) -> Result<()> {
     write(target, Operation::SetPiece { id, index, piece }).map(drop)
+}
+
+/// The pictures the smooth cut of the join before part `index` of block `id` replaces.
+pub fn set_smooth(target: &ProjectDbTarget, id: i64, index: usize, frames: u64) -> Result<()> {
+    write(target, Operation::SetSmooth { id, index, frames }).map(drop)
+}
+
+/// The clip of the in-between pictures of the join before part `index` of block `id`.
+pub fn set_smooth_clip(target: &ProjectDbTarget, id: i64, index: usize, clip_id: String) -> Result<()> {
+    write(target, Operation::SetSmoothClip { id, index, clip_id }).map(drop)
 }
 
 /// The J (`lead`) and L (`tail`) of the join before part `index` of block `id`.

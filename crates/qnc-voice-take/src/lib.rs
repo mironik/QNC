@@ -82,13 +82,13 @@ pub fn describe_record(settings: &qnc_work_settings::WorkSettings, name: &str, c
     let sample_rate = settings.audio_sample_rate().map_err(|e| e.message)?;
     let sounds = vec![PathBuf::new(); takes.len()];
     let seconds = takes.iter().copied().fold(0.0, f64::max);
-    let clip = qnc_voice_clip::VoiceClip { sounds: &sounds, seconds, text: "", heading: "", width, height, fps, fields, sample_rate, timecode: first_tc, out: Path::new(""), project_dir: Path::new("") };
+    let clip = qnc_voice_clip::VoiceClip { sounds: &sounds, seconds, text: "", heading: "", sequence: None, width, height, fps, fields, sample_rate, timecode: first_tc, out: Path::new(""), project_dir: Path::new("") };
     qnc_voice_clip::describe(&clip, &clip_id(name), &canonical(clip_uri)?)
 }
 
 /// A file of the voice folder as the source reference of the catalog writes it (its path
 /// percent encoded), the form the player reads; the script keeps the plain form.
-fn canonical(uri: &str) -> Result<String> {
+pub fn canonical(uri: &str) -> Result<String> {
     let (source, path) = uri.split_once("/file/").ok_or_else(|| format!("{uri}: {}", qnc_ui_text::text("voice.take_missing")))?;
     qnc_source_contract::SourceReference::new(source, path).map(|reference| reference.uri()).map_err(|e| format!("{uri}: {e}"))
 }
@@ -148,7 +148,7 @@ impl Take {
         let seconds = self.earlier.iter().map(|(_, seconds)| *seconds).fold(recording.seconds, f64::max);
         let timecode = self.first_tc.clone().unwrap_or_else(|| recording.timecode.clone());
         let out = self.folder.join(format!("{}.mxf", self.name));
-        let clip = qnc_voice_clip::VoiceClip { sounds: &sounds, seconds, text, heading, width: self.width, height: self.height, fps: self.fps, fields: self.fields, sample_rate: self.rate, timecode: &timecode, out: &out, project_dir: &self.project_dir };
+        let clip = qnc_voice_clip::VoiceClip { sounds: &sounds, seconds, text, heading, sequence: None, width: self.width, height: self.height, fps: self.fps, fields: self.fields, sample_rate: self.rate, timecode: &timecode, out: &out, project_dir: &self.project_dir };
         qnc_voice_clip::make(&clip)?;
         let clip_uri = format!("{}/{}.mxf", self.base, self.name);
         let record = qnc_voice_clip::describe(&clip, &clip_id(&self.name), &canonical(&clip_uri)?)?;

@@ -244,6 +244,9 @@
     "subsegment_join_cut": {
       "label": "Spoj dijela SubSegmenta: rez ili crossfade"
     },
+    "subsegment_join_smooth": {
+      "label": "Spoj dijela SubSegmenta: smooth (AI meduslike oko reza)"
+    },
     "subsegment_close": {
       "label": "Zatvori SubSegment, vrati source timeline"
     },
