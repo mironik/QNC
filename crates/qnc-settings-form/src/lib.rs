@@ -134,7 +134,9 @@ pub fn field_column(ui: &mut egui::Ui, column_w: f32, settings: &mut Value, fiel
         }
         let top = ui.cursor().min;
         answer.changed |= field_cell(ui, width, settings, field, options, style);
-        if here && chosen {
+        // The row the keyboard is on is framed, a row of choices and a typed one alike (user
+        // 2026-11-08: the frame showed only on the choices).
+        if here {
             let rect = egui::Rect::from_min_max(top, egui::pos2(top.x + column_w, ui.cursor().min.y));
             qnc_ui_kit::paint_focus(ui, rect.expand(2.0), true, keys.focus);
         }

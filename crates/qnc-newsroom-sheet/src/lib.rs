@@ -277,11 +277,12 @@ fn fill(ui: &mut egui::Ui, overlay: &mut SheetOverlay, theme: &Theme, at: Option
     if at == Some((1, true)) {
         ui.memory_mut(|memory| memory.request_focus(name_id));
     }
-    ui.horizontal(|ui| {
+    let name_row = ui.horizontal(|ui| {
         label(ui, theme, qnc_ui_text::text("project.project_name"));
         let edit = qnc_ui_kit::row_field(&mut overlay.name, field_w, ROW_HEIGHT).id(name_id);
         ui.add_enabled(overlay.name_editable, edit.hint_text(qnc_ui_text::text("project.name_new_project")));
     });
+    qnc_ui_kit::paint_focus(ui, name_row.response.rect.expand(2.0), at.is_some_and(|(row, _)| row == 1), theme.focus);
     let mut typed = ui.memory(|memory| memory.has_focus(name_id)).then_some(1);
     ui.add_space(ROW_GAP / 2.0);
     // Rows 2.., the sheet's fields.
