@@ -8555,3 +8555,7 @@ svira); gdje idu ceka odluku korisnika. Uzivo nije provjereno.
 Dopuna isti dan (korisnik: "naziv klipa je nepotreban u prikazu... baza neka sadrzi sve podatke, ali za Smut treba samo
 neophodno"): dio slozene izjave u tekstu pokazuje samo TC i duljinu (naziv ostaje u bazi); uz pauzu je jedan gumb Smooth
 (ukljuceno ili ne, zadano 8 slika), stanje samo dok nije spremno. Uzivo nije provjereno.
+Izmjena isti dan (korisnik: tabelarni prikaz, "ljeva kolona timecode, srednja tekst izjave, krajna desna dugme smooth i
+podesavanje razmaka"; IN/OUT se pise samo u dokumentu za provjeru): dijelovi slozene izjave u scenariju su redovi tablice
+(`qnc-script-panel`): TC pocetak-kraj i duljina, tekst, a desno (dok je izjava otvorena) Smooth i pauza spoja prije tog dijela.
+Red "IN: ... OUT: ..." bloka vise se ne prikazuje u formi; u izvozu ostaje. Uzivo nije provjereno.

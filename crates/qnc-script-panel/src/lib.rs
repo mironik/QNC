@@ -217,10 +217,6 @@ pub fn paint_block(ui: &mut egui::Ui, row: &qnc_script::BlockRow, view: &ScriptV
                 }
             });
         });
-        // The first and last words of a block whose kind shows them (in-cue, out-cue).
-        if row.cues && !block.text.trim().is_empty() {
-            ui.label(RichText::new(qnc_ui_text::fill("script.block_cues", &[("in", &qnc_script::in_cue(&block.text)), ("out", &qnc_script::out_cue(&block.text))])).color(theme.text_muted).size(theme.font_ui));
-        }
         // The voice record of a recorded block: its status and its takes, one of them used
         // (user 2026-10-30: chosen as A1 of a camera clip).
         if row.recorded && view.recording.is_none_or(|(recording, _, _)| recording != block.id) {
@@ -256,21 +252,14 @@ pub fn paint_block(ui: &mut egui::Ui, row: &qnc_script::BlockRow, view: &ScriptV
         // A SubSegment of several parts: each part's clip and timecodes, its words under it, one
         // part under another (user 2026-10-29).
         let parts: Vec<(Option<String>, &str)> = if block.pieces.len() > 1 {
-            block.pieces.iter().map(|piece| (Some(format!("{} - {}  {}", piece.start_tc, piece.end_tc, piece.length)), piece.text.as_str())).collect()
+            block.pieces.iter().map(|piece| (Some(format!("{} - {}\n{}", piece.start_tc, piece.end_tc, piece.length)), piece.text.as_str())).collect()
         } else {
             vec![(None, block.text.as_str())]
         };
         for (index, (detail, text)) in parts.into_iter().enumerate() {
-            // While the SubSegment is open, the pause between two parts is here, in its text.
-            let open_part = view.subsegment.as_ref().filter(|open| open.block_id == block.id && index > 0).and_then(|open| Some((open, open.parts.get(index)?)));
-            if let Some((open, part)) = open_part {
-                if let Some(event) = part_controls::gap_row(ui, open, index, part, theme) {
-                    asked = Some(event);
-                }
-            }
-            if let Some(detail) = detail {
-                ui.label(RichText::new(detail).color(theme.text_muted).size(theme.font_ui));
-            }
+            // The text of the part (the middle column of a SubSegment's table).
+            let paint_text = |ui: &mut egui::Ui| -> (Option<ActionEvent>, bool) {
+            let mut asked = None;
             // The words of the part with their times (user 2026-11-04: the transcript in the
             // script has its timecodes, to edit by its text): the timecode in front of every line
             // of speech, a click on a word puts the playhead there, a double click on two words
@@ -297,13 +286,44 @@ pub fn paint_block(ui: &mut egui::Ui, row: &qnc_script::BlockRow, view: &ScriptV
                 if let Some(event) = text_editor::show(ui, theme, (block.id, index), words, view.text_draft(block.id, index, &qnc_script::text_of(words)), heard, (part_chosen, bring)) {
                     asked = Some(event);
                 }
-                continue;
+                return (asked, false);
             }
             let shown = if text.is_empty() { qnc_ui_text::text("script.no_words").to_string() } else { text.to_string() };
             let color = if text.is_empty() { theme.text_muted } else { theme.text };
-            if ui.add(egui::Label::new(RichText::new(shown).color(color).size(theme.font_ui + 1.0)).wrap().sense(Sense::click())).clicked() {
-                picked = true;
+            let clicked = ui.add(egui::Label::new(RichText::new(shown).color(color).size(theme.font_ui + 1.0)).wrap().sense(Sense::click())).clicked();
+            (asked, clicked)
+            };
+            let answer = match detail {
+                // A SubSegment as a table (user 2026-11-08): timecode, the text, and on the right
+                // the smooth cut and pause of the join before the part.
+                Some(detail) => {
+                    let open_part = view.subsegment.as_ref().filter(|open| open.block_id == block.id && index > 0).and_then(|open| Some((open, open.parts.get(index)?)));
+                    let row = ui.horizontal_top(|ui| {
+                        let height = ui.spacing().interact_size.y;
+                        let middle = (ui.available_width() - TC_COLUMN - JOIN_COLUMN - 2.0 * ui.spacing().item_spacing.x).max(120.0);
+                        ui.allocate_ui(egui::vec2(TC_COLUMN, height), |ui| {
+                            ui.set_width(TC_COLUMN);
+                            ui.label(RichText::new(detail).color(theme.text_muted).size(theme.font_ui));
+                        });
+                        let text = ui.allocate_ui(egui::vec2(middle, height), |ui| {
+                            ui.set_width(middle);
+                            paint_text(ui)
+                        });
+                        let join = ui.allocate_ui(egui::vec2(JOIN_COLUMN, height), |ui| {
+                            ui.set_width(JOIN_COLUMN);
+                            open_part.and_then(|(open, part)| part_controls::join_cell(ui, open, index, part, theme))
+                        });
+                        (join.inner.or(text.inner.0), text.inner.1)
+                    });
+                    ui.separator();
+                    row.inner
+                }
+                None => paint_text(ui),
+            };
+            if answer.0.is_some() {
+                asked = answer.0;
             }
+            picked |= answer.1;
         }
         if let Some(event) = paint_fields(ui, row, view, theme) {
             asked = Some(event);
@@ -359,6 +379,9 @@ fn paint_fields(ui: &mut egui::Ui, row: &qnc_script::BlockRow, view: &ScriptView
 
 /// The width of a field's name in front of it.
 const LABEL_WIDTH: f32 = 120.0;
+/// The columns of a SubSegment's table: its timecode on the left, its join on the right.
+const TC_COLUMN: f32 = 200.0;
+const JOIN_COLUMN: f32 = 230.0;
 
 /// The TextSourceEditor at the bottom: text is written here; a kind's button puts it after the
 /// chosen block as that kind, Replace puts it back into the block it was taken from.
