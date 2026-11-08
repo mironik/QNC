@@ -252,7 +252,7 @@ pub fn paint_block(ui: &mut egui::Ui, place: &'static str, row: &qnc_script::Blo
         // A SubSegment of several parts: each part's clip and timecodes, its words under it, one
         // part under another (user 2026-10-29).
         let parts: Vec<(Option<String>, &str)> = if block.pieces.len() > 1 {
-            block.pieces.iter().map(|piece| (Some(format!("{} - {}\n{}", piece.start_tc, piece.end_tc, piece.length)), piece.text.as_str())).collect()
+            block.pieces.iter().map(|piece| (Some(format!("{} - {}  {}", piece.start_tc, piece.end_tc, piece.length)), piece.text.as_str())).collect()
         } else {
             vec![(None, block.text.as_str())]
         };
@@ -303,7 +303,7 @@ pub fn paint_block(ui: &mut egui::Ui, place: &'static str, row: &qnc_script::Blo
                         let middle = (ui.available_width() - TC_COLUMN - JOIN_COLUMN - 2.0 * ui.spacing().item_spacing.x).max(120.0);
                         ui.allocate_ui(egui::vec2(TC_COLUMN, height), |ui| {
                             ui.set_width(TC_COLUMN);
-                            ui.label(RichText::new(detail).color(theme.text_muted).size(theme.font_ui));
+                            ui.add(egui::Label::new(RichText::new(detail).color(theme.text_muted).size(theme.font_ui)).extend());
                         });
                         let text = ui.allocate_ui(egui::vec2(middle, height), |ui| {
                             ui.set_width(middle);
@@ -380,7 +380,7 @@ fn paint_fields(ui: &mut egui::Ui, row: &qnc_script::BlockRow, view: &ScriptView
 /// The width of a field's name in front of it.
 const LABEL_WIDTH: f32 = 120.0;
 /// The columns of a SubSegment's table: its timecode on the left, its join on the right.
-const TC_COLUMN: f32 = 200.0;
+const TC_COLUMN: f32 = 310.0;
 const JOIN_COLUMN: f32 = 230.0;
 
 /// The TextSourceEditor at the bottom: text is written here; a kind's button puts it after the

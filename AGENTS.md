@@ -8569,3 +8569,5 @@ tipkovnicu. Svaki prikaz ima svoj id (`qnc-script-panel` `paint_block(.., place,
 Popravak isti dan (korisnik: "iz rijeci pa izbrisao slovo p, ostavio a; reproducira se uredno, ali u tekstu se ne prikazuje a"):
 rijec se u tekstu dijela birala po svojoj sredini, pa je ostatak rijeci nestajao. Rijec s poravnatim slovima sada pokazuje slova
 koja dio jos izgovara (`qnc-script` `timed_words`; pojedino slovo po svojoj sredini, znak bez vremena ide s prethodnim). Test.
+Izmjena isti dan (korisnik: "u ljevoj koloni sve timecode stavi u jedan red"): lijeva kolona tablice izjave u jednom je redu
+(pocetak - kraj, duljina), kolona siroka 310.
