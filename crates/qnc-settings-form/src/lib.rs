@@ -87,10 +87,21 @@ pub fn field_grid(
     changed
 }
 
+/// What the column of fields did this frame.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub struct ColumnAnswer {
+    /// A value changed.
+    pub changed: bool,
+    /// The key for the next field was pressed in the last typed field (or with none to move
+    /// to): the form goes on past the column (user 2026-11-08: the last Enter goes to the
+    /// button that confirms the form).
+    pub past_last: bool,
+}
+
 /// The fields one under the other, each label left of its field (user 2026-10-27). When the
 /// form's catalog key for the next field was pressed (`next`), the typed field after the one
 /// typed in (or the first, when the row before the column had it: `from_before`) takes the
-/// keyboard. True when a value changed.
+/// keyboard.
 #[allow(clippy::too_many_arguments)]
 pub fn field_column(
     ui: &mut egui::Ui,
@@ -101,7 +112,7 @@ pub fn field_column(
     style: &GridStyle,
     next: bool,
     from_before: bool,
-) -> bool {
+) -> ColumnAnswer {
     let label_w = style.label_beside.map_or(0.0, |(width, _)| width);
     let width = (column_w - label_w - style.gap).max(40.0);
     let typed: Vec<egui::Id> = fields.iter().filter(|field| field.kind != FieldKind::Choice).map(text_id).collect();
@@ -111,6 +122,7 @@ pub fn field_column(
         (true, false, Some(index)) => typed.get(index + 1),
         _ => None,
     };
+    let past_last = next && after.is_none() && (from_before || focused.is_some());
     let mut changed = false;
     for field in fields {
         changed |= field_cell(ui, width, settings, field, options, style);
@@ -119,7 +131,7 @@ pub fn field_column(
     if let Some(after) = after {
         ui.memory_mut(|memory| memory.request_focus(*after));
     }
-    changed
+    ColumnAnswer { changed, past_last }
 }
 
 /// The id of a field's text box (for moving on to the next field).

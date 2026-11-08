@@ -240,11 +240,14 @@ pub struct SubsegmentEdit {
     assist_curves: Vec<(usize, Vec<(u64, i16)>)>,
     /// The last proposal and what it was made of.
     assisted: Option<(assist::AssistKey, Vec<(usize, Vec<(u64, i16)>)>)>,
+    /// The word of the text a click put the playhead on: its part, the axis frame and the clip
+    /// frame past its end (O then puts OUT after the word).
+    word: Option<(usize, u64, u64)>,
 }
 
 impl Default for SubsegmentEdit {
     fn default() -> Self {
-        Self { view: EditView::default(), blocks: Vec::new(), names: HashMap::new(), project: None, settled: true, writes: Vec::new(), open_subsegment: None, pieces_request: None, trim: None, chosen: None, chosen_to: None, sound_also: Vec::new(), join_sound: None, value: None, slide: None, slip_part: None, waves: qnc_program_waveform::ProgramWaves::new(), filmstrips: qnc_program_filmstrip::ProgramFilmstrips::new(), waves_project: None, trim_stills: qnc_trim_stills::TrimStills::new(), zoom_follow: Default::default(), sound: None, level: None, assist: false, assist_curves: Vec::new(), assisted: None }
+        Self { view: EditView::default(), blocks: Vec::new(), names: HashMap::new(), project: None, settled: true, writes: Vec::new(), open_subsegment: None, pieces_request: None, trim: None, chosen: None, chosen_to: None, sound_also: Vec::new(), join_sound: None, value: None, slide: None, slip_part: None, waves: qnc_program_waveform::ProgramWaves::new(), filmstrips: qnc_program_filmstrip::ProgramFilmstrips::new(), waves_project: None, trim_stills: qnc_trim_stills::TrimStills::new(), zoom_follow: Default::default(), sound: None, level: None, assist: false, assist_curves: Vec::new(), assisted: None, word: None }
     }
 }
 
@@ -1035,7 +1038,9 @@ impl SubsegmentEdit {
         };
         let (Some(part), Some(piece)) = (parts.get(index), drafted_pieces.get(index)) else { return Some(true) };
         let frame = piece.from_frame + (at - part.start);
-        let (from, to) = if out { (piece.from_frame, frame + 1) } else { (frame, piece.to_frame) };
+        // The playhead on a word clicked in the text: OUT after the word, not after its first frame.
+        let out_at = self.word.filter(|(part_index, word_at, _)| *part_index == index && *word_at == at).map_or(frame + 1, |(_, _, word_to)| word_to.min(piece.to_frame.max(frame + 1)));
+        let (from, to) = if out { (piece.from_frame, out_at) } else { (frame, piece.to_frame) };
         if to <= from {
             return Some(true);
         }
@@ -1299,6 +1304,8 @@ impl SubsegmentEdit {
         let pieces = qnc_script_draft::block_pieces(&block);
         let (Some(piece), Some(part)) = (pieces.get(index), view::subsegment_view(&block, None).parts.get(index).cloned()) else { return false };
         let at = part.start + frame.saturating_sub(piece.from_frame).min(part.end.saturating_sub(part.start + 1));
+        // While the playhead stays on this word, O puts the part's OUT after it (user 2026-11-08).
+        self.word = Some((index, at, word_to));
         if self.open_subsegment == Some(id) {
             self.pieces_request = Some((qnc_script_draft::piece_inputs(&block), at));
         } else {

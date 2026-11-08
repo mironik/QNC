@@ -40,7 +40,6 @@ pub fn show(
     // While a field is typed in its keys move between fields; while a dialog, picker or
     // browser is open no Project key works.
     let typing = ctx.wants_keyboard_input();
-    let next_field = qnc_keyboard_shortcut::pressed_while_typing(ctx, &contracts.shortcuts, "project", "form_next_field");
     let open = !typing && !session.keys_held() && actions.contains(&"project_open_selected");
     let intents = open.then_some(ProjectIntent::OpenSelectedProject).into_iter().collect();
     let mut blocks = Blocks { contracts, session, intents };
@@ -48,7 +47,7 @@ pub fn show(
     blocks.delete_questions(ctx);
     // The story sheet over the board (piece `qnc-newsroom-sheet`): name and story data.
     if let Some(overlay) = blocks.session.sheet.as_mut() {
-        if let Some(answer) = qnc_newsroom_sheet::show(ctx, overlay, &contracts.theme, next_field) {
+        if let Some(answer) = qnc_newsroom_sheet::show(ctx, overlay, &contracts.theme, &contracts.shortcuts) {
             blocks.intents.push(ProjectIntent::AnswerStorySheet { answer });
         }
     }

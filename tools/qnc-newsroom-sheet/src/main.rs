@@ -126,11 +126,7 @@ impl eframe::App for App {
         if self.tab == Tab::Profile {
             return;
         }
-        let next_field = ctx.wants_keyboard_input()
-            && qnc_keyboard_shortcut::egui_shortcut_events(ctx)
-                .iter()
-                .any(|event| self.shortcuts.action_ids_for_event("project", event).contains(&"form_next_field"));
-        match qnc_newsroom_sheet::show(ctx, &mut self.overlay, &self.theme, next_field) {
+        match qnc_newsroom_sheet::show(ctx, &mut self.overlay, &self.theme, &self.shortcuts) {
             Some(Answer::Cancel) => ctx.send_viewport_cmd(egui::ViewportCommand::Close),
             Some(Answer::Confirm) => match self.keep() {
                 Ok(()) => ctx.send_viewport_cmd(egui::ViewportCommand::Close),

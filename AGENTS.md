@@ -8442,3 +8442,18 @@ Dopuna 2026-11-08 (korisnik: "omoguciti prikaz prijepisa bez cekanja kraja prepi
 165 s, a klip je otvoren tek nakon njega): klip koji se prepisuje je u redu panela prijepisa poveznica kao i gotov
 (`qnc-transcript-panel`); klik ga otvara i pokazuje retke kako nastaju. Spremljeni dijelovi (korak 1, #3) stavljaju klip u
 tab Prijepis vec nakon prvog komada, a druge forme ga citaju iz baze. Uzivo nije provjereno.
+Popravak i izmjena 2026-11-08 (korisnik: "kada u tekstu koristim IN/OUT, na OUT postavlja rez prije selektirane rijeci, a
+trebao bi na kraju"; "kad kreiram novi projekt fokus po defaultu na prvo polje, svaki Enter skace na novi red, na kraju
+Enter vodi na dugme Kreiraj projekt, strelicama Odustani - Kreiraj"; "ponovni prijepis pocinje tek kad korisnik klikne
+Dodaj izjavu ili Dodaj u slozenu izjavu"; Project otkljucan samo za to): (1) Klik na rijec prijepisa pamti rijec; dok je
+playhead jos na njezinoj prvoj slici, O stavlja OUT iza rijeci (`qnc-source-panel` `chose_word`, `word_at_playhead`;
+`qnc-timeline-model` `with_source_out_at`); isto u tekstu izjave scenarija za dio slozene izjave
+(`qnc-subsegment-edit` `word`). (2) Obrazac novog projekta (`qnc-newsroom-sheet`): kad se otvori, naziv projekta ima
+tipkovnicu; Enter ide na sljedece polje za upis (izbori se preskacu); Enter u zadnjem polju (`qnc-settings-form`
+`ColumnAnswer.past_last`) stavlja tipkovnicu na Kreiraj (okvir fokusa), strelice lijevo/desno izmedju Odustani i
+Kreiraj (nove radnje kataloga `form_button_prev`, `form_button_next`, QNC preset, opseg `project`), Enter pritisne gumb;
+klik u polje vraca tipkovnicu polju. `show` dobiva katalog tipki (Project ploca i program obrasca vise ne citaju Enter
+sami; C10 Project ploce 1142 -> 1141). (3) Dvoklik na rijeci vise ne pokrece ponovni prijepis odmah: tekst oznacen
+rijecima ide hrvatskom modelu tek na Dodaj izjavu (`save_virtual_shot`), Slozenu izjavu (`script_subsegment`) ili
++ IZJAVA (`script_add_clip`) (`qnc-panel-focus`). Testovi dotaknutih kocki, conformance (osim otvorenog C5
+`qnc-frame-interp`). Uzivo nije provjereno. Project je ponovno zamrznut.

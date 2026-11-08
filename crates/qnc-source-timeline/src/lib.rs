@@ -326,6 +326,8 @@ impl SourceTimeline {
     /// taken.
     pub fn mark_to_word(&mut self, from: u64, to: u64, preview: &mut SourcePreview, timeline: &mut TimelineProjection) -> Option<bool> {
         if !self.mark_taken(timeline) {
+            // Nothing taken: the click puts the playhead on the word; O then puts OUT at its end.
+            self.keys.chose_word(from, to);
             return None;
         }
         let edge = if timeline.source_mark_focus == qnc_timeline_model::TimelineSourceMarkFocus::In { qnc_edit_edge::Edge::In } else { qnc_edit_edge::Edge::Out };

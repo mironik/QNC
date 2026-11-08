@@ -430,6 +430,12 @@
     "form_next_field": {
       "label": "Sljedeće polje obrasca"
     },
+    "form_button_prev": {
+      "label": "Prethodni gumb obrasca"
+    },
+    "form_button_next": {
+      "label": "Sljedeći gumb obrasca"
+    },
     "transcript_search_next": {
       "label": "Sljedeći nađeni pojam u prijepisu"
     },
@@ -745,7 +751,9 @@
           {
             "key": "Enter"
           }
-        ]
+        ],
+        "form_button_prev": [{ "code": "ArrowLeft", "key": "ArrowLeft" }],
+        "form_button_next": [{ "code": "ArrowRight", "key": "ArrowRight" }]
       },
       "script_text": {
         "script_text_cut": [{ "key": "Enter" }],

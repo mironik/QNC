@@ -140,17 +140,16 @@ impl TimelineProjection {
         self.normalize_source_marks()
     }
 
-    pub fn with_source_out_at_confirmed(mut self) -> Self {
-        if let Some(frame) = self.confirmed_frame() {
-            self.source_out_frame = Some(
-                self.local_frame(frame).max(
-                    self.source_in_frame
-                        .unwrap_or(0)
-                        .saturating_add(1)
-                        .min(self.duration_frames()),
-                ),
-            );
+    pub fn with_source_out_at_confirmed(self) -> Self {
+        match self.confirmed_frame() {
+            Some(frame) => self.with_source_out_at(frame),
+            None => self.normalize_source_marks(),
         }
+    }
+
+    /// OUT at `frame` (an absolute frame, past the last frame kept), never before IN.
+    pub fn with_source_out_at(mut self, frame: u64) -> Self {
+        self.source_out_frame = Some(self.local_frame(frame).max(self.source_in_frame.unwrap_or(0).saturating_add(1).min(self.duration_frames())));
         self.normalize_source_marks()
     }
 

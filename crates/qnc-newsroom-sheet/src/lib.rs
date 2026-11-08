@@ -25,10 +25,57 @@ pub const ROW_GAP: f32 = 12.0;
 const MARGIN: f32 = 24.0;
 
 
+/// The button of the filled sheet the keyboard is on (user 2026-11-08: the last Enter goes to
+/// Create, the arrows between Cancel and Create, Enter presses it).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum OnButton {
+    Confirm,
+    Cancel,
+}
+
+/// The keys of the filled sheet from the form's catalog (scope `project`): the next field
+/// (pressed while a field is typed in), and Enter and the arrows while a button has the keyboard.
+struct SheetKeys {
+    next_field: bool,
+    enter: bool,
+    left: bool,
+    right: bool,
+}
+
+impl SheetKeys {
+    fn read(ctx: &egui::Context, catalog: &qnc_keyboard_shortcut::ShortcutCatalog) -> Self {
+        let typing = ctx.wants_keyboard_input();
+        let events = qnc_keyboard_shortcut::egui_shortcut_events(ctx);
+        let pressed = |action: &str| !typing && events.iter().any(|event| catalog.action_ids_for_event("project", event).contains(&action));
+        Self {
+            next_field: qnc_keyboard_shortcut::pressed_while_typing(ctx, catalog, "project", "form_next_field"),
+            enter: pressed("form_next_field"),
+            left: pressed("form_button_prev"),
+            right: pressed("form_button_next"),
+        }
+    }
+}
+
 /// Draws the overlay in the middle of the screen, whole on it: a title bar as a window has,
 /// the sheet (it scrolls when it is taller than the screen), the buttons on the right at the
-/// bottom. `next_field` is the catalog key for the next field, pressed while a field is typed in.
-pub fn show(ctx: &egui::Context, overlay: &mut SheetOverlay, theme: &Theme, next_field: bool) -> Option<Answer> {
+/// bottom. The keys come from the form's shortcut catalog. Opened, the project name has the
+/// keyboard (user 2026-11-08); every Enter goes to the next field, the last to Create.
+pub fn show(ctx: &egui::Context, overlay: &mut SheetOverlay, theme: &Theme, catalog: &qnc_keyboard_shortcut::ShortcutCatalog) -> Option<Answer> {
+    let keys = SheetKeys::read(ctx, catalog);
+    // Opened now (not drawn the pass before): the name field takes the keyboard, no button.
+    let seen = egui::Id::new("qnc_story_sheet_seen");
+    let pass = ctx.cumulative_pass_nr();
+    let opened = ctx.data(|data| data.get_temp::<u64>(seen)).is_none_or(|last| last + 1 < pass);
+    ctx.data_mut(|data| data.insert_temp(seen, pass));
+    let button_id = egui::Id::new("qnc_story_sheet_button");
+    let mut on_button: Option<OnButton> = if opened { None } else { ctx.data(|data| data.get_temp(button_id)) };
+    if opened && overlay.editing.is_none() {
+        ctx.memory_mut(|memory| memory.request_focus(egui::Id::new(NAME_ID)));
+    }
+    // A field clicked or typed in has the keyboard: no button has it.
+    if ctx.wants_keyboard_input() {
+        on_button = None;
+    }
     let screen = ctx.screen_rect();
     let width = WIDTH.min(screen.width() - 2.0 * MARGIN);
     let bar = theme.chrome_row_height.max(ROW_HEIGHT + 4.0);
@@ -50,17 +97,56 @@ pub fn show(ctx: &egui::Context, overlay: &mut SheetOverlay, theme: &Theme, next
                     egui::ScrollArea::vertical().max_height(body_height).auto_shrink([false, true]).show(ui, |ui| {
                         if editing {
                             editor(ui, overlay, theme);
-                        } else {
-                            fill(ui, overlay, theme, next_field);
+                        } else if fill(ui, overlay, theme, keys.next_field) {
+                            // The last field's Enter: the keyboard goes to Create.
+                            ui.memory_mut(|memory| memory.surrender_focus(egui::Id::new(NAME_ID)));
+                            if let Some(focused) = ui.memory(|memory| memory.focused()) {
+                                ui.memory_mut(|memory| memory.surrender_focus(focused));
+                            }
+                            on_button = Some(OnButton::Confirm);
                         }
                     });
                 });
                 egui::Frame::NONE.inner_margin(MARGIN).show(ui, |ui| {
-                    answer = if editing { editor_buttons(ui, overlay, theme) } else { fill_buttons(ui, overlay, theme) };
+                    answer = if editing {
+                        editor_buttons(ui, overlay, theme)
+                    } else {
+                        // The arrows between Cancel and Create, Enter presses the one the keyboard is on.
+                        let mut pressed = None;
+                        if let Some(button) = on_button {
+                            if keys.left || keys.right {
+                                on_button = Some(if button == OnButton::Confirm { OnButton::Cancel } else { OnButton::Confirm });
+                            } else if keys.enter {
+                                pressed = answer_of(button, overlay);
+                            }
+                        }
+                        let clicked = fill_buttons(ui, overlay, theme, on_button);
+                        pressed.or(clicked)
+                    };
                 });
             });
         });
+    ctx.data_mut(|data| match on_button {
+        Some(button) => data.insert_temp(button_id, button),
+        None => data.remove::<OnButton>(button_id),
+    });
     answer
+}
+
+/// The answer of the button the keyboard pressed (Create only when the sheet can be confirmed).
+fn answer_of(button: OnButton, overlay: &SheetOverlay) -> Option<Answer> {
+    match button {
+        OnButton::Confirm => ready(overlay).then_some(Answer::Confirm),
+        OnButton::Cancel => Some(Answer::Cancel),
+    }
+}
+
+/// The id of the project name's text box.
+const NAME_ID: &str = "qnc_story_sheet_name";
+
+/// Whether the sheet can be confirmed: a name and a sheet.
+fn ready(overlay: &SheetOverlay) -> bool {
+    !overlay.name.trim().is_empty() && overlay.sheets.current().is_some()
 }
 
 /// The title of the overlay in a bar along its top, as a window has.
@@ -109,8 +195,9 @@ pub fn button(ui: &mut egui::Ui, label: &str, enabled: bool, theme: &Theme) -> b
     qnc_ui_kit::chrome_button(ui, label, enabled, false, qnc_theme_styles::button(theme)).clicked()
 }
 
-/// The sheet filled: its choice, the project name, its fields.
-fn fill(ui: &mut egui::Ui, overlay: &mut SheetOverlay, theme: &Theme, next_field: bool) {
+/// The sheet filled: its choice, the project name, its fields. True when the key for the next
+/// field was pressed in its last field (the keyboard goes on to Create).
+fn fill(ui: &mut egui::Ui, overlay: &mut SheetOverlay, theme: &Theme, next_field: bool) -> bool {
     let width = ui.available_width();
     let field_w = width - LABEL_WIDTH - ROW_GAP;
     ui.spacing_mut().interact_size.y = ROW_HEIGHT;
@@ -135,7 +222,7 @@ fn fill(ui: &mut egui::Ui, overlay: &mut SheetOverlay, theme: &Theme, next_field
         }
     }
     ui.add_space(ROW_GAP);
-    let name_id = egui::Id::new("qnc_story_sheet_name");
+    let name_id = egui::Id::new(NAME_ID);
     let from_name = next_field && ui.memory(|memory| memory.has_focus(name_id));
     ui.horizontal(|ui| {
         label(ui, theme, qnc_ui_text::text("project.project_name"));
@@ -143,25 +230,31 @@ fn fill(ui: &mut egui::Ui, overlay: &mut SheetOverlay, theme: &Theme, next_field
         ui.add_enabled(overlay.name_editable, edit.hint_text(qnc_ui_text::text("project.name_new_project")));
     });
     ui.add_space(ROW_GAP / 2.0);
+    // A sheet without typed fields: the name's Enter goes on to Create.
+    let mut past_last = from_name;
     if let Some(sheet) = overlay.sheets.current().cloned() {
-        qnc_settings_form::field_column(ui, width, &mut overlay.values, &sheet.fields, &sheet.options, &style(theme), next_field, from_name);
+        past_last = qnc_settings_form::field_column(ui, width, &mut overlay.values, &sheet.fields, &sheet.options, &style(theme), next_field, from_name).past_last;
     }
     if !overlay.message.is_empty() {
         ui.label(RichText::new(&overlay.message).color(theme.danger));
     }
+    past_last
 }
 
-/// Confirm (rightmost) and Cancel of the filled sheet.
-fn fill_buttons(ui: &mut egui::Ui, overlay: &SheetOverlay, theme: &Theme) -> Option<Answer> {
+/// Confirm (rightmost) and Cancel of the filled sheet; the one the keyboard is on is framed.
+fn fill_buttons(ui: &mut egui::Ui, overlay: &SheetOverlay, theme: &Theme, on_button: Option<OnButton>) -> Option<Answer> {
     let mut answer = None;
     right_row(ui, |ui| {
-        let ready = !overlay.name.trim().is_empty() && overlay.sheets.current().is_some();
-        if qnc_ui_kit::strong_button(ui, &overlay.confirm_label, ready, theme.accent, theme.chrome_control_height).clicked() {
+        let confirm = qnc_ui_kit::strong_button(ui, &overlay.confirm_label, ready(overlay), theme.accent, theme.chrome_control_height);
+        if confirm.clicked() {
             answer = Some(Answer::Confirm);
         }
-        if button(ui, qnc_ui_text::text("common.cancel"), true, theme) {
+        let cancel = qnc_ui_kit::chrome_button(ui, qnc_ui_text::text("common.cancel"), true, false, qnc_theme_styles::button(theme));
+        if cancel.clicked() {
             answer = Some(Answer::Cancel);
         }
+        qnc_ui_kit::paint_focus(ui, confirm.rect.expand(2.0), on_button == Some(OnButton::Confirm), theme.focus);
+        qnc_ui_kit::paint_focus(ui, cancel.rect.expand(2.0), on_button == Some(OnButton::Cancel), theme.focus);
     });
     answer
 }

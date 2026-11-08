@@ -5274,6 +5274,7 @@ dependencies = [
  "qnc-desktop-theme",
  "qnc-dev-diagnostics",
  "qnc-field-spec",
+ "qnc-keyboard-shortcut",
  "qnc-newsroom-sheet-model",
  "qnc-settings-form",
  "qnc-theme-styles",

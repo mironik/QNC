@@ -42,6 +42,14 @@ impl PanelFocus {
         if matches!(action_id, "play_pause" | "timeline_cue_frame") {
             self.moves.stop(pieces.0);
         }
+        // The text chosen (a pair of words marked IN/OUT) is heard again with the Croatian model
+        // once it is added as a statement or to a composite statement (user 2026-11-08: not at the
+        // double click, only at Add statement / Add to composite statement), where the form has a
+        // transcript. The action itself goes on below.
+        if matches!(action_id, "save_virtual_shot" | qnc_script::SUBSEGMENT | qnc_script::ADD_CLIP) && self.source.take_marked_by_text().is_some() {
+            let timecode = self.source.view().timecode;
+            self.side.act(qnc_transcript::REPASS, None, None, pieces.0, pieces.3, timecode.as_ref());
+        }
         // The one meaning of a word (`qnc-edit-words`, AGENTS 0.12): a click on a word of the
         // transcript while the source IN or OUT is taken brings that mark to the word (as in
         // the zoom), it does not only cue.
@@ -125,14 +133,7 @@ impl PanelFocus {
             if let Some(done) = self.source.mark_to_word(from, to, pieces.0, pieces.3) {
                 return Some(done);
             }
-            let cut = self.source.cut_word(pieces.3, from, to);
-            // The text chosen (a pair of words marked IN/OUT) is heard again with the Croatian
-            // model at once (user 2026-11-08), where the form has a transcript.
-            if self.source.take_marked_by_text().is_some() {
-                let timecode = self.source.view().timecode;
-                self.side.act(qnc_transcript::REPASS, None, None, pieces.0, pieces.3, timecode.as_ref());
-            }
-            return Some(cut);
+            return Some(self.source.cut_word(pieces.3, from, to));
         }
         // The Export button and the box it opens (piece `qnc-segments-keys`).
         if let Some(done) = qnc_segments_keys::export(action_id, event.at.is_some(), pieces.0, pieces.2) {

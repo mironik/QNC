@@ -40,6 +40,10 @@ pub struct SourcePanel {
     was_playing: bool,
     /// The clip frame of OUT a play started before it stops at.
     stop_at: Option<u64>,
+    /// The word of the transcript a click put the playhead on (its first frame and the frame
+    /// past its last): while the playhead stays there, O puts OUT at the word's end (user
+    /// 2026-11-08: "OUT is set before the chosen word, it should be at its end").
+    word: Option<(u64, u64)>,
 }
 
 impl SourcePanel {
@@ -69,6 +73,17 @@ impl SourcePanel {
                 preview.cue(out);
             }
         }
+    }
+
+    /// A click on a word of the transcript put the playhead on it (`from..to`, clip frames).
+    pub fn chose_word(&mut self, from: u64, to: u64) {
+        self.word = (to > from).then_some((from, to));
+    }
+
+    /// The word chosen while the playhead is still on its first frame.
+    fn word_at_playhead(&self, preview: &SourcePreview, timeline: &TimelineProjection) -> Option<(u64, u64)> {
+        let at = preview.clip_frame().or(timeline.confirmed_frame())?;
+        self.word.filter(|(from, _)| *from == at)
     }
 
     /// IN or OUT is taken: the arrows move it, Escape gives them back to the playhead.
@@ -103,7 +118,11 @@ impl SourcePanel {
             // OUT stops the play there (user 2026-10-19).
             "mark_out" => {
                 self.mark_taken = false;
-                *timeline = timeline.with_source_out_at_confirmed();
+                // The playhead on a word chosen in the text: OUT after the word, not before it.
+                *timeline = match self.word_at_playhead(preview, timeline) {
+                    Some((_, to)) => timeline.with_source_out_at(to),
+                    None => timeline.with_source_out_at_confirmed(),
+                };
                 preview.pause();
                 true
             }
