@@ -8559,3 +8559,7 @@ Izmjena isti dan (korisnik: tabelarni prikaz, "ljeva kolona timecode, srednja te
 podesavanje razmaka"; IN/OUT se pise samo u dokumentu za provjeru): dijelovi slozene izjave u scenariju su redovi tablice
 (`qnc-script-panel`): TC pocetak-kraj i duljina, tekst, a desno (dok je izjava otvorena) Smooth i pauza spoja prije tog dijela.
 Red "IN: ... OUT: ..." bloka vise se ne prikazuje u formi; u izvozu ostaje. Uzivo nije provjereno.
+Dopuna isti dan (korisnik: "zasto se ne cuje ton"; A1 sva tri dijela bio je iskljucen; "ukljuci A1 u bazi i dodaj crvenu oznaku"):
+dio slozene izjave s iskljucenim A1 ima crvenu oznaku A1 na pocetku svoje trake na timelineu (`qnc-timeline`
+`TimelineCoverSpan.a1_off`, boja `lane_silent`). A1 ukljucen u aktivnom projektu primjerom `qnc-script-db/examples/a1_on.rs`
+kroz pisca scenarija (na zahtjev korisnika). Uzivo nije provjereno.

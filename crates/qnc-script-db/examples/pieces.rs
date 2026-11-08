@@ -7,7 +7,7 @@ fn main() -> Result<(), String> {
     let target = qnc_db_broker::ProjectDbTarget::for_project(reader.settings_reader(), &snapshot.settings)?;
     for block in qnc_script_db::read(&target)? {
         for (index, piece) in block.pieces.iter().enumerate() {
-            println!("[{}:{index}] clip={} {}..{} gap={} cut={}", block.id, piece.clip_id, piece.from_frame, piece.to_frame, piece.gap_before, piece.cut);
+            println!("[{}:{index}] clip={} {}..{} gap={} cut={} a1_channel={:?} a1_db={} a1_off={} smooth={}", block.id, piece.clip_id, piece.from_frame, piece.to_frame, piece.gap_before, piece.cut, piece.a1_channel, piece.a1_level_db, piece.a1_off, piece.smooth_frames);
         }
     }
     Ok(())

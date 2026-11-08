@@ -82,6 +82,7 @@ pub fn show(ui: &mut egui::Ui, view: &SubsegmentView, theme: TimelineTheme, leng
             pending: false,
             fill: cover_fill(part.end - part.start, view.rate, lengths),
             label: Some(length.as_str()),
+            a1_off: part.a1_off,
         })
         .collect();
     // A line on every edge (the IN and OUT of every part): a right click near one takes it.

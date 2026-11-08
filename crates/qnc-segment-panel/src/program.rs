@@ -77,6 +77,7 @@ pub(crate) fn paint_program(
         pending: true,
         fill: cover_fill(to - from, segments.timebase, lengths),
         label: Some(label),
+        a1_off: false,
     });
     let covers = shown
         .iter()
@@ -92,6 +93,7 @@ pub(crate) fn paint_program(
             pending: false,
             fill: cover_fill(cover.end_frame - cover.start_frame, segments.timebase, lengths),
             label: Some(label.as_str()),
+            a1_off: false,
         })
         .chain(draft_span)
         .collect::<Vec<_>>();

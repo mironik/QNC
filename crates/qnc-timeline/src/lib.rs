@@ -294,6 +294,8 @@ pub struct TimelineCoverSpan<'a> {
     pub fill: Option<Color32>,
     /// A short text drawn inside a saved cover when it fits (e.g. its length).
     pub label: Option<&'a str>,
+    /// Its sound is off: a red A1 at its start (user 2026-11-08: it must not go unnoticed).
+    pub a1_off: bool,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -1913,6 +1915,11 @@ fn paint_covers(
             // Not saved yet: a frame in the focus colour round it.
             ui.painter().rect_stroke(rect, 1.0, Stroke::new(2.0, input.theme.focus), StrokeKind::Inside);
         }
+        if cover.a1_off && rect.width() >= 24.0 {
+            let tag = Rect::from_min_size(rect.min, Vec2::new(24.0, rect.height()));
+            ui.painter().rect_filled(tag, 1.0, input.theme.lane_silent);
+            ui.painter().text(tag.center(), Align2::CENTER_CENTER, "A1", FontId::proportional(10.0), Color32::WHITE);
+        }
         if let Some(label) = cover.label.filter(|_| rect.width() >= 34.0) {
             ui.painter().text(
                 rect.center(),
@@ -2707,6 +2714,7 @@ mod tests {
             pending: false,
             fill: None,
             label: None,
+            a1_off: false,
         }];
         let slots = [TimelineSlotSpan {
             id: "slot_mid",
