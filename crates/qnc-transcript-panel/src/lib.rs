@@ -129,8 +129,10 @@ fn paint_queue(ui: &mut egui::Ui, view: &TranscriptView, theme: &qnc_desktop_the
         };
         let quality = if row.quality == QueueQuality::Fast { "transcript.fast" } else { "transcript.best" };
         let text = format!("{}  ·  {}  ·  {}  ·  {}", row.name, clock(row.length_seconds), qnc_ui_text::text(quality), state);
-        // A done clip is a link: its text opens without looking for it in the pool (user 2026-10-26).
-        let done = row.state == QueueState::Done;
+        // A done clip is a link: its text opens without looking for it in the pool (user 2026-10-26);
+        // so is the running one, its lines shown as they are heard (user 2026-11-08: "the
+        // transcript shown without waiting for the end").
+        let done = matches!(row.state, QueueState::Done | QueueState::Running);
         let mut rich = RichText::new(text).color(color).size(theme.font_ui);
         if done {
             rich = rich.underline();
