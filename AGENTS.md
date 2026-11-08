@@ -8545,3 +8545,7 @@ Izmjena 2026-11-08 (korisnik: redak "pokrio je prikaz razine tona"; izabrao rjes
 slozena izjava otvorena, njezine kontrole su u njezinu tekstu (`qnc-script-panel` `part_controls.rs`; isti blok u MA Audiju i MA
 Scriptu): u redu dijela A1 (kanal, razina, uklj.), mjesto i Obrisi, a red izmedju dva dijela je spoj (pauza, Rez/Pretapanje,
 Smooth). Iste radnje kao prije; `qnc-subsegment-panel` crta samo timeline i zoom. Uzivo nije provjereno.
+Izmjena 2026-11-08 (korisnik: "suma podataka, nepregledno, zbunjujuce... treba odvojiti tonove, oni su vec odabrani"): u tekstu
+izjave nema tona (A1 dijela mijenja se na timelineu, Ctrl+1 ili klik na A1). Izmedju dva dijela stoje samo Rez/Pretapanje i Smooth
+(stanje samo dok nije spremno); pauza, brojevi -/+, mjesto i Obrisi samo uz dio izabran klikom na traku timelinea. Dio s A1 radnje
+ostaju u katalogu (`subsegment_part_channel` i dr.) bez gumba. Uzivo nije provjereno.

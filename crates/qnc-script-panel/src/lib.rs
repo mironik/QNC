@@ -270,8 +270,8 @@ pub fn paint_block(ui: &mut egui::Ui, row: &qnc_script::BlockRow, view: &ScriptV
                 }
             }
             match open_part {
-                Some((open, part)) => {
-                    if let Some(event) = part_controls::part_row(ui, open, index, part, detail.as_deref(), theme) {
+                Some((open, _)) => {
+                    if let Some(event) = part_controls::part_row(ui, open, index, detail.as_deref(), theme) {
                         asked = Some(event);
                     }
                 }
