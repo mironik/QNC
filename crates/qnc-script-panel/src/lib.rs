@@ -300,8 +300,14 @@ pub fn paint_block(ui: &mut egui::Ui, place: &'static str, row: &qnc_script::Blo
             }
             // A recorded text shows how the take used was read (user 2026-11-08).
             let recording_here = view.recording.is_some_and(|(recording, _, _)| recording == block.id);
-            if let Some(check) = row.voice.as_ref().filter(|_| row.recorded && !text.is_empty() && !recording_here).and_then(|voice| voice.check_of(voice.chosen)) {
-                return (asked, read_marks::show(ui, text, check, theme));
+            if row.recorded && !text.is_empty() && !recording_here {
+                let check = row.voice.as_ref().and_then(|voice| voice.check_of(voice.chosen));
+                let taken = view.taken_mark.filter(|(taken, _)| *taken == block.id).map(|(_, word)| word);
+                let (clicked, right) = read_marks::show(ui, text, &read_marks::Shown { check, marks: &block.marks, taken, lengths: &row.mark_lengths }, theme);
+                if let Some(word) = right {
+                    asked = Some(ActionEvent::key(qnc_script::MARK_AT).with_target(format!("{}:{word}", block.id)).at(PANEL));
+                }
+                return (asked, clicked);
             }
             let shown = if text.is_empty() { qnc_ui_text::text("script.no_words").to_string() } else { text.to_string() };
             let color = if text.is_empty() { theme.text_muted } else { theme.text };

@@ -33,6 +33,8 @@ use qnc_voice_take::{Recorded, Take};
 mod read;
 mod view;
 mod text_edit;
+mod text_marks;
+pub use text_marks::MARK_AT;
 mod word_pick;
 pub use word_pick::{WordPick, TEXT_CUT, TEXT_DRAFT, TEXT_REVERT, WORD_PICK, WORD_TAKE};
 pub use text_edit::text_of;
@@ -273,6 +275,9 @@ impl Script {
             Some((action, own_target)) => (action.as_str(), own_target.as_deref()),
             None => (action_id, target),
         };
+        if let Some(done) = self.mark_key(action_id, target, preview) {
+            return Some(done);
+        }
         if let Some(done) = self.pick_key(action_id, target, preview) {
             return Some(done);
         }
@@ -740,6 +745,7 @@ impl Script {
                     a1,
                     a2,
                     origin: part.origin,
+                    marks: part.marks,
                 });
             }
             let version = qnc_skeleton_db::new_version(target)?;
@@ -821,6 +827,16 @@ impl Script {
                     .collect();
                 shown
             });
+            // The shots the M markers of a text make: their lengths, by what was heard or the
+            // reading time.
+            if !row.block.marks.is_empty() {
+                let take = self.voices.iter().find(|(voice, _)| voice.block_id == row.block.id).and_then(|(voice, _)| voice.chosen_take());
+                let check = row.voice.as_ref().and_then(|voice| voice.check_of(voice.chosen));
+                let starts: Vec<f64> = take.and_then(|take| take.heard.as_ref()).map_or_else(Vec::new, |heard| heard.iter().map(|word| word.start).collect());
+                let at = qnc_script_draft::mark_seconds(&row.block, check.map(|check| (check, starts.as_slice())), row.seconds);
+                let ends = at.iter().copied().chain([row.seconds]);
+                row.mark_lengths = std::iter::once(0.0).chain(at.iter().copied()).zip(ends).map(|(from, to)| (to - from).max(0.0)).collect();
+            }
             // The words of a statement with their times (user 2026-11-04: edited by its text).
             if row.is_clip() {
                 let names = &self.names;

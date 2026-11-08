@@ -117,6 +117,22 @@ fn take(number: u16, seconds: f64, tc: &str, text: &str) -> VoiceTake {
 }
 
 #[test]
+fn a_marker_stays_with_its_word_goes_with_it_and_is_one_step_of_undo() {
+    let (_dir, target) = written();
+    let id = add(&target, None, off("prva druga treca cetvrta")).unwrap();
+    assert!(set_marks(&target, id, vec![0]).is_err(), "not before the first word");
+    assert!(set_marks(&target, id, vec![4]).is_err(), "not after the last");
+    set_marks(&target, id, vec![3, 1]).unwrap();
+    assert_eq!(read(&target).unwrap()[0].marks, [1, 3]);
+    set_text(&target, id, "nova prva druga cetvrta".into()).unwrap();
+    assert_eq!(read(&target).unwrap()[0].marks, [2, 3], "before druga and cetvrta, which moved");
+    set_text(&target, id, "nova prva cetvrta".into()).unwrap();
+    assert_eq!(read(&target).unwrap()[0].marks, [2], "druga deleted, its marker with it");
+    undo(&target).unwrap();
+    assert_eq!(read(&target).unwrap()[0].marks, [2, 3]);
+}
+
+#[test]
 fn the_words_heard_are_kept_with_their_take_and_no_step_of_undo() {
     let (_dir, target) = written();
     let id = add(&target, None, off("Prvi off.")).unwrap();

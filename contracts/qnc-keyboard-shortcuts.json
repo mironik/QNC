@@ -226,6 +226,9 @@
     "script_word_pick": {
       "label": "Shift+desni klik na rijec ili slovo izjave: uzeto se prosiri do nje (Delete ih izreze iz videa)"
     },
+    "script_mark_at": {
+      "label": "Desni klik (Ctrl+) izmedu dvije rijeci OFF-a: M marker tamo; na postojecem ga uzme (Delete ga brise)"
+    },
     "script_word_take": {
       "label": "Desni klik (Ctrl+) na rijec ili slovo izjave: uzme ga (Delete ga izreze iz videa)"
     },

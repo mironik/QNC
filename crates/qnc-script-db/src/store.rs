@@ -16,6 +16,8 @@ pub(crate) struct Store {
     no_fields: bool,
     /// A table made before blocks of several parts: its blocks are read as one range each.
     no_pieces: bool,
+    /// A table made before M markers in the text: its blocks are read without them.
+    no_marks: bool,
 }
 
 impl Store {
@@ -35,7 +37,8 @@ impl Store {
         let legacy = ready && !has_voice(&conn)?;
         let no_fields = ready && !has_column(&conn, "fields_json")?;
         let no_pieces = ready && !has_column(&conn, "pieces_json")?;
-        Ok(Self { conn, ready, legacy, no_fields, no_pieces })
+        let no_marks = ready && !has_column(&conn, "marks_json")?;
+        Ok(Self { conn, ready, legacy, no_fields, no_pieces, no_marks })
     }
 
     pub(crate) fn execute(&mut self, operation: &Operation) -> Result<Data> {
@@ -112,6 +115,7 @@ impl Store {
             Operation::AddVoiceTake { id, name, clip_uri, take } => self.add_voice_take(*id, name, clip_uri, take),
             Operation::SetVoiceChosen { id, take } => self.set_voice_chosen(*id, *take),
             Operation::SetTakeHeard { id, take, heard } => self.set_take_heard(*id, *take, heard),
+            Operation::SetMarks { id, marks } => self.set_marks(*id, marks),
         }
     }
 
@@ -119,10 +123,11 @@ impl Store {
         let voice = if self.legacy { "'', 0.0, ''" } else { "voice_uri, voice_seconds, voice_tc" };
         let fields = if self.no_fields { "'{}'" } else { "fields_json" };
         let pieces = if self.no_pieces { "'[]'" } else { "pieces_json" };
+        let marks = if self.no_marks { "'[]'" } else { "marks_json" };
         let mut statement = self
             .conn
             .prepare(&format!(
-                "SELECT block_id, kind, text, clip_id, clip_name, from_frame, to_frame, start_tc, end_tc, length, seconds, {voice}, {fields}, {pieces}
+                "SELECT block_id, kind, text, clip_id, clip_name, from_frame, to_frame, start_tc, end_tc, length, seconds, {voice}, {fields}, {pieces}, {marks}
                  FROM public_script_blocks ORDER BY position"
             ))
             .map_err(err)?;
@@ -145,6 +150,7 @@ impl Store {
                     voice_tc: r.get(13)?,
                     fields: serde_json::from_str(&r.get::<_, String>(14)?).unwrap_or_default(),
                     pieces: serde_json::from_str(&r.get::<_, String>(15)?).unwrap_or_default(),
+                    marks: serde_json::from_str(&r.get::<_, String>(16)?).unwrap_or_default(),
                 })
             })
             .map_err(err)?;
@@ -248,8 +254,27 @@ impl Store {
             return Err(qnc_ui_text::fill("db.script_text_empty", &[("kind", &kind.label)]));
         }
         let tx = qnc_db_broker::begin_write(&mut self.conn).map_err(err)?;
-        tx.execute("UPDATE script_blocks SET text = ?2, updated_at_utc = strftime('%Y-%m-%dT%H:%M:%fZ','now') WHERE block_id = ?1", params![id, text]).map_err(err)?;
+        // The markers stay with their words; a word deleted takes its marker with it.
+        let (old, marks): (String, String) = tx.query_row("SELECT text, marks_json FROM script_blocks WHERE block_id = ?1", params![id], |r| Ok((r.get(0)?, r.get(1)?))).map_err(err)?;
+        let marks = serde_json::to_string(&marks_after_edit(&old, text, &serde_json::from_str::<Vec<u32>>(&marks).unwrap_or_default())).map_err(err)?;
+        tx.execute("UPDATE script_blocks SET text = ?2, marks_json = ?3, updated_at_utc = strftime('%Y-%m-%dT%H:%M:%fZ','now') WHERE block_id = ?1", params![id, text, marks]).map_err(err)?;
         tx.commit().map_err(err)?;
+        Ok(Data::Changed)
+    }
+
+    /// The M markers in the text of block `id`, each before a word of it but the first.
+    fn set_marks(&mut self, id: i64, marks: &[u32]) -> Result<Data> {
+        let kind = self.kind_spec(&self.kind_of_block(id)?)?;
+        let text: String = self.conn.query_row("SELECT text FROM script_blocks WHERE block_id = ?1", params![id], |r| r.get(0)).map_err(err)?;
+        let words = text.split_whitespace().count() as u32;
+        if kind.role == Role::Clip || marks.iter().any(|mark| *mark == 0 || *mark >= words) {
+            return Err(qnc_ui_text::text("db.script_mark_invalid").into());
+        }
+        let mut marks = marks.to_vec();
+        marks.sort_unstable();
+        marks.dedup();
+        let json = serde_json::to_string(&marks).map_err(err)?;
+        self.conn.execute("UPDATE script_blocks SET marks_json = ?2, updated_at_utc = strftime('%Y-%m-%dT%H:%M:%fZ','now') WHERE block_id = ?1", params![id, json]).map_err(err)?;
         Ok(Data::Changed)
     }
 
@@ -547,7 +572,34 @@ const COLUMNS: &str = "block_id INTEGER PRIMARY KEY AUTOINCREMENT,
             voice_tc TEXT NOT NULL DEFAULT '',
             fields_json TEXT NOT NULL DEFAULT '{}',
             pieces_json TEXT NOT NULL DEFAULT '[]',
+            marks_json TEXT NOT NULL DEFAULT '[]',
             updated_at_utc TEXT NOT NULL";
+
+/// The M markers of `old` in the text as edited to `new`: each with its word, the words the two
+/// have in common found in order; a marker whose word is gone goes with it.
+fn marks_after_edit(old: &str, new: &str, marks: &[u32]) -> Vec<u32> {
+    let (old, new): (Vec<&str>, Vec<&str>) = (old.split_whitespace().collect(), new.split_whitespace().collect());
+    let mut common = vec![vec![0u32; new.len() + 1]; old.len() + 1];
+    for i in (0..old.len()).rev() {
+        for j in (0..new.len()).rev() {
+            common[i][j] = if old[i] == new[j] { common[i + 1][j + 1] + 1 } else { common[i + 1][j].max(common[i][j + 1]) };
+        }
+    }
+    let (mut i, mut j, mut kept) = (0, 0, Vec::new());
+    while i < old.len() && j < new.len() {
+        if old[i] == new[j] {
+            if marks.contains(&(i as u32)) && j > 0 {
+                kept.push(j as u32);
+            }
+            (i, j) = (i + 1, j + 1);
+        } else if common[i + 1][j] >= common[i][j + 1] {
+            i += 1;
+        } else {
+            j += 1;
+        }
+    }
+    kept
+}
 
 fn table_sql(conn: &Connection) -> Result<Option<String>> {
     conn.query_row("SELECT sql FROM sqlite_master WHERE type='table' AND name='script_blocks'", [], |r| r.get(0)).optional().map_err(err)
@@ -585,10 +637,14 @@ fn ensure_schema(conn: &Connection) -> Result<()> {
         ))
         .map_err(err)?;
     }
+    // Blocks written before M markers in the text keep everything and get none.
+    if !has_column(conn, "marks_json")? {
+        conn.execute_batch("DROP VIEW IF EXISTS public_script_blocks; ALTER TABLE script_blocks ADD COLUMN marks_json TEXT NOT NULL DEFAULT '[]';").map_err(err)?;
+    }
     conn.execute_batch(&format!(
         "CREATE TABLE IF NOT EXISTS script_blocks ({COLUMNS});
         CREATE VIEW IF NOT EXISTS public_script_blocks AS
-            SELECT block_id, position, kind, text, clip_id, clip_name, from_frame, to_frame, start_tc, end_tc, length, seconds, voice_uri, voice_seconds, voice_tc, fields_json, pieces_json, updated_at_utc
+            SELECT block_id, position, kind, text, clip_id, clip_name, from_frame, to_frame, start_tc, end_tc, length, seconds, voice_uri, voice_seconds, voice_tc, fields_json, pieces_json, marks_json, updated_at_utc
             FROM script_blocks;
         CREATE TABLE IF NOT EXISTS script_profile (
             singleton INTEGER PRIMARY KEY CHECK (singleton = 1),
@@ -634,6 +690,7 @@ fn undoable(operation: &Operation) -> bool {
             | Operation::Move { .. }
             | Operation::Remove { .. }
             | Operation::SetFields { .. }
+            | Operation::SetMarks { .. }
             | Operation::AddPiece { .. }
             | Operation::SetJoin { .. }
             | Operation::SetSmooth { .. }

@@ -30,6 +30,8 @@ pub enum Verdict {
 pub struct CheckedWord {
     pub at: Range<usize>,
     pub verdict: Verdict,
+    /// The heard word it was matched with (an index of what `check` was given).
+    pub heard: Option<usize>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -132,7 +134,7 @@ pub fn check(written: &str, heard: &[&str]) -> ReadCheck {
             (!plain.is_empty()).then(|| (start..start + word.len(), plain))
         })
         .collect();
-    let spoken: Vec<(&str, String)> = heard.iter().map(|word| (*word, plain(word))).filter(|(_, plain)| !plain.is_empty()).collect();
+    let spoken: Vec<(usize, &str, String)> = heard.iter().enumerate().map(|(index, word)| (index, *word, plain(word))).filter(|(_, _, plain)| !plain.is_empty()).collect();
     let (n, m) = (tokens.len(), spoken.len());
     let width = m + 1;
     let mut cost = vec![u32::MAX; (n + 1) * width];
@@ -158,22 +160,23 @@ pub fn check(written: &str, heard: &[&str]) -> ReadCheck {
                 offer(at(i, j + 1), EXTRA, Step::Extra);
             }
             if i < n && j < m {
-                let price = likeness(&tokens[i].1, &spoken[j].1);
+                let price = likeness(&tokens[i].1, &spoken[j].2);
                 offer(at(i + 1, j + 1), price, if price == WRONG { Step::Wrong } else { Step::Same });
             }
-            if j < m && is_digits(&spoken[j].1) {
+            if j < m && is_digits(&spoken[j].2) {
                 for count in (1..=NUMBER_WORDS).take_while(|count| i + count <= n && is_number_word(&tokens[i + count - 1].1)) {
                     offer(at(i + count, j + 1), 0, Step::NumberHeard(count));
                 }
             }
             if i < n && is_digits(&tokens[i].1) {
-                for count in (1..=NUMBER_WORDS).take_while(|count| j + count <= m && is_number_word(&spoken[j + count - 1].1)) {
+                for count in (1..=NUMBER_WORDS).take_while(|count| j + count <= m && is_number_word(&spoken[j + count - 1].2)) {
                     offer(at(i + 1, j + count), 0, Step::NumberWritten(count));
                 }
             }
         }
     }
     let mut verdicts = vec![Verdict::Missed; n];
+    let mut matched = vec![None; n];
     let mut extra = Vec::new();
     let (mut i, mut j) = (n, m);
     loop {
@@ -182,15 +185,17 @@ pub fn check(written: &str, heard: &[&str]) -> ReadCheck {
             Step::Same => {
                 (i, j) = (i - 1, j - 1);
                 verdicts[i] = Verdict::Read;
+                matched[i] = Some(spoken[j].0);
             }
             Step::Wrong => {
                 (i, j) = (i - 1, j - 1);
                 verdicts[i] = Verdict::Wrong;
+                matched[i] = Some(spoken[j].0);
             }
             Step::Missed => i -= 1,
             Step::Extra => {
                 j -= 1;
-                extra.push(spoken[j].0.to_string());
+                extra.push(spoken[j].1.to_string());
             }
             Step::NumberHeard(count) => {
                 j -= 1;
@@ -198,19 +203,36 @@ pub fn check(written: &str, heard: &[&str]) -> ReadCheck {
                     i -= 1;
                     verdicts[i] = Verdict::Read;
                 }
+                matched[i] = Some(spoken[j].0);
             }
             Step::NumberWritten(count) => {
                 i -= 1;
                 j -= count;
                 verdicts[i] = Verdict::Read;
+                matched[i] = Some(spoken[j].0);
             }
         }
     }
     extra.reverse();
     let read = verdicts.iter().filter(|verdict| **verdict == Verdict::Read).count();
     let percent = if n == 0 { 0 } else { (read * 100 / n) as u32 };
-    let words = tokens.into_iter().zip(verdicts).map(|((at, _), verdict)| CheckedWord { at, verdict }).collect();
+    let words = tokens.into_iter().zip(verdicts).zip(matched).map(|(((at, _), verdict), heard)| CheckedWord { at, verdict, heard }).collect();
     ReadCheck { words, extra, heard: heard.join(" "), percent }
+}
+
+/// Where the words of `written` start, in bytes (a mark in the text is the number of one of them).
+pub fn word_starts(written: &str) -> Vec<usize> {
+    written.split_whitespace().map(|word| word.as_ptr() as usize - written.as_ptr() as usize).collect()
+}
+
+/// The second of a recording `seconds` long at which word `word` of `written` is said (user
+/// 2026-11-08: M markers in the text of an OFF): the time of the heard word matched with it or the
+/// next one matched; with no check, or nothing matched after it, its share of the words.
+pub fn word_second(written: &str, check: Option<(&ReadCheck, &[f64])>, seconds: f64, word: usize) -> f64 {
+    let starts = word_starts(written);
+    let share = seconds * word as f64 / starts.len().max(1) as f64;
+    let Some((&at, (check, heard))) = starts.get(word).zip(check) else { return share };
+    check.words.iter().filter(|checked| checked.at.start >= at).find_map(|checked| heard.get(checked.heard?).copied()).unwrap_or(share)
 }
 
 #[cfg(test)]
@@ -262,6 +284,16 @@ mod tests {
         let text = "čač  Šuma.";
         let done = check(text, &["cac", "suma"]);
         assert_eq!(&text[done.words[1].at.clone()], "Šuma.");
+    }
+
+    #[test]
+    fn a_word_is_at_the_time_it_was_heard_else_at_the_next_heard_else_its_share() {
+        let text = "prva druga treca cetvrta";
+        let done = check(text, &["prva", "treca", "cetvrta"]);
+        let heard = [0.5, 2.0, 3.0];
+        assert_eq!(word_second(text, Some((&done, &heard)), 8.0, 2), 2.0);
+        assert_eq!(word_second(text, Some((&done, &heard)), 8.0, 1), 2.0, "the word missed: the next one heard");
+        assert_eq!(word_second(text, None, 8.0, 1), 2.0, "not recorded: its share");
     }
 
     #[test]

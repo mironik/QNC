@@ -68,6 +68,10 @@ pub struct ProgramSegment {
     /// it stays theirs. Added to the level of the lane.
     #[serde(default)]
     pub level_keys: Vec<LevelKey>,
+    /// The M markers set in the text of the OFF it came from (user 2026-11-08), as frames of its
+    /// clip: an S-Story keeps them, sent to the Story they become M markers.
+    #[serde(default)]
+    pub text_marks: Vec<u64>,
 }
 
 /// One point of a level curve (docs/98 2.1): a frame of the item's clip (source frames, so
@@ -234,6 +238,10 @@ pub struct AppendSegment {
     /// Where the segment came from, e.g. `script:<block>:<part>`; kept with the segment so
     /// the same part can later be sent again in its place.
     pub origin: String,
+    /// The M markers set in the text of its OFF, as frames of its clip: an S-Story keeps them, the
+    /// Story makes them M markers.
+    #[serde(default)]
+    pub marks: Vec<u64>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]

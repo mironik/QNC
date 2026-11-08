@@ -58,3 +58,16 @@ fn the_skeleton_is_the_script_as_story_segments_without_the_offs_not_recorded() 
     assert_eq!(shown, vec![("offovi", "voice-P_OFF1", 0, 150, "script:2:0"), ("tonovi", "c1", 100, 200, "script:3:0"), ("tonovi", "c2", 10, 60, "script:5:0")]);
     assert_eq!(parts[0].a1, Some((Some(1), 0, false)));
 }
+
+#[test]
+fn a_marker_in_the_text_of_an_off_is_the_frame_its_word_was_heard_at() {
+    let heard = |text: &str, start: f64| qnc_script_db::HeardWord { text: text.into(), start, end: start + 0.2 };
+    let take = VoiceTake { take: 1, wav_uri: String::new(), seconds: 4.0, tc: String::new(), text: String::new(), heard: Some(vec![heard("prva", 0.2), heard("druga", 1.5), heard("treca", 3.0)]) };
+    let voices = [Voice { block_id: 2, name: "P".into(), clip_uri: String::new(), chosen: 1, takes: vec![take] }];
+    let mut off = block(2, "off", "prva druga treca");
+    off.marks = vec![1, 2];
+    let clip_id = |name: &str| name.to_string();
+    let rates = DraftRates { words_per_second: 2.5, fps: 50.0, clip_id: &clip_id };
+    let parts = skeleton(&[off], &voices, &general_tv(), &rates).unwrap();
+    assert_eq!(parts[0].marks, [75, 150]);
+}

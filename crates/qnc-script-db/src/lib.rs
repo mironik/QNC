@@ -73,12 +73,17 @@ pub struct Block {
     /// range).
     #[serde(default)]
     pub pieces: Vec<Piece>,
+    /// The M markers in the text of a block (user 2026-11-08: the cuts of the B-roll over an
+    /// OFF): each the number of the word it stands before, from 1, in order. A marker belongs to
+    /// its place in the text, so it stays when another take is used.
+    #[serde(default)]
+    pub marks: Vec<u32>,
 }
 
 impl Block {
     /// A text block of kind `kind`.
     pub fn written(kind: impl Into<String>, text: impl Into<String>) -> Self {
-        Self { id: 0, kind: kind.into(), text: text.into(), clip_id: String::new(), clip_name: String::new(), from_frame: 0, to_frame: 0, start_tc: String::new(), end_tc: String::new(), length: String::new(), seconds: 0.0, voice_uri: String::new(), voice_seconds: 0.0, voice_tc: String::new(), fields: BTreeMap::new(), pieces: Vec::new() }
+        Self { id: 0, kind: kind.into(), text: text.into(), clip_id: String::new(), clip_name: String::new(), from_frame: 0, to_frame: 0, start_tc: String::new(), end_tc: String::new(), length: String::new(), seconds: 0.0, voice_uri: String::new(), voice_seconds: 0.0, voice_tc: String::new(), fields: BTreeMap::new(), pieces: Vec::new(), marks: Vec::new() }
     }
 
     /// A clip block of kind `kind` made of `pieces` (at least one): its clip, IN and timecodes
@@ -244,6 +249,8 @@ pub enum Operation {
     SetVoiceChosen { id: i64, take: u16 },
     /// The words heard in take `take` of block `id`'s voice record.
     SetTakeHeard { id: i64, take: u16, heard: Vec<HeardWord> },
+    /// The M markers in the text of block `id` become `marks`.
+    SetMarks { id: i64, marks: Vec<u32> },
     /// The blocks in reading order.
     Read,
     /// The profile the project's script is written with (none yet: the script was never
@@ -431,6 +438,11 @@ pub fn set_voice_chosen(target: &ProjectDbTarget, id: i64, take: u16) -> Result<
 /// The words heard in take `take` of block `id`.
 pub fn set_take_heard(target: &ProjectDbTarget, id: i64, take: u16, heard: Vec<HeardWord>) -> Result<()> {
     write(target, Operation::SetTakeHeard { id, take, heard }).map(drop)
+}
+
+/// The M markers in the text of block `id` become `marks`.
+pub fn set_marks(target: &ProjectDbTarget, id: i64, marks: Vec<u32>) -> Result<()> {
+    write(target, Operation::SetMarks { id, marks }).map(drop)
 }
 
 /// The fields of block `id` become `fields`.

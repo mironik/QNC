@@ -41,7 +41,7 @@ impl Store {
                 "SELECT segment_id, kind, sort_index, clip_id, in_frame, out_frame, fps_num,
                         fps_den, active, a1_source_channel, duration_frames, a1_level_db, a1_off,
                         v_lead_frames, lead, a1_lead_frames, a1_tail_frames, v_tail_frames,
-                        a2_source_channel, a2_level_db, a2_off, a2_lead_frames, a2_tail_frames, level_keys
+                        a2_source_channel, a2_level_db, a2_off, a2_lead_frames, a2_tail_frames, level_keys, text_marks
                  FROM public_story_parts ORDER BY sort_index, segment_id",
             )
             .map_err(err)?;
@@ -78,6 +78,7 @@ impl Store {
                     a2_lead_frames: row.get::<_, i64>(21)?.clamp(-i64::from(MAX_OVERLAP_FRAMES), i64::from(MAX_OVERLAP_FRAMES)) as i32,
                     a2_tail_frames: row.get::<_, i64>(22)?.clamp(-i64::from(MAX_OVERLAP_FRAMES), i64::from(MAX_OVERLAP_FRAMES)) as i32,
                     level_keys: LevelKey::from_column(&row.get::<_, String>(23)?),
+                    text_marks: serde_json::from_str(&row.get::<_, String>(24)?).unwrap_or_default(),
                 })
             })
             .map_err(err)?

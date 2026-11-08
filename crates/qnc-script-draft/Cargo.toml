@@ -7,6 +7,7 @@ description = "QNC public piece: the draft of a story from its script (user 2026
 [dependencies]
 qnc-frame-interp = { workspace = true }
 qnc-program-input = { workspace = true }
+qnc-read-check = { workspace = true }
 qnc-script-db = { workspace = true }
 qnc-script-profile = { workspace = true }
 qnc-ui-text = { workspace = true }

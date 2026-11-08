@@ -26,10 +26,23 @@ impl Store {
             else {
                 return Err(qnc_ui_text::text("story.invalid_reply_story").into());
             };
+            let marks = serde_json::to_string(&segment.marks).map_err(err)?;
             self.conn
-                .execute("UPDATE story_items SET origin = ?1 WHERE item_id = ?2", params![segment.origin, segment_id])
+                .execute("UPDATE story_items SET origin = ?1, text_marks = ?2 WHERE item_id = ?3", params![segment.origin, marks, segment_id])
                 .map_err(err)?;
             created.push(segment_id);
+        }
+        // The markers of the text are M markers in the Story; an S-Story only keeps them (every
+        // clip of it is one slot).
+        if !qnc_db_broker::is_draft(&self.conn) {
+            for (segment, segment_id) in segments.iter().zip(&created) {
+                let Some((_, rate)) = qnc_content_read::clip_timing_on(&self.conn, &segment.clip_id)? else { continue };
+                let Some(story) = story_rate(&self.conn)? else { continue };
+                let (num, den) = story_per_source(story, rate)?;
+                for mark in segment.marks.iter().filter(|mark| (segment.in_frame + 1..segment.out_frame).contains(*mark)) {
+                    self.create_marker(segment_id, (*mark - segment.in_frame) * num as u64 / den as u64)?;
+                }
+            }
         }
         Ok(Data::Created(created.join(",")))
     }

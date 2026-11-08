@@ -18,6 +18,7 @@ impl ProgramSegments {
                 a1: (segment.a1_source_channel, segment.a1_level_db, segment.a1_off),
                 a2: (segment.a2_source_channel, segment.a2_level_db, segment.a2_off),
                 origin: format!("draft:{}", segment.segment_id),
+                marks: segment.text_marks.clone(),
             })
             .collect();
         if segments.is_empty() {

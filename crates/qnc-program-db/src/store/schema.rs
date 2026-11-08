@@ -17,6 +17,8 @@ pub(crate) const SCHEMA_COLUMNS: &[(&str, &[&str])] = &[
 /// without one is brought up by its owner, never removed).
 pub(crate) const ADDED_COLUMNS: &[(&str, &str, &str)] = &[
     ("story_items", "level_keys", "TEXT NOT NULL DEFAULT ''"),
+    // The M markers set in the text of an OFF (user 2026-11-08).
+    ("story_items", "text_marks", "TEXT NOT NULL DEFAULT '[]'"),
     // The sound assistant is on (user 2026-11-06).
     ("story_state", "sound_assist", "INTEGER NOT NULL DEFAULT 0"),
 ];
@@ -206,6 +208,7 @@ pub(crate) fn ensure_story_schema(conn: &Connection) -> Result<()> {
             a2_lead_frames INTEGER NOT NULL DEFAULT 0,
             a2_tail_frames INTEGER NOT NULL DEFAULT 0,
             level_keys TEXT NOT NULL DEFAULT '',
+            text_marks TEXT NOT NULL DEFAULT '[]',
             created_at TEXT NOT NULL,
             updated_at TEXT NOT NULL
          );
@@ -264,7 +267,7 @@ pub(crate) fn ensure_story_schema(conn: &Connection) -> Result<()> {
                 source_out_frame AS out_frame, source_fps_num AS fps_num, source_fps_den AS fps_den,
                 active, duration_frames, duration_label, duration_color_key, a1_source_channel,
                 a1_level_db, a1_off, v_lead_frames, lead, a1_lead_frames, a1_tail_frames, v_tail_frames,
-                a2_source_channel, a2_level_db, a2_off, a2_lead_frames, a2_tail_frames, level_keys
+                a2_source_channel, a2_level_db, a2_off, a2_lead_frames, a2_tail_frames, level_keys, text_marks
          FROM story_items WHERE role = 'segment';
          DROP VIEW IF EXISTS public_story_markers;
          CREATE VIEW public_story_markers AS

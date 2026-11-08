@@ -144,6 +144,26 @@ pub struct SkeletonPart {
     pub a1: Option<(Option<u16>, i8, bool)>,
     /// `script:<block>:<part>`: the block and part of the script it came from.
     pub origin: String,
+    /// The M markers set in the text of an OFF, as frames of its clip.
+    pub marks: Vec<u64>,
+}
+
+/// The seconds of a recording `seconds` long at which the M markers in the text of `block` fall;
+/// `check` is what was read and the second each heard word starts at, when it is known.
+pub fn mark_seconds(block: &Block, check: Option<(&qnc_read_check::ReadCheck, &[f64])>, seconds: f64) -> Vec<f64> {
+    block.marks.iter().map(|word| qnc_read_check::word_second(&block.text, check, seconds, *word as usize)).collect()
+}
+
+/// The frames of the clip of `take` at which the M markers in the text of `block` fall, strictly
+/// inside `[0, frames)`, each once.
+fn mark_frames(block: &Block, take: &qnc_script_db::VoiceTake, fps: f64, frames: u64) -> Vec<u64> {
+    let words: Vec<&str> = take.heard.iter().flatten().map(|word| word.text.as_str()).collect();
+    let starts: Vec<f64> = take.heard.iter().flatten().map(|word| word.start).collect();
+    let check = take.heard.is_some().then(|| qnc_read_check::check(&block.text, &words));
+    let mut marks: Vec<u64> = mark_seconds(block, check.as_ref().map(|check| (check, starts.as_slice())), take.seconds).into_iter().map(|second| (second * fps).round().max(0.0) as u64).filter(|frame| (1..frames).contains(frame)).collect();
+    marks.sort_unstable();
+    marks.dedup();
+    marks
 }
 
 /// The skeleton of `blocks`: the parts of the draft as story segments, in reading order. An OFF
@@ -166,16 +186,19 @@ pub fn skeleton(blocks: &[Block], voices: &[Voice], profile: &ScriptProfile, rat
                 to_frame: piece.to_frame,
                 a1: piece.a1,
                 origin: format!("script:{}:{index}", block.id),
+                marks: Vec::new(),
             })),
             Role::Spoken => {
                 if let Some((voice, take)) = voices.iter().find(|voice| voice.block_id == block.id).and_then(|voice| Some((voice, voice.chosen_take()?))) {
+                    let to_frame = ((take.seconds * rates.fps).round().max(1.0)) as u64;
                     parts.push(SkeletonPart {
                         kind: "offovi",
                         clip_id: (rates.clip_id)(&voice.name),
                         from_frame: 0,
-                        to_frame: ((take.seconds * rates.fps).round().max(1.0)) as u64,
+                        to_frame,
                         a1: Some((Some(take.take.saturating_sub(1)), 0, false)),
                         origin: format!("script:{}:0", block.id),
+                        marks: mark_frames(block, take, rates.fps, to_frame),
                     });
                 }
             }

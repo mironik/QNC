@@ -28,6 +28,7 @@ fn part(id: &str, kind: &str, clip: &str, range: (u64, u64), active: bool) -> Pr
         a2_lead_frames: 0,
         a2_tail_frames: 0,
         level_keys: Vec::new(),
+        text_marks: Vec::new(),
     }
 }
 

@@ -73,6 +73,8 @@ pub struct BlockRow {
     /// 2026-11-04: the transcript in the script has its timecodes, to edit by its text); empty
     /// for a part whose clip has no transcript there.
     pub words: Vec<Vec<TimedWord>>,
+    /// The seconds of the shots its M markers make (empty without markers).
+    pub mark_lengths: Vec<f64>,
 }
 
 /// A word of a statement: its clip frames `[from, to)`, its text, the source timecode of its
@@ -220,6 +222,8 @@ pub struct ScriptView {
     pub exporting: bool,
     /// Why the takes are not being checked against their text, if they are not.
     pub read_note: Option<String>,
+    /// The M marker in a text taken with a right click: its block and word.
+    pub taken_mark: Option<(i64, u32)>,
     /// The SubSegment open in place of the source timeline.
     pub subsegment: Option<SubsegmentView>,
     /// Words picked in the text of a statement (Delete cuts them out of its video).
@@ -399,7 +403,7 @@ pub fn rows(blocks: &[Block], profile: Option<&ScriptProfile>, words_per_second:
             } else {
                 kind.map_or_else(|| block.kind.to_uppercase(), |kind| kind.short.clone())
             };
-            BlockRow { seconds: block_seconds(block, kind, words_per_second), mark, role: kind.map(|kind| kind.role), recorded: kind.is_some_and(|kind| kind.recorded), cues: kind.is_some_and(|kind| kind.cues), in_story: kind.is_some_and(|kind| kind.counts == Counts::Story), voice: None, words: Vec::new(), block: block.clone() }
+            BlockRow { seconds: block_seconds(block, kind, words_per_second), mark, role: kind.map(|kind| kind.role), recorded: kind.is_some_and(|kind| kind.recorded), cues: kind.is_some_and(|kind| kind.cues), in_story: kind.is_some_and(|kind| kind.counts == Counts::Story), voice: None, words: Vec::new(), mark_lengths: Vec::new(), block: block.clone() }
         })
         .collect()
 }
