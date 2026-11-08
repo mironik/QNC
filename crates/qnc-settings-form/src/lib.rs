@@ -87,51 +87,86 @@ pub fn field_grid(
     changed
 }
 
+/// The keyboard on the column (user 2026-11-08: a form is filled by the keyboard alone, Enter
+/// from row to row): the row it is on (`None`: not on this column), whether it just came to
+/// that row, and the arrow pressed (`Some(true)` left).
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub struct ColumnKeys {
+    pub at: Option<usize>,
+    pub arrived: bool,
+    pub arrow: Option<bool>,
+}
+
 /// What the column of fields did this frame.
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
 pub struct ColumnAnswer {
     /// A value changed.
     pub changed: bool,
-    /// The key for the next field was pressed in the last typed field (or with none to move
-    /// to): the form goes on past the column (user 2026-11-08: the last Enter goes to the
-    /// button that confirms the form).
-    pub past_last: bool,
+    /// The row whose text box has the keyboard (a click into it moves the keyboard there).
+    pub typed: Option<usize>,
 }
 
-/// The fields one under the other, each label left of its field (user 2026-10-27). When the
-/// form's catalog key for the next field was pressed (`next`), the typed field after the one
-/// typed in (or the first, when the row before the column had it: `from_before`) takes the
-/// keyboard.
-#[allow(clippy::too_many_arguments)]
-pub fn field_column(
-    ui: &mut egui::Ui,
-    column_w: f32,
-    settings: &mut Value,
-    fields: &[FieldSpec],
-    options: &OptionSets,
-    style: &GridStyle,
-    next: bool,
-    from_before: bool,
-) -> ColumnAnswer {
+/// Whether a field is chosen from its choices (no text to type): a choice, or a number with them.
+pub fn is_chosen(field: &FieldSpec, options: &OptionSets) -> bool {
+    match field.kind {
+        FieldKind::Choice => true,
+        FieldKind::Number | FieldKind::Integer => field.options.as_ref().and_then(|name| options.get(name)).is_some_and(|choices| !choices.is_empty()),
+        _ => false,
+    }
+}
+
+/// The fields one under the other, each label left of its field (user 2026-10-27). The row the
+/// keyboard is on (`keys.at`): a text row takes the keyboard when it is come to; a row of
+/// choices is framed and its arrows walk the choices (the key row of every form, `qnc-key-row`).
+pub fn field_column(ui: &mut egui::Ui, column_w: f32, settings: &mut Value, fields: &[FieldSpec], options: &OptionSets, style: &GridStyle, keys: ColumnKeys) -> ColumnAnswer {
     let label_w = style.label_beside.map_or(0.0, |(width, _)| width);
     let width = (column_w - label_w - style.gap).max(40.0);
-    let typed: Vec<egui::Id> = fields.iter().filter(|field| field.kind != FieldKind::Choice).map(text_id).collect();
-    let focused = typed.iter().position(|id| ui.memory(|memory| memory.has_focus(*id)));
-    let after = match (next, from_before, focused) {
-        (true, true, _) => typed.first(),
-        (true, false, Some(index)) => typed.get(index + 1),
-        _ => None,
-    };
-    let past_last = next && after.is_none() && (from_before || focused.is_some());
-    let mut changed = false;
-    for field in fields {
-        changed |= field_cell(ui, width, settings, field, options, style);
+    let mut answer = ColumnAnswer::default();
+    for (index, field) in fields.iter().enumerate() {
+        let here = keys.at == Some(index);
+        let chosen = is_chosen(field, options);
+        if here && chosen {
+            if let Some(back) = keys.arrow {
+                answer.changed |= step_choice(settings, field, options, back);
+            }
+        }
+        let top = ui.cursor().min;
+        answer.changed |= field_cell(ui, width, settings, field, options, style);
+        if here && chosen {
+            let rect = egui::Rect::from_min_max(top, egui::pos2(top.x + column_w, ui.cursor().min.y));
+            qnc_ui_kit::paint_focus(ui, rect.expand(2.0), true, style.label_color);
+        }
+        if !chosen {
+            let id = text_id(field);
+            if here && keys.arrived {
+                ui.memory_mut(|memory| memory.request_focus(id));
+            }
+            if ui.memory(|memory| memory.has_focus(id)) {
+                answer.typed = Some(index);
+            }
+        }
         ui.add_space(style.gap / 2.0);
     }
-    if let Some(after) = after {
-        ui.memory_mut(|memory| memory.request_focus(*after));
+    answer
+}
+
+/// The next (or, `back`, the previous) choice of a field of choices, as a key row walks.
+fn step_choice(settings: &mut Value, field: &FieldSpec, options: &OptionSets, back: bool) -> bool {
+    let choices = field.options.as_ref().and_then(|name| options.get(name)).map(Vec::as_slice).unwrap_or(&[]);
+    let current = match field.kind {
+        FieldKind::Choice => path_string(settings, &field.path, &field.default),
+        _ => number_string(settings, &field.path),
+    };
+    let mut row = qnc_key_row::KeyRow::new(choices.iter().map(|(code, _)| code.clone()));
+    row.select(&current);
+    let Some(next) = row.choose(back).map(str::to_string).filter(|next| *next != current) else { return false };
+    match field.kind {
+        FieldKind::Choice => {
+            set_string_path(settings, &field.path, next);
+            true
+        }
+        _ => set_number(settings, &field.path, &next, field.kind == FieldKind::Integer),
     }
-    ColumnAnswer { changed, past_last }
 }
 
 /// The id of a field's text box (for moving on to the next field).

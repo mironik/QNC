@@ -11,6 +11,7 @@ qnc-desktop-theme = { workspace = true }
 qnc-dev-diagnostics = { workspace = true }
 qnc-field-spec = { workspace = true }
 qnc-keyboard-shortcut = { workspace = true }
+qnc-key-row = { workspace = true }
 qnc-settings-form = { workspace = true }
 qnc-theme-styles = { workspace = true }
 qnc-ui-kit = { workspace = true }

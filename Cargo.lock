@@ -5274,6 +5274,7 @@ dependencies = [
  "qnc-desktop-theme",
  "qnc-dev-diagnostics",
  "qnc-field-spec",
+ "qnc-key-row",
  "qnc-keyboard-shortcut",
  "qnc-newsroom-sheet-model",
  "qnc-settings-form",
@@ -6260,6 +6261,7 @@ version = "0.1.0"
 dependencies = [
  "eframe",
  "qnc-field-spec",
+ "qnc-key-row",
  "qnc-settings-path",
  "qnc-ui-kit",
  "serde",

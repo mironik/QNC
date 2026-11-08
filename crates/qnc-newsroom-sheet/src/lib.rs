@@ -25,21 +25,18 @@ pub const ROW_GAP: f32 = 12.0;
 const MARGIN: f32 = 24.0;
 
 
-/// The button of the filled sheet the keyboard is on (user 2026-11-08: the last Enter goes to
-/// Create, the arrows between Cancel and Create, Enter presses it).
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-enum OnButton {
-    Confirm,
-    Cancel,
-}
+/// The buttons of the filled sheet as a row of the keyboard (the one row block of every form,
+/// `qnc-key-row`): Cancel and Create, left to right, by their catalog actions.
+const CANCEL: &str = "project_story_cancel";
+const CONFIRM: &str = "project_story_confirm";
 
 /// The keys of the filled sheet from the form's catalog (scope `project`): the next field
-/// (pressed while a field is typed in), and Enter and the arrows while a button has the keyboard.
+/// (pressed while a field is typed in), and Enter and the arrows of a key row (the same
+/// actions as on every row of the forms) while the buttons have the keyboard.
 struct SheetKeys {
     next_field: bool,
     enter: bool,
-    left: bool,
-    right: bool,
+    arrow: Option<bool>,
 }
 
 impl SheetKeys {
@@ -47,12 +44,8 @@ impl SheetKeys {
         let typing = ctx.wants_keyboard_input();
         let events = qnc_keyboard_shortcut::egui_shortcut_events(ctx);
         let pressed = |action: &str| !typing && events.iter().any(|event| catalog.action_ids_for_event("project", event).contains(&action));
-        Self {
-            next_field: qnc_keyboard_shortcut::pressed_while_typing(ctx, catalog, "project", "form_next_field"),
-            enter: pressed("form_next_field"),
-            left: pressed("form_button_prev"),
-            right: pressed("form_button_next"),
-        }
+        let arrow = if pressed("step_back_frame") { Some(true) } else if pressed("step_forward_frame") { Some(false) } else { None };
+        Self { next_field: qnc_keyboard_shortcut::pressed_while_typing(ctx, catalog, "project", "form_next_field"), enter: pressed("form_next_field"), arrow }
     }
 }
 
@@ -62,19 +55,32 @@ impl SheetKeys {
 /// keyboard (user 2026-11-08); every Enter goes to the next field, the last to Create.
 pub fn show(ctx: &egui::Context, overlay: &mut SheetOverlay, theme: &Theme, catalog: &qnc_keyboard_shortcut::ShortcutCatalog) -> Option<Answer> {
     let keys = SheetKeys::read(ctx, catalog);
-    // Opened now (not drawn the pass before): the name field takes the keyboard, no button.
+    // Opened now (not drawn the pass before): the keyboard is on the first row, the sheet's
+    // choice (user 2026-11-08: no mouse, Enter from row to row).
     let seen = egui::Id::new("qnc_story_sheet_seen");
     let pass = ctx.cumulative_pass_nr();
     let opened = ctx.data(|data| data.get_temp::<u64>(seen)).is_none_or(|last| last + 1 < pass);
     ctx.data_mut(|data| data.insert_temp(seen, pass));
-    let button_id = egui::Id::new("qnc_story_sheet_button");
-    let mut on_button: Option<OnButton> = if opened { None } else { ctx.data(|data| data.get_temp(button_id)) };
-    if opened && overlay.editing.is_none() {
-        ctx.memory_mut(|memory| memory.request_focus(egui::Id::new(NAME_ID)));
+    let place_id = egui::Id::new("qnc_story_sheet_keyboard");
+    let mut place: Place = if opened { Place::Row(0, true) } else { ctx.data(|data| data.get_temp(place_id)).unwrap_or(Place::Row(0, true)) };
+    // Enter: the next row, from the last one the buttons (Create).
+    if keys.next_field || keys.enter {
+        let rows = rows_of(overlay);
+        place = match place {
+            Place::Row(at, _) if at + 1 < rows => Place::Row(at + 1, true),
+            Place::Row(..) => {
+                let mut row = qnc_key_row::KeyRow::new([CANCEL, CONFIRM]);
+                row.select(CONFIRM);
+                Place::Buttons(row, true)
+            }
+            buttons => buttons,
+        };
     }
-    // A field clicked or typed in has the keyboard: no button has it.
-    if ctx.wants_keyboard_input() {
-        on_button = None;
+    // A row of choices or the buttons have the keyboard: no text box keeps it.
+    if !matches!(place, Place::Row(at, _) if is_typed(overlay, at)) {
+        if let Some(focused) = ctx.memory(|memory| memory.focused()) {
+            ctx.memory_mut(|memory| memory.surrender_focus(focused));
+        }
     }
     let screen = ctx.screen_rect();
     let width = WIDTH.min(screen.width() - 2.0 * MARGIN);
@@ -97,13 +103,17 @@ pub fn show(ctx: &egui::Context, overlay: &mut SheetOverlay, theme: &Theme, cata
                     egui::ScrollArea::vertical().max_height(body_height).auto_shrink([false, true]).show(ui, |ui| {
                         if editing {
                             editor(ui, overlay, theme);
-                        } else if fill(ui, overlay, theme, keys.next_field) {
-                            // The last field's Enter: the keyboard goes to Create.
-                            ui.memory_mut(|memory| memory.surrender_focus(egui::Id::new(NAME_ID)));
-                            if let Some(focused) = ui.memory(|memory| memory.focused()) {
-                                ui.memory_mut(|memory| memory.surrender_focus(focused));
+                        } else {
+                            let at = match &place {
+                                Place::Row(at, arrived) => Some((*at, *arrived)),
+                                Place::Buttons(..) => None,
+                            };
+                            // A click into a text box moves the keyboard to its row.
+                            if let Some(typed) = fill(ui, overlay, theme, at, keys.arrow) {
+                                if !matches!(place, Place::Row(at, _) if at == typed) {
+                                    place = Place::Row(typed, false);
+                                }
                             }
-                            on_button = Some(OnButton::Confirm);
                         }
                     });
                 });
@@ -111,33 +121,63 @@ pub fn show(ctx: &egui::Context, overlay: &mut SheetOverlay, theme: &Theme, cata
                     answer = if editing {
                         editor_buttons(ui, overlay, theme)
                     } else {
-                        // The arrows between Cancel and Create, Enter presses the one the keyboard is on.
+                        // The arrows between Cancel and Create, Enter presses the one the keyboard
+                        // is on (not the Enter that brought it there).
                         let mut pressed = None;
-                        if let Some(button) = on_button {
-                            if keys.left || keys.right {
-                                on_button = Some(if button == OnButton::Confirm { OnButton::Cancel } else { OnButton::Confirm });
-                            } else if keys.enter {
-                                pressed = answer_of(button, overlay);
+                        if let Place::Buttons(row, arrived) = &mut place {
+                            if let Some(back) = keys.arrow {
+                                row.choose(back);
+                            } else if keys.enter && !*arrived {
+                                pressed = row.chosen().and_then(|action| answer_of(action, overlay));
                             }
+                            *arrived = false;
                         }
-                        let clicked = fill_buttons(ui, overlay, theme, on_button);
+                        let chosen = match &place {
+                            Place::Buttons(row, _) => row.chosen(),
+                            Place::Row(..) => None,
+                        };
+                        let clicked = fill_buttons(ui, overlay, theme, chosen);
                         pressed.or(clicked)
                     };
                 });
             });
         });
-    ctx.data_mut(|data| match on_button {
-        Some(button) => data.insert_temp(button_id, button),
-        None => data.remove::<OnButton>(button_id),
-    });
+    // Come to a row once: the next pass it is only there.
+    if let Place::Row(at, true) = place {
+        place = Place::Row(at, false);
+    }
+    ctx.data_mut(|data| data.insert_temp(place_id, place));
     answer
 }
 
+/// Where the keyboard is in the filled sheet: on a row (and whether it just came there), or on
+/// the buttons' key row (`qnc-key-row`).
+#[derive(Debug, Clone)]
+enum Place {
+    Row(usize, bool),
+    Buttons(qnc_key_row::KeyRow, bool),
+}
+
+/// The rows of the filled sheet: its choice, the project name, its fields.
+fn rows_of(overlay: &SheetOverlay) -> usize {
+    2 + overlay.sheets.current().map_or(0, |sheet| sheet.fields.len())
+}
+
+/// Whether row `at` is typed in (the name, a field with no choices).
+fn is_typed(overlay: &SheetOverlay, at: usize) -> bool {
+    match at {
+        0 => false,
+        1 => true,
+        _ => overlay.sheets.current().and_then(|sheet| sheet.fields.get(at - 2).map(|field| !qnc_settings_form::is_chosen(field, &sheet.options))).unwrap_or(false),
+    }
+}
+
 /// The answer of the button the keyboard pressed (Create only when the sheet can be confirmed).
-fn answer_of(button: OnButton, overlay: &SheetOverlay) -> Option<Answer> {
-    match button {
-        OnButton::Confirm => ready(overlay).then_some(Answer::Confirm),
-        OnButton::Cancel => Some(Answer::Cancel),
+fn answer_of(action: &str, overlay: &SheetOverlay) -> Option<Answer> {
+    match action {
+        CONFIRM => ready(overlay).then_some(Answer::Confirm),
+        CANCEL => Some(Answer::Cancel),
+        _ => None,
     }
 }
 
@@ -195,14 +235,23 @@ pub fn button(ui: &mut egui::Ui, label: &str, enabled: bool, theme: &Theme) -> b
     qnc_ui_kit::chrome_button(ui, label, enabled, false, qnc_theme_styles::button(theme)).clicked()
 }
 
-/// The sheet filled: its choice, the project name, its fields. True when the key for the next
-/// field was pressed in its last field (the keyboard goes on to Create).
-fn fill(ui: &mut egui::Ui, overlay: &mut SheetOverlay, theme: &Theme, next_field: bool) -> bool {
+/// The sheet filled: its choice, the project name, its fields. `at` is the row the keyboard is
+/// on and whether it just came there; `arrow` walks the choices of a row of choices. The row
+/// whose text box has the keyboard (a click into it) comes back.
+fn fill(ui: &mut egui::Ui, overlay: &mut SheetOverlay, theme: &Theme, at: Option<(usize, bool)>, arrow: Option<bool>) -> Option<usize> {
     let width = ui.available_width();
     let field_w = width - LABEL_WIDTH - ROW_GAP;
     ui.spacing_mut().interact_size.y = ROW_HEIGHT;
     let mut chosen = None;
-    ui.horizontal(|ui| {
+    // Row 0, the sheet: its arrows walk the sheets as a key row does.
+    if at.is_some_and(|(row, _)| row == 0) {
+        if let Some(back) = arrow {
+            let mut row = qnc_key_row::KeyRow::new((0..overlay.sheets.list.len()).map(|index| index.to_string()));
+            row.select(&overlay.sheets.chosen.to_string());
+            chosen = row.choose(back).and_then(|index| index.parse::<usize>().ok()).filter(|index| *index != overlay.sheets.chosen);
+        }
+    }
+    let sheet_row = ui.horizontal(|ui| {
         label(ui, theme, qnc_ui_text::text("sheet.sheet"));
         let shown = overlay.sheets.current().map_or("—".to_string(), |sheet| sheet.name.clone());
         egui::ComboBox::from_id_salt("qnc_story_sheet_choice").selected_text(shown).width(field_w * 0.6).show_ui(ui, |ui| {
@@ -216,33 +265,39 @@ fn fill(ui: &mut egui::Ui, overlay: &mut SheetOverlay, theme: &Theme, next_field
             overlay.editing = overlay.sheets.current().cloned();
         }
     });
+    qnc_ui_kit::paint_focus(ui, sheet_row.response.rect.expand(2.0), at.is_some_and(|(row, _)| row == 0), theme.focus);
     if let Some(index) = chosen {
         if let Err(error) = overlay.sheets.choose(index) {
             overlay.message = error;
         }
     }
     ui.add_space(ROW_GAP);
+    // Row 1, the project name.
     let name_id = egui::Id::new(NAME_ID);
-    let from_name = next_field && ui.memory(|memory| memory.has_focus(name_id));
+    if at == Some((1, true)) {
+        ui.memory_mut(|memory| memory.request_focus(name_id));
+    }
     ui.horizontal(|ui| {
         label(ui, theme, qnc_ui_text::text("project.project_name"));
         let edit = qnc_ui_kit::row_field(&mut overlay.name, field_w, ROW_HEIGHT).id(name_id);
         ui.add_enabled(overlay.name_editable, edit.hint_text(qnc_ui_text::text("project.name_new_project")));
     });
+    let mut typed = ui.memory(|memory| memory.has_focus(name_id)).then_some(1);
     ui.add_space(ROW_GAP / 2.0);
-    // A sheet without typed fields: the name's Enter goes on to Create.
-    let mut past_last = from_name;
+    // Rows 2.., the sheet's fields.
     if let Some(sheet) = overlay.sheets.current().cloned() {
-        past_last = qnc_settings_form::field_column(ui, width, &mut overlay.values, &sheet.fields, &sheet.options, &style(theme), next_field, from_name).past_last;
+        let keys = qnc_settings_form::ColumnKeys { at: at.and_then(|(row, _)| row.checked_sub(2)), arrived: at.is_some_and(|(_, arrived)| arrived), arrow };
+        let answer = qnc_settings_form::field_column(ui, width, &mut overlay.values, &sheet.fields, &sheet.options, &style(theme), keys);
+        typed = typed.or(answer.typed.map(|row| row + 2));
     }
     if !overlay.message.is_empty() {
         ui.label(RichText::new(&overlay.message).color(theme.danger));
     }
-    past_last
+    typed
 }
 
 /// Confirm (rightmost) and Cancel of the filled sheet; the one the keyboard is on is framed.
-fn fill_buttons(ui: &mut egui::Ui, overlay: &SheetOverlay, theme: &Theme, on_button: Option<OnButton>) -> Option<Answer> {
+fn fill_buttons(ui: &mut egui::Ui, overlay: &SheetOverlay, theme: &Theme, on_button: Option<&str>) -> Option<Answer> {
     let mut answer = None;
     right_row(ui, |ui| {
         let confirm = qnc_ui_kit::strong_button(ui, &overlay.confirm_label, ready(overlay), theme.accent, theme.chrome_control_height);
@@ -253,8 +308,8 @@ fn fill_buttons(ui: &mut egui::Ui, overlay: &SheetOverlay, theme: &Theme, on_but
         if cancel.clicked() {
             answer = Some(Answer::Cancel);
         }
-        qnc_ui_kit::paint_focus(ui, confirm.rect.expand(2.0), on_button == Some(OnButton::Confirm), theme.focus);
-        qnc_ui_kit::paint_focus(ui, cancel.rect.expand(2.0), on_button == Some(OnButton::Cancel), theme.focus);
+        qnc_ui_kit::paint_focus(ui, confirm.rect.expand(2.0), on_button == Some(CONFIRM), theme.focus);
+        qnc_ui_kit::paint_focus(ui, cancel.rect.expand(2.0), on_button == Some(CANCEL), theme.focus);
     });
     answer
 }

@@ -8489,3 +8489,15 @@ Pravilo "noviji prijepis vrijedi preko svog raspona" sada vrijedi i pri citanju,
 ista `lines_cut` kao pri upisu), pa ga dobivaju panel prijepisa, scenarij i rijeci zooma bez ijedne izmjene kod njih.
 Provjereno citanjem aktivnog projekta: Mironik 3609 vise nema "ovo je" dvaput. Test (stari redak upisan cijeli cita se
 bez ponavljanja). Uzivo nije provjereno.
+Izmjena 2026-11-08 (korisnik: "opet si napustio kocku za obrazac za kreiranje novog projekta"; "kad kliknem na novi
+projekt obrazac mora biti s fokusom na prvi zapis Obrazac; korisnik ne treba klikati misem, sve ide kroz tipkovnicu, a
+prelaz iz reda u red obrasca ide s Enter"): zamjenjuje prethodni zapis o obrascu (fokus na nazivu, vlastita logika
+gumba). Obrazac je cijeli na tipkovnici: kad se otvori, tipkovnica je na prvom redu (Obrazac); Enter ide red po red
+(Obrazac, naziv projekta, svako polje lista, pa gumbi); na redu s izborom (Obrazac, polje izbora) strelice biraju
+izbor, na redu za upis tipkovnica je u polju; zadnji Enter stavlja tipkovnicu na Kreiraj, strelice Odustani | Kreiraj,
+Enter pritisne. Izbor na redu i gumbi idu kroz postojecu kocku reda tipki `qnc-key-row` (kao red dugmadi u Ingestu i
+Storyju), strelice su iste radnje kataloga kao na svakom redu (`step_back_frame`, `step_forward_frame` dodane u opseg
+`project`; radnje `form_button_prev/next` uklonjene). Hod po poljima je u kocki obrasca (`qnc-settings-form`
+`ColumnKeys`, `is_chosen`, `field_column`), obrazac priloga (`qnc-newsroom-sheet`) vodi samo na kojem je redu. Klik u
+polje i dalje stavlja tipkovnicu na taj red. Testovi, conformance (osim otvorenog C5 `qnc-frame-interp`). Uzivo nije
+provjereno.
