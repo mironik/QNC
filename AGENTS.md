@@ -8541,3 +8541,7 @@ Popravak 2026-11-08 (korisnik: "ne vidim nikakve nove gumbe"): redci dijelova sl
 dock ima mjesta samo za timeline, pa ih nikad nije bilo vidjeti (ni pauzu, spoj i A1 dijela). Sada jedan redak pluta odmah iznad
 timelinea (`qnc-subsegment-panel`): za izabrani ili uzeti dio, inace za dio iza spoja najblizeg playheadu; prvi dio klikom na
 njegovu traku. Layout nije diran. Uzivo nije provjereno.
+Izmjena 2026-11-08 (korisnik: redak "pokrio je prikaz razine tona"; izabrao rjesenje A): zamjenjuje plutajuci redak. Dok je
+slozena izjava otvorena, njezine kontrole su u njezinu tekstu (`qnc-script-panel` `part_controls.rs`; isti blok u MA Audiju i MA
+Scriptu): u redu dijela A1 (kanal, razina, uklj.), mjesto i Obrisi, a red izmedju dva dijela je spoj (pauza, Rez/Pretapanje,
+Smooth). Iste radnje kao prije; `qnc-subsegment-panel` crta samo timeline i zoom. Uzivo nije provjereno.

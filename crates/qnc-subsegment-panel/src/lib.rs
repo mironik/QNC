@@ -5,10 +5,10 @@
 //! longer) and whether its sound is cut or crossed, "we will test which is better". Passive:
 //! it paints the script's view and gives catalog actions; it never plays, reads or writes.
 
-use eframe::egui::{self, RichText};
+use eframe::egui;
 use qnc_action_event::ActionEvent;
 use qnc_segment_panel::{cover_fill, CoverLengthBand};
-use qnc_script::{SubsegmentView, JOIN_CUT, JOIN_GAP, JOIN_SMOOTH, PART_CHANNEL, PART_LEVEL, PART_MOVE, PART_OFF, PART_REMOVE};
+use qnc_script::SubsegmentView;
 use qnc_timeline::{
     AudioLane, TimelineCoverSpan, TimelineFocusPaint, TimelineInput, TimelineLayerFlags, TimelineMarkerPart, TimelineMarkerPin,
     TimelineMetrics, TimelinePicture, TimelineProjection, TimelineTheme, TimelineVirtualSpan,
@@ -214,97 +214,7 @@ pub fn show(ui: &mut egui::Ui, view: &SubsegmentView, theme: TimelineTheme, leng
         _ if qnc_script::ROW_ACTIONS.contains(&event.action_id.as_str()) || event.action_id == qnc_script::SUBSEGMENT_SELECT => event.at(ROW_PANEL),
         _ => event,
     });
-    answer = answer.or(zoomed);
-    // The part in hand: its pause and join before it (after the first) and its own A1, the
-    // camera channel, level and on/off (user 2026-10-29). The dock has room only for the
-    // timeline (user 2026-11-08: "I see no new buttons"), so the one row floats just above it.
-    if let Some((index, part)) = part_in_hand(view).and_then(|index| view.parts.get(index).map(|part| (index, part))) {
-        let target = |step: Option<i64>| match step {
-            Some(step) => format!("{}:{index}:{step}", view.block_id),
-            None => format!("{}:{index}", view.block_id),
-        };
-        let over = ui.max_rect().left_top();
-        egui::Area::new(egui::Id::new("qnc_subsegment_part_row")).order(egui::Order::Foreground).pivot(egui::Align2::LEFT_BOTTOM).fixed_pos(over).show(ui.ctx(), |ui| egui::Frame::popup(ui.style()).show(ui, |ui| ui.horizontal(|ui| {
-            // The part whose A1 is taken (Ctrl+1) is marked as a taken lane is.
-            let taken = view.sound == Some(index);
-            let name = RichText::new(qnc_ui_text::fill("subsegment.part", &[("n", &(index + 1).to_string()), ("clip", &part.clip_name)]));
-            ui.label(if taken { name.color(theme.lane_taken).strong() } else { name.color(theme.text) });
-            // Its place among the parts and its leaving (user 2026-10-29).
-            let last = index + 1 == view.parts.len();
-            if qnc_ui_kit::small_button(ui, qnc_ui_text::text("subsegment.move_earlier"), index > 0, false).on_hover_text(qnc_ui_text::text("subsegment.move_hint")).clicked() {
-                answer = Some(ActionEvent::key(PART_MOVE).with_target(target(Some(-1))));
-            }
-            if qnc_ui_kit::small_button(ui, qnc_ui_text::text("subsegment.move_later"), !last, false).on_hover_text(qnc_ui_text::text("subsegment.move_hint")).clicked() {
-                answer = Some(ActionEvent::key(PART_MOVE).with_target(target(Some(1))));
-            }
-            if qnc_ui_kit::small_button(ui, qnc_ui_text::text("subsegment.remove"), view.parts.len() > 1, false).on_hover_text(qnc_ui_text::text("subsegment.remove_hint")).clicked() {
-                answer = Some(ActionEvent::key(PART_REMOVE).with_target(target(None)));
-            }
-            ui.separator();
-            if index > 0 {
-                ui.label(RichText::new(qnc_ui_text::fill("subsegment.join", &[("frames", &part.gap_before.to_string())])).color(theme.text));
-                if ui.small_button("-").clicked() && part.gap_before > 0 {
-                    answer = Some(ActionEvent::key(JOIN_GAP).with_target(target(Some(-1))));
-                }
-                if ui.small_button("+").clicked() {
-                    answer = Some(ActionEvent::key(JOIN_GAP).with_target(target(Some(1))));
-                }
-                let kind = qnc_ui_text::text(if part.cut { "subsegment.cut" } else { "subsegment.crossfade" });
-                if ui.small_button(kind).on_hover_text(qnc_ui_text::text("subsegment.join_hint")).clicked() {
-                    answer = Some(ActionEvent::key(JOIN_CUT).with_target(target(None)));
-                }
-                // The smooth cut of the join: AI in-between pictures around it, its pictures
-                // two more or fewer; what it is doing is said beside it.
-                let on = part.smooth_frames > 0;
-                let label = if on { qnc_ui_text::fill("subsegment.smooth_on", &[("frames", &part.smooth_frames.to_string())]) } else { qnc_ui_text::text("subsegment.smooth").to_string() };
-                if qnc_ui_kit::small_button(ui, &label, true, on).on_hover_text(qnc_ui_text::text("subsegment.smooth_hint")).clicked() {
-                    answer = Some(ActionEvent::key(JOIN_SMOOTH).with_target(target(None)));
-                }
-                if on {
-                    if ui.small_button("-").clicked() {
-                        answer = Some(ActionEvent::key(JOIN_SMOOTH).with_target(target(Some(-1))));
-                    }
-                    if ui.small_button("+").clicked() {
-                        answer = Some(ActionEvent::key(JOIN_SMOOTH).with_target(target(Some(1))));
-                    }
-                    let state = match part.smooth_ready {
-                        Some(true) => "subsegment.smooth_ready",
-                        Some(false) => "subsegment.smooth_making",
-                        None => "subsegment.smooth_cannot",
-                    };
-                    ui.label(RichText::new(qnc_ui_text::text(state)).color(theme.text));
-                }
-                ui.separator();
-            }
-            ui.label(RichText::new("A1").color(theme.text)).on_hover_text(qnc_ui_text::text("subsegment.channel_hint"));
-            for channel in 0..part.channels.unwrap_or(2).max(1) {
-                let chosen = part.a1_channel == Some(channel);
-                if ui.selectable_label(chosen, (channel + 1).to_string()).clicked() {
-                    answer = Some(ActionEvent::key(PART_CHANNEL).with_target(target(Some(i64::from(channel)))));
-                }
-            }
-            if ui.small_button("-").clicked() {
-                answer = Some(ActionEvent::key(PART_LEVEL).with_target(target(Some(-1))));
-            }
-            ui.label(RichText::new(format!("{:+} dB", part.a1_level_db)).color(theme.text));
-            if ui.small_button("+").clicked() {
-                answer = Some(ActionEvent::key(PART_LEVEL).with_target(target(Some(1))));
-            }
-            let off = qnc_ui_text::text(if part.a1_off { "subsegment.a1_off" } else { "subsegment.a1_on" });
-            if ui.small_button(off).clicked() {
-                answer = Some(ActionEvent::key(PART_OFF).with_target(target(None)));
-            }
-        })));
-    }
-    answer
-}
-
-/// The part the row above the timeline is about: the one chosen or taken, else the part after
-/// the join nearest the playhead (the first part has no join; a click on its strip chooses it).
-fn part_in_hand(view: &SubsegmentView) -> Option<usize> {
-    let taken = view.chosen.or(view.sound).or(view.slide).or(view.trim.map(|(at, _, _)| at));
-    let at = view.playhead.unwrap_or(0);
-    taken.or_else(|| (1..view.parts.len()).min_by_key(|index| view.parts[*index].start.abs_diff(at))).or((!view.parts.is_empty()).then_some(0))
+    answer.or(zoomed)
 }
 
 /// The mouse map's panel of a program's row: the SubSegment's timeline is one (AGENTS 0.12).

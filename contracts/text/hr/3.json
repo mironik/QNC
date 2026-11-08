@@ -33,7 +33,6 @@
     "script.letter_hint": "Klik: playhead na ovo slovo. Desni klik (Ctrl+): uzima slovo. Shift+desni klik: uzima do ovdje. Delete: uzeto se izreže iz videa. Dvoklik na dva slova: IN dijela na prvom, OUT na kraju drugog.",
     "subsegment.trimming": "REZ",
     "subsegment.join": "pauza {frames} sl.",
-    "subsegment.part": "{n}. {clip}",
     "subsegment.channel_hint": "Kanal kamere koji se čuje na A1 za ovaj dio; bez izbora: kanal zadržan za njegov klip na source timelineu.",
     "subsegment.a1_on": "Uklj.",
     "subsegment.a1_off": "ISKLJ.",

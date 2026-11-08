@@ -5,7 +5,6 @@ edition = "2021"
 description = "QNC public passive panel: the SubSegment open in place of the source timeline (user 2026-10-29) - its parts one after another on the one qnc-timeline, the playhead of the player and the pause and join (cut or crossfade) before every part; it paints only and gives catalog actions"
 
 [dependencies]
-qnc-ui-kit = { workspace = true }
 eframe = { workspace = true }
 qnc-action-event = { workspace = true }
 qnc-program-view = { workspace = true }

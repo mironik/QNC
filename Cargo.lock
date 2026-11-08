@@ -6810,7 +6810,6 @@ dependencies = [
  "qnc-segment-panel",
  "qnc-timeline",
  "qnc-trim-overlay",
- "qnc-ui-kit",
  "qnc-ui-text",
 ]
 

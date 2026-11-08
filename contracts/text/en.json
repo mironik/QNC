@@ -671,7 +671,6 @@
     "script.letter_hint": "Click: the playhead to this letter. Right click (Ctrl+): takes the letter. Shift+right click: takes up to here. Delete: cuts what is taken out of the video. Double click two letters: the part's IN at the first, OUT at the end of the second.",
     "subsegment.trimming": "TRIM",
     "subsegment.join": "pause {frames} fr",
-    "subsegment.part": "{n}. {clip}",
     "subsegment.channel_hint": "The camera channel heard on A1 for this part; none chosen: the channel kept for its clip on the source timeline.",
     "subsegment.a1_on": "On",
     "subsegment.a1_off": "OFF",

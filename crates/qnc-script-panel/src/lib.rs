@@ -11,6 +11,7 @@ use eframe::egui::{self, RichText, Sense};
 use qnc_action_event::ActionEvent;
 use qnc_script::{seconds_label, FieldEdit, DRAFT, EXPORT, SEND_STORY, OPEN_EXPORT, Role, FIELD_COMMIT, FIELD_SET, FIELD_TEXT, ScriptView, ADD_CLIP, ADD_QUOTE, ADD_TEXT, CLEAR_EDITOR, EDITOR_TEXT, MOVE_DOWN, MOVE_UP, OPEN, PANEL, RECORD, REMOVE, REPLACE_TEXT, SELECT, VOICE_TAKE};
 
+mod part_controls;
 mod text_editor;
 use qnc_text_source_editor::{Answer, Editor, EditorButton};
 use qnc_transcript::TranscriptView;
@@ -260,8 +261,25 @@ pub fn paint_block(ui: &mut egui::Ui, row: &qnc_script::BlockRow, view: &ScriptV
             vec![(None, block.text.as_str())]
         };
         for (index, (detail, text)) in parts.into_iter().enumerate() {
-            if let Some(detail) = detail {
-                ui.label(RichText::new(detail).color(theme.text_muted).size(theme.font_ui));
+            // While the SubSegment is open, its joins and every part's A1 are here, in its text
+            // (user 2026-11-08: the dock has no room and they must not cover its header).
+            let open_part = view.subsegment.as_ref().filter(|open| open.block_id == block.id).and_then(|open| Some((open, open.parts.get(index)?)));
+            if let Some((open, part)) = open_part.filter(|_| index > 0) {
+                if let Some(event) = part_controls::join_row(ui, open, index, part, theme) {
+                    asked = Some(event);
+                }
+            }
+            match open_part {
+                Some((open, part)) => {
+                    if let Some(event) = part_controls::part_row(ui, open, index, part, detail.as_deref(), theme) {
+                        asked = Some(event);
+                    }
+                }
+                None => {
+                    if let Some(detail) = detail {
+                        ui.label(RichText::new(detail).color(theme.text_muted).size(theme.font_ui));
+                    }
+                }
             }
             // The words of the part with their times (user 2026-11-04: the transcript in the
             // script has its timecodes, to edit by its text): the timecode in front of every line
