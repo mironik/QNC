@@ -8505,3 +8505,8 @@ Popravak 2026-11-08 (korisnik: "gubi se prikaz fokusa i kursora"): Project ploca
 Enter na redu s izborom (kad se ne pise u polje) otvarao i projekt odabran u popisu ispod obrasca; sada dok je obrazac
 otvoren Enter ne otvara projekt (`qnc-project-blocks`, isti redak). Okvir reda s izborom je boje fokusa teme, ne
 prigusene boje oznake (`qnc-settings-form` `ColumnKeys.focus`). Uzivo nije provjereno.
+Popravak 2026-11-08 (korisnik: "okvir fokusa se vidi samo na poljima s izbornikom, ne i na edit poljima"; "ni kursor se
+nije vidio"): okvir reda na kojem je tipkovnica crta se i na redovima za upis (naziv projekta, polja bez izbora). Naziv
+projekta dobivao je tipkovnicu prije nego je nacrtan, pa je isti Enter koji ga je doveo obradilo i samo polje i pustilo
+tipkovnicu (kursor nestao); sada je dobiva nakon crtanja, kao i polja lista (`qnc-newsroom-sheet`). Uzivo nije
+provjereno.
