@@ -105,6 +105,11 @@ impl SidePieces {
     pub fn poll(&mut self, preview: &mut SourcePreview, timeline: &TimelineProjection, clips: &mut [ClipRow]) {
         // The transcripts the pieces show, read once for all of them.
         if self.transcript.is_some() || self.script.is_some() {
+            // No clip on the preview: the form was left or opened again; what a repass wrote is
+            // read now (user 2026-11-08: the truth is in the database, shown then).
+            if preview.view().clip_id.is_none() {
+                self.transcripts.let_go();
+            }
             let shown = self.transcript.as_ref().and(preview.view().clip_id.clone());
             let statements = self.script.as_ref().map(Script::transcript_clips).unwrap_or_default();
             self.transcripts.poll(preview.project_target(), shown.into_iter().chain(statements));
@@ -137,6 +142,13 @@ impl SidePieces {
     pub fn act(&mut self, action_id: &str, value: Option<i64>, target: Option<&str>, preview: &mut SourcePreview, timeline: &TimelineProjection, timecode: Option<&SourceTimecode>) -> Option<bool> {
         if let Some(transcript) = &mut self.transcript {
             if let Some(done) = transcript.act(action_id, value, target, preview, timeline, timecode) {
+                // A statement sent to the repass (user 2026-11-08): it is transcribed again in the
+                // background and written to the database only; this form keeps what it shows.
+                if action_id == qnc_transcript::REPASS && done {
+                    if let Some(clip) = preview.view().clip_id.clone() {
+                        self.transcripts.hold(&clip);
+                    }
+                }
                 // What the action changed (the search) is seen at once.
                 self.views.transcript = Arc::new(transcript.view().clone());
                 return Some(done);

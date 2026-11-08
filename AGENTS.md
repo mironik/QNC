@@ -8457,3 +8457,13 @@ sami; C10 Project ploce 1142 -> 1141). (3) Dvoklik na rijeci vise ne pokrece pon
 rijecima ide hrvatskom modelu tek na Dodaj izjavu (`save_virtual_shot`), Slozenu izjavu (`script_subsegment`) ili
 + IZJAVA (`script_add_clip`) (`qnc-panel-focus`). Testovi dotaknutih kocki, conformance (osim otvorenog C5
 `qnc-frame-interp`). Uzivo nije provjereno. Project je ponovno zamrznut.
+Izmjena 2026-11-08 (korisnik: "odabrana izjava bi se trebala ponovo transcriptirati u pozadini i ne bi se smjela
+osvjezavati na trenutnoj formi, samo zapisana u bazu; tek kad korisnik prijede na sljedecu formu ili ponovo otvori
+trenutnu (istina je u bazi)"): klip poslan na ponovni prijepis forma zadrzava kakav ga pokazuje (`qnc-clip-transcripts`
+`hold`, `let_go`, `is_held`; postavlja ga `qnc-side-pieces` kad prode `transcribe_repass`): novi prijepis ide samo u bazu,
+panel prijepisa ne pokazuje retke ponovnog prijepisa dok traje, a tekst izjava u scenariju se ne mijenja. Kad forma
+nema klip na previewu (napustena ili ponovno otvorena) cita bazu i pokazuje novi prijepis; druge forme ga citaju odmah.
+Klip koji vise nije trazen (drugi klip u AI Media Assistu) takoder se pusti. Ponovni prijepis vise ne otvara tab
+Prijepis kad zavrsi (`qnc-transcript`: samo kad je zavrsio prvi prijepis, Fast). Test
+`a_held_clip_keeps_what_it_shows_until_it_is_let_go`, conformance (osim otvorenog C5 `qnc-frame-interp`). Uzivo nije
+provjereno.

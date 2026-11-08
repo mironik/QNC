@@ -35,6 +35,10 @@ pub struct ClipTranscripts {
     read_at: Option<Instant>,
     /// When the last read whose answer was taken started.
     last_read: Option<Instant>,
+    /// Clips whose answer is not taken while the form stays as it is (user 2026-11-08: a
+    /// statement transcribed again goes to the database only; the form shows it once another
+    /// clip is shown or the form opens again). A clip no longer asked for is let go.
+    held: BTreeSet<String>,
 }
 
 impl ClipTranscripts {
@@ -81,6 +85,7 @@ impl ClipTranscripts {
             }
         }
         self.kept.retain(|clip, _| self.wanted.contains(clip));
+        self.held.retain(|clip| self.wanted.contains(clip));
         let (Some(key), None) = (key, &self.reading) else { return changed };
         let unread = self.wanted.iter().any(|clip| !self.kept.contains_key(clip));
         let due = self.read_at.is_none_or(|at| at.elapsed() >= READ_EVERY);
@@ -122,6 +127,10 @@ impl ClipTranscripts {
                     continue;
                 }
             };
+            // A held clip keeps what it shows (read once, it is not read anew).
+            if self.held.contains(&clip) && self.kept.contains_key(&clip) {
+                continue;
+            }
             if self.kept.get(&clip).is_none_or(|held| **held != transcripts) {
                 self.kept.insert(clip, Arc::new(transcripts));
                 changed = true;
@@ -136,6 +145,25 @@ impl ClipTranscripts {
     /// The next poll reads from the database (a transcript was just written).
     pub fn read_now(&mut self) {
         self.read_at = None;
+    }
+
+    /// `clip` keeps what is shown of it: new answers of the database are not taken until
+    /// [`let_go`](Self::let_go) (or until it is no longer asked for).
+    pub fn hold(&mut self, clip: &str) {
+        self.held.insert(clip.to_string());
+    }
+
+    /// Every held clip takes the database's answer again (another clip shown, the form opened).
+    pub fn let_go(&mut self) {
+        if !self.held.is_empty() {
+            self.held.clear();
+            self.read_at = None;
+        }
+    }
+
+    /// Whether `clip` keeps what is shown of it.
+    pub fn is_held(&self, clip: &str) -> bool {
+        self.held.contains(clip)
     }
 
     /// The kept transcripts of `clip`; `None` while it was not read yet.
@@ -179,5 +207,16 @@ mod tests {
         assert_eq!(held.error(), Some("busy"));
         assert!(held.take(HashMap::from([("a".to_string(), Ok(vec![transcript("ovo"), transcript("je")]))])), "a transcript written meanwhile");
         assert!(held.rev() > rev);
+    }
+
+    #[test]
+    fn a_held_clip_keeps_what_it_shows_until_it_is_let_go() {
+        let mut held = ClipTranscripts::new();
+        assert!(held.take(HashMap::from([("a".to_string(), Ok(vec![transcript("staro")]))])));
+        held.hold("a");
+        assert!(!held.take(HashMap::from([("a".to_string(), Ok(vec![transcript("novo")]))])), "the repass is not shown on this form");
+        assert_eq!(held.of("a").unwrap()[0].lines[0].text, "staro");
+        held.let_go();
+        assert!(held.take(HashMap::from([("a".to_string(), Ok(vec![transcript("novo")]))])), "the form opened again reads the database");
     }
 }

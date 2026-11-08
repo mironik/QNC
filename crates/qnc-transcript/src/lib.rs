@@ -445,7 +445,9 @@ impl Transcript {
         self.view.marks = timeline.visible_source_marks();
         self.view.queue = self.queue.iter().map(|q| self.queue_row(q)).collect();
         let kept = clip_id.as_deref().and_then(|clip| transcripts.of(clip)).map(|kept| kept.as_slice()).unwrap_or_default();
-        let running = self.running.as_ref().filter(|run| Some(&run.clip_id) == clip_id.as_ref());
+        // A held clip (its statement transcribed again, user 2026-11-08) shows no running lines:
+        // the new transcript goes to the database only.
+        let running = self.running.as_ref().filter(|run| Some(&run.clip_id) == clip_id.as_ref() && !transcripts.is_held(&run.clip_id));
         self.view.running = running.map(|run| run.range);
         let key = (self.rev, transcripts.rev(), clip_id.clone());
         if self.built.as_ref() == Some(&key) {
@@ -543,7 +545,10 @@ impl Transcript {
                                 self.view.transcribed = Arc::new(transcribed.into_iter().collect());
                             }
                             if finished {
-                                self.view.all_done = true;
+                                // A repass alone (the Croatian model, Best) is written to the
+                                // database only: the form does not move to the Transcript tab
+                                // (user 2026-11-08).
+                                self.view.all_done |= self.queue.iter().any(|q| q.state == QueueState::Done && q.quality == QueueQuality::Fast);
                                 self.write(preview, qnc_transcript_db::clear_done);
                             }
                         }
