@@ -8549,3 +8549,6 @@ Izmjena 2026-11-08 (korisnik: "suma podataka, nepregledno, zbunjujuce... treba o
 izjave nema tona (A1 dijela mijenja se na timelineu, Ctrl+1 ili klik na A1). Izmedju dva dijela stoje samo Rez/Pretapanje i Smooth
 (stanje samo dok nije spremno); pauza, brojevi -/+, mjesto i Obrisi samo uz dio izabran klikom na traku timelinea. Dio s A1 radnje
 ostaju u katalogu (`subsegment_part_channel` i dr.) bez gumba. Uzivo nije provjereno.
+Izmjena isti dan (korisnik: "ostaviti samo opciju dodavanja razmaka"): u tekstu otvorene izjave jedina kontrola je pauza izmedju
+dva dijela (-/+). Rez/Pretapanje, Smooth, mjesto i Obrisi dijela nemaju gumb (radnje ostaju u katalogu, spremljeni smooth i dalje
+svira); gdje idu ceka odluku korisnika. Uzivo nije provjereno.

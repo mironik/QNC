@@ -261,25 +261,15 @@ pub fn paint_block(ui: &mut egui::Ui, row: &qnc_script::BlockRow, view: &ScriptV
             vec![(None, block.text.as_str())]
         };
         for (index, (detail, text)) in parts.into_iter().enumerate() {
-            // While the SubSegment is open, its joins and every part's A1 are here, in its text
-            // (user 2026-11-08: the dock has no room and they must not cover its header).
-            let open_part = view.subsegment.as_ref().filter(|open| open.block_id == block.id).and_then(|open| Some((open, open.parts.get(index)?)));
-            if let Some((open, part)) = open_part.filter(|_| index > 0) {
-                if let Some(event) = part_controls::join_row(ui, open, index, part, theme) {
+            // While the SubSegment is open, the pause between two parts is here, in its text.
+            let open_part = view.subsegment.as_ref().filter(|open| open.block_id == block.id && index > 0).and_then(|open| Some((open, open.parts.get(index)?)));
+            if let Some((open, part)) = open_part {
+                if let Some(event) = part_controls::gap_row(ui, open, index, part, theme) {
                     asked = Some(event);
                 }
             }
-            match open_part {
-                Some((open, _)) => {
-                    if let Some(event) = part_controls::part_row(ui, open, index, detail.as_deref(), theme) {
-                        asked = Some(event);
-                    }
-                }
-                None => {
-                    if let Some(detail) = detail {
-                        ui.label(RichText::new(detail).color(theme.text_muted).size(theme.font_ui));
-                    }
-                }
+            if let Some(detail) = detail {
+                ui.label(RichText::new(detail).color(theme.text_muted).size(theme.font_ui));
             }
             // The words of the part with their times (user 2026-11-04: the transcript in the
             // script has its timecodes, to edit by its text): the timecode in front of every line
