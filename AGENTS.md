@@ -8552,3 +8552,6 @@ ostaju u katalogu (`subsegment_part_channel` i dr.) bez gumba. Uzivo nije provje
 Izmjena isti dan (korisnik: "ostaviti samo opciju dodavanja razmaka"): u tekstu otvorene izjave jedina kontrola je pauza izmedju
 dva dijela (-/+). Rez/Pretapanje, Smooth, mjesto i Obrisi dijela nemaju gumb (radnje ostaju u katalogu, spremljeni smooth i dalje
 svira); gdje idu ceka odluku korisnika. Uzivo nije provjereno.
+Dopuna isti dan (korisnik: "naziv klipa je nepotreban u prikazu... baza neka sadrzi sve podatke, ali za Smut treba samo
+neophodno"): dio slozene izjave u tekstu pokazuje samo TC i duljinu (naziv ostaje u bazi); uz pauzu je jedan gumb Smooth
+(ukljuceno ili ne, zadano 8 slika), stanje samo dok nije spremno. Uzivo nije provjereno.

@@ -256,7 +256,7 @@ pub fn paint_block(ui: &mut egui::Ui, row: &qnc_script::BlockRow, view: &ScriptV
         // A SubSegment of several parts: each part's clip and timecodes, its words under it, one
         // part under another (user 2026-10-29).
         let parts: Vec<(Option<String>, &str)> = if block.pieces.len() > 1 {
-            block.pieces.iter().map(|piece| (Some(format!("{}  {} - {}  {}", piece.clip_name, piece.start_tc, piece.end_tc, piece.length)), piece.text.as_str())).collect()
+            block.pieces.iter().map(|piece| (Some(format!("{} - {}  {}", piece.start_tc, piece.end_tc, piece.length)), piece.text.as_str())).collect()
         } else {
             vec![(None, block.text.as_str())]
         };
