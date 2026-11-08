@@ -27,3 +27,12 @@ fn every_send_is_a_new_version_numbered_one_two_and_listed_in_order() {
     let listed = versions(&target).unwrap();
     assert_eq!(listed.iter().map(|version| version.number).collect::<Vec<_>>(), [1, 2]);
 }
+
+/// A version's story file beside the project database (its list made again) is never given to
+/// a new version (audit 2026-11-08 #18): the new one would add to that old story.
+#[test]
+fn a_new_version_is_numbered_past_every_story_file_there() {
+    let (dir, target) = project();
+    std::fs::write(dir.path().join(qnc_db_broker::draft_file(3)), b"").unwrap();
+    assert_eq!(new_version(&target).unwrap(), 4);
+}

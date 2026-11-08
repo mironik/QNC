@@ -108,6 +108,9 @@ pub const OPEN_EXPORT: &str = "script_open_export";
 /// How often the script is read again (another process may change it).
 const READ_EVERY: Duration = Duration::from_secs(2);
 
+/// A write waiting for the one on its way.
+type QueuedWrite = Box<dyn FnOnce(&ProjectDbTarget) -> Result<Option<i64>, String> + Send>;
+
 /// What a take gives back: the take that started, or the finished one as its block keeps it.
 enum TakeAnswer {
     Started(Take),
@@ -123,6 +126,9 @@ pub struct Script {
     read_at: Option<Instant>,
     /// A write on its way to the database; its answer is the id of an added block.
     writing: Option<mpsc::Receiver<Result<Option<i64>, String>>>,
+    /// Writes made while one is on its way: they go in order, each its own answer (audit
+    /// 2026-11-08 #16: a second write overwrote the first's answer, which was lost).
+    queued: std::collections::VecDeque<(ProjectDbTarget, QueuedWrite)>,
     source_request: Option<(String, u64, u64)>,
     /// Name, frames and seconds of each clip of the pool.
     names: HashMap<String, (String, u64, f64)>,
@@ -161,7 +167,7 @@ pub struct Script {
 
 impl Default for Script {
     fn default() -> Self {
-        Self { view: ScriptView::default(), blocks: Vec::new(), project: None, reading: None, read_at: None, writing: None, source_request: None, names: HashMap::new(), words_per_second: Ok(0.0), take: None, taking: None, exporting: None, draft: Default::default(), edit: Default::default(), letters: HashMap::new(), letter_times: qnc_letter_times::LetterTimes::new(), word_cut: qnc_edit_words::WordPair::new(), word_pick: None, voices: Vec::new(), voice_request: None, voice_after_write: None, message_after_write: None, clear_after_write: false }
+        Self { view: ScriptView::default(), blocks: Vec::new(), project: None, reading: None, read_at: None, writing: None, queued: std::collections::VecDeque::new(), source_request: None, names: HashMap::new(), words_per_second: Ok(0.0), take: None, taking: None, exporting: None, draft: Default::default(), edit: Default::default(), letters: HashMap::new(), letter_times: qnc_letter_times::LetterTimes::new(), word_cut: qnc_edit_words::WordPair::new(), word_pick: None, voices: Vec::new(), voice_request: None, voice_after_write: None, message_after_write: None, clear_after_write: false }
     }
 }
 
@@ -646,11 +652,20 @@ impl Script {
             self.view.message = qnc_ui_text::text("script.no_project").into();
             return true;
         };
+        self.queued.push_back((target, Box::new(write)));
+        if self.writing.is_none() {
+            self.write_next();
+        }
+        true
+    }
+
+    /// The next queued write goes, off the form thread.
+    fn write_next(&mut self) {
+        let Some((target, write)) = self.queued.pop_front() else { return };
         let (send, done) = mpsc::channel();
         if std::thread::Builder::new().name("qnc-script-write".into()).spawn(move || _ = send.send(write(&target))).is_ok() {
             self.writing = Some(done);
         }
-        true
     }
 
     /// Sends the skeleton to the story (user 2026-10-31): the voice records go into the catalog
@@ -862,29 +877,40 @@ impl Script {
         self.view.exporting = self.exporting.is_some() || self.draft.running();
         if let Some(done) = &self.writing {
             if let Ok(result) = done.try_recv() {
-                let heard = self.voice_after_write.take();
-                let said = self.message_after_write.take();
-                match result {
-                    Ok(added) => {
-                        self.voice_request = heard;
-                        self.view.message = said.unwrap_or_default();
-                        // A saved text leaves the editor empty (MA Script).
-                        if std::mem::take(&mut self.clear_after_write) {
-                            self.view.editor.clear();
-                            self.view.editing = None;
-                        }
-                        if let Some(id) = added {
-                            self.view.selected = Some(id);
-                            // The editor's text is in the script now.
-                            if self.view.editing.is_none() {
+                // More writes queued: the next goes; what follows the writes waits for the last.
+                if !self.queued.is_empty() {
+                    match result {
+                        Ok(Some(id)) => self.view.selected = Some(id),
+                        Ok(None) => {}
+                        Err(error) => self.view.message = error,
+                    }
+                    self.writing = None;
+                    self.write_next();
+                } else {
+                    let heard = self.voice_after_write.take();
+                    let said = self.message_after_write.take();
+                    match result {
+                        Ok(added) => {
+                            self.voice_request = heard;
+                            self.view.message = said.unwrap_or_default();
+                            // A saved text leaves the editor empty (MA Script).
+                            if std::mem::take(&mut self.clear_after_write) {
                                 self.view.editor.clear();
+                                self.view.editing = None;
+                            }
+                            if let Some(id) = added {
+                                self.view.selected = Some(id);
+                                // The editor's text is in the script now.
+                                if self.view.editing.is_none() {
+                                    self.view.editor.clear();
+                                }
                             }
                         }
+                        Err(error) => self.view.message = error,
                     }
-                    Err(error) => self.view.message = error,
+                    self.writing = None;
+                    self.read_at = None; // read now
                 }
-                self.writing = None;
-                self.read_at = None; // read now
             }
         }
         if let Some(reading) = &self.reading {

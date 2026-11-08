@@ -33,8 +33,16 @@ pub(crate) fn snapshot(conn: &Connection) -> Result<String> {
 /// The blocks back as `rows` holds them, each keeping the recording it has now.
 fn restore(conn: &Connection, rows: &str) -> Result<()> {
     let all = columns(conn)?;
-    let names = all.join(", ");
-    let values: Vec<String> = all.iter().map(|column| format!("json_extract(value, '$.{column}')")).collect();
+    // Only the columns the step holds (audit 2026-11-08 #17): a step kept before the table got a
+    // column puts it back with that column's default, it never writes NULL into it.
+    let held: Vec<String> = {
+        let mut statement = conn.prepare("SELECT key FROM json_each(json_extract(?1, '$[0]'))").map_err(err)?;
+        let keys = statement.query_map(params![rows], |r| r.get::<_, String>(0)).map_err(err)?;
+        keys.collect::<std::result::Result<Vec<_>, _>>().map_err(err)?
+    };
+    let inserted: Vec<&String> = all.iter().filter(|column| held.is_empty() || held.contains(column)).collect();
+    let names = inserted.iter().map(|column| column.as_str()).collect::<Vec<_>>().join(", ");
+    let values: Vec<String> = inserted.iter().map(|column| format!("json_extract(value, '$.{column}')")).collect();
     let voice: Vec<&str> = VOICE.iter().copied().filter(|column| all.iter().any(|c| c == column)).collect();
     // The recording of every block as it is now.
     let kept: Vec<(i64, Vec<rusqlite::types::Value>)> = if voice.is_empty() {

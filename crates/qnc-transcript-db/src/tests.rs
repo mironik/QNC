@@ -60,8 +60,8 @@ fn queued_clips_are_read_in_order_and_asking_a_clip_again_waits_it_again() {
     let (_dir, target) = project();
     assert!(read_queue(&target).unwrap().is_empty(), "a project without a queue reads none");
     enqueue(&target, vec![asked("a", QueueQuality::Fast), asked("b", QueueQuality::Best)]).unwrap();
-    set_queued(&target, "a", QueueState::Done, "", 4200).unwrap();
-    set_queued(&target, "b", QueueState::Failed, "no sound", 0).unwrap();
+    set_queued(&target, &asked("a", QueueQuality::Fast), QueueState::Done, "", 4200).unwrap();
+    set_queued(&target, &asked("b", QueueQuality::Best), QueueState::Failed, "no sound", 0).unwrap();
     let queue = read_queue(&target).unwrap();
     assert_eq!(queue[0].took_ms, 4200, "how long a done clip took is kept");
     assert_eq!(queue.iter().map(|q| (q.clip_id.as_str(), q.state, q.quality)).collect::<Vec<_>>(), [("a", QueueState::Done, QueueQuality::Fast), ("b", QueueState::Failed, QueueQuality::Best)]);
@@ -72,6 +72,22 @@ fn queued_clips_are_read_in_order_and_asking_a_clip_again_waits_it_again() {
 }
 
 #[test]
+fn a_clip_asked_again_while_it_runs_is_not_marked_done_by_the_old_run() {
+    let (_dir, target) = project();
+    let first = asked("a", QueueQuality::Fast);
+    enqueue(&target, vec![first.clone()]).unwrap();
+    set_queued(&target, &first, QueueState::Running, "", 0).unwrap();
+    // Asked again (another range, the Croatian pass) while the first one runs.
+    let again = Queued { from_frame: 100, to_frame: 200, quality: QueueQuality::Best, ..first.clone() };
+    enqueue(&target, vec![again.clone()]).unwrap();
+    set_queued(&target, &first, QueueState::Done, "", 10).unwrap();
+    let entry = read_queue(&target).unwrap().into_iter().next().unwrap();
+    assert_eq!((entry.state, entry.from_frame, entry.quality), (QueueState::Waiting, 100, QueueQuality::Best), "the new request still waits");
+    set_queued(&target, &again, QueueState::Done, "", 10).unwrap();
+    assert_eq!(read_queue(&target).unwrap()[0].state, QueueState::Done);
+}
+
+#[test]
 fn transcribed_clips_are_listed_and_done_entries_leave_the_queue_failed_ones_stay() {
     let (_dir, target) = project();
     assert!(read_transcribed(&target).unwrap().is_empty(), "a project without transcripts lists none");
@@ -79,8 +95,8 @@ fn transcribed_clips_are_listed_and_done_entries_leave_the_queue_failed_ones_sta
     save(&target, transcript(100, 200, "Dobar")).unwrap();
     assert_eq!(read_transcribed(&target).unwrap(), ["c1"], "a clip once, however many ranges");
     enqueue(&target, vec![asked("a", QueueQuality::Fast), asked("b", QueueQuality::Fast)]).unwrap();
-    set_queued(&target, "a", QueueState::Done, "", 100).unwrap();
-    set_queued(&target, "b", QueueState::Failed, "no sound", 0).unwrap();
+    set_queued(&target, &asked("a", QueueQuality::Fast), QueueState::Done, "", 100).unwrap();
+    set_queued(&target, &asked("b", QueueQuality::Fast), QueueState::Failed, "no sound", 0).unwrap();
     clear_done(&target).unwrap();
     assert_eq!(read_queue(&target).unwrap().iter().map(|q| q.clip_id.as_str()).collect::<Vec<_>>(), ["b"]);
 }

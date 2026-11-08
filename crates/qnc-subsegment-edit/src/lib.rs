@@ -259,6 +259,37 @@ impl SubsegmentEdit {
         id.and_then(|id| self.blocks.iter().find(|block| block.id == id))
     }
 
+    /// What is held of parts the statement no longer has (another writer shortened it while an
+    /// edge, a slot or a sound was taken) is let go, so no key reaches past its parts (audit
+    /// 2026-11-08 #14: a key after that crashed the application).
+    fn forget_parts_gone(&mut self, count: usize) {
+        if self.trim.is_some_and(|trim| trim.index >= count || (trim.roll.is_some() && trim.index + 1 >= count)) {
+            self.trim = None;
+        }
+        if self.chosen.is_some_and(|index| index >= count) {
+            (self.chosen, self.chosen_to) = (None, None);
+        }
+        if self.chosen_to.is_some_and(|index| index >= count) {
+            self.chosen_to = None;
+        }
+        self.sound_also.retain(|index| *index < count);
+        if self.sound.is_some_and(|sound| sound.index >= count) {
+            (self.sound, self.sound_also) = (None, Vec::new());
+        }
+        if self.join_sound.is_some_and(|join| join.index == 0 || join.index >= count) {
+            self.join_sound = None;
+        }
+        if self.slide.is_some_and(|(index, _)| index == 0 || index + 1 >= count) {
+            self.slide = None;
+        }
+        if self.slip_part.is_some_and(|(index, _)| index >= count) {
+            self.slip_part = None;
+        }
+        if self.level.as_ref().is_some_and(|line| line.id.parse::<usize>().map_or(true, |index| index >= count)) {
+            self.level = None;
+        }
+    }
+
     /// The open SubSegment as its block holds it now and the player plays it: a write that
     /// changed a pause or a join plays again where it stands; a block gone closes it.
     fn follow_subsegment(&mut self, preview: &SourcePreview) {
@@ -268,6 +299,7 @@ impl SubsegmentEdit {
             }
             return;
         };
+        self.forget_parts_gone(view::block_pieces(&block).len());
         let playing = preview.shown_pieces();
         if playing.is_none() && self.pieces_request.is_none() {
             // The player opened something else (a clip of the pool): the source timeline is back.
@@ -504,12 +536,9 @@ impl SubsegmentEdit {
                     })
                     .collect();
                 let id = block.id;
-                return Some(self.write(preview, move |target| {
-                    for (index, piece) in written {
-                        qnc_script_db::set_piece(target, id, index, piece)?;
-                    }
-                    Ok(None)
-                }));
+                // One write and one step of undo for every slot (audit 2026-11-08 #15).
+                let changes = written.into_iter().map(|(index, piece)| qnc_script_db::Operation::SetPiece { id, index, piece }).collect();
+                return Some(self.write(preview, move |target| qnc_script_db::together(target, changes).map(|_| None)));
             }
             qnc_lane_choice::LaneKey::Drop => {
                 self.sound = None;
@@ -531,6 +560,7 @@ impl SubsegmentEdit {
     fn trim_key(&mut self, action_id: &str, target: Option<&str>, preview: &SourcePreview) -> Option<bool> {
         let block = self.block(self.open_subsegment)?.clone();
         let pieces = view::block_pieces(&block);
+        self.forget_parts_gone(pieces.len());
         let take = |index: usize, out: bool| pieces.get(index).map(|piece| Trim { index, out, from: piece.from_frame, to: piece.to_frame, roll: None });
         if let Some(done) = self.assist_key(action_id, &block, &pieces, preview) {
             return Some(done);
@@ -698,7 +728,7 @@ impl SubsegmentEdit {
             }
             None => {
                 // The one rule of an edge (`qnc-edit-edge`): as far as it can go in its clip.
-                let length = self.names.get(&pieces[trim.index].clip_id).map_or(u64::MAX, |(_, frames, _)| *frames);
+                let length = pieces.get(trim.index).and_then(|piece| self.names.get(&piece.clip_id)).map_or(u64::MAX, |(_, frames, _)| *frames);
                 let range = qnc_edit_edge::Range { from: trim.from, to: trim.to }.moved(qnc_edit_edge::Edge::of_out(trim.out), step, length);
                 (trim.from, trim.to) = (range.from, range.to);
             }
@@ -785,17 +815,16 @@ impl SubsegmentEdit {
                 if writes.is_empty() {
                     return Some(true);
                 }
-                return Some(self.write(preview, move |target| {
-                    for (at, piece, join) in writes {
-                        if let Some(piece) = piece {
-                            qnc_script_db::set_piece(target, id, at, piece)?;
-                        }
-                        if let Some((gap, cut)) = join {
-                            qnc_script_db::set_join(target, id, at, gap, cut)?;
-                        }
-                    }
-                    Ok(None)
-                }));
+                // One write and one step of undo for the slot moved (audit 2026-11-08 #15).
+                let changes = writes
+                    .into_iter()
+                    .flat_map(|(index, piece, join)| {
+                        let piece = piece.map(|piece| qnc_script_db::Operation::SetPiece { id, index, piece });
+                        let join = join.map(|(gap_before, cut)| qnc_script_db::Operation::SetJoin { id, index, gap_before, cut });
+                        piece.into_iter().chain(join)
+                    })
+                    .collect();
+                return Some(self.write(preview, move |target| qnc_script_db::together(target, changes).map(|_| None)));
             }
             "clear_focus" => {
                 self.slide = None;
@@ -982,8 +1011,8 @@ impl SubsegmentEdit {
     /// each within its own clip and keeping at least a frame; a move one of them cannot take is
     /// taken only as far as both can (a roll, the length of the statement stays).
     fn roll_to(&self, trim: &mut Trim, pieces: &[Piece], to: u64) {
-        let (Some(next_from), Some(next)) = (trim.roll, pieces.get(trim.index + 1)) else { return };
-        let length = self.names.get(&pieces[trim.index].clip_id).map_or(u64::MAX, |(_, frames, _)| *frames);
+        let (Some(next_from), Some(next), Some(this)) = (trim.roll, pieces.get(trim.index + 1), pieces.get(trim.index)) else { return };
+        let length = self.names.get(&this.clip_id).map_or(u64::MAX, |(_, frames, _)| *frames);
         // The one rule of a roll (`qnc-edit-edge`).
         let (before, after) = qnc_edit_edge::rolled(qnc_edit_edge::Range { from: trim.from, to: trim.to }, length, qnc_edit_edge::Range { from: next_from, to: next.to_frame }, to as i64 - trim.to as i64);
         trim.to = before.to;
@@ -1004,7 +1033,7 @@ impl SubsegmentEdit {
             self.view.message = qnc_ui_text::text("subsegment.mark_in_pause").into();
             return Some(true);
         };
-        let (part, piece) = (&parts[index], &drafted_pieces[index]);
+        let (Some(part), Some(piece)) = (parts.get(index), drafted_pieces.get(index)) else { return Some(true) };
         let frame = piece.from_frame + (at - part.start);
         let (from, to) = if out { (piece.from_frame, frame + 1) } else { (frame, piece.to_frame) };
         if to <= from {
@@ -1134,8 +1163,8 @@ impl SubsegmentEdit {
     fn write_trim(&mut self, preview: &SourcePreview, block: &Block, pieces: &[Piece], trim: Trim) -> bool {
         let id = block.id;
         let mut writes = Vec::new();
-        if pieces.get(trim.index).is_some_and(|piece| (piece.from_frame, piece.to_frame) != (trim.from, trim.to)) {
-            writes.push((trim.index, self.trimmed_piece(&pieces[trim.index], trim)));
+        if let Some(piece) = pieces.get(trim.index).filter(|piece| (piece.from_frame, piece.to_frame) != (trim.from, trim.to)) {
+            writes.push((trim.index, self.trimmed_piece(piece, trim)));
         }
         if let (Some(from), Some(next)) = (trim.roll, pieces.get(trim.index + 1)) {
             if from != next.from_frame {
@@ -1145,12 +1174,9 @@ impl SubsegmentEdit {
         if writes.is_empty() {
             return true;
         }
-        self.write(preview, move |target| {
-            for (index, piece) in writes {
-                qnc_script_db::set_piece(target, id, index, piece)?;
-            }
-            Ok(None)
-        })
+        // A roll is one write and one step of undo (audit 2026-11-08 #15).
+        let changes = writes.into_iter().map(|(index, piece)| qnc_script_db::Operation::SetPiece { id, index, piece }).collect();
+        self.write(preview, move |target| qnc_script_db::together(target, changes).map(|_| None))
     }
 
     /// The frame of the trimmed edge on the SubSegment's axis (the last frame of an OUT).

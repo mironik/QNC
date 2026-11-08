@@ -118,7 +118,18 @@ pub enum Operation {
     Enqueue(Vec<Queued>),
     /// A queued clip is now in `state` (a running entry stays one, by its clip), with how
     /// long it took when done.
-    SetQueued { clip_id: String, state: QueueState, error: String, #[serde(default)] took_ms: u64 },
+    SetQueued {
+        clip_id: String,
+        state: QueueState,
+        error: String,
+        #[serde(default)]
+        took_ms: u64,
+        /// The range and engine the state is of (audit 2026-11-08 #4): a clip asked again while
+        /// it ran has a new range or engine, and the end of the old run must not mark the new
+        /// request done. Without it, the clip's entry whatever it holds.
+        #[serde(default)]
+        asked: Option<(u64, u64, QueueQuality)>,
+    },
     /// The queue, in the order it was asked.
     ReadQueue,
     /// A statement is added to the list (user 2026-10-26).
@@ -193,9 +204,10 @@ pub fn enqueue(target: &ProjectDbTarget, ranges: Vec<Queued>) -> Result<()> {
     write(target, Operation::Enqueue(ranges))
 }
 
-/// Puts the queued `clip_id` in `state`; `took_ms` is how long it took when done.
-pub fn set_queued(target: &ProjectDbTarget, clip_id: &str, state: QueueState, error: &str, took_ms: u64) -> Result<()> {
-    write(target, Operation::SetQueued { clip_id: clip_id.into(), state, error: error.into(), took_ms })
+/// Puts `entry` in `state`; `took_ms` is how long it took when done. Only while its clip's
+/// entry still asks the same range with the same engine: one asked again meanwhile waits.
+pub fn set_queued(target: &ProjectDbTarget, entry: &Queued, state: QueueState, error: &str, took_ms: u64) -> Result<()> {
+    write(target, Operation::SetQueued { clip_id: entry.clip_id.clone(), state, error: error.into(), took_ms, asked: Some((entry.from_frame, entry.to_frame, entry.quality)) })
 }
 
 /// The statements of the project behind `target`, in the order they were added.

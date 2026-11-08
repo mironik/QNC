@@ -122,16 +122,28 @@ fn run(locator: &StillLocator, db: &ProjectDbTarget, cancel: &AtomicBool, send: 
             drop(lease);
             return wake_worker(locator);
         };
-        if let Err(error) = qnc_transcript_db::set_queued(db, &next.clip_id, QueueState::Running, "", 0) {
+        if let Err(error) = qnc_transcript_db::set_queued(db, &next, QueueState::Running, "", 0) {
             return log(&format!("transcribe-queue mark {}: {error}", next.clip_id));
         }
         let _ = send.send(Heard::Started { clip_id: next.clip_id.clone(), from: next.from_frame, to: next.to_frame });
+        // What an earlier run of this request kept goes on from where it ended (audit
+        // 2026-11-08 #3: an interruption or a crash threw away everything heard).
+        let earlier = kept_part(db, &next);
+        let heard: std::cell::RefCell<Vec<Line>> = std::cell::RefCell::new(earlier.as_ref().map(|part| part.lines.clone()).unwrap_or_default());
+        for line in heard.borrow().iter() {
+            let _ = send.send(Heard::Line { clip_id: next.clip_id.clone(), line: line.clone() });
+        }
+        let from = earlier.as_ref().map_or(next.from_frame, |part| part.to_frame);
+        if earlier.is_some() {
+            log(&format!("transcribe-queue {} goes on from {from} (kept by an earlier run)", next.clip_id));
+        }
         let stop = StopWhen { cancel, lost: lease.lost() };
-        let ask = Ask { clip_id: next.clip_id.clone(), from: next.from_frame, to: next.to_frame };
+        let ask = Ask { clip_id: next.clip_id.clone(), from, to: next.to_frame };
         let quality = match next.quality {
             QueueQuality::Fast => Quality::Fast,
             QueueQuality::Best => Quality::Best,
         };
+        let language = locator.settings().speech_language().unwrap_or_default();
         let started = std::time::Instant::now();
         let made = stop.run(|flag| {
             qnc_transcribe_run::transcribe(
@@ -141,26 +153,70 @@ fn run(locator: &StillLocator, db: &ProjectDbTarget, cancel: &AtomicBool, send: 
                 Pace::YieldToPlayer,
                 flag,
                 &mut |line| {
+                    heard.borrow_mut().push(line.clone());
                     let _ = send.send(Heard::Line { clip_id: next.clip_id.clone(), line: line.clone() });
                 },
                 &mut |progress| {
+                    // Every piece heard is kept at once: what is done so far, as a part.
+                    if let Progress::Heard { until, .. } = progress {
+                        keep_part(db, &next, until, &heard.borrow(), &language);
+                    }
                     let _ = send.send(Heard::Progress { clip_id: next.clip_id.clone(), progress });
                 },
             )
         });
         if cancel.load(Ordering::Relaxed) || !lease.held() {
-            // Stopped, not failed: it waits for the next runner.
-            let _ = qnc_transcript_db::set_queued(db, &next.clip_id, QueueState::Waiting, "", 0);
+            // Stopped, not failed: it waits for the next runner, which goes on from the part kept.
+            let _ = qnc_transcript_db::set_queued(db, &next, QueueState::Waiting, "", 0);
             return;
         }
+        // The whole request in one transcript: the part kept by an earlier run and this one.
+        let made = made.map(|mut transcript| {
+            if let Some(part) = earlier {
+                transcript.lines = part.lines.into_iter().chain(transcript.lines).collect();
+                transcript.from_frame = next.from_frame;
+            }
+            transcript
+        });
         let kept = made.and_then(|transcript| qnc_transcript_db::save(db, transcript));
         let (state, error) = match &kept {
             Ok(()) => (QueueState::Done, String::new()),
             Err(error) => (QueueState::Failed, error.clone()),
         };
         log(&format!("transcribe-queue {} {}..{} {:?} {:?} ms={} {error}", next.clip_id, next.from_frame, next.to_frame, next.quality, state, started.elapsed().as_millis()));
-        let _ = qnc_transcript_db::set_queued(db, &next.clip_id, state, &error, started.elapsed().as_millis() as u64);
+        let _ = qnc_transcript_db::set_queued(db, &next, state, &error, started.elapsed().as_millis() as u64);
         let _ = send.send(Heard::Finished { clip_id: next.clip_id, result: kept });
+    }
+}
+
+/// What the engine of a part kept along the way is called: the request is not finished.
+const PART_ENGINE: &str = "(part, still being transcribed)";
+
+/// A part of `asked` an earlier run kept: from its start, short of its end.
+fn kept_part(db: &ProjectDbTarget, asked: &Queued) -> Option<qnc_transcript_db::ClipTranscript> {
+    let transcripts = qnc_transcript_db::read_clip(db, &asked.clip_id).ok()?;
+    transcripts
+        .into_iter()
+        .filter(|part| part.engine == PART_ENGINE && part.from_frame == asked.from_frame && part.from_frame < part.to_frame && part.to_frame < asked.to_frame)
+        .max_by_key(|part| part.to_frame)
+}
+
+/// Keeps what is heard of `asked` up to clip frame `until` (a newer part replaces the older:
+/// it holds its range). Nothing for an empty part; a failed keep is only logged.
+fn keep_part(db: &ProjectDbTarget, asked: &Queued, until: u64, lines: &[Line], language: &str) {
+    if until <= asked.from_frame || until >= asked.to_frame || language.is_empty() {
+        return;
+    }
+    let part = qnc_transcript_db::ClipTranscript {
+        clip_id: asked.clip_id.clone(),
+        from_frame: asked.from_frame,
+        to_frame: until,
+        language: language.to_string(),
+        engine: PART_ENGINE.to_string(),
+        lines: lines.iter().filter(|line| line.from >= asked.from_frame && line.to <= until).cloned().collect(),
+    };
+    if let Err(error) = qnc_transcript_db::save(db, part) {
+        log(&format!("transcribe-queue keep part {} ..{until}: {error}", asked.clip_id));
     }
 }
 

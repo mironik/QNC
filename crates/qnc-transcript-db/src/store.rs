@@ -45,7 +45,7 @@ impl Store {
             Operation::ReadQueue if !self.queue_ready => Ok(Data::Queue(Vec::new())),
             Operation::ReadQueue => self.read_queue(),
             Operation::Enqueue(ranges) => self.enqueue(ranges),
-            Operation::SetQueued { clip_id, state, error, took_ms } => self.set_queued(clip_id, *state, error, *took_ms),
+            Operation::SetQueued { clip_id, state, error, took_ms, asked } => self.set_queued(clip_id, *state, error, *took_ms, *asked),
             Operation::ReadQuotes if !self.quotes_ready => Ok(Data::Quotes(Vec::new())),
             Operation::ReadQuotes => self.read_quotes(),
             Operation::AddQuote(quote) => self.add_quote(quote),
@@ -91,13 +91,20 @@ impl Store {
         Ok(Data::Changed)
     }
 
-    fn set_queued(&mut self, clip_id: &str, state: QueueState, error: &str, took_ms: u64) -> Result<Data> {
+    fn set_queued(&mut self, clip_id: &str, state: QueueState, error: &str, took_ms: u64, asked: Option<(u64, u64, QueueQuality)>) -> Result<Data> {
         valid_clip(clip_id)?;
         let tx = qnc_db_broker::begin_write(&mut self.conn).map_err(err)?;
-        tx.execute(
-            "UPDATE transcript_queue SET state = ?2, error = ?3, took_ms = ?4 WHERE clip_id = ?1",
-            params![clip_id, state_name(state), error, took_ms as i64],
-        )
+        match asked {
+            Some((from, to, quality)) => tx.execute(
+                "UPDATE transcript_queue SET state = ?2, error = ?3, took_ms = ?4
+                 WHERE clip_id = ?1 AND from_frame = ?5 AND to_frame = ?6 AND quality = ?7",
+                params![clip_id, state_name(state), error, took_ms as i64, from as i64, to as i64, quality_name(quality)],
+            ),
+            None => tx.execute(
+                "UPDATE transcript_queue SET state = ?2, error = ?3, took_ms = ?4 WHERE clip_id = ?1",
+                params![clip_id, state_name(state), error, took_ms as i64],
+            ),
+        }
         .map_err(err)?;
         tx.commit().map_err(err)?;
         Ok(Data::Changed)

@@ -264,6 +264,10 @@ pub enum Operation {
     CutOut { id: i64, index: usize, before: Option<Piece>, after: Option<Piece> },
     /// Part `index` of block `id` becomes `kept` (what its edited text still says, in order).
     KeepOf { id: i64, index: usize, kept: Vec<Piece> },
+    /// Several changes of parts written as one (audit 2026-11-08 #15: a roll, a slot moved,
+    /// several slots' sound): one transaction and one step of undo; one refused writes none.
+    /// Only changes of parts (`SetPiece`, `SetJoin`, `SetJoinSound`, `SetJoinPicture`).
+    Together { changes: Vec<Operation> },
     /// The script as it was before its last change (user 2026-11-06: "Backspace undo does not
     /// work"): every change of its blocks is one step; the voice of a block stays as recorded.
     Undo,
@@ -462,6 +466,16 @@ pub fn undo(target: &ProjectDbTarget) -> Result<bool> {
 /// The change the last undo took back; `Ok(false)`: nothing to redo.
 pub fn redo(target: &ProjectDbTarget) -> Result<bool> {
     write(target, Operation::Redo).map(|data| data == Data::Changed)
+}
+
+/// Several changes of parts written as one: one transaction, one step of undo, none written
+/// when one is refused.
+pub fn together(target: &ProjectDbTarget, changes: Vec<Operation>) -> Result<()> {
+    match changes.len() {
+        0 => Ok(()),
+        1 => write(target, changes.into_iter().next().expect("one change")).map(drop),
+        _ => write(target, Operation::Together { changes }).map(drop),
+    }
 }
 
 /// Part `index` of block `id` keeps only `kept` of its range (what its edited text still says).

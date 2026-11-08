@@ -37,9 +37,13 @@ impl Store {
     }
 
     fn create(&mut self) -> Result<Data> {
+        // Past every story file of a version beside the project database too (audit 2026-11-08
+        // #18): a number whose file is there (the table made again) would add to that old story.
+        let on_disk = qnc_db_broker::highest_draft(&self.conn);
         let tx = qnc_db_broker::begin_write(&mut self.conn).map_err(err)?;
         // Numbered after the highest number a version ever had: a number is not given again.
-        let number: u32 = tx.query_row("SELECT COALESCE(MAX(number), 0) + 1 FROM skeleton_versions", [], |row| row.get(0)).map_err(err)?;
+        let in_table: u32 = tx.query_row("SELECT COALESCE(MAX(number), 0) FROM skeleton_versions", [], |row| row.get(0)).map_err(err)?;
+        let number = in_table.max(on_disk) + 1;
         tx.execute(
             "INSERT INTO skeleton_versions (number, created_at_utc) VALUES (?1, strftime('%Y-%m-%dT%H:%M:%fZ','now'))",
             params![number],

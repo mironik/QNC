@@ -8421,3 +8421,20 @@ Dopuna 2026-11-08 (korisnik: "s automatskim pokretanjem wav2vec2 za odabrani tek
 oznaci IN/OUT (odabrani tekst), taj dio odmah ide u ponovni prijepis hrvatskim modelom, kao gumb "Ponovo (HR)", u formi koja
 ima prijepis (`qnc-source-timeline` `take_marked_by_text`, `qnc-panel-focus`). Rez skarama i I/O ga ne pokrecu. Uzivo nije
 provjereno.
+Izvedeno 2026-11-08 (pregled cijele aplikacije `docs/100-audit-2026-11-08.md`; korisnik: "da, kreni s prvim korakom"):
+korak 1, gubitak rada i rusenje. (#3) Red prijepisa sprema prepisani dio u bazu projekta nakon svakog komada (prijepis
+`[od, do kuda je cuo)` s oznakom motora "(part, still being transcribed)", `qnc-transcribe-run` `Progress::Heard.until`,
+`qnc-transcribe-queue` `keep_part`); prekid ili pad vise ne baca rad: sljedeci rad istog zahtjeva nastavlja od kraja
+spremljenog dijela i na kraju sprema jedan prijepis cijelog raspona (dio unutar njega se brise postojecim pravilom).
+(#4) Stanje reda vrijedi samo za raspon i motor koji je radio (`qnc-transcript-db` `SetQueued.asked`, `set_queued` prima
+zapis reda): klip zatrazen ponovno dok stari radi ostaje cekati, kraj starog rada ga vise ne oznaci gotovim. (#14) Slozena
+izjava pusta uzeto (rub, slot, ton, J/L, slip, krivulja) kad drugi pisac skrati izjavu ispod uzetog dijela
+(`qnc-subsegment-edit` `forget_parts_gone`), indeksi dijelova citaju se bez pada. (#15) Roll, pomak slota, ton vise
+slotova i KEEP AI-ja su jedan upis i jedan korak undoa: nova operacija baze scenarija `Together` (samo promjene dijelova;
+jedna odbijena ne upise nijednu; `qnc-script-db` `together`). (#16) Upisi scenarija i prijepisa (red, izjave) dok jedan
+putuje idu redom, svaki sa svojim odgovorom (`qnc-script` `queued`/`write_next`, `qnc-transcript` `ask`/`ask_next`).
+(#17) Undo scenarija vraca i korak snimljen prije novih stupaca (upisuje samo stupce koje korak ima, ostali dobivaju
+zadanu vrijednost; `qnc-script-db` `undo.rs`). (#18) Nova verzija S-Storyja dobiva broj veci i od svake datoteke
+`story-draft-<n>.db` uz projekt (`qnc-db-broker` `highest_draft`). Testovi `qnc-script-db` (2 nova), `qnc-transcript-db`
+(novi), `qnc-skeleton-db` (novi), dotaknute kocke, `cargo check --workspace --all-targets`, conformance (osim otvorenog
+C5 `qnc-frame-interp`). Uzivo nije provjereno.

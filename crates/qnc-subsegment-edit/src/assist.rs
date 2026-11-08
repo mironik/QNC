@@ -81,12 +81,9 @@ impl SubsegmentEdit {
                     .collect();
                 self.assisted = None;
                 let id = block.id;
-                self.write(preview, move |target| {
-                    for (index, piece) in written {
-                        qnc_script_db::set_piece(target, id, index, piece)?;
-                    }
-                    Ok(None)
-                });
+                // The whole proposal is one write and one step of undo (audit 2026-11-08 #15).
+                let changes = written.into_iter().map(|(index, piece)| qnc_script_db::Operation::SetPiece { id, index, piece }).collect();
+                self.write(preview, move |target| qnc_script_db::together(target, changes).map(|_| None));
                 self.view.message = qnc_ui_text::fill("story.msg.sound_assist_kept", &[("count", &count.to_string())]).into();
                 Some(true)
             }

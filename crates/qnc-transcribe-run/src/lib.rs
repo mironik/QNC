@@ -52,8 +52,9 @@ pub struct Ask {
 pub enum Progress {
     /// Its sound is being read.
     Reading,
-    /// `seconds` of its `of` seconds of sound are transcribed.
-    Heard { seconds: f64, of: f64 },
+    /// `seconds` of its `of` seconds of sound are transcribed; every line up to clip frame
+    /// `until` is heard (what is there can be kept before the rest, audit 2026-11-08 #3).
+    Heard { seconds: f64, of: f64, until: u64 },
 }
 
 /// When a transcription runs.
@@ -257,7 +258,10 @@ fn hear_while_read(
             }
         }
         processed += block.len();
-        on_progress(Progress::Heard { seconds: (processed as f64 / rate as f64).min(total), of: total });
+        let seconds = (processed as f64 / rate as f64).min(total);
+        let frames = (seconds * f64::from(job.place.fps.0) / f64::from(job.place.fps.1.max(1))).round() as u64;
+        let until = lines.iter().map(|line: &Line| line.to).max().unwrap_or(0).max(ask.from + frames).min(ask.to);
+        on_progress(Progress::Heard { seconds, of: total, until });
         if last {
             break;
         }

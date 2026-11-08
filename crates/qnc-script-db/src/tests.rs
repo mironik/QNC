@@ -387,3 +387,49 @@ fn every_change_of_the_script_is_one_undo_step_and_redo_takes_it_again() {
     add_piece(&target, id, piece("2002", 600, 650, "treći")).unwrap();
     assert!(!redo(&target).unwrap(), "a new change forgets redo");
 }
+
+/// A roll, a slot moved, several slots' sound (audit 2026-11-08 #15): one write and one step
+/// of undo; one change refused writes none of them.
+#[test]
+fn changes_of_parts_together_are_one_write_and_one_undo_step() {
+    let (_dir, target) = written();
+    let id = add(&target, None, sot("2002")).unwrap();
+    add_piece(&target, id, piece("2002", 500, 550, "drugi")).unwrap();
+    let ranges = |target: &ProjectDbTarget| read(target).unwrap()[0].pieces.iter().map(|p| (p.from_frame, p.to_frame)).collect::<Vec<_>>();
+    let roll = vec![
+        Operation::SetPiece { id, index: 0, piece: piece("2002", 100, 360, "rekao je") },
+        Operation::SetPiece { id, index: 1, piece: piece("2002", 510, 550, "drugi") },
+    ];
+    together(&target, roll).unwrap();
+    assert_eq!(ranges(&target), [(100, 360), (510, 550)]);
+    assert!(undo(&target).unwrap());
+    assert_eq!(ranges(&target), [(100, 350), (500, 550)], "one undo takes both back");
+    let refused = vec![
+        Operation::SetPiece { id, index: 0, piece: piece("2002", 100, 360, "rekao je") },
+        Operation::SetPiece { id, index: 1, piece: piece("2679", 1, 9, "") },
+    ];
+    assert!(together(&target, refused).is_err());
+    assert_eq!(ranges(&target), [(100, 350), (500, 550)], "the first is not written either");
+    assert!(together(&target, vec![Operation::Remove { id }, Operation::Remove { id }]).is_err(), "only changes of parts");
+}
+
+/// A step of undo kept before the table had a column (audit 2026-11-08 #17): undo puts the
+/// blocks back with the column's default, it does not fail.
+#[test]
+fn an_undo_step_kept_before_a_column_was_added_puts_the_blocks_back() {
+    let (dir, target) = written();
+    let id = add(&target, None, off("staro")).unwrap();
+    set_text(&target, id, "novo".into()).unwrap();
+    // The step as an older table kept it: without the columns added since.
+    let conn = Connection::open(dir.path().join("project.db")).unwrap();
+    let rows: String = conn.query_row("SELECT rows_json FROM script_undo ORDER BY step DESC LIMIT 1", [], |r| r.get(0)).unwrap();
+    let mut old: Vec<serde_json::Map<String, serde_json::Value>> = serde_json::from_str(&rows).unwrap();
+    for row in &mut old {
+        row.remove("pieces_json");
+        row.remove("fields_json");
+    }
+    conn.execute("UPDATE script_undo SET rows_json = ?1 WHERE step = (SELECT MAX(step) FROM script_undo)", [serde_json::to_string(&old).unwrap()]).unwrap();
+    drop(conn);
+    assert!(undo(&target).unwrap());
+    assert_eq!(texts(&target), ["staro"]);
+}

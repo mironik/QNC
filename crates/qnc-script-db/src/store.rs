@@ -95,6 +95,16 @@ impl Store {
             Operation::RemovePiece { id, index } => self.remove_piece(*id, *index),
             Operation::CutOut { id, index, before, after } => self.cut_out(*id, *index, before.as_ref(), after.as_ref()),
             Operation::KeepOf { id, index, kept } => self.keep_of(*id, *index, kept),
+            // Inside the one transaction `execute` opened: a refused change rolls all back.
+            Operation::Together { changes } => {
+                if !self.ready || changes.iter().any(|change| !part_change(change)) {
+                    return Err(qnc_ui_text::text("db.script_reply").into());
+                }
+                for change in changes {
+                    self.change(change)?;
+                }
+                Ok(Data::Changed)
+            }
             Operation::Undo | Operation::Redo => Ok(Data::Blocks(Vec::new())),
             Operation::ReadVoices => self.voices().map(Data::Voices),
             Operation::AddVoiceTake { id, name, clip_uri, take } => self.add_voice_take(*id, name, clip_uri, take),
@@ -610,5 +620,11 @@ fn undoable(operation: &Operation) -> bool {
             | Operation::RemovePiece { .. }
             | Operation::CutOut { .. }
             | Operation::KeepOf { .. }
+            | Operation::Together { .. }
     )
+}
+
+/// A change `Together` takes: a change of a block's parts.
+fn part_change(operation: &Operation) -> bool {
+    matches!(operation, Operation::SetPiece { .. } | Operation::SetJoin { .. } | Operation::SetJoinSound { .. } | Operation::SetJoinPicture { .. })
 }

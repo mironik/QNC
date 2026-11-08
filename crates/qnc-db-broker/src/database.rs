@@ -30,6 +30,18 @@ pub const DRAFT_PREFIX: &str = "story-draft-";
 pub fn draft_file(version: u32) -> String {
     format!("{DRAFT_PREFIX}{version}.db")
 }
+
+/// The highest version whose story file lies beside the database `conn` is a connection of
+/// (0: none). A new version is numbered past it too, so it never lands in an old story's file.
+pub fn highest_draft(conn: &Connection) -> u32 {
+    let Some(folder) = conn.path().and_then(|path| Path::new(path).parent().map(Path::to_path_buf)) else { return 0 };
+    let Ok(entries) = std::fs::read_dir(folder) else { return 0 };
+    entries
+        .filter_map(|entry| entry.ok()?.file_name().into_string().ok())
+        .filter_map(|name| name.strip_prefix(DRAFT_PREFIX)?.strip_suffix(".db")?.parse::<u32>().ok())
+        .max()
+        .unwrap_or(0)
+}
 /// The name the project database is attached under on a draft connection.
 pub const PROJECT_SCHEMA: &str = "project";
 

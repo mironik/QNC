@@ -168,6 +168,9 @@ fn pending(queue: &[Queued]) -> bool {
     queue.iter().any(|q| matches!(q.state, QueueState::Waiting | QueueState::Running))
 }
 
+/// A write of the queue or the statements waiting for the one on its way.
+type Ask = Box<dyn FnOnce(&ProjectDbTarget) -> Result<(), String> + Send>;
+
 /// The clip being transcribed now and its lines heard so far.
 struct Running {
     clip_id: String,
@@ -190,6 +193,9 @@ pub struct Transcript {
     queue_at: Option<Instant>,
     /// An enqueue on its way to the database.
     asking: Option<mpsc::Receiver<Result<(), String>>>,
+    /// Writes made while one is on its way: they go in order, each its own answer (audit
+    /// 2026-11-08 #16: a second write overwrote the first's answer).
+    asks: std::collections::VecDeque<(ProjectDbTarget, Ask)>,
     /// Name, frames and seconds of each clip of the pool.
     names: HashMap<String, (String, u64, f64)>,
     /// Grows when what the lines are made of changes; the lines are made again only then
@@ -211,6 +217,7 @@ impl Default for Transcript {
             source_request: None,
             queue_at: None,
             asking: None,
+            asks: std::collections::VecDeque::new(),
             names: HashMap::new(),
             rev: 0,
             built: None,
@@ -317,11 +324,25 @@ impl Transcript {
     /// A write of the statements off the form thread; the list is read again when it is done.
     fn write(&mut self, preview: &SourcePreview, write: impl FnOnce(&ProjectDbTarget) -> Result<(), String> + Send + 'static) -> bool {
         let Some(target) = preview.project_target().cloned() else { return false };
+        self.ask(target, Box::new(write));
+        true
+    }
+
+    /// A write of this process to the database, in order after the one on its way.
+    fn ask(&mut self, target: ProjectDbTarget, work: Ask) {
+        self.asks.push_back((target, work));
+        if self.asking.is_none() {
+            self.ask_next();
+        }
+    }
+
+    /// The next queued write goes, off the form thread.
+    fn ask_next(&mut self) {
+        let Some((target, work)) = self.asks.pop_front() else { return };
         let (send, done) = mpsc::channel();
-        if std::thread::Builder::new().name("qnc-transcript-quote".into()).spawn(move || _ = send.send(write(&target))).is_ok() {
+        if std::thread::Builder::new().name("qnc-transcript-write".into()).spawn(move || _ = send.send(work(&target))).is_ok() {
             self.asking = Some(done);
         }
-        true
     }
 
     /// Queues the ticked clips whole, or without ticks the shown clip's IN/OUT.
@@ -348,13 +369,10 @@ impl Transcript {
             self.view.message = qnc_ui_text::text("transcribe.choose_clip").into();
             return true;
         }
-        let (send, done) = mpsc::channel();
         let count = ranges.len();
-        if std::thread::Builder::new().name("qnc-transcript-ask".into()).spawn(move || _ = send.send(qnc_transcript_db::enqueue(&target, ranges))).is_ok() {
-            self.asking = Some(done);
-            self.ticks.clear();
-            self.view.message = qnc_ui_text::fill("transcribe.queued", &[("count", &count.to_string())]);
-        }
+        self.ask(target, Box::new(move |target| qnc_transcript_db::enqueue(target, ranges)));
+        self.ticks.clear();
+        self.view.message = qnc_ui_text::fill("transcribe.queued", &[("count", &count.to_string())]);
         true
     }
 
@@ -379,11 +397,8 @@ impl Transcript {
             return true;
         };
         let queued = Queued { clip_id, from_frame, to_frame, quality: QueueQuality::Best, state: QueueState::Waiting, error: String::new(), took_ms: 0 };
-        let (send, done) = mpsc::channel();
-        if std::thread::Builder::new().name("qnc-transcript-repass".into()).spawn(move || _ = send.send(qnc_transcript_db::enqueue(&target, vec![queued]))).is_ok() {
-            self.asking = Some(done);
-            self.view.message = qnc_ui_text::text("transcribe.repass_queued").into();
-        }
+        self.ask(target, Box::new(move |target| qnc_transcript_db::enqueue(target, vec![queued])));
+        self.view.message = qnc_ui_text::text("transcribe.repass_queued").into();
         true
     }
 
@@ -408,6 +423,7 @@ impl Transcript {
                     self.view.message = error;
                 }
                 self.asking = None;
+                self.ask_next();
                 self.queue_at = None; // read the queue now
             }
         }
@@ -465,7 +481,7 @@ impl Transcript {
             error: q.error.clone(),
             length_seconds: fps.map_or(0.0, |fps| q.to_frame.saturating_sub(q.from_frame) as f64 / fps),
             progress: running.and_then(|run| match run.progress {
-                Progress::Heard { seconds, of } if of > 0.0 => Some((seconds / of).clamp(0.0, 1.0)),
+                Progress::Heard { seconds, of, .. } if of > 0.0 => Some((seconds / of).clamp(0.0, 1.0)),
                 _ => None,
             }),
             // Whole seconds: the view changes once a second, not at every frame.
