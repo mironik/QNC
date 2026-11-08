@@ -40,7 +40,7 @@ pub fn show(
     // While a field is typed in its keys move between fields; while a dialog, picker or
     // browser is open no Project key works.
     let typing = ctx.wants_keyboard_input();
-    let open = !typing && !session.keys_held() && actions.contains(&"project_open_selected");
+    let open = !typing && !session.keys_held() && session.sheet.is_none() && actions.contains(&"project_open_selected");
     let intents = open.then_some(ProjectIntent::OpenSelectedProject).into_iter().collect();
     let mut blocks = Blocks { contracts, session, intents };
     blocks.board(ui, frame);

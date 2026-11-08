@@ -8501,3 +8501,7 @@ Storyju), strelice su iste radnje kataloga kao na svakom redu (`step_back_frame`
 `ColumnKeys`, `is_chosen`, `field_column`), obrazac priloga (`qnc-newsroom-sheet`) vodi samo na kojem je redu. Klik u
 polje i dalje stavlja tipkovnicu na taj red. Testovi, conformance (osim otvorenog C5 `qnc-frame-interp`). Uzivo nije
 provjereno.
+Popravak 2026-11-08 (korisnik: "gubi se prikaz fokusa i kursora"): Project ploca nije znala da je obrazac otvoren, pa je
+Enter na redu s izborom (kad se ne pise u polje) otvarao i projekt odabran u popisu ispod obrasca; sada dok je obrazac
+otvoren Enter ne otvara projekt (`qnc-project-blocks`, isti redak). Okvir reda s izborom je boje fokusa teme, ne
+prigusene boje oznake (`qnc-settings-form` `ColumnKeys.focus`). Uzivo nije provjereno.

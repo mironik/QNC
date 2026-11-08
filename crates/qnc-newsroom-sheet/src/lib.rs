@@ -286,7 +286,7 @@ fn fill(ui: &mut egui::Ui, overlay: &mut SheetOverlay, theme: &Theme, at: Option
     ui.add_space(ROW_GAP / 2.0);
     // Rows 2.., the sheet's fields.
     if let Some(sheet) = overlay.sheets.current().cloned() {
-        let keys = qnc_settings_form::ColumnKeys { at: at.and_then(|(row, _)| row.checked_sub(2)), arrived: at.is_some_and(|(_, arrived)| arrived), arrow };
+        let keys = qnc_settings_form::ColumnKeys { at: at.and_then(|(row, _)| row.checked_sub(2)), arrived: at.is_some_and(|(_, arrived)| arrived), arrow, focus: theme.focus };
         let answer = qnc_settings_form::field_column(ui, width, &mut overlay.values, &sheet.fields, &sheet.options, &style(theme), keys);
         typed = typed.or(answer.typed.map(|row| row + 2));
     }

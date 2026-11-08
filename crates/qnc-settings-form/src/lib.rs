@@ -95,6 +95,8 @@ pub struct ColumnKeys {
     pub at: Option<usize>,
     pub arrived: bool,
     pub arrow: Option<bool>,
+    /// The colour of the frame of the row of choices the keyboard is on (the theme's focus).
+    pub focus: egui::Color32,
 }
 
 /// What the column of fields did this frame.
@@ -134,7 +136,7 @@ pub fn field_column(ui: &mut egui::Ui, column_w: f32, settings: &mut Value, fiel
         answer.changed |= field_cell(ui, width, settings, field, options, style);
         if here && chosen {
             let rect = egui::Rect::from_min_max(top, egui::pos2(top.x + column_w, ui.cursor().min.y));
-            qnc_ui_kit::paint_focus(ui, rect.expand(2.0), true, style.label_color);
+            qnc_ui_kit::paint_focus(ui, rect.expand(2.0), true, keys.focus);
         }
         if !chosen {
             let id = text_id(field);
