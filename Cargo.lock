@@ -7392,9 +7392,11 @@ dependencies = [
  "qnc-letter-db",
  "qnc-letter-times",
  "qnc-program-view",
+ "qnc-script-db",
  "qnc-still-locator",
  "qnc-transcribe-run",
  "qnc-transcript-db",
+ "qnc-voice-take",
  "qnc-word-align",
 ]
 

@@ -9,6 +9,8 @@ qnc-clip-transcripts = { workspace = true }
 qnc-db-broker = { workspace = true }
 qnc-dev-diagnostics = { workspace = true }
 qnc-program-view = { workspace = true }
+qnc-script-db = { workspace = true }
+qnc-voice-take = { workspace = true }
 qnc-still-locator = { workspace = true }
 qnc-transcribe-run = { workspace = true }
 qnc-transcript-db = { workspace = true }

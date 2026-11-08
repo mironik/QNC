@@ -27,6 +27,8 @@ type Read = Result<Vec<qnc_letter_db::WordLetters>, String>;
 #[derive(Debug, Clone, PartialEq, Eq)]
 struct Need {
     clip_id: String,
+    /// The channel of its clip A1 plays (a voice record has one take per channel).
+    channel: u16,
     first: u64,
     last: u64,
     /// The piece on the zoom's axis and in its clip: `(program_start, program_end, source_in, source_out)`.
@@ -57,7 +59,15 @@ pub struct ZoomWords {
     /// Clips whose transcription failed: not asked again in this run (each arrow step moves
     /// the window, so a failed clip would be asked at every step).
     failed: HashSet<String>,
+    /// The voice records of the project (user 2026-11-08: no text in the zoom over an OFF): their
+    /// words are the ones heard in each take, not a transcript of the clip's speech channel.
+    voices: Vec<qnc_script_db::Voice>,
+    voices_at: Option<std::time::Instant>,
+    reading_voices: Option<mpsc::Receiver<Vec<qnc_script_db::Voice>>>,
 }
+
+/// How often the voice records are read again.
+const VOICES_EVERY: std::time::Duration = std::time::Duration::from_secs(3);
 
 impl ZoomWords {
     pub fn new() -> Self {
@@ -78,7 +88,10 @@ impl ZoomWords {
             *self = Self { project_id: Some(locator.project_id().to_string()), ..Self::default() };
         }
         self.take_finished();
-        let needs = needs(sound);
+        self.follow_voices(locator);
+        // A voice clip's words are its takes' (`voice_words`); nothing to transcribe or lay.
+        let fps = locator.settings().video_picture().map_or(0.0, |(_, _, fps)| fps);
+        let (voice, needs): (Vec<Need>, Vec<Need>) = needs(sound).into_iter().partition(|need| need.clip_id.starts_with("voice-"));
         let target = locator.clone();
         self.transcripts.poll_from(locator.project_id(), move || qnc_db_broker::ProjectDbTarget::for_project(target.reader(), target.settings()).map_err(|error| error), needs.iter().map(|need| need.clip_id.clone()));
         let settled = self.kept_at.is_none_or(|at| self.transcripts.read_since(at));
@@ -92,7 +105,7 @@ impl ZoomWords {
                 }
             }
         }
-        sound.words = needs.iter().flat_map(|need| self.words_of(sound, need)).collect();
+        sound.words = needs.iter().flat_map(|need| self.words_of(sound, need)).chain(voice.iter().flat_map(|need| self.voice_words(sound, need, fps))).collect();
         sound.words.sort_by_key(|word| word.from);
         sound.words.dedup_by(|a, b| a.from == b.from && a.text == b.text);
         sound.unheard.clear();
@@ -113,6 +126,50 @@ impl ZoomWords {
                 self.letters.remove(&need.clip_id);
             }
         }
+    }
+
+    /// The voice records, read off the form thread and again in rhythm (the database is the truth).
+    fn follow_voices(&mut self, locator: &StillLocator) {
+        if let Some(read) = &self.reading_voices {
+            match read.try_recv() {
+                Ok(voices) => {
+                    self.voices = voices;
+                    self.reading_voices = None;
+                }
+                Err(mpsc::TryRecvError::Disconnected) => self.reading_voices = None,
+                Err(mpsc::TryRecvError::Empty) => {}
+            }
+        }
+        if self.reading_voices.is_some() || self.voices_at.is_some_and(|at| at.elapsed() < VOICES_EVERY) {
+            return;
+        }
+        self.voices_at = Some(std::time::Instant::now());
+        let (send, done) = mpsc::channel();
+        let locator = locator.clone();
+        let spawned = std::thread::Builder::new().name("qnc-zoom-voices".into()).spawn(move || {
+            let read = qnc_db_broker::ProjectDbTarget::for_project(locator.reader(), locator.settings()).and_then(|target| qnc_script_db::read_voices(&target));
+            match read {
+                Ok(voices) => _ = send.send(voices),
+                Err(error) => log(&format!("zoom-words voices: {error}")),
+            }
+        });
+        if spawned.is_ok() {
+            self.reading_voices = Some(done);
+        }
+    }
+
+    /// The words heard in the take `need` plays, on the zoom's axis.
+    fn voice_words(&self, sound: &ZoomSound, need: &Need, fps: f64) -> Vec<ZoomWord> {
+        let heard = self.voices.iter().find(|voice| qnc_voice_take::clip_id(&voice.name) == need.clip_id).and_then(|voice| voice.takes.iter().find(|take| take.take == need.channel + 1)).and_then(|take| take.heard.as_ref());
+        let (program_start, program_end, source_in, source_out) = need.piece;
+        let axis = |frame: u64| to_axis(program_start, program_end, source_in, source_out, frame).clamp(sound.from, sound.to);
+        heard
+            .into_iter()
+            .flatten()
+            .map(|word| ((word.start * fps).round().max(0.0) as u64, ((word.end * fps).round().max(0.0) as u64), word.text.clone()))
+            .filter(|(from, to, _)| *from < need.last && need.first < (*to).max(from + 1))
+            .map(|(from, to, text)| ZoomWord { from: axis(from), to: axis(to.max(from + 1)), text, letters: Vec::new() })
+            .collect()
     }
 
     /// The words of `need`'s part without letters, in its clip's frames.
@@ -246,6 +303,7 @@ fn needs(sound: &ZoomSound) -> Vec<Need> {
             let source = |frame: u64| to_source(at.program_start, at.program_end, at.source_in, at.source_out, frame);
             Need {
                 clip_id: at.clip_id.clone(),
+                channel: at.channel,
                 first: source(sound.from.max(at.program_start)),
                 last: source(sound.to.min(at.program_end)),
                 piece: (at.program_start, at.program_end, at.source_in, at.source_out),
@@ -286,7 +344,7 @@ mod tests {
         assert_eq!(to_source(1000, 1200, 300, 400, 1100), 350);
         assert_eq!(to_axis(1000, 1200, 300, 400, 350), 1100);
         let kept = vec![ClipTranscript { clip_id: "c".into(), from_frame: 200, to_frame: 500, language: "hr".into(), engine: "e".into(), lines: Vec::new() }];
-        let need = |first, last| Need { clip_id: "c".into(), first, last, piece: (0, 0, 0, 0) };
+        let need = |first, last| Need { clip_id: "c".into(), channel: 0, first, last, piece: (0, 0, 0, 0) };
         assert!(covered(&kept, &need(300, 400)));
         assert!(!covered(&kept, &need(450, 550)));
     }
