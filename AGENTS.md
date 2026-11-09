@@ -8629,3 +8629,8 @@ bez spremljenih izjava, bez crvenih redaka "Ton bez teksta" i bez IN/OUT oznaka 
 je traka: Potrazi s poljem (pojam i nalazi drzi `qnc-transcript`, isti put kao u MA Scriptu), "n od m" ili "nema",
 Sljedeci kad je nalaza vise od jednog (isto sto Enter u polju) i Kopiraj (cijeli prijepis prikazanog klipa u
 medjuspremnik, redak po redak). Red prijepisa i klik/dvoklik na rijec ostaju. MA Script nije mijenjan. Uzivo nije provjereno.
+Pravilo 2026-11-09 (korisnik: "trebamo povijest rada kako bi se mogli fino vratiti ako zatreba, i ujedno kao dokumentacija
+razvoja"): svaki zavrseni korak (testovi i conformance prolaze, zapis u AGENTS.md) je svoj commit s opisom sto i zasto;
+push na `libav-decoder` na kraju svakog bloka rada, bez mergea; oznaka `v-GGGG-MM-DD` na kraju dana; za svaki dan
+`docs/razvoj/GGGG-MM-DD.md` (koraci s commitom, sto je provjereno uzivo, sto je otvoreno, gdje se vratiti). Prvi je
+`docs/razvoj/2026-11-09.md`. Force push samo uz izricitu dozvolu.
