@@ -223,12 +223,13 @@ impl TimelineProjection {
     /// IN/OUT the source timeline paints. A confirmed player source shows the
     /// whole clip at once, the same way v5 does, until a mark replaces that end.
     pub fn visible_source_marks(&self) -> Option<(u64, u64)> {
-        let duration = self.duration_frames;
-        if self.playhead_frame.is_some() && duration > 0 {
-            let start = self.source_in_frame.unwrap_or(0).min(duration);
-            let mut end = self.source_out_frame.unwrap_or(duration).min(duration);
+        // A window of the clip (a statement enlarged) ends where the window ends.
+        let last = self.range_start_frame.saturating_add(self.duration_frames);
+        if self.playhead_frame.is_some() && self.duration_frames > 0 {
+            let start = self.source_in_frame.unwrap_or(self.range_start_frame).min(last);
+            let mut end = self.source_out_frame.unwrap_or(last).min(last);
             if end <= start {
-                end = start.saturating_add(1).min(duration);
+                end = start.saturating_add(1).min(last);
             }
             return (end > start).then_some((start, end));
         }

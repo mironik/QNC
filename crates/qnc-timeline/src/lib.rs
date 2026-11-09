@@ -2530,6 +2530,10 @@ mod tests {
     #[test]
     fn empty_projection_draws_no_in_out_marks() {
         assert_eq!(TimelineProjection::default().visible_source_marks(), None);
+        // A window of the clip keeps the clip's frames (a statement enlarged, IN past its length).
+        let mut window = TimelineProjection::new(1800, 280).with_playhead(1900);
+        (window.source_in_frame, window.source_out_frame) = (Some(1882), Some(2078));
+        assert_eq!(window.visible_source_marks(), Some((1882, 2078)));
     }
 
     #[test]
