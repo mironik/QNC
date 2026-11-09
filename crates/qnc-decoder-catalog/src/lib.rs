@@ -354,6 +354,11 @@ pub enum Executable {
     Path {
         path: PathBuf,
     },
+    /// A program that ships beside the application (its program name, no path): the one
+    /// build QNC delivers, never whatever another install put on the PATH (2026-11-10).
+    Beside {
+        name: String,
+    },
 }
 fn bad(message: impl Into<String>) -> DecodeError {
     DecodeError::new(ErrorKind::Contract, message)
@@ -550,6 +555,13 @@ impl Registration {
                     .map(|p| p.join(&file))
                     .find(|p| p.is_file())
                     .ok_or_else(|| bad(format!("selected decoder {} is not installed", self.id)))?
+            }
+            Executable::Beside { name } => {
+                if !id_valid(name) {
+                    return Err(bad("invalid decoder program name"));
+                }
+                qnc_plugin_process::beside_application(name)
+                    .map_err(|why| bad(format!("selected decoder {} is not installed: {why}", self.id)))?
             }
         };
         if !path.is_file() {

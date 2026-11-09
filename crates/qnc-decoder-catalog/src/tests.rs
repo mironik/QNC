@@ -12,7 +12,9 @@ fn local_catalog() -> (tempfile::TempDir, Catalog) {
     )
     .unwrap();
     let mut c = catalog();
-    c.adapters.truncate(1);
+    // The ffmpeg executable registration: its launch is a command these tests can read.
+    c.adapters.retain(|a| a.id == "qnc.ffmpeg");
+    c.selected = "qnc.ffmpeg".into();
     c.prefer.clear();
     c.adapters[0].executable = Executable::Path {
         path: "decoder".into(),
@@ -27,6 +29,7 @@ fn local_catalog() -> (tempfile::TempDir, Catalog) {
 fn a_decoder_of_another_build_than_the_catalog_wants_does_not_run() {
     let mut registration = catalog().adapters[0].clone();
     registration.build = None;
+    registration.executable = Executable::Command { name: "ffmpeg".into() };
     // Only on a host with ffmpeg on its path (the build machine has it).
     let Ok(path) = registration.executable_path(Path::new(".")) else {
         return;

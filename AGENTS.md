@@ -8652,3 +8652,19 @@ full (GPL), biblioteke libava BtbN n8.1.3 LGPL (`FFMPEG_DIR`); izbor jednog buil
 korisnika. Nije izvedeno: zakljucavanje ffprobea u postavci racunala (`qnc-source-bindings`) i verzije biblioteka libava.
 Test `a_decoder_of_another_build_than_the_catalog_wants_does_not_run`, testovi `qnc-decoder-catalog` (10) i kocki koje
 ga koriste, `cargo check --workspace --all-targets`, conformance, `qnc-versions`.
+Odluka i izvedba 2026-11-10 (vanjski audit, korak 3; korisnik: "da, LGPL za sve i kreni s korakom 3, ako to nece
+usporiti"): QNC koristi jedan FFmpeg, LGPL build (BtbN n8.1.3-17-gc389840894-20261011, isti kao biblioteke libava), koji
+ide uz aplikaciju; Gyan GPL build na PATH-u vise se ne koristi. Katalog dekodera: nova vrsta programa `beside` (program uz
+aplikaciju, `qnc-plugin-process::beside_application`; nikad onaj s PATH-a), svi unosi traze build
+`n8.1.3-17-gc389840894-20261011`; izabran je `qnc.libav` (`libav_v1`: slika u procesu, zvuk i ostali poslovi kroz
+`ffmpeg` uz aplikaciju i program poslova `qnc-decoder-ffmpeg`), `qnc.ffmpeg.d3d11va` ostaje preferiran za H.264 8-bit
+4:2:0, `qnc.ffmpeg` (naredba) ostaje u katalogu. Program izgraden bez znacajke `libav` dekodira isti unos naredbom.
+`ffmpeg.exe` i `ffprobe.exe` kopirani su uz aplikaciju (`target/release`, `target/debug`; DLL-ovi su isti build);
+probe racunala (`data/ingest-transport.json`) pokazuje na `target/release/ffprobe.exe`. LGPL build nema libx264: prerender
+i export rade samo s hardverskim koderom (QSV, NVENC, AMF, VideoToolbox), racunalo bez njega dobiva gresku kodera;
+testovi `qnc-libav-decode` koji probne datoteke prave libx264-om trebaju Gyan na PATH-u. Provjereno (kartice samo citane):
+`qnc-decoder-acceptance` s LGPL `ffmpeg` i programom poslova na FX6 MXF (Mironik 3609) i FX3A MP4 (C0013): ACCEPTED (slike
+bajt po bajt, kljucne slike, otkazivanje); libav prema LGPL naredbi na Mironik 3608: iste slike s cetiri mjesta i nakon
+skokova, prva slika 162-236 ms prema 259-317 ms naredbom; brzina dekodiranja Gyan prema LGPL (8 s originala, 5 puta):
+medijan 2,66 s prema 2,71 s (sum). Testovi `qnc-decoder-catalog` (10), conformance, `qnc-versions`. Uzivo kroz aplikaciju
+nije provjereno. Za beta paket: `ffmpeg.exe`, `ffprobe.exe` i DLL-ovi idu uz aplikaciju, uz licencu LGPL.

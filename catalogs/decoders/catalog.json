@@ -1,32 +1,45 @@
 {
   "version": "1",
-  "selected": "qnc.ffmpeg",
+  "selected": "qnc.libav",
   "prefer": ["qnc.ffmpeg.d3d11va"],
   "adapters": [
     {
-      "id": "qnc.ffmpeg",
+      "id": "qnc.libav",
       "version": "0.1.0",
-      "driver": { "protocol": "ffmpeg_cli_v1" },
-      "executable": { "kind": "command", "name": "ffmpeg" },
+      "driver": { "protocol": "libav_v1" },
+      "executable": { "kind": "beside", "name": "ffmpeg" },
       "supported_os": ["windows", "linux", "macos"],
       "supported_cpu": ["x86_64", "aarch64"],
       "containers": ["mxf", "mov,mp4,m4a,3gp,3g2,mj2", "mov", "mp4", "matroska,webm", "matroska", "wav"],
       "codecs": ["h264", "hevc", "mpeg2video", "prores", "dnxhd", "dvvideo", "mjpeg", "ffv1", "aac", "pcm_s16le", "pcm_s24le", "pcm_s32le", "pcm_f32le", "pcm_s16be", "pcm_s24be"],
       "pixel_formats": ["yuv420p", "nv12", "yuv422p", "yuv444p", "rgb24", "bgr24", "yuv420p10le", "p010le", "yuv422p10le", "yuv444p10le", "rgba", "bgra", "gray"],
       "jobs": { "program": "qnc-decoder-ffmpeg" },
-      "build": "8.1.1-full_build-www.gyan.dev"
+      "build": "n8.1.3-17-gc389840894-20261011"
+    },
+    {
+      "id": "qnc.ffmpeg",
+      "version": "0.1.0",
+      "driver": { "protocol": "ffmpeg_cli_v1" },
+      "executable": { "kind": "beside", "name": "ffmpeg" },
+      "supported_os": ["windows", "linux", "macos"],
+      "supported_cpu": ["x86_64", "aarch64"],
+      "containers": ["mxf", "mov,mp4,m4a,3gp,3g2,mj2", "mov", "mp4", "matroska,webm", "matroska", "wav"],
+      "codecs": ["h264", "hevc", "mpeg2video", "prores", "dnxhd", "dvvideo", "mjpeg", "ffv1", "aac", "pcm_s16le", "pcm_s24le", "pcm_s32le", "pcm_f32le", "pcm_s16be", "pcm_s24be"],
+      "pixel_formats": ["yuv420p", "nv12", "yuv422p", "yuv444p", "rgb24", "bgr24", "yuv420p10le", "p010le", "yuv422p10le", "yuv444p10le", "rgba", "bgra", "gray"],
+      "jobs": { "program": "qnc-decoder-ffmpeg" },
+      "build": "n8.1.3-17-gc389840894-20261011"
     },
     {
       "id": "qnc.ffmpeg.d3d11va",
       "version": "0.1.0",
       "driver": { "protocol": "ffmpeg_hwaccel_v1", "hwaccel": "d3d11va" },
-      "executable": { "kind": "command", "name": "ffmpeg" },
+      "executable": { "kind": "beside", "name": "ffmpeg" },
       "supported_os": ["windows"],
       "supported_cpu": ["x86_64", "aarch64"],
       "containers": ["mxf", "mov,mp4,m4a,3gp,3g2,mj2", "mov", "mp4", "matroska,webm", "matroska"],
       "codecs": ["h264"],
       "pixel_formats": ["yuv420p", "nv12"],
-      "build": "8.1.1-full_build-www.gyan.dev"
+      "build": "n8.1.3-17-gc389840894-20261011"
     }
   ]
 }
