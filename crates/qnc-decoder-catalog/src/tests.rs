@@ -19,7 +19,25 @@ fn local_catalog() -> (tempfile::TempDir, Catalog) {
     };
     c.adapters[0].supported_os = vec![std::env::consts::OS.into()];
     c.adapters[0].supported_cpu = vec![std::env::consts::ARCH.into()];
+    // The marker file is never launched, so it is not asked its build.
+    c.adapters[0].build = None;
     (dir, c)
+}
+#[test]
+fn a_decoder_of_another_build_than_the_catalog_wants_does_not_run() {
+    let mut registration = catalog().adapters[0].clone();
+    registration.build = None;
+    // Only on a host with ffmpeg on its path (the build machine has it).
+    let Ok(path) = registration.executable_path(Path::new(".")) else {
+        return;
+    };
+    let build = build_of(&path).unwrap();
+    assert!(!build.is_empty() && !build.contains(' '), "build {build}");
+    registration.build = Some(build);
+    assert_eq!(registration.executable_path(Path::new(".")).unwrap(), path);
+    registration.build = Some("0.0-another-build".into());
+    let error = registration.executable_path(Path::new(".")).unwrap_err();
+    assert!(error.to_string().contains("0.0-another-build"), "{error}");
 }
 #[test]
 fn selection_is_explicit_and_unknown_or_duplicate_ids_fail() {

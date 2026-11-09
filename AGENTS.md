@@ -8642,3 +8642,13 @@ korisnik: "da, otkljucaj i kreni s korakom 1"): `qnc-media-readahead` je dekoder
 datoteka se odvaja od zapele veze, pa je tok otvoren poslije otvara iznova. Ostali blokovi i druge datoteke citaju se i
 dalje. Test `a_block_the_media_never_gives_is_a_read_error_after_the_wait_limit`, conformance. Uzivo nije provjereno.
 Ostali koraci audita (zakljucati verziju FFmpeg-a, ukljuciti libav kroz katalog, osnovni CI) cekaju.
+Izvedeno 2026-11-10 (vanjski audit, korak 2 "FFmpeg nije zakljucan na verziju"; korisnik: "da, kreni s korakom 2"):
+registracija u katalogu dekodera ima neobavezno polje `build` (ono sto program pise iza "version " u prvom retku
+`-version`); `qnc-decoder-catalog` `executable_path` program drugog builda odbija jasnom greskom (Unsupported, "decoder
+... is build X, the catalog wants Y"), nikad tihi drugi dekoder; `build_of` pita program jednom po procesu. Katalog
+racunala (`catalogs/decoders/catalog.json`, oba unosa) trazi `8.1.1-full_build-www.gyan.dev`, build koji aplikacija danas
+koristi. Nalaz: aplikacija koristi dva FFmpeg builda: naredba `ffmpeg` i probe (`data/ingest-transport.json`) Gyan 8.1.1
+full (GPL), biblioteke libava BtbN n8.1.3 LGPL (`FFMPEG_DIR`); izbor jednog builda (licenca beta paketa) ceka odluku
+korisnika. Nije izvedeno: zakljucavanje ffprobea u postavci racunala (`qnc-source-bindings`) i verzije biblioteka libava.
+Test `a_decoder_of_another_build_than_the_catalog_wants_does_not_run`, testovi `qnc-decoder-catalog` (10) i kocki koje
+ga koriste, `cargo check --workspace --all-targets`, conformance, `qnc-versions`.

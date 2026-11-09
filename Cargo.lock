@@ -3874,6 +3874,7 @@ dependencies = [
  "qnc-media-decode",
  "qnc-media-metadata",
  "qnc-media-stream",
+ "qnc-plugin-process",
  "serde",
  "serde_json",
  "tempfile",

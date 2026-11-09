@@ -42,6 +42,12 @@ pub struct Registration {
     /// the jobs are done by the registration's own driver as before.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub jobs: Option<JobsPlugin>,
+    /// The build the executable must be: what it says after "<program> version " on the
+    /// first line of `-version` (ffmpeg: "8.1.1-full_build-www.gyan.dev"). Another build on
+    /// this host gives other pictures without anyone seeing it, so a different one is a
+    /// clear error, never a silent decoder (audit 2026-11-09). Without it any build runs.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub build: Option<String>,
 }
 
 /// The jobs program of a registration.
@@ -552,9 +558,46 @@ impl Registration {
                 self.id
             )));
         }
-        path.canonicalize()
-            .map_err(|_| bad("cannot resolve decoder executable"))
+        let path = path
+            .canonicalize()
+            .map_err(|_| bad("cannot resolve decoder executable"))?;
+        if let Some(want) = &self.build {
+            let found = build_of(&path)?;
+            if &found != want {
+                return Err(DecodeError::new(
+                    ErrorKind::Unsupported,
+                    format!("decoder {} is build {found}, the catalog wants {want}", self.id),
+                ));
+            }
+        }
+        Ok(path)
     }
+}
+
+/// The build an executable says it is (the word after "version " on the first line of
+/// `-version`), asked once per executable in a process.
+pub fn build_of(executable: &Path) -> Result<String> {
+    use std::{collections::HashMap, sync::Mutex};
+    static SEEN: Mutex<Option<HashMap<PathBuf, std::result::Result<String, String>>>> = Mutex::new(None);
+    let mut seen = SEEN.lock().unwrap_or_else(|poisoned| poisoned.into_inner());
+    let answer = seen
+        .get_or_insert_with(HashMap::new)
+        .entry(executable.to_path_buf())
+        .or_insert_with(|| {
+            let output = qnc_plugin_process::background_command(executable)
+                .args(["-hide_banner", "-version"])
+                .output()
+                .map_err(|error| format!("cannot run {}: {error}", executable.display()))?;
+            let text = String::from_utf8_lossy(&output.stdout);
+            text.lines()
+                .next()
+                .and_then(|line| line.split_once(" version "))
+                .and_then(|(_, rest)| rest.split_whitespace().next())
+                .map(str::to_owned)
+                .ok_or_else(|| format!("{} does not say its version", executable.display()))
+        })
+        .clone();
+    answer.map_err(bad)
 }
 #[derive(Debug)]
 struct SelectedAdapter {
