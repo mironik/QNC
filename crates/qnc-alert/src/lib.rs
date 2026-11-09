@@ -44,6 +44,11 @@ pub fn show(ctx: &egui::Context, alert: Option<&Alert>, fill: Color32, text: Col
         });
 }
 
+/// The warning a command raised (`qnc_notice::raise`), in the colours of a warning.
+pub fn show_raised(ctx: &egui::Context) {
+    show(ctx, qnc_notice::current().as_ref(), qnc_desktop_theme::danger(), qnc_desktop_theme::total_text());
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

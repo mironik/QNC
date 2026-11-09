@@ -206,6 +206,11 @@ fn picture_at(view: &SegmentsView, slots: &[Slot], moved: &dyn Fn(u64) -> u64, f
         return Some(picture);
     }
     let (segment, source_frame) = source_at(view, frame)?;
+    // In a compound statement the picture is its part's there.
+    if !segment.parts.is_empty() {
+        let part = segment.parts.iter().find(|part| part.start_frame <= frame && frame < part.end_frame)?;
+        return part.kind.has_base_video().then(|| StillPicture { clip_id: part.clip_id.clone(), source_frame: part.source_in_frame + (frame - part.start_frame) * part.source_out_frame.saturating_sub(part.source_in_frame) / part.duration_frames().max(1) });
+    }
     segment.kind.has_base_video().then(|| StillPicture { clip_id: segment.clip_id.clone(), source_frame })
 }
 
@@ -252,6 +257,7 @@ mod tests {
             selected: false,
             lead: false,
             level_keys: Vec::new(),
+            parts: Vec::new(),
         };
         let slot = |id: &str, start, end| Slot { slot_id: id.into(), start_frame: start, end_frame: end, has_cover: id == "s2", selected: false };
         let slots = vec![slot("s1", 0, 15), slot("s2", 15, 33), slot("s3", 33, 40)];
@@ -387,7 +393,7 @@ pub fn story_zoom_clicks(stills: &mut [EditStill], view: &crate::SegmentsView) {
                 frames,
                 fill: None,
                 chosen: slot.selected,
-                select: None,
+                select: Some(StillAction::new("zoom_take_slot", Some(slot.slot_id.clone()), None)),
                 take: StillAction::new("select_current_marker_slot", Some(slot.slot_id.clone()), None),
             });
         }
@@ -417,7 +423,7 @@ mod zoom_click_tests {
         assert_eq!((strip(0).frames, strip(0).take.target.as_deref()), (100, Some("s1")), "the slot before the cut");
         assert_eq!((strip(1).frames, strip(1).take.target.as_deref(), strip(1).chosen), (50, Some("s2"), true), "the slot after it");
         assert_eq!(strip(0).take.action, "select_current_marker_slot", "a right click on a strip is the timeline's");
-        assert!(strip(0).select.is_none(), "a left click: the zoom's pick of the side");
+        assert_eq!(strip(0).select.as_ref().map(|action| action.action.as_str()), Some("zoom_take_slot"), "a left click on the strip is its slot");
         let right = |index: usize| stills[index].right_click.clone().map(|action| (action.action, action.target, action.value));
         assert_eq!(right(0), Some(("select_marker".into(), Some("m1".into()), Some(99))), "a right click on the picture: the marker");
         assert_eq!(right(1), Some(("select_marker".into(), Some("m1".into()), Some(100))));

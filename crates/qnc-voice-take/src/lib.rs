@@ -17,6 +17,9 @@ use std::path::{Path, PathBuf};
 use qnc_still_locator::StillLocator;
 use qnc_voice_record::Recorder;
 
+mod session;
+pub use session::{RecordedSession, Session};
+
 pub const MODULE_ID: &str = "qnc.module.voice-take";
 
 pub type Result<T> = std::result::Result<T, String>;
@@ -25,22 +28,30 @@ pub type Result<T> = std::result::Result<T, String>;
 #[derive(Debug, Clone, PartialEq)]
 pub struct Earlier {
     pub name: String,
-    /// Each take's recording (QNC URI of its WAV) and length, seconds.
-    pub takes: Vec<(String, f64)>,
-    /// The timecode of the first take (the clip's).
-    pub first_tc: String,
+    /// How many readings it has.
+    pub takes: u16,
 }
 
-/// A take that records.
+/// A reading shorter than this is a press by mistake.
+const SHORTEST_READING: f64 = 0.5;
+
+/// A recording under way: Space, a click or a tap marks where a new reading starts (user
+/// 2026-11-09: no channels; one recording, the presses divide it into readings).
 pub struct Take {
     recorder: Recorder,
-    folder: PathBuf,
-    base: String,
     name: String,
     number: u16,
-    earlier: Vec<(PathBuf, f64)>,
-    first_tc: Option<String>,
-    wav_uri: String,
+    marks: Vec<f64>,
+    maker: ReadingMaker,
+}
+
+/// Makes a reading's WAV and its clip in the voice folder of the project (from the settings as
+/// saved); a recording of one OFF and of the whole story end the same way.
+pub struct ReadingMaker {
+    folder: PathBuf,
+    base: String,
+    /// The audio outputs of the project: the clip has a channel for each.
+    outputs: usize,
     project_dir: PathBuf,
     width: u32,
     height: u32,
@@ -49,23 +60,66 @@ pub struct Take {
     rate: u32,
 }
 
+impl ReadingMaker {
+    pub fn for_project(locator: &StillLocator) -> Result<Self> {
+        let settings = locator.settings();
+        let project_dir = locator.reader().local_workspace_dir(settings).map_err(|e| e.to_string())?.ok_or_else(|| qnc_ui_text::text("script.voice_local_only").to_string())?;
+        let (folder, base) = settings.voice_location(&project_dir).map_err(|e| e.message)?;
+        let rate = settings.audio_sample_rate().map_err(|e| e.message)?;
+        let (width, height, fps) = settings.video_picture().map_err(|e| e.message)?;
+        let fields = settings.video_fields().map_err(|e| e.message)?;
+        let outputs = usize::from(settings.audio_channels().map_err(|e| e.message)?).max(1);
+        std::fs::create_dir_all(&folder).map_err(|e| e.to_string())?;
+        Ok(Self { folder, base, outputs, project_dir, width, height, fps, fields, rate })
+    }
+
+    /// Reading `number` of record `name`: `samples` as its WAV and its mono clip, `text` on its
+    /// title card. Writes files: call it off the form thread.
+    #[allow(clippy::too_many_arguments)]
+    pub fn make(&self, name: &str, number: u16, samples: &[f32], rate: u32, timecode: &str, text: &str, silent: bool) -> Result<Recorded> {
+        let take_name = qnc_script_db::take_name(name, number);
+        let wav = self.folder.join(format!("{take_name}.wav"));
+        qnc_voice_record::write_take(&wav, samples, rate)?;
+        let seconds = samples.len() as f64 / f64::from(rate);
+        let out = self.folder.join(format!("{take_name}.mxf"));
+        let sounds = vec![wav; self.outputs];
+        let clip = qnc_voice_clip::VoiceClip { sounds: &sounds, seconds, text, heading: "", sequence: None, width: self.width, height: self.height, fps: self.fps, fields: self.fields, sample_rate: self.rate, timecode, out: &out, project_dir: &self.project_dir };
+        qnc_voice_clip::make(&clip)?;
+        let clip_uri = format!("{}/{take_name}.mxf", self.base);
+        let record = qnc_voice_clip::describe(&clip, &clip_id(&take_name), &canonical(&clip_uri)?)?;
+        Ok(Recorded { silent, clip_uri, name: name.to_string(), number, wav_uri: format!("{}/{take_name}.wav", self.base), seconds, timecode: timecode.to_string(), record })
+    }
+}
+
 /// A finished take, as its block keeps it.
 #[derive(Debug, Clone, PartialEq)]
 pub struct Recorded {
-    /// The record's name and clip (QNC URI).
+    /// The record's name and this reading's clip (QNC URI).
     pub name: String,
     pub clip_uri: String,
-    /// The take: its number (and channel), its recording (QNC URI), length and the time of day
-    /// it started.
+    /// The reading: its number, its recording (QNC URI), length and the time of day it started.
     pub number: u16,
     pub wav_uri: String,
     pub seconds: f64,
     pub timecode: String,
     /// The microphone gave no signal in this take.
     pub silent: bool,
-    /// The record's clip as the catalog keeps it, every take one channel (piece
-    /// `qnc-voice-clip`, what it asked the encoder for).
+    /// This reading's clip as the catalog keeps it (piece `qnc-voice-clip`).
     pub record: qnc_media_metadata::ClipMetadata,
+}
+
+/// Where each reading of a recording of `samples` samples is, cut at `marks` (seconds); a
+/// reading too short to be one goes.
+pub fn readings(samples: usize, rate: u32, marks: &[f64]) -> Vec<(usize, usize)> {
+    let at = |seconds: f64| ((seconds * f64::from(rate)) as usize).min(samples);
+    let cuts: Vec<usize> = std::iter::once(0).chain(marks.iter().map(|mark| at(*mark))).chain(std::iter::once(samples)).collect();
+    let least = (SHORTEST_READING * f64::from(rate)) as usize;
+    let kept: Vec<(usize, usize)> = cuts.windows(2).map(|pair| (pair[0], pair[1])).filter(|(from, to)| to.saturating_sub(*from) >= least).collect();
+    if kept.is_empty() {
+        vec![(0, samples)]
+    } else {
+        kept
+    }
 }
 
 /// The name of a record: the project's name and the block's mark (`OFF 2` is `OFF2`), as a
@@ -82,7 +136,8 @@ pub fn describe_record(settings: &qnc_work_settings::WorkSettings, name: &str, c
     let (width, height, fps) = settings.video_picture().map_err(|e| e.message)?;
     let fields = settings.video_fields().map_err(|e| e.message)?;
     let sample_rate = settings.audio_sample_rate().map_err(|e| e.message)?;
-    let sounds = vec![PathBuf::new(); takes.len()];
+    // A reading is on every output of the project (the player asks for that many channels).
+    let sounds = vec![PathBuf::new(); usize::from(settings.audio_channels().map_err(|e| e.message)?).max(1)];
     let seconds = takes.iter().copied().fold(0.0, f64::max);
     let clip = qnc_voice_clip::VoiceClip { sounds: &sounds, seconds, text: "", heading: "", sequence: None, width, height, fps, fields, sample_rate, timecode: first_tc, out: Path::new(""), project_dir: Path::new("") };
     qnc_voice_clip::describe(&clip, &clip_id(name), &canonical(clip_uri)?)
@@ -108,27 +163,26 @@ impl Take {
     /// microphone: call it off the form thread.
     pub fn start(locator: &StillLocator, mark: &str, earlier: Option<Earlier>, setting: &Path) -> Result<Self> {
         let settings = locator.settings();
-        let project_dir = locator.reader().local_workspace_dir(settings).map_err(|e| e.to_string())?.ok_or_else(|| qnc_ui_text::text("script.voice_local_only").to_string())?;
-        let (folder, base) = settings.voice_location(&project_dir).map_err(|e| e.message)?;
-        let rate = settings.audio_sample_rate().map_err(|e| e.message)?;
-        let (width, height, fps) = settings.video_picture().map_err(|e| e.message)?;
-        let fields = settings.video_fields().map_err(|e| e.message)?;
+        let maker = ReadingMaker::for_project(locator)?;
         let name = earlier.as_ref().map_or_else(|| record_name(&settings.project_name, mark), |earlier| earlier.name.clone());
-        let taken = earlier.as_ref().map_or(0, |earlier| earlier.takes.len());
-        if taken >= qnc_voice_clip::MAX_CHANNELS {
-            return Err(qnc_ui_text::fill("voice.full", &[("most", &qnc_voice_clip::MAX_CHANNELS.to_string())]));
-        }
-        let earlier_files = earlier.as_ref().map_or(Ok(Vec::new()), |earlier| earlier.takes.iter().map(|(uri, seconds)| Ok((file_of(&folder, &base, uri)?, *seconds))).collect::<Result<Vec<_>>>())?;
-        std::fs::create_dir_all(&folder).map_err(|e| e.to_string())?;
-        let number = taken as u16 + 1;
-        let wav = take_file(&name, number);
-        let recorder = Recorder::start(folder.join(&wav), &project_dir, rate, fps, setting)?;
-        Ok(Self { recorder, folder, base: base.clone(), wav_uri: format!("{base}/{wav}"), name, number, earlier: earlier_files, first_tc: earlier.map(|earlier| earlier.first_tc), project_dir, width, height, fps, fields, rate })
+        let number = earlier.as_ref().map_or(0, |earlier| earlier.takes) + 1;
+        let raw = format!("{name}_recording_{number}.wav");
+        let recorder = Recorder::start(maker.folder.join(&raw), &maker.project_dir, maker.rate, maker.fps, setting)?;
+        Ok(Self { recorder, name, number, marks: Vec::new(), maker })
     }
 
-    /// The take's number (the channel it becomes).
-    pub fn number(&self) -> u16 {
-        self.number
+    /// A press: a new reading starts here, the beep says it was taken.
+    pub fn mark(&mut self) -> bool {
+        let added = session::add_mark(&mut self.marks, self.recorder.seconds());
+        if added {
+            qnc_voice_record::beep();
+        }
+        added
+    }
+
+    /// The presses so far.
+    pub fn marks(&self) -> usize {
+        self.marks.len()
     }
 
     /// Seconds recorded so far.
@@ -141,20 +195,16 @@ impl Take {
         self.recorder.take_peak()
     }
 
-    /// Stops the take and makes the record's clip again with it as its last channel: `text` on
-    /// the title card under `heading`. Writes files: call it off the form thread.
-    pub fn finish(self, text: &str, heading: &str) -> Result<Recorded> {
+    /// Stops the recording and makes every reading its own mono clip: `text` on the title card
+    /// under `heading`. Writes files: call it off the form thread.
+    pub fn finish(self, text: &str, _heading: &str) -> Result<Vec<Recorded>> {
         let recording = self.recorder.stop()?;
-        let mut sounds: Vec<PathBuf> = self.earlier.iter().map(|(file, _)| file.clone()).collect();
-        sounds.push(recording.path.clone());
-        let seconds = self.earlier.iter().map(|(_, seconds)| *seconds).fold(recording.seconds, f64::max);
-        let timecode = self.first_tc.clone().unwrap_or_else(|| recording.timecode.clone());
-        let out = self.folder.join(format!("{}.mxf", self.name));
-        let clip = qnc_voice_clip::VoiceClip { sounds: &sounds, seconds, text, heading, sequence: None, width: self.width, height: self.height, fps: self.fps, fields: self.fields, sample_rate: self.rate, timecode: &timecode, out: &out, project_dir: &self.project_dir };
-        qnc_voice_clip::make(&clip)?;
-        let clip_uri = format!("{}/{}.mxf", self.base, self.name);
-        let record = qnc_voice_clip::describe(&clip, &clip_id(&self.name), &canonical(&clip_uri)?)?;
-        Ok(Recorded { silent: recording.silent, clip_uri, name: self.name, number: self.number, wav_uri: self.wav_uri, seconds: recording.seconds, timecode: recording.timecode, record })
+        let (samples, rate) = qnc_voice_record::read_take(&recording.path)?;
+        readings(samples.len(), rate, &self.marks)
+            .into_iter()
+            .enumerate()
+            .map(|(index, (from, to))| self.maker.make(&self.name, self.number + index as u16, &samples[from..to], rate, &recording.timecode, text, recording.silent))
+            .collect()
     }
 
     /// Stops the take and throws it away (its file is left empty for the next take).
@@ -172,11 +222,6 @@ pub fn voice_file(locator: &StillLocator, uri: &str) -> Result<PathBuf> {
     file_of(&folder, &base, uri)
 }
 
-/// The file of take `number` of record `name`.
-fn take_file(name: &str, number: u16) -> String {
-    format!("{name}_T{number}.wav")
-}
-
 /// The file in the voice folder behind `uri` (a take of the record).
 fn file_of(folder: &Path, base: &str, uri: &str) -> Result<PathBuf> {
     let relative = uri.strip_prefix(base).and_then(|rest| rest.strip_prefix('/')).filter(|rest| !rest.is_empty() && !rest.contains("..")).ok_or_else(|| format!("{uri}: {}", qnc_ui_text::text("voice.take_missing")))?;
@@ -191,7 +236,6 @@ mod tests {
     fn a_record_is_named_after_the_project_and_the_mark_as_every_os_takes_it() {
         assert_eq!(record_name("Mironik teniski centar", "OFF 2"), "Mironik_teniski_centar_OFF2");
         assert_eq!(record_name("2026/10/30 Vijesti", "Take VO 1"), "2026_10_30_Vijesti_TakeVO1");
-        assert_eq!(take_file("Mironik_OFF2", 3), "Mironik_OFF2_T3.wav");
     }
 
     #[test]

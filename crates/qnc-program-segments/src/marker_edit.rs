@@ -84,7 +84,14 @@ impl ProgramSegments {
         // A cut between two clips (user 2026-10-29) moves as an M marker does, between the cuts
         // beside it (markers and other joins): whole a roll, its picture alone a picture J or L.
         let join = qnc_program_view::join_segment(&marker_id).is_some();
-        let pins = if join { self.cut_pins() } else { self.stored_pins() };
+        let mut pins = if join { self.cut_pins() } else { self.stored_pins() };
+        // The join under an M marker (no pin of its own): it moves in the marker's place.
+        if join && !pins.iter().any(|pin| pin.marker_id == marker_id) {
+            let stored = self.cut_frame(&marker_id);
+            if let Some(pin) = pins.iter_mut().find(|pin| Some(pin.frame) == stored) {
+                pin.marker_id.clone_from(&marker_id);
+            }
+        }
         if let Err(error) = check_move(&pins, &marker_id, frame) {
             return self.refresh_view(error);
         }

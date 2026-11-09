@@ -426,24 +426,14 @@ impl SourceTimeline {
             // turn it off/on) it moves the playhead (user 2026-10-16). Ctrl+wheel is
             // Ctrl+left/right: the level of a taken lane, up louder.
             // One step by one key (`qnc-edit-step`, the same on every timeline and its zoom).
-            wheel if qnc_edit_step::ctrl_frames(wheel).is_some() => {
-                let level = qnc_edit_step::level_action(qnc_edit_step::level(wheel)?);
-                if let Some(changed) = self.route_lane(level, preview) {
-                    return Some(changed);
-                }
-                // No lane taken: Ctrl+wheel moves the taken IN or OUT, as the wheel does
-                // (user 2026-10-17: right button and wheel cut the clip).
-                if !self.keys.mark_taken(timeline) {
-                    return Some(false);
-                }
-                self.keys.route(qnc_edit_step::arrow(qnc_edit_step::ctrl_frames(wheel)?), preview, timeline)
-            }
             wheel if qnc_edit_step::is_wheel(wheel) => {
-                let frames = qnc_edit_step::frames(wheel)?;
-                if self.lane_taken() {
-                    return Some(preview.step(frames));
+                let held = qnc_edit_step::WheelHeld { sound: self.lane_taken(), level: false, mark: self.keys.mark_taken(timeline) };
+                match qnc_edit_step::wheel(wheel, held)? {
+                    qnc_edit_step::WheelDoes::Playhead(frames) => Some(preview.step(frames)),
+                    qnc_edit_step::WheelDoes::Arrow(frames) => self.keys.route(qnc_edit_step::arrow(frames), preview, timeline),
+                    qnc_edit_step::WheelDoes::Level(steps) => self.route_lane(qnc_edit_step::level_action(steps), preview),
+                    qnc_edit_step::WheelDoes::Nothing => Some(false),
                 }
-                self.keys.route(qnc_edit_step::arrow(frames), preview, timeline)
             }
             // Down with no lane taken closes an open large wave.
             "step_next_part" if self.lanes.wave_zoom() != [0, 0] => {

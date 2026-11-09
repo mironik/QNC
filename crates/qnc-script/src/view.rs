@@ -211,6 +211,11 @@ pub struct ScriptView {
     pub recording: Option<(i64, f64, f32)>,
     /// A recording is being started or finished.
     pub record_busy: bool,
+    /// The readings marked in that recording (each press adds one to the first).
+    pub recording_marks: usize,
+    /// The whole story recording: seconds, level of the microphone and readings marked.
+    pub session: Option<(f64, f32, usize)>,
+    pub session_busy: bool,
     /// Field values typed and not yet in the script, by block and field code.
     pub field_drafts: BTreeMap<(i64, String), String>,
     /// The text of a statement's part as the user edits it before Enter (docs/99 step 4: the

@@ -167,6 +167,9 @@ impl Pointer {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct MouseMap {
     panels: Vec<(String, Vec<(Pointer, String)>)>,
+    /// Per timeline, the actions of its panel that have no meaning on it (user 2026-11-09: one
+    /// table instead of every owner's own list of what it takes).
+    no_meaning: Vec<(String, Vec<String>)>,
 }
 
 impl MouseMap {
@@ -191,7 +194,24 @@ impl MouseMap {
             }
             parsed.push((panel.clone(), actions));
         }
-        Ok(Self { panels: parsed })
+        let no_meaning = map
+            .get("no_meaning")
+            .and_then(serde_json::Value::as_object)
+            .map(|timelines| {
+                timelines
+                    .iter()
+                    .map(|(timeline, actions)| (timeline.clone(), actions.as_array().into_iter().flatten().filter_map(serde_json::Value::as_str).map(str::to_string).collect()))
+                    .collect()
+            })
+            .unwrap_or_default();
+        Ok(Self { panels: parsed, no_meaning })
+    }
+
+    /// Whether `action` of the map's `panel` is one `timeline` takes: every action of the panel
+    /// but those written as having no meaning on it.
+    pub fn takes(&self, timeline: &str, panel: &str, action: &str) -> bool {
+        let known = self.panels.iter().any(|(name, actions)| name == panel && actions.iter().any(|(_, known)| known == action));
+        known && !self.no_meaning.iter().any(|(name, actions)| name == timeline && actions.iter().any(|none| none == action))
     }
 
     /// The map of this QNC (the contract, built in).
@@ -215,6 +235,11 @@ impl MouseMap {
             .iter()
             .flat_map(|(panel, actions)| actions.iter().map(move |(pointer, action)| (panel.as_str(), *pointer, action.as_str())))
     }
+}
+
+/// Whether `timeline` takes `action` of `panel` in this QNC's map.
+pub fn takes(timeline: &str, panel: &str, action: &str) -> bool {
+    MouseMap::of_this_qnc().takes(timeline, panel, action)
 }
 
 /// The action of `pointer` on `panel` in this QNC's map.

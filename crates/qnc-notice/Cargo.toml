@@ -5,3 +5,4 @@ edition = "2021"
 description = "QNC public piece (core): what the user is told or asked, a warning that must not be missed and a question with options. The model only, no egui: qnc-alert and qnc-choice-box draw them."
 
 [dependencies]
+qnc-ui-text.workspace = true

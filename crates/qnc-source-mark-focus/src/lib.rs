@@ -104,35 +104,18 @@ pub fn release(timeline: &mut TimelineProjection) -> MarkKey {
     MarkKey::Changed
 }
 
-/// Alt+arrows on the source (v5 `adjacent_source_navigation_target`): the start, IN
-/// and OUT in order; from a taken mark to the next one, else from the playhead.
-/// The start releases the mark and cues frame 0; IN or OUT is taken.
-pub fn adjacent(timeline: &mut TimelineProjection, up: bool) -> MarkKey {
-    // (frame, order, target): 0 start, 1 IN, 2 OUT.
-    let mut items = vec![(0u64, 0u8)];
-    items.extend(timeline.source_in_frame.map(|frame| (frame, 1)));
-    items.extend(timeline.source_out_frame.map(|frame| (frame, 2)));
-    items.sort();
-    let taken = match timeline.source_mark_focus {
-        TimelineSourceMarkFocus::In => items.iter().position(|item| item.1 == 1),
-        TimelineSourceMarkFocus::Out => items.iter().position(|item| item.1 == 2),
-        TimelineSourceMarkFocus::Playhead => None,
-    };
-    let playhead = timeline.playhead_frame.unwrap_or(0).saturating_sub(timeline.range_start_frame);
-    let target = match taken {
-        Some(index) if up => index.checked_sub(1).and_then(|next| items.get(next)),
-        Some(index) => items.get(index + 1),
-        None if up => items.iter().rev().find(|item| item.0 < playhead),
-        None => items.iter().find(|item| item.0 > playhead),
-    };
-    match target.map(|item| item.1) {
-        Some(0) => {
-            timeline.source_mark_focus = TimelineSourceMarkFocus::Playhead;
-            MarkKey::Cue(timeline.range_start_frame)
-        }
-        Some(order) => take(timeline, order == 1),
-        None => MarkKey::Refused,
+/// Alt+arrows on the source (user 2026-11-09: everywhere they only move the playhead): the
+/// start, IN and the last picture before OUT in order, from the playhead. Nothing is taken;
+/// with a mark taken they do nothing.
+pub fn adjacent(timeline: &TimelineProjection, up: bool) -> MarkKey {
+    if is_taken(timeline) {
+        return MarkKey::Refused;
     }
+    let start = timeline.range_start_frame;
+    let mut stops = vec![start];
+    stops.extend(timeline.source_in_frame.map(|frame| start + frame));
+    stops.extend(timeline.source_out_frame.map(|frame| start + frame.saturating_sub(1)));
+    qnc_edit_step::next_stop(&stops, timeline.playhead_frame.unwrap_or(start), up).map_or(MarkKey::Refused, MarkKey::Cue)
 }
 
 /// Shift+I (v5 `mark_in_fit_duration`): IN at the playhead, OUT `frames` later, inside
@@ -199,10 +182,15 @@ mod tests {
     fn alt_arrows_walk_start_in_out_and_shift_i_fits_a_slot() {
         let mut t = timeline();
         t.playhead_frame = Some(20);
-        assert_eq!(adjacent(&mut t, false), MarkKey::Cue(39), "from the playhead to OUT");
-        assert_eq!(adjacent(&mut t, true), MarkKey::Cue(10), "OUT -> IN");
-        assert_eq!(adjacent(&mut t, true), MarkKey::Cue(0), "IN -> start");
-        assert!(!is_taken(&t));
+        assert_eq!(adjacent(&t, false), MarkKey::Cue(39), "from the playhead to OUT");
+        assert!(!is_taken(&t), "nothing is taken");
+        t.playhead_frame = Some(39);
+        assert_eq!(adjacent(&t, true), MarkKey::Cue(10), "OUT -> IN");
+        t.playhead_frame = Some(10);
+        assert_eq!(adjacent(&t, true), MarkKey::Cue(0), "IN -> start");
+        t.source_mark_focus = TimelineSourceMarkFocus::In;
+        assert_eq!(adjacent(&t, true), MarkKey::Refused, "a taken mark keeps the arrows");
+        t.source_mark_focus = TimelineSourceMarkFocus::Playhead;
         t.playhead_frame = Some(90);
         assert_eq!(fit(&mut t, 25), MarkKey::Changed);
         assert_eq!((t.source_in_frame, t.source_out_frame), (Some(90), Some(100)), "inside the clip");

@@ -26,17 +26,19 @@ pub fn block_pieces(block: &Block) -> Vec<Piece> {
 }
 
 /// The smooth cut of the join between `before` and `after` as they are now: the id of the clip
-/// of its in-between pictures and their count. `None` without a smooth cut or where one cannot
-/// be: a pause or a J/L of the picture at the join, or parts too short for the pictures it
-/// replaces.
+/// of its in-between pictures and their count (those that replace the pictures around the cut
+/// and one for every frame of the pause at the join: user 2026-11-09, a pause moves the parts
+/// apart and the smooth cut fills it, no hole in the picture). `None` without a smooth cut or
+/// where one cannot be: a J/L of the picture at the join, or parts too short for the pictures
+/// it replaces.
 pub fn smooth_of(before: &Piece, after: &Piece) -> Option<(String, u64)> {
     let n = after.smooth_frames;
-    if n == 0 || after.gap_before > 0 || after.v_lead_frames > 0 || after.v_tail_frames > 0 {
+    if n == 0 || after.v_lead_frames > 0 || after.v_tail_frames > 0 {
         return None;
     }
     let out_last = before.to_frame.checked_sub(1)?;
     let span = qnc_frame_interp::span(out_last, after.from_frame, n);
-    (out_last >= span.before && span.from_picture >= before.from_frame && span.to_picture < after.to_frame).then(|| (qnc_frame_interp::clip_id(&before.clip_id, &after.clip_id, out_last, after.from_frame, n), n))
+    (out_last >= span.before && span.from_picture >= before.from_frame && span.to_picture < after.to_frame).then(|| (qnc_frame_interp::clip_id(&before.clip_id, &after.clip_id, out_last, after.from_frame, n, after.gap_before), n + after.gap_before))
 }
 
 /// The parts as the player's program takes them.
@@ -103,15 +105,16 @@ pub fn draft_pieces(blocks: &[Block], voices: &[Voice], profile: &ScriptProfile,
             }
             Role::Spoken => match voices.iter().find(|voice| voice.block_id == block.id).and_then(|voice| Some((voice, voice.chosen_take()?))) {
                 Some((voice, take)) => {
+                    let (from_frame, to_frame) = take_sound_range(&block.text, take, rates.fps).unwrap_or((0, frames(take.seconds).max(1)));
                     pieces.push(PieceInput {
                         smooth: None,
-                        clip_id: (rates.clip_id)(&voice.name),
-                        from_frame: 0,
-                        to_frame: frames(take.seconds).max(1),
+                        clip_id: (rates.clip_id)(&qnc_script_db::take_name(&voice.name, take.take)),
+                        from_frame,
+                        to_frame,
                         gap_before: pause,
                         crossfade: false,
-                        // The take used is its channel of the record (user 2026-10-30).
-                        a1: Some((Some(take.take.saturating_sub(1)), 0, false)),
+                        // Every reading is its own mono clip (user 2026-11-09).
+                        a1: Some((Some(0), 0, false)),
                         sound_lead: 0,
                         sound_tail: 0,
                         picture_lead: 0,
@@ -146,12 +149,34 @@ pub struct SkeletonPart {
     pub origin: String,
     /// The M markers set in the text of an OFF, as frames of its clip.
     pub marks: Vec<u64>,
+    /// The parts of a compound statement, which is one segment (user 2026-11-09); else empty.
+    pub parts: Vec<PieceInput>,
 }
 
 /// The seconds of a recording `seconds` long at which the M markers in the text of `block` fall;
 /// `check` is what was read and the second each heard word starts at, when it is known.
 pub fn mark_seconds(block: &Block, check: Option<(&qnc_read_check::ReadCheck, &[f64])>, seconds: f64) -> Vec<f64> {
     block.marks.iter().map(|word| qnc_read_check::word_second(&block.text, check, seconds, *word as usize)).collect()
+}
+
+/// A reading this good has its IN and OUT where its sound is (user 2026-11-09: "for a correct off,
+/// over 90%"); a worse one is listened to and cut by hand.
+const SOUND_MARKS_PERCENT: u32 = 90;
+/// Sound kept before the first word and after the last, seconds: breath of the word, not silence.
+const SOUND_MARGIN: f64 = 0.1;
+
+/// IN and OUT of the reading `take` of `text`, frames `[in, out)` of its clip, from where its first
+/// word starts and its last ends; none until it is heard or when it is under 90 %.
+pub fn take_sound_range(text: &str, take: &qnc_script_db::VoiceTake, fps: f64) -> Option<(u64, u64)> {
+    let heard = take.heard.as_ref()?;
+    let words: Vec<&str> = heard.iter().map(|word| word.text.as_str()).collect();
+    if qnc_read_check::check(text, &words).percent < SOUND_MARKS_PERCENT {
+        return None;
+    }
+    let frames = (take.seconds * fps).round().max(1.0) as u64;
+    let from = (((heard.first()?.start - SOUND_MARGIN) * fps).floor().max(0.0)) as u64;
+    let to = (((heard.last()?.end + SOUND_MARGIN) * fps).ceil() as u64).min(frames);
+    (to > from).then_some((from, to))
 }
 
 /// The frames of the clip of `take` at which the M markers in the text of `block` fall, strictly
@@ -179,26 +204,33 @@ pub fn skeleton(blocks: &[Block], voices: &[Voice], profile: &ScriptProfile, rat
             continue;
         }
         match kind.role {
-            Role::Clip => parts.extend(piece_inputs(block).into_iter().enumerate().map(|(index, piece)| SkeletonPart {
-                kind: "tonovi",
-                clip_id: piece.clip_id,
-                from_frame: piece.from_frame,
-                to_frame: piece.to_frame,
-                a1: piece.a1,
-                origin: format!("script:{}:{index}", block.id),
-                marks: Vec::new(),
-            })),
+            Role::Clip => {
+                let pieces = piece_inputs(block);
+                let Some(first) = pieces.first() else { continue };
+                parts.push(SkeletonPart {
+                    kind: "tonovi",
+                    clip_id: first.clip_id.clone(),
+                    from_frame: first.from_frame,
+                    to_frame: first.to_frame,
+                    a1: first.a1,
+                    origin: format!("script:{}:0", block.id),
+                    marks: Vec::new(),
+                    parts: if pieces.len() > 1 { pieces } else { Vec::new() },
+                });
+            }
             Role::Spoken => {
                 if let Some((voice, take)) = voices.iter().find(|voice| voice.block_id == block.id).and_then(|voice| Some((voice, voice.chosen_take()?))) {
-                    let to_frame = ((take.seconds * rates.fps).round().max(1.0)) as u64;
+                    let whole = ((take.seconds * rates.fps).round().max(1.0)) as u64;
+                    let (from_frame, to_frame) = take_sound_range(&block.text, take, rates.fps).unwrap_or((0, whole));
                     parts.push(SkeletonPart {
                         kind: "offovi",
-                        clip_id: (rates.clip_id)(&voice.name),
-                        from_frame: 0,
+                        clip_id: (rates.clip_id)(&qnc_script_db::take_name(&voice.name, take.take)),
+                        from_frame,
                         to_frame,
-                        a1: Some((Some(take.take.saturating_sub(1)), 0, false)),
+                        a1: Some((Some(0), 0, false)),
                         origin: format!("script:{}:0", block.id),
-                        marks: mark_frames(block, take, rates.fps, to_frame),
+                        marks: mark_frames(block, take, rates.fps, whole),
+                        parts: Vec::new(),
                     });
                 }
             }

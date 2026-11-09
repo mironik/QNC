@@ -90,9 +90,10 @@ pub fn show(ctx: &egui::Context, segments: &SegmentsView, theme: &TimelineTheme)
                 // closes the zoom (user 2026-11-05: "a left click on the picture closed the zoom, it
                 // must mark what is chosen"): the owner's own pick when it gives one (a
                 // SubSegment's slot), else the one system action of every zoom.
-                let pick = still.strip.as_ref().and_then(|strip| strip.select.as_ref()).or(still.click.as_ref()).map(|action| event_of(action, panel)).or_else(|| {
-                    taken_cut.clone().map(|cut| Verb::PickSide { cut, side: Side::of(still.after) }.event(panel))
-                });
+                // Three separate choices in every zoom (user 2026-11-09): the picture is the video
+                // of the cut, the strip its slot, the waves below its sound.
+                let picture_pick = still.click.as_ref().map(|action| event_of(action, panel)).or_else(|| taken_cut.clone().map(|cut| Verb::TakePicture { cut }.event(panel)));
+                let strip_pick = still.strip.as_ref().and_then(|strip| strip.select.as_ref()).map(|action| event_of(action, panel));
                 // The slot's length strip at the bottom of the picture (user 2026-11-05), as on the
                 // timeline: a right click on it takes the slot, a right click on the picture
                 // outside it the marker of the cut (a right click is Ctrl+, everywhere).
@@ -101,10 +102,12 @@ pub fn show(ctx: &egui::Context, segments: &SegmentsView, theme: &TimelineTheme)
                 let at = response.interact_pointer_pos();
                 let on_strip = strip_rect.zip(at).is_some_and(|(strip, at)| strip.contains(at));
                 if let (Some(strip), Some(rect)) = (still.strip.as_ref(), strip_rect) {
-                    paint_strip(ui, rect, strip, in_focus, ui.rect_contains_pointer(rect), theme);
+                    // Only the picture taken: the slot's strip is not chosen (user 2026-11-09).
+                    let only_picture = sound.is_some_and(|sound| sound.picture_taken);
+                    paint_strip(ui, rect, strip, in_focus && !only_picture, ui.rect_contains_pointer(rect), theme);
                 }
                 if response.clicked() {
-                    if let Some(pick) = pick {
+                    if let Some(pick) = if on_strip { strip_pick } else { picture_pick } {
                         turned = Some(pick);
                     }
                 } else if response.secondary_clicked() {
@@ -137,7 +140,7 @@ pub fn show(ctx: &egui::Context, segments: &SegmentsView, theme: &TimelineTheme)
                 // The side the next action is on, plainly (user 2026-11-05: "the A1 of the clip
                 // before or of the next one, so the user sees what the action is on"): its half
                 // of the sound under a faint red, framed red as its pictures.
-                if let Some(after) = focus {
+                if let Some(after) = focus.filter(|_| !sound.picture_taken) {
                     let width = (sound.to - sound.from).max(1) as f32;
                     let x = area.left() + area.width() * (sound.cut.clamp(sound.from, sound.to) - sound.from) as f32 / width;
                     let half = if after { Rect::from_min_max(egui::pos2(x, area.top()), area.max) } else { Rect::from_min_max(area.min, egui::pos2(x, area.bottom())) };
@@ -260,6 +263,13 @@ fn paint_sound(ui: &mut egui::Ui, area: Rect, sound: &ZoomSound, gap_at: Option<
             let right = ui.input(|i| i.pointer.secondary_clicked() && i.pointer.interact_pos().is_some_and(|pos| band.contains(pos)));
             if right {
                 side = Some(Verb::TakeSound { cut: cut.to_string(), lane: lane_of(lane) }.event(panel));
+            }
+            // A left click on the wave is the sound of the cut on this lane; on the sound already
+            // taken, the side of it clicked (the J after the cut, the L before it).
+            let left = ui.input(|i| i.pointer.primary_clicked().then(|| i.pointer.interact_pos()).flatten()).filter(|pos| band.contains(*pos) && pos.x > band.left() + LABEL_SIZE.x + 6.0);
+            if let (Some(pos), None) = (left, side.as_ref()) {
+                let verb = if taken_lane { Verb::PickSide { cut: cut.to_string(), side: Side::of(pos.x >= x_of(sound.cut)) } } else { Verb::TakeSound { cut: cut.to_string(), lane: lane_of(lane) } };
+                side = Some(verb.event(panel));
             }
         }
     }

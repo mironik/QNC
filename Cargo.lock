@@ -3396,6 +3396,7 @@ name = "qnc-alert"
 version = "0.1.0"
 dependencies = [
  "eframe",
+ "qnc-desktop-theme",
  "qnc-notice",
 ]
 
@@ -4043,6 +4044,7 @@ dependencies = [
  "qnc-dev-diagnostics",
  "qnc-image-assets",
  "qnc-media-thumbnail",
+ "qnc-notice",
  "qnc-panel-focus",
  "qnc-pending-marks",
  "qnc-pool-tabs",
@@ -4293,6 +4295,7 @@ name = "qnc-form-host"
 version = "0.1.0"
 dependencies = [
  "eframe",
+ "qnc-alert",
  "qnc-dev-diagnostics",
  "qnc-key-intents",
  "qnc-keyboard-shortcut",
@@ -5351,6 +5354,9 @@ dependencies = [
 [[package]]
 name = "qnc-notice"
 version = "0.1.0"
+dependencies = [
+ "qnc-ui-text",
+]
 
 [[package]]
 name = "qnc-paint-pace"
@@ -5371,8 +5377,10 @@ dependencies = [
  "qnc-edit-step",
  "qnc-edit-verbs",
  "qnc-focus-walk",
+ "qnc-ingest-layout",
  "qnc-key-list",
  "qnc-keyframe-jump",
+ "qnc-mouse-map",
  "qnc-playhead-moves",
  "qnc-pool-tabs",
  "qnc-program-segments",
@@ -6118,13 +6126,16 @@ dependencies = [
  "qnc-letter-db",
  "qnc-letter-times",
  "qnc-newsroom-sheet-db",
+ "qnc-notice",
  "qnc-program-db",
+ "qnc-program-input",
  "qnc-read-check",
  "qnc-script-db",
  "qnc-script-draft",
  "qnc-script-export",
  "qnc-script-files",
  "qnc-script-profile",
+ "qnc-session-readings",
  "qnc-skeleton-db",
  "qnc-smooth-joins",
  "qnc-source-preview",
@@ -6139,6 +6150,7 @@ dependencies = [
  "qnc-voice-catalog",
  "qnc-voice-record",
  "qnc-voice-take",
+ "qnc-worker-wake",
  "serde",
  "serde_json",
 ]
@@ -6200,6 +6212,7 @@ dependencies = [
  "qnc-desktop-theme",
  "qnc-keyboard-shortcut",
  "qnc-script",
+ "qnc-script-db",
  "qnc-settings-form",
  "qnc-text-source-editor",
  "qnc-transcript",
@@ -6282,6 +6295,23 @@ dependencies = [
  "qnc-source-preview",
  "qnc-source-timeline",
  "qnc-wrap-session",
+]
+
+[[package]]
+name = "qnc-session-readings"
+version = "0.1.0"
+dependencies = [
+ "qnc-db-broker",
+ "qnc-read-check",
+ "qnc-script-db",
+ "qnc-still-locator",
+ "qnc-take-heard",
+ "qnc-transcribe-jobs",
+ "qnc-transcribe-run",
+ "qnc-ui-text",
+ "qnc-voice-catalog",
+ "qnc-voice-record",
+ "qnc-voice-take",
 ]
 
 [[package]]
@@ -6438,6 +6468,7 @@ dependencies = [
  "qnc-clip-row",
  "qnc-clip-shots",
  "qnc-db-broker",
+ "qnc-notice",
  "qnc-script",
  "qnc-skeleton-versions",
  "qnc-source-preview",
@@ -6634,6 +6665,7 @@ name = "qnc-source-mark-focus"
 version = "0.1.0"
 dependencies = [
  "qnc-edit-edge",
+ "qnc-edit-step",
  "qnc-timeline-model",
  "qnc-ui-text",
 ]
@@ -6823,6 +6855,7 @@ dependencies = [
  "qnc-sound-assist",
  "qnc-source-preview",
  "qnc-source-timecode",
+ "qnc-timeline-model",
  "qnc-trim-stills",
  "qnc-ui-text",
 ]
@@ -6833,6 +6866,7 @@ version = "0.1.0"
 dependencies = [
  "eframe",
  "qnc-action-event",
+ "qnc-mouse-map",
  "qnc-program-view",
  "qnc-script",
  "qnc-segment-panel",
@@ -7276,6 +7310,7 @@ name = "qnc-voice-take"
 version = "0.1.0"
 dependencies = [
  "qnc-media-metadata",
+ "qnc-script-db",
  "qnc-source-contract",
  "qnc-still-locator",
  "qnc-ui-text",

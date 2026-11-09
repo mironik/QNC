@@ -30,7 +30,10 @@ pub struct Wanted {
     pub after_clip: String,
     pub out_last: u64,
     pub in_first: u64,
+    /// The pictures around the cut that give way to in-between ones.
     pub n: u64,
+    /// The frames of the pause at the join, each one more in-between picture.
+    pub pause: u64,
 }
 
 /// The joins of `blocks` that ask for a smooth cut and do not have its clip as they are now.
@@ -39,8 +42,8 @@ pub fn wanted(blocks: &[Block]) -> Vec<Wanted> {
     for block in blocks {
         for (index, pair) in block.pieces.windows(2).enumerate() {
             let (before, after) = (&pair[0], &pair[1]);
-            if let Some((clip_id, n)) = qnc_script_draft::smooth_of(before, after).filter(|(id, _)| *id != after.smooth_clip) {
-                joins.push(Wanted { block_id: block.id, index: index + 1, clip_id, before_clip: before.clip_id.clone(), after_clip: after.clip_id.clone(), out_last: before.to_frame - 1, in_first: after.from_frame, n });
+            if let Some((clip_id, _)) = qnc_script_draft::smooth_of(before, after).filter(|(id, _)| *id != after.smooth_clip) {
+                joins.push(Wanted { block_id: block.id, index: index + 1, clip_id, before_clip: before.clip_id.clone(), after_clip: after.clip_id.clone(), out_last: before.to_frame - 1, in_first: after.from_frame, n: after.smooth_frames, pause: after.gap_before });
             }
         }
     }
@@ -159,11 +162,12 @@ fn make(locator: &StillLocator, join: &Wanted) -> Result<(), String> {
         let engine = qnc_ai_catalog::installed_frame_interpolator()?;
         let interpolator = qnc_frame_interp::Interpolator { program: qnc_plugin_process::beside_application(&engine.program)?, model: engine.model };
         let pictures = work.join("pictures");
-        interpolator.between(&from, &to, join.n, &pictures)?;
+        let count = join.n + join.pause;
+        interpolator.between(&from, &to, count, &pictures)?;
         // The clip has one silent channel, as every clip the player reads has a sound; the cut's
         // own sound stays that of its parts.
         let silence = work.join("silence.wav");
-        let seconds = join.n as f64 / fps;
+        let seconds = count as f64 / fps;
         qnc_transcribe_jobs::write_wav(&silence, &vec![0.0; (seconds * 16_000.0).ceil() as usize + 1])?;
         let sounds = [silence];
         let out = folder.join(format!("{}.mxf", join.clip_id));
@@ -214,11 +218,16 @@ mod tests {
     }
 
     #[test]
-    fn no_smooth_cut_over_a_pause_or_when_a_part_is_too_short() {
+    fn a_pause_at_the_join_is_more_in_between_pictures_and_a_part_too_short_has_none() {
         let before = piece("a", 100, 200);
         let mut paused = piece("b", 500, 600);
         (paused.smooth_frames, paused.gap_before) = (8, 5);
-        assert!(wanted(&[block(vec![before.clone(), paused])]).is_empty());
+        let joins = wanted(&[block(vec![before.clone(), paused.clone()])]);
+        assert_eq!((joins[0].n, joins[0].pause), (8, 5));
+        assert_eq!(qnc_script_draft::smooth_of(&before, &paused).unwrap().1, 13, "one for every frame of the pause");
+        let mut longer = paused.clone();
+        longer.gap_before = 6;
+        assert_ne!(wanted(&[block(vec![before.clone(), longer])])[0].clip_id, joins[0].clip_id, "another pause, another clip");
         let mut short = piece("b", 500, 503);
         short.smooth_frames = 8;
         assert!(wanted(&[block(vec![before, short])]).is_empty());

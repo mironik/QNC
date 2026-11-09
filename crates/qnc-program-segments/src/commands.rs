@@ -228,7 +228,8 @@ impl ProgramSegments {
             SegmentCommand::PickChannel { .. } => return false,
             SegmentCommand::SelectSlot { slot_id, frame } => {
                 self.drop_selected_cover();
-                self.select_slot(&slot_id, Some(frame))
+                self.select_slot(&slot_id, Some(frame));
+                self.zoom_row_at(frame);
             }
             SegmentCommand::StepMarker { up } => {
                 match neighbour_marker(&self.view.markers, playhead, up).cloned() {
@@ -245,20 +246,8 @@ impl ProgramSegments {
             SegmentCommand::ProgramStart => self.cue_program(0),
             SegmentCommand::Cue(frame) => {
                 let frame = self.clip_half_frame(frame);
-                // A click that only places the playhead lets go of a slot it leaves, so
-                // Ctrl+I/O take the slot under the playhead.
-                let inside = self.view.slots.iter().any(|slot| {
-                    self.selected_slot.as_deref() == Some(slot.slot_id.as_str()) && (slot.start_frame..slot.end_frame).contains(&frame)
-                });
-                // The stored selection goes too, or a later reread brings it back (user
-                // 2026-10-23: after Sync the B-roll button did nothing).
-                if !inside && self.selected_slot.take().is_some() {
-                    self.write(Operation::SelectSlot { slot_id: String::new() });
-                }
-                self.drop_selected_cover();
-                // Nothing picked stays picked, so Backspace is the undo in time again.
-                self.selected_marker = None;
-                self.cue_at(frame)
+                self.place_playhead(frame);
+                self.zoom_row_at(frame);
             }
             SegmentCommand::Marker => self.marker_at_playhead(),
             SegmentCommand::AddSegment(kind) => self.create_from_source(kind),
@@ -324,6 +313,11 @@ impl ProgramSegments {
             }
             SegmentCommand::TakeCutEdge { marker_id, frame } => return self.take_sound_edge_at(&marker_id, frame),
             SegmentCommand::ZoomSide { marker_id, after } => return self.zoom_side(&marker_id, after),
+            SegmentCommand::ZoomTakeSlot(slot_id) => {
+                self.let_go_if_unmoved();
+                self.take_slot(&slot_id);
+                self.take_slot_move(&slot_id);
+            }
             SegmentCommand::DragCutEdge { marker_id, frame } => return self.drag_sound_edge(&marker_id, frame),
             SegmentCommand::SelectSlotAtPlayhead => self.select_slot_at_playhead(),
             SegmentCommand::FocusEmptySlot => self.focus_empty_slot(),

@@ -78,7 +78,7 @@ impl IngestApplication {
 
     /// Refused, the message shown in the view at once.
     pub(super) fn refuse_shown(&mut self, message: String) -> IngestDispatchResult {
-        self.view.message = message.clone();
+        self.view.message = qnc_notice::raised(message.clone());
         IngestDispatchResult::rejected_shown(message)
     }
 }

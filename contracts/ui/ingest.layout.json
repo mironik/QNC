@@ -63,7 +63,8 @@
       "ingest_clip_toggle"
     ],
     "source_timeline": [
-      "timeline_cue_frame"
+      "timeline_cue_frame",
+      "playlist_input_start"
     ]
   },
   "board": {

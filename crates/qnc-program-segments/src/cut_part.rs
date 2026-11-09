@@ -67,7 +67,12 @@ impl ProgramSegments {
         // The A1/A2 buttons of the trim zoom (log 2026-10-29: refused on a Wrap row) name the cut
         // already taken: that zoom is open, so its part is taken there too.
         let from_trim_zoom = marker_id.is_some() && marker_id.as_deref() == self.marker_edit.as_ref().map(|(id, _)| id.as_str());
-        if self.zoom_slot.is_none() && !from_trim_zoom && (marker_id.is_some() || self.marker_edit.is_some()) {
+        // The zoom of a clip's edge in the S-Story: its video and sound are chosen in the zoom.
+        let edge_zoom = marker_id.is_some() && self.slot_trim.is_some();
+        if edge_zoom {
+            self.let_go_if_unmoved();
+        }
+        if self.zoom_slot.is_none() && !from_trim_zoom && !edge_zoom && (marker_id.is_some() || self.marker_edit.is_some()) {
             self.refresh_view(qnc_ui_text::text("story.msg.cut_part_zoom_only").into());
             return true;
         }
@@ -84,6 +89,15 @@ impl ProgramSegments {
         };
         let stored = self.cut_frame(&marker_id);
         if picture {
+            // An M marker on the join of two clips with no cover at it (user 2026-11-09: the J
+            // of a segment's picture over the Off before it): the picture there is the clips'.
+            if let Some(join) = self.join_under_marker(&marker_id) {
+                if let Some(frame) = self.cut_frame(&join) {
+                    self.let_go_edits(false);
+                    self.marker_edit = Some((join.clone(), frame)); // the M marker stays the one drawn
+                    return self.take_cut_part(Some(join), true, 0);
+                }
+            }
             // A cut of the picture is only where the picture of the program changes (user
             // 2026-10-29: a cover overwrites the picture and A2, it is no layer above).
             if let Some(words) = self.no_picture_cut(&marker_id) {
@@ -177,6 +191,11 @@ impl ProgramSegments {
         if self.cut_sound_taken() {
             return self.take_sound_edge(after);
         }
+        // A picture clicked while the whole cut is taken (user 2026-11-09: in the zoom the
+        // picture could not be chosen apart from the sound): only the picture of the cut.
+        if self.cut_part == CutPart::Whole && (self.join_under_marker(marker_id).is_some() || self.no_picture_cut(marker_id).is_none()) {
+            return self.take_cut_part(Some(marker_id.to_string()), true, 0);
+        }
         self.refresh_view(String::new());
         true
     }
@@ -265,6 +284,16 @@ impl ProgramSegments {
         }
         let (before, after) = self.cut_covers(marker_id);
         (before.is_none() && after.is_none()).then_some("story.msg.marker_no_picture_cut")
+    }
+
+    /// The cut between two clips an M marker stands on, when neither side of it has a cover.
+    fn join_under_marker(&self, marker_id: &str) -> Option<String> {
+        if qnc_program_view::join_segment(marker_id).is_some() || !matches!(self.cut_covers(marker_id), (None, None)) {
+            return None;
+        }
+        let frame = self.cut_frame(marker_id)?;
+        let pair = self.view.rows.windows(2).find(|pair| !pair[0].lead && !pair[1].lead && pair[1].start_frame == frame)?;
+        Some(format!("{}{}", qnc_program_view::JOIN_PREFIX, pair[1].segment_id))
     }
 
     /// The two clips of a cut between them, as stored: the one before and `segment_id` after.

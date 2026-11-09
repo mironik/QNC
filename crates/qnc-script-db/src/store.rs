@@ -4,7 +4,7 @@ use crate::*;
 use rusqlite::{params, Connection, OptionalExtension};
 
 /// The tables this module owns; it writes no other.
-const OWNED: [&str; 5] = ["script_blocks", "script_profile", "script_voice", "script_voice_takes", "script_undo"];
+const OWNED: [&str; 6] = ["script_blocks", "script_profile", "script_voice", "script_voice_takes", "script_undo", "script_sessions"];
 
 pub(crate) struct Store {
     conn: Connection,
@@ -113,6 +113,7 @@ impl Store {
             Operation::Undo | Operation::Redo => Ok(Data::Blocks(Vec::new())),
             Operation::ReadVoices => self.voices().map(Data::Voices),
             Operation::AddVoiceTake { id, name, clip_uri, take } => self.add_voice_take(*id, name, clip_uri, take),
+            Operation::AddSession { wav_uri, seconds, tc, marks } => self.add_session(wav_uri, *seconds, tc, marks),
             Operation::SetVoiceChosen { id, take } => self.set_voice_chosen(*id, *take),
             Operation::SetTakeHeard { id, take, heard } => self.set_take_heard(*id, *take, heard),
             Operation::SetMarks { id, marks } => self.set_marks(*id, marks),

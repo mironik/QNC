@@ -421,6 +421,9 @@ pub fn artifacts_context(
         .ok_or_else(|| qnc_ui_text::text("artifact.timeline_artifacts_have_local_binding_project").to_string())?;
     let filmstrip_dir = settings.product_local_dir(&project_dir, ProductArea::Filmstrip);
     let filmstrip_root_uri = settings.product_uri(ProductArea::Filmstrip);
+    // What the project made itself (a recorded OFF) is read from the project's folder.
+    let mut sources = source_bindings.to_vec();
+    sources.push(SourceBinding { uri: settings.project_media_source_uri().map_err(|e| e.message)?, file: Some(project_dir.clone()), endpoint: None, token_env: None });
     let project_db = ProjectDbTarget::for_project(reader, settings)?;
     let artifacts = SharedArtifacts::new(project_db.clone());
     let made = |kind| -> Result<bool, String> {
@@ -448,7 +451,7 @@ pub fn artifacts_context(
                 Ok(Box::new(ProjectFilmstripContentWriter(ArtifactPublisher::start(&target, lease.clone())?)))
             })
         },
-        filmstrip_sources: filmstrip_source_bindings(source_bindings)?,
+        filmstrip_sources: filmstrip_source_bindings(&sources)?,
         wave_reader: Arc::new(ProjectWaveContentReader {
             read: SharedRead::new(content_target),
             artifacts,
@@ -457,7 +460,7 @@ pub fn artifacts_context(
         wave_writer: Arc::new(move || -> Result<Box<dyn qnc_wave_worker::WaveContentWrite>, String> {
             Ok(Box::new(ProjectWaveContentWriter(ArtifactPublisher::start(&project_db, lease.clone())?)))
         }),
-        wave_sources: wave_source_bindings(source_bindings)?,
+        wave_sources: wave_source_bindings(&sources)?,
     })
 }
 

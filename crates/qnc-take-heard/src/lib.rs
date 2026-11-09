@@ -124,7 +124,7 @@ fn claim(locator: &StillLocator, take: &Wanted) -> (String, i64, u16) {
 
 /// Why this project's takes cannot be heard: it does not transcribe, or its speech is not the
 /// language of the engine.
-fn barred(locator: &StillLocator) -> Option<String> {
+pub fn barred(locator: &StillLocator) -> Option<String> {
     let settings = locator.settings();
     match settings.transcription_enabled() {
         Ok(true) => {}

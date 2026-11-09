@@ -7,11 +7,18 @@ use crate::*;
 use rusqlite::{params, Connection, OptionalExtension};
 
 /// The most takes a record has (the channels of its clip).
-pub const MAX_TAKES: u16 = 8;
+pub const MAX_TAKES: u16 = 99;
 
 pub(crate) fn ensure_schema(conn: &Connection) -> Result<()> {
     conn.execute_batch(
-        "CREATE TABLE IF NOT EXISTS script_voice (
+        "CREATE TABLE IF NOT EXISTS script_sessions (
+            session_id INTEGER PRIMARY KEY AUTOINCREMENT,
+            wav_uri TEXT NOT NULL CHECK (length(wav_uri) > 0),
+            seconds REAL NOT NULL CHECK (seconds >= 0),
+            tc TEXT NOT NULL,
+            marks_json TEXT NOT NULL,
+            recorded_at_utc TEXT NOT NULL);
+        CREATE TABLE IF NOT EXISTS script_voice (
             block_id INTEGER PRIMARY KEY,
             name TEXT NOT NULL CHECK (length(name) > 0),
             clip_uri TEXT NOT NULL CHECK (length(clip_uri) > 0),
@@ -107,10 +114,8 @@ impl Store {
         if take.take > MAX_TAKES {
             return Err(qnc_ui_text::fill("db.script_voice_full", &[("most", &MAX_TAKES.to_string())]));
         }
-        if let Some((kept_name, kept_clip)) = &kept {
-            if kept_name != name || kept_clip != clip_uri {
-                return Err(qnc_ui_text::text("db.script_voice_renamed").into());
-            }
+        if kept.as_ref().is_some_and(|(kept_name, _)| kept_name != name) {
+            return Err(qnc_ui_text::text("db.script_voice_renamed").into());
         }
         tx.execute(
             "INSERT INTO script_voice_takes (block_id, take, wav_uri, seconds, tc, text, recorded_at_utc) VALUES (?1, ?2, ?3, ?4, ?5, ?6, strftime('%Y-%m-%dT%H:%M:%fZ','now'))",
@@ -119,18 +124,27 @@ impl Store {
         .map_err(err)?;
         tx.execute(
             "INSERT INTO script_voice (block_id, name, clip_uri, chosen, updated_at_utc) VALUES (?1, ?2, ?3, ?4, strftime('%Y-%m-%dT%H:%M:%fZ','now'))
-             ON CONFLICT(block_id) DO UPDATE SET chosen = excluded.chosen, updated_at_utc = excluded.updated_at_utc",
+             ON CONFLICT(block_id) DO UPDATE SET chosen = excluded.chosen, clip_uri = excluded.clip_uri, updated_at_utc = excluded.updated_at_utc",
             params![id, name, clip_uri, take.take],
         )
         .map_err(err)?;
-        // The clip starts where its first take started; its length used is the take's.
-        let clip_tc: String = tx.query_row("SELECT tc FROM script_voice_takes WHERE block_id = ?1 AND take = 1", params![id], |r| r.get(0)).map_err(err)?;
+        // The block uses this reading: its own clip, length and timecode.
+        let clip_tc = &take.tc;
         tx.execute(
             "UPDATE script_blocks SET voice_uri = ?2, voice_seconds = ?3, voice_tc = ?4, updated_at_utc = strftime('%Y-%m-%dT%H:%M:%fZ','now') WHERE block_id = ?1",
             params![id, clip_uri, take.seconds, clip_tc],
         )
         .map_err(err)?;
         tx.commit().map_err(err)?;
+        Ok(Data::Changed)
+    }
+
+    /// One recording of the whole story (no step of undo: a recording stays).
+    pub(crate) fn add_session(&mut self, wav_uri: &str, seconds: f64, tc: &str, marks: &[f64]) -> Result<Data> {
+        let marks = serde_json::to_string(marks).map_err(err)?;
+        self.connection()
+            .execute("INSERT INTO script_sessions (wav_uri, seconds, tc, marks_json, recorded_at_utc) VALUES (?1, ?2, ?3, ?4, strftime('%Y-%m-%dT%H:%M:%SZ', 'now'))", params![wav_uri, seconds, tc, marks])
+            .map_err(err)?;
         Ok(Data::Changed)
     }
 
@@ -147,13 +161,14 @@ impl Store {
     /// Take `take` of block `id` becomes the one used; the block keeps its length.
     pub(crate) fn set_voice_chosen(&mut self, id: i64, take: u16) -> Result<Data> {
         let tx = qnc_db_broker::begin_write(self.connection_mut()).map_err(err)?;
-        let seconds: f64 = tx
-            .query_row("SELECT seconds FROM script_voice_takes WHERE block_id = ?1 AND take = ?2", params![id, take], |r| r.get(0))
+        let (seconds, wav_uri, tc): (f64, String, String) = tx
+            .query_row("SELECT seconds, wav_uri, tc FROM script_voice_takes WHERE block_id = ?1 AND take = ?2", params![id, take], |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?)))
             .optional()
             .map_err(err)?
             .ok_or_else(|| qnc_ui_text::fill("db.script_voice_no_take", &[("take", &take.to_string())]))?;
-        tx.execute("UPDATE script_voice SET chosen = ?2, updated_at_utc = strftime('%Y-%m-%dT%H:%M:%fZ','now') WHERE block_id = ?1", params![id, take]).map_err(err)?;
-        tx.execute("UPDATE script_blocks SET voice_seconds = ?2, updated_at_utc = strftime('%Y-%m-%dT%H:%M:%fZ','now') WHERE block_id = ?1", params![id, seconds]).map_err(err)?;
+        let clip_uri = take_clip_uri(&wav_uri);
+        tx.execute("UPDATE script_voice SET chosen = ?2, clip_uri = ?3, updated_at_utc = strftime('%Y-%m-%dT%H:%M:%fZ','now') WHERE block_id = ?1", params![id, take, clip_uri]).map_err(err)?;
+        tx.execute("UPDATE script_blocks SET voice_seconds = ?2, voice_uri = ?3, voice_tc = ?4, updated_at_utc = strftime('%Y-%m-%dT%H:%M:%fZ','now') WHERE block_id = ?1", params![id, seconds, clip_uri, tc]).map_err(err)?;
         tx.commit().map_err(err)?;
         Ok(Data::Changed)
     }

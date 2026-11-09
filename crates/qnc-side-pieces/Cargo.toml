@@ -8,6 +8,7 @@ description = "QNC public module: the pieces of the right panel of an editorial 
 qnc-clip-row = { workspace = true }
 qnc-clip-shots = { workspace = true }
 qnc-db-broker = { workspace = true }
+qnc-notice.workspace = true
 qnc-script = { workspace = true }
 qnc-skeleton-versions = { workspace = true }
 qnc-source-preview = { workspace = true }

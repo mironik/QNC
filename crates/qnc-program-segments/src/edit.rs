@@ -42,6 +42,10 @@ impl ProgramSegments {
         let Some(segment) = self.stored.iter().find(|row| row.segment_id == segment_id && row.active) else {
             return self.refresh_view(qnc_ui_text::text("story.msg.segment_edit_only_active").into());
         };
+        // A compound statement has no one clip to open: it is trimmed on the Wrap row as a whole.
+        if !segment.parts.is_empty() {
+            return self.refresh_view(qnc_notice::raised(qnc_ui_text::text("story.msg.compound_whole").into()));
+        }
         self.source_request = Some((segment.clip_id.clone(), segment.in_frame, segment.out_frame, take));
         self.selected = Some(segment_id.clone());
         self.editing = Some(segment_id);
@@ -235,7 +239,10 @@ impl ProgramSegments {
         let length = duration.max(cut + 1);
         let whole = qnc_program_waveform::Placement { program_start: 0, program_end: length, source_in: 0, source_out: length, ..at };
         let axis = qnc_program_view::ZoomAxis { cut, holds: (cut, cut), half, total: duration, position, follow: &self.zoom_follow, lanes: [vec![whole], Vec::new()] };
-        Some(axis.sound())
+        // The M marker of this edge: its video and sound are chosen alone in the zoom.
+        let (before, after) = trim.slot_id.split_once('|')?;
+        let taken_cut = Some(if trim.start { before } else { after }.to_string());
+        Some(qnc_program_view::ZoomSound { taken_cut, ..axis.sound() })
     }
 
     /// Whether a segment edge taken from the segment panel waits for Enter or Escape.

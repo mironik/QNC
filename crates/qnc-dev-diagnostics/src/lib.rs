@@ -590,6 +590,8 @@ pub fn log_line(stream: DiagnosticsStream, message: impl AsRef<str>) {
 /// backtrace) before the usual report on stderr, whether diagnostics are on or not: a program
 /// started from a window has no stderr, so a panic left no trace (live 2026-10-28).
 pub fn log_panics(program: &'static str) {
+    #[cfg(windows)]
+    crash_trace::install(program);
     let previous = std::panic::take_hook();
     std::panic::set_hook(Box::new(move |info| {
         log_line(DiagnosticsStream::Player, panic_line(program, info, &std::backtrace::Backtrace::force_capture()));
@@ -611,6 +613,66 @@ fn panic_line(program: &str, info: &std::panic::PanicHookInfo<'_>, backtrace: &s
         std::process::id(),
         thread.name().unwrap_or("unnamed"),
     )
+}
+
+/// A process that ends without a panic (a stack overflow, an abort, a fault in native code such as
+/// a decoder or a sound driver) left no trace either (live 2026-11-09): its stderr goes to
+/// `diagnostics/stderr-<program>.log` and an unhandled fault is written into the player log.
+#[cfg(windows)]
+mod crash_trace {
+    use std::ffi::c_void;
+    use std::os::windows::io::IntoRawHandle;
+
+    #[repr(C)]
+    struct ExceptionRecord {
+        code: u32,
+        flags: u32,
+        record: *const ExceptionRecord,
+        address: *mut c_void,
+    }
+
+    #[repr(C)]
+    struct ExceptionPointers {
+        record: *const ExceptionRecord,
+        context: *mut c_void,
+    }
+
+    type Filter = unsafe extern "system" fn(*const ExceptionPointers) -> i32;
+
+    #[link(name = "kernel32")]
+    extern "system" {
+        fn SetStdHandle(which: u32, handle: *mut c_void) -> i32;
+        fn SetUnhandledExceptionFilter(filter: Option<Filter>) -> Option<Filter>;
+    }
+
+    const STD_ERROR_HANDLE: u32 = -12i32 as u32;
+    static PROGRAM: std::sync::OnceLock<&'static str> = std::sync::OnceLock::new();
+
+    unsafe extern "system" fn on_fault(pointers: *const ExceptionPointers) -> i32 {
+        let (code, address) = match unsafe { pointers.as_ref().and_then(|p| p.record.as_ref()) } {
+            Some(record) => (record.code, record.address as usize),
+            None => (0, 0),
+        };
+        let program = PROGRAM.get().copied().unwrap_or("?");
+        super::log_line(super::DiagnosticsStream::Player, format!("crash program={program} pid={} code=0x{code:08X} address=0x{address:X}", std::process::id()));
+        // Let Windows end the process as it would have.
+        0
+    }
+
+    pub(super) fn install(program: &'static str) {
+        if super::unit_test() {
+            return;
+        }
+        let _ = PROGRAM.set(program);
+        unsafe { SetUnhandledExceptionFilter(Some(on_fault)) };
+        let Some(root) = super::locate_qnc_root() else { return };
+        let dir = super::log_dir(&root);
+        let _ = std::fs::create_dir_all(&dir);
+        let Ok(mut file) = std::fs::OpenOptions::new().create(true).append(true).open(dir.join(format!("stderr-{program}.log"))) else { return };
+        let _ = std::io::Write::write_all(&mut file, format!("{} started pid={}\n", super::unix_ms(), std::process::id()).as_bytes());
+        // The handle stays open for the life of the process; Rust's stderr asks for it on every write.
+        unsafe { SetStdHandle(STD_ERROR_HANDLE, file.into_raw_handle()) };
+    }
 }
 
 pub fn recent_lines_from_root(

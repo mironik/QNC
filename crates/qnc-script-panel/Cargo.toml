@@ -15,3 +15,4 @@ qnc-text-source-editor = { workspace = true }
 qnc-transcript = { workspace = true }
 qnc-ui-kit = { workspace = true }
 qnc-ui-text = { workspace = true }
+qnc-script-db = { version = "0.1.0", path = "../qnc-script-db" }

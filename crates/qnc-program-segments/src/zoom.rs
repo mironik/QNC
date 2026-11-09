@@ -16,7 +16,10 @@ use qnc_timeline_model::enlarged as window;
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) enum ZoomOn {
     Slot(String),
+    /// The Wrap row of a segment, called by one click.
     Segment(String),
+    /// A segment in edit mode (a double click): 70 % of the window, 15 % each side.
+    SegmentEdit(String),
     Program,
 }
 
@@ -41,10 +44,25 @@ impl ProgramSegments {
         let covered = slot.as_ref().filter(|id| self.view.slots.iter().any(|slot| &slot.slot_id == *id && (slot.has_cover || self.is_s_story())));
         let wanted = match (covered, self.view.user_segment_at(frame)) {
             (Some(id), _) => Some(ZoomOn::Slot(id.clone())),
-            (None, Some(row)) => Some(ZoomOn::Segment(row.segment_id.clone())),
+            (None, Some(row)) => Some(ZoomOn::SegmentEdit(row.segment_id.clone())),
             (None, None) => slot.map(ZoomOn::Slot),
         };
         self.toggle_zoom(wanted);
+    }
+
+    /// One click on a segment or a cover (user 2026-11-09: "a click calls that wrap segment to
+    /// the timeline"): its Wrap row in the place of the source timeline. A click inside what is
+    /// already in edit mode only places the playhead there.
+    pub(crate) fn zoom_row_at(&mut self, frame: u64) {
+        let editing = self.zoom_slot.is_some() && !matches!(self.zoom_slot, Some(ZoomOn::Segment(_)));
+        if editing && self.zoom_window(&self.view).is_some_and(|(from, to)| (from..to).contains(&frame)) {
+            return;
+        }
+        let Some(wanted) = self.view.user_segment_at(frame).map(|row| ZoomOn::Segment(row.segment_id.clone())) else { return };
+        if self.zoom_slot.as_ref() != Some(&wanted) {
+            self.zoom_slot = Some(wanted);
+            self.refresh_view(String::new());
+        }
     }
 
     /// The whole program enlarged; again closes it.
@@ -71,6 +89,7 @@ impl ProgramSegments {
                 Some(window(slot.start_frame, slot.end_frame, view.total_frames))
             }
             ZoomOn::Segment(id) => view.wrap_rows().into_iter().find(|(_, row)| &row.segment_id == id).map(|(window, _)| window),
+            ZoomOn::SegmentEdit(id) => view.wrap_rows().into_iter().find(|(_, row)| &row.segment_id == id).map(|((from, to), _)| window(from, to, view.total_frames)),
             ZoomOn::Program => (view.total_frames > 0).then_some((0, view.total_frames)),
         }
     }

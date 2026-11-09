@@ -9,6 +9,7 @@ qnc-clip-row = { workspace = true }
 qnc-smooth-joins = { workspace = true }
 qnc-read-check = { workspace = true }
 qnc-take-heard = { workspace = true }
+qnc-session-readings = { workspace = true }
 qnc-clip-transcripts = { workspace = true }
 qnc-subsegment-edit = { workspace = true }
 qnc-db-broker = { workspace = true }
@@ -38,3 +39,6 @@ qnc-dev-diagnostics = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
 qnc-edit-words = { workspace = true }
+qnc-notice.workspace = true
+qnc-program-input = { version = "0.1.0", path = "../qnc-program-input" }
+qnc-worker-wake = { version = "0.1.0", path = "../qnc-worker-wake" }

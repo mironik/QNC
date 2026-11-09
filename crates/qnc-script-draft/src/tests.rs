@@ -30,7 +30,7 @@ fn a_draft_is_the_script_in_reading_order_with_its_recorded_takes_and_pauses_for
     let rates = DraftRates { words_per_second: 2.5, fps: 50.0, clip_id: &clip_id };
     let pieces = draft_pieces(&blocks, &voices, &general_tv(), &rates).unwrap();
     let shown: Vec<_> = pieces.iter().map(|p| (p.clip_id.as_str(), p.from_frame, p.to_frame, p.gap_before, p.a1)).collect();
-    assert_eq!(shown, vec![("voice-P_OFF1", 0, 150, 0, Some((Some(1), 0, false))), ("c1", 100, 200, 0, None), ("c2", 10, 60, 100, None)]);
+    assert_eq!(shown, vec![("voice-P_OFF1_T2", 0, 150, 0, Some((Some(0), 0, false))), ("c1", 100, 200, 0, None), ("c2", 10, 60, 100, None)]);
 }
 
 #[test]
@@ -55,8 +55,18 @@ fn the_skeleton_is_the_script_as_story_segments_without_the_offs_not_recorded() 
     let rates = DraftRates { words_per_second: 2.5, fps: 50.0, clip_id: &clip_id };
     let parts = skeleton(&blocks, &voices, &general_tv(), &rates).unwrap();
     let shown: Vec<_> = parts.iter().map(|p| (p.kind, p.clip_id.as_str(), p.from_frame, p.to_frame, p.origin.as_str())).collect();
-    assert_eq!(shown, vec![("offovi", "voice-P_OFF1", 0, 150, "script:2:0"), ("tonovi", "c1", 100, 200, "script:3:0"), ("tonovi", "c2", 10, 60, "script:5:0")]);
-    assert_eq!(parts[0].a1, Some((Some(1), 0, false)));
+    assert_eq!(shown, vec![("offovi", "voice-P_OFF1_T2", 0, 150, "script:2:0"), ("tonovi", "c1", 100, 200, "script:3:0"), ("tonovi", "c2", 10, 60, "script:5:0")]);
+    assert_eq!(parts[0].a1, Some((Some(0), 0, false)));
+}
+
+#[test]
+fn a_good_reading_has_its_in_and_out_where_its_sound_is_a_bad_one_has_none() {
+    let heard = |text: &str, start: f64, end: f64| qnc_script_db::HeardWord { text: text.into(), start, end };
+    let take = |words| VoiceTake { take: 1, wav_uri: String::new(), seconds: 6.0, tc: String::new(), text: String::new(), heard: Some(words) };
+    let good = take(vec![heard("prva", 1.0, 1.4), heard("druga", 1.5, 2.0), heard("treca", 2.1, 3.0)]);
+    assert_eq!(take_sound_range("prva druga treca", &good, 50.0), Some((45, 155)));
+    let bad = take(vec![heard("prva", 1.0, 1.4)]);
+    assert_eq!(take_sound_range("prva druga treca", &bad, 50.0), None);
 }
 
 #[test]

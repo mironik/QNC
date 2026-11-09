@@ -221,6 +221,27 @@ pub struct VoiceTake {
     pub heard: Option<Vec<HeardWord>>,
 }
 
+/// The name of the files of reading `take` of record `name`: its WAV and its mono clip.
+pub fn take_name(name: &str, take: u16) -> String {
+    format!("{name}_T{take}")
+}
+
+/// The letter a reading is shown with: a, b, ... z, then aa, ab (OFF 1a, OFF 1b; user 2026-11-09).
+pub fn take_letter(take: u16) -> String {
+    let index = take.saturating_sub(1);
+    let letter = |n: u16| char::from(b'a' + (n % 26) as u8);
+    if index < 26 {
+        letter(index).to_string()
+    } else {
+        format!("{}{}", letter(index / 26 - 1), letter(index))
+    }
+}
+
+/// The clip of a reading, beside its WAV.
+pub fn take_clip_uri(wav_uri: &str) -> String {
+    format!("{}.mxf", wav_uri.strip_suffix(".wav").unwrap_or(wav_uri))
+}
+
 /// A word heard in a take: its text and its seconds in the take.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -245,6 +266,8 @@ pub enum Operation {
     /// Block `id` gets `take` as the next take of its voice record (named `name` at the first
     /// take, its clip at `clip_uri`); the take becomes the one used.
     AddVoiceTake { id: i64, name: String, clip_uri: String, take: VoiceTake },
+    /// One recording of the whole story, with the seconds where a new reading was marked.
+    AddSession { wav_uri: String, seconds: f64, tc: String, marks: Vec<f64> },
     /// Take `take` of block `id`'s voice record becomes the one used (its channel of the clip).
     SetVoiceChosen { id: i64, take: u16 },
     /// The words heard in take `take` of block `id`'s voice record.
@@ -426,6 +449,10 @@ pub fn read_voice(target: &ProjectDbTarget, id: i64) -> Result<Option<Voice>> {
 }
 
 /// Block `id` gets `take` as the next take of its voice record.
+pub fn add_session(target: &ProjectDbTarget, wav_uri: String, seconds: f64, tc: String, marks: Vec<f64>) -> Result<()> {
+    write(target, Operation::AddSession { wav_uri, seconds, tc, marks }).map(drop)
+}
+
 pub fn add_voice_take(target: &ProjectDbTarget, id: i64, name: String, clip_uri: String, take: VoiceTake) -> Result<()> {
     write(target, Operation::AddVoiceTake { id, name, clip_uri, take }).map(drop)
 }

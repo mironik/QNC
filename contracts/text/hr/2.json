@@ -195,6 +195,8 @@
     "transcript.search_hint": "riječ u prijepisu",
     "transcript.search_found": "{at} od {count}",
     "transcript.search_none": "nema",
+    "transcript.search_next": "Sljedeći",
+    "transcript.copy": "Kopiraj",
     "ai.tab_audio": "AI zvuk",
     "ai.tab_video": "AI slika",
     "ma.transcribe_fast": "Brzo",

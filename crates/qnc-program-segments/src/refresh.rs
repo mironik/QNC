@@ -2,6 +2,9 @@ use super::*;
 
 impl ProgramSegments {
     pub(crate) fn refresh_view(&mut self, message: String) {
+        if crate::refused::is_refusal(&message) {
+            self.warn(&message);
+        }
         if !known(
             &self.selected,
             self.stored.iter().map(|row| row.segment_id.as_str()),

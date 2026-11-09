@@ -36,6 +36,7 @@ fn the_lead_in_and_lead_out_are_drawn_in_the_rows_of_the_first_and_last_segment(
         selected: false,
         lead,
         level_keys: Vec::new(),
+        parts: Vec::new(),
     };
     let view = SegmentsView {
         rows: vec![row("li0", (0, 70), true), row("li1", (70, 100), true), row("a", (100, 200), false), row("b", (200, 300), false), row("lo", (300, 400), true)],

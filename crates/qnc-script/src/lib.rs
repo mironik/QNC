@@ -35,11 +35,13 @@ mod view;
 mod text_edit;
 mod text_marks;
 pub use text_marks::MARK_AT;
+mod session;
+pub use session::{SESSION, SESSION_MARK};
 mod word_pick;
 pub use word_pick::{WordPick, TEXT_CUT, TEXT_DRAFT, TEXT_REVERT, WORD_PICK, WORD_TAKE};
 pub use text_edit::text_of;
 pub use qnc_subsegment_edit::{
-    drag_target, nearest_edge, own_action, subsegment_pictures, subsegment_placements, subsegment_view, subsegment_zoom, JoinSide, JoinSound, SubsegmentPart, SubsegmentView, DRAG_EDGE, JOIN_CUT, JOIN_GAP, JOIN_SMOOTH, PART_CHANNEL, PART_LEVEL, PART_MOVE, PART_OFF, PART_REMOVE, ROW_ACTIONS, SLIP, SUBSEGMENT_CLOSE, SUBSEGMENT_CUE, SUBSEGMENT_SELECT, SUBSEGMENT_TAKE, TAKE_EDGE, ZOOM_WORD,
+    drag_target, nearest_edge, own_action, subsegment_pictures, subsegment_placements, subsegment_view, subsegment_zoom, JoinSide, JoinSound, SubsegmentPart, SubsegmentView, DRAG_EDGE, JOIN_CUT, JOIN_GAP, JOIN_SMOOTH, PART_CHANNEL, PART_LEVEL, PART_MOVE, PART_OFF, PART_REMOVE, SLIP, SUBSEGMENT_CLOSE, SUBSEGMENT_CUE, SUBSEGMENT_SELECT, SUBSEGMENT_TAKE, TAKE_EDGE, ZOOM_WORD,
 };
 
 pub use view::*;
@@ -110,13 +112,19 @@ pub const OPEN_EXPORT: &str = "script_open_export";
 /// How often the script is read again (another process may change it).
 const READ_EVERY: Duration = Duration::from_secs(2);
 
+/// A reading's own clip into the catalog, so the Broadcast Player plays it.
+fn publish_reading(locator: &qnc_source_preview::StillLocator, name: &str, reading: &qnc_script_db::VoiceTake) -> Result<(), String> {
+    let record = qnc_voice_take::describe_record(locator.settings(), name, &qnc_script_db::take_clip_uri(&reading.wav_uri), &[reading.seconds], &reading.tc)?;
+    qnc_voice_catalog::publish_record(locator.reader(), locator.settings(), name, record)
+}
+
 /// A write waiting for the one on its way.
 type QueuedWrite = Box<dyn FnOnce(&ProjectDbTarget) -> Result<Option<i64>, String> + Send>;
 
 /// What a take gives back: the take that started, or the finished one as its block keeps it.
 enum TakeAnswer {
     Started(Take),
-    Finished(Result<Recorded, String>),
+    Finished(Result<Vec<Recorded>, String>),
     Cancelled(Result<(), String>),
 }
 
@@ -140,6 +148,9 @@ pub struct Script {
     take: Option<(i64, Take)>,
     /// A take on its way to start, or a stopped one on its way to its clip.
     taking: Option<(i64, mpsc::Receiver<TakeAnswer>)>,
+    /// The reading of the whole story that records, and one on its way to start or stop.
+    session: Option<qnc_voice_take::Session>,
+    session_busy: Option<mpsc::Receiver<session::SessionAnswer>>,
     /// An export on its way to the export folder (piece `qnc-script-files`).
     exporting: Option<mpsc::Receiver<Result<String, String>>>,
     /// The draft story being written (`qnc-export --draft`).
@@ -167,6 +178,7 @@ pub struct Script {
     voice_request: Option<(String, u16, bool)>,
     /// The take to hear once the write in progress is done.
     voice_after_write: Option<(String, u16, bool)>,
+    marks_after_write: Option<(String, u64, u64)>,
     /// How many takes each record had when it was last heard here: one with more was made
     /// again and is prepared anew.
     heard_takes: HashMap<String, usize>,
@@ -179,7 +191,7 @@ pub struct Script {
 
 impl Default for Script {
     fn default() -> Self {
-        Self { view: ScriptView::default(), blocks: Vec::new(), project: None, reading: None, read_at: None, writing: None, queued: std::collections::VecDeque::new(), source_request: None, names: HashMap::new(), words_per_second: Ok(0.0), take: None, taking: None, exporting: None, draft: Default::default(), edit: Default::default(), letters: HashMap::new(), letter_times: qnc_letter_times::LetterTimes::new(), smooth_joins: qnc_smooth_joins::SmoothJoins::new(), take_heard: qnc_take_heard::TakeHeard::new(), read_checks: HashMap::new(), word_cut: qnc_edit_words::WordPair::new(), word_pick: None, voices: Vec::new(), voice_request: None, voice_after_write: None, heard_takes: HashMap::new(), message_after_write: None, clear_after_write: false }
+        Self { view: ScriptView::default(), blocks: Vec::new(), project: None, reading: None, read_at: None, writing: None, queued: std::collections::VecDeque::new(), source_request: None, names: HashMap::new(), words_per_second: Ok(0.0), take: None, taking: None, session: None, session_busy: None, exporting: None, draft: Default::default(), edit: Default::default(), letters: HashMap::new(), letter_times: qnc_letter_times::LetterTimes::new(), smooth_joins: qnc_smooth_joins::SmoothJoins::new(), take_heard: qnc_take_heard::TakeHeard::new(), read_checks: HashMap::new(), word_cut: qnc_edit_words::WordPair::new(), word_pick: None, voices: Vec::new(), voice_request: None, voice_after_write: None, marks_after_write: None, heard_takes: HashMap::new(), message_after_write: None, clear_after_write: false }
     }
 }
 
@@ -270,6 +282,9 @@ impl Script {
         // While a SubSegment is open in place of the source timeline its keys are its own
         // (`qnc-subsegment-edit`). A pointer on its timeline comes as the mouse map's row action
         // (AGENTS 0.12): the SubSegment's own action of it, with the frame or part it points at.
+        if let Some(done) = self.session_key(action_id, preview) {
+            return Some(done);
+        }
         let own = self.edit.own(action_id, target);
         let (action_id, target) = match &own {
             Some((action, own_target)) => (action.as_str(), own_target.as_deref()),
@@ -402,14 +417,17 @@ impl Script {
                 // voice clips is written there now), then the take used is kept.
                 let voice = self.voices.iter().find(|(voice, _)| voice.block_id == block).map(|(voice, _)| voice.clone());
                 let (Some(voice), Some(locator)) = (voice, preview.still_locator()) else { return Some(false) };
-                let clip = qnc_voice_take::clip_id(&voice.name);
-                let fresh = self.heard_takes.insert(clip.clone(), voice.takes.len()) != Some(voice.takes.len());
-                self.voice_after_write = Some((clip, take.saturating_sub(1), fresh));
+                let Some(reading) = voice.takes.iter().find(|reading| reading.take == take).cloned() else { return Some(false) };
+                let name = qnc_script_db::take_name(&voice.name, take);
+                let clip = qnc_voice_take::clip_id(&name);
+                let fresh = self.heard_takes.insert(clip.clone(), 1).is_none();
+                // A good reading opens with its IN and OUT where its sound is (user 2026-11-09).
+                let text = self.view.blocks.iter().find(|row| row.block.id == block).map(|row| row.block.text.clone()).unwrap_or_default();
+                let fps = locator.settings().video_picture().map_or(0.0, |(_, _, fps)| fps);
+                self.marks_after_write = qnc_script_draft::take_sound_range(&text, &reading, fps).map(|(from, to)| (clip.clone(), from, to));
+                self.voice_after_write = Some((clip, 0, fresh));
                 self.write(preview, move |target| {
-                    let takes: Vec<f64> = voice.takes.iter().map(|take| take.seconds).collect();
-                    let first_tc = voice.takes.first().map(|take| take.tc.clone()).unwrap_or_default();
-                    let record = qnc_voice_take::describe_record(locator.settings(), &voice.name, &voice.clip_uri, &takes, &first_tc)?;
-                    qnc_voice_catalog::publish_record(locator.reader(), locator.settings(), &voice.name, record)?;
+                    publish_reading(&locator, &name, &reading)?;
                     qnc_script_db::set_voice_chosen(target, block, take).map(|_| None)
                 })
             }
@@ -571,10 +589,14 @@ impl Script {
                 // The picture of the record says which OFF it is (user 2026-10-30); the record
                 // goes into the catalog, so the Broadcast Player plays its takes.
                 let finished = take.finish(&mark, "");
-                if let (Ok(recorded), Some(locator)) = (&finished, locator) {
-                    if let Err(error) = qnc_voice_catalog::publish_record(locator.reader(), locator.settings(), &recorded.name, recorded.record.clone()) {
-                        qnc_dev_diagnostics::log_line(qnc_dev_diagnostics::DiagnosticsStream::Player, format!("voice-catalog {} refused: {error}", recorded.name));
+                if let (Ok(readings), Some(locator)) = (&finished, locator) {
+                    for recorded in readings {
+                        let name = qnc_script_db::take_name(&recorded.name, recorded.number);
+                        if let Err(error) = qnc_voice_catalog::publish_record(locator.reader(), locator.settings(), &name, recorded.record.clone()) {
+                            qnc_dev_diagnostics::log_line(qnc_dev_diagnostics::DiagnosticsStream::Player, format!("voice-catalog {name} refused: {error}"));
+                        }
                     }
+                    session::wake_worker();
                 }
                 TakeAnswer::Finished(finished)
             });
@@ -594,8 +616,7 @@ impl Script {
         self.spawn_take(id, move || {
             let earlier = match qnc_script_db::read_voice(&target, id) {
                 Ok(voice) => voice.map(|voice| qnc_voice_take::Earlier {
-                    first_tc: voice.takes.first().map(|take| take.tc.clone()).unwrap_or_default(),
-                    takes: voice.takes.iter().map(|take| (take.wav_uri.clone(), take.seconds)).collect(),
+                    takes: voice.takes.last().map_or(0, |take| take.take),
                     name: voice.name,
                 }),
                 Err(error) => return TakeAnswer::Finished(Err(error)),
@@ -716,11 +737,10 @@ impl Script {
         self.message_after_write = Some(qnc_ui_text::fill("script.sent_story", &[("n", &parts.len().to_string())]));
         self.view.message = qnc_ui_text::text("script.sending_story").into();
         self.write(preview, move |target| {
-            for voice in voices.iter().filter(|voice| !voice.takes.is_empty()) {
-                let takes: Vec<f64> = voice.takes.iter().map(|take| take.seconds).collect();
-                let first_tc = voice.takes.first().map(|take| take.tc.clone()).unwrap_or_default();
-                let record = qnc_voice_take::describe_record(locator.settings(), &voice.name, &voice.clip_uri, &takes, &first_tc)?;
-                qnc_voice_catalog::publish_record(locator.reader(), locator.settings(), &voice.name, record)?;
+            for voice in &voices {
+                for reading in &voice.takes {
+                    publish_reading(&locator, &qnc_script_db::take_name(&voice.name, reading.take), reading)?;
+                }
             }
             // The skeleton goes to S-Story as a new version (user 2026-10-31: "always a new
             // version"; every version is a copy of the Story of its own); neither the script nor
@@ -737,15 +757,25 @@ impl Script {
                 // An OFF's A2 is its own voice, off; a statement keeps the A2 kept for its clip,
                 // else channel 2.
                 let a2 = if part.kind == "offovi" { (a1.0, 0, true) } else { lane(kept.as_ref().map(|sound| &sound.a2), 1) };
+                // A compound statement goes as one segment with its parts, each with its own A1
+                // (user 2026-11-09); the story fills in the rate of each clip.
+                let mut compound = Vec::with_capacity(part.parts.len());
+                for piece in &part.parts {
+                    let kept = qnc_clip_sound::read(target, &piece.clip_id)?.map_or((0, 0, false), |sound| (sound.a1.channel, sound.a1.level_db, sound.a1.off));
+                    let sound = piece.a1.map_or(kept, |(channel, level, off)| (channel.unwrap_or(kept.0), level, off));
+                    compound.push(qnc_program_input::compound_part(piece, (0, 0), sound));
+                }
+                let whole = !compound.is_empty();
                 segments.push(qnc_program_db::AppendSegment {
                     kind: part.kind.into(),
                     clip_id: part.clip_id,
-                    in_frame: part.from_frame,
-                    out_frame: part.to_frame,
-                    a1,
+                    in_frame: if whole { 0 } else { part.from_frame },
+                    out_frame: if whole { 0 } else { part.to_frame },
+                    a1: if whole { (a1.0, 0, false) } else { a1 },
                     a2,
                     origin: part.origin,
                     marks: part.marks,
+                    parts: compound,
                 });
             }
             let version = qnc_skeleton_db::new_version(target)?;
@@ -791,6 +821,7 @@ impl Script {
             None => Ok(0.0),
         };
         self.take_answers(preview);
+        self.session_answers(preview);
         if let Some(project) = project.filter(|_| self.reading.is_none() && self.writing.is_none() && self.read_at.is_none_or(|at| at.elapsed() >= READ_EVERY)) {
             self.read_at = Some(Instant::now());
             let (send, read) = mpsc::channel();
@@ -898,22 +929,26 @@ impl Script {
                         self.view.message = qnc_ui_text::text("script.recording").into();
                     }
                     // A finished take goes into its block's record as its next channel, the one used.
-                    TakeAnswer::Finished(Ok(Recorded { name, clip_uri, number, wav_uri, seconds, timecode, silent, .. })) => {
+                    TakeAnswer::Finished(Ok(readings)) => for Recorded { name, clip_uri, number, wav_uri, seconds, timecode, silent, .. } in readings {
                         // A take that heard nothing is kept, and said at once (user 2026-11-08).
                         if silent {
-                            self.message_after_write = Some(qnc_ui_text::fill("script.take_silent", &[("take", &number.to_string())]));
+                            self.message_after_write = Some(qnc_notice::raised(qnc_ui_text::fill("script.take_silent", &[("take", &number.to_string())])));
                         }
                         let text = self.view.blocks.iter().find(|row| row.block.id == id).map(|row| row.block.text.clone()).unwrap_or_default();
                         let take = qnc_script_db::VoiceTake { take: number, wav_uri, seconds, tc: timecode, text, heard: None };
                         self.write(preview, move |target| qnc_script_db::add_voice_take(target, id, name, clip_uri, take).map(|_| None));
                     }
-                    TakeAnswer::Finished(Err(error)) => self.view.message = error,
+                    TakeAnswer::Finished(Err(error)) => {
+                        qnc_dev_diagnostics::log_line(qnc_dev_diagnostics::DiagnosticsStream::Player, format!("script-record block={id} failed: {error}"));
+                        self.view.message = qnc_notice::raised(error);
+                    }
                     TakeAnswer::Cancelled(Ok(())) => self.view.message = qnc_ui_text::text("script.record_cancelled").into(),
                     TakeAnswer::Cancelled(Err(error)) => self.view.message = error,
                 }
             }
         }
         self.view.recording = self.take.as_ref().map(|(id, take)| (*id, take.seconds(), take.take_peak()));
+        self.view.recording_marks = self.take.as_ref().map_or(0, |(_, take)| take.marks());
         self.view.record_busy = self.taking.is_some();
         if let Some(done) = &self.exporting {
             if let Ok(result) = done.try_recv() {
@@ -954,6 +989,9 @@ impl Script {
                     match result {
                         Ok(added) => {
                             self.voice_request = heard;
+                            if let Some(marks) = self.marks_after_write.take() {
+                                self.source_request = Some(marks);
+                            }
                             self.view.message = said.unwrap_or_default();
                             // A saved text leaves the editor empty (MA Script).
                             if std::mem::take(&mut self.clear_after_write) {

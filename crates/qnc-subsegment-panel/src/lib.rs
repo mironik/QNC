@@ -43,11 +43,16 @@ pub fn show(ui: &mut egui::Ui, view: &SubsegmentView, theme: TimelineTheme, leng
     // No title row above the timeline (user 2026-10-29: not needed); a clip of the pool brings
     // the source timeline back.
     let mut answer = None;
-    let duration = view.total_frames.max(1);
-    let mut state = TimelineProjection::new(0, duration).with_cue_enabled(true);
+    let total = view.total_frames.max(1);
+    // A part enlarged (a double click on it, 70/15/15): the same timeline over its window.
+    let (from, to) = view.enlarged.filter(|(from, to)| from < to).unwrap_or((0, total));
+    let duration = to - from;
+    let mut state = TimelineProjection::new(from, duration).with_cue_enabled(true);
     if let Some(frame) = view.playhead {
-        state = state.with_playhead(frame.min(duration));
+        state = state.with_playhead(frame.clamp(from, to));
     }
+    let peaks_at = |frame: u64| ((frame as f64 / total as f64) * view.a1.len() as f64).round() as usize;
+    let a1_peaks = &view.a1[peaks_at(from).min(view.a1.len())..peaks_at(to).min(view.a1.len())];
     let labels: Vec<String> = view.parts.iter().map(|part| format!("{} {}", part.clip_name, part.length)).collect();
     let ids: Vec<String> = (0..view.parts.len()).map(|index| format!("part-{index}")).collect();
     let spans: Vec<TimelineVirtualSpan<'_>> = view
@@ -124,7 +129,7 @@ pub fn show(ui: &mut egui::Ui, view: &SubsegmentView, theme: TimelineTheme, leng
         trim.extend([(part.start, trim_label), (part.end.saturating_sub(1), trim_label)]);
     }
     // The parts' level curves in the A1 band, as on a Wrap row (user 2026-11-07).
-    let level_curves = qnc_trim_overlay::timeline_level_curves(&view.level_curves, 0, duration, 0);
+    let level_curves = qnc_trim_overlay::timeline_level_curves(&view.level_curves, from, to, 0);
     // The parts' filmstrip on V1, as a Wrap row shows its segments (user 2026-10-29).
     let pictures: Vec<TimelinePicture<'_>> = view
         .pictures
@@ -139,19 +144,19 @@ pub fn show(ui: &mut egui::Ui, view: &SubsegmentView, theme: TimelineTheme, leng
                 ui,
                 TimelineInput {
                     state: &state,
-                    layers: TimelineLayerFlags::a1_v_a2().with_overlays().with_audio_bands().with_covers_shown(),
+                    layers: TimelineLayerFlags::a1_v_a2().with_overlays().with_audio_bands().with_covers_shown().with_compact_video(view.video_compact),
                     metrics: TimelineMetrics::default(),
                     theme,
                     expanded_audio: AudioLane::None,
                     focus: TimelineFocusPaint::Playhead,
                     show_lane_labels: true,
-                    shot_in_frame: 0,
-                    shot_out_frame: duration,
-                    draft_in_frame: 0,
-                    draft_out_frame: duration,
+                    shot_in_frame: from,
+                    shot_out_frame: to,
+                    draft_in_frame: from,
+                    draft_out_frame: to,
                     draft_in_active: false,
                     draft_out_active: false,
-                    a1_peaks: &view.a1,
+                    a1_peaks,
                     a2_peaks: &[],
                     a3_peaks: &[],
                     a4_peaks: &[],
@@ -202,7 +207,7 @@ pub fn show(ui: &mut egui::Ui, view: &SubsegmentView, theme: TimelineTheme, leng
         None => None,
     };
     answer = answer.or(drag_event);
-    answer = answer.or_else(|| qnc_timeline::event(&intent, ROW_PANEL, &axis).filter(|event| qnc_script::ROW_ACTIONS.contains(&event.action_id.as_str())));
+    answer = answer.or_else(|| qnc_timeline::event(&intent, ROW_PANEL, &axis).filter(|event| takes(&event.action_id)));
     // The trim zoom of a taken edge, as a cover's: its wheel moves the edge; a click on a word
     // moves the taken edge to it (user 2026-11-04), on the SubSegment's axis.
     // The strips under its pictures in the colour of their length, as the timeline's (the one
@@ -212,7 +217,7 @@ pub fn show(ui: &mut egui::Ui, view: &SubsegmentView, theme: TimelineTheme, leng
         "transcript_cut_word" => ActionEvent { action_id: qnc_script::ZOOM_WORD.to_string(), ..event },
         // A picture or its strip: the timeline row's action, on the row's panel (the zoom is the
         // timeline enlarged).
-        _ if qnc_script::ROW_ACTIONS.contains(&event.action_id.as_str()) || event.action_id == qnc_script::SUBSEGMENT_SELECT => event.at(ROW_PANEL),
+        _ if takes(&event.action_id) || event.action_id == qnc_script::SUBSEGMENT_SELECT => event.at(ROW_PANEL),
         _ => event,
     });
     answer.or(zoomed)
@@ -220,3 +225,9 @@ pub fn show(ui: &mut egui::Ui, view: &SubsegmentView, theme: TimelineTheme, leng
 
 /// The mouse map's panel of a program's row: the SubSegment's timeline is one (AGENTS 0.12).
 const ROW_PANEL: &str = "segments";
+
+/// Whether the SubSegment's timeline takes an action of the mouse map (the one table of what has
+/// no meaning on a timeline, contracts/input/mouse.json).
+fn takes(action: &str) -> bool {
+    qnc_mouse_map::takes("subsegment", ROW_PANEL, action)
+}

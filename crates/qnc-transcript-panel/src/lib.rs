@@ -18,18 +18,49 @@ pub const MODULE_ID: &str = "qnc.module.transcript-panel";
 
 /// Paints the transcript of the shown clip on the whole of `ui`; `timecode` is the shown clip's
 /// source timecode (frames are shown without it).
+///
+/// Only the title and the text (user 2026-11-09, AI Media Assist: "besides the name Transcript
+/// no other text is needed, nor IN/OUT"): no statements, no silent sound, no IN/OUT marks; at the
+/// bottom the search, how many it found, Next (when there are more) and Copy of the transcript.
 pub fn show(ui: &mut egui::Ui, view: &TranscriptView, theme: &qnc_desktop_theme::Theme, timecode: Option<&SourceTimecode>) -> Option<ActionEvent> {
-    paint(ui, view, theme, timecode, true)
+    let rect = ui.available_rect_before_wrap();
+    let bar_height = theme.font_ui + 20.0;
+    let (top, bottom) = rect.split_top_bottom_at_y(rect.max.y - bar_height);
+    let mut text_ui = ui.new_child(egui::UiBuilder::new().max_rect(top).layout(egui::Layout::top_down(egui::Align::Min)));
+    let asked = paint(&mut text_ui, view, theme, timecode, Mode::Clean);
+    ui.painter().rect_filled(bottom, 0.0, theme.bg);
+    let mut bar = ui.new_child(egui::UiBuilder::new().max_rect(bottom.shrink2(egui::vec2(8.0, 4.0))).layout(egui::Layout::left_to_right(egui::Align::Center)));
+    let searched = search_field(&mut bar, &view.search, theme);
+    let size = egui::vec2(96.0, theme.font_ui + 10.0);
+    let mut next = None;
+    if view.search.count > 1 && bar.add(qnc_ui_kit::sized_button(RichText::new(qnc_ui_text::text("transcript.search_next")).size(theme.font_ui), size)).clicked() {
+        next = Some(ActionEvent::key(qnc_transcript::SEARCH_NEXT).at(PANEL));
+    }
+    if bar.add_enabled(!view.lines.is_empty(), qnc_ui_kit::sized_button(RichText::new(qnc_ui_text::text("transcript.copy")).size(theme.font_ui), size)).clicked() {
+        bar.ctx().copy_text(view.lines.iter().map(|line| line.text.trim()).filter(|text| !text.is_empty()).collect::<Vec<_>>().join("\n"));
+    }
+    ui.allocate_rect(rect, Sense::hover());
+    next.or(searched).or(asked)
 }
 
 /// The transcript of the shown clip to read and search (user 2026-11-05, MA Script media
 /// overlay): the statements kept without their header row (Add IN-OUT, Copy) and without the
 /// note that there are none, the words of the term typed in [`search_field`] lit.
 pub fn show_searched(ui: &mut egui::Ui, view: &TranscriptView, theme: &qnc_desktop_theme::Theme, timecode: Option<&SourceTimecode>) -> Option<ActionEvent> {
-    paint(ui, view, theme, timecode, false)
+    paint(ui, view, theme, timecode, Mode::Searched)
 }
 
-fn paint(ui: &mut egui::Ui, view: &TranscriptView, theme: &qnc_desktop_theme::Theme, timecode: Option<&SourceTimecode>, statements: bool) -> Option<ActionEvent> {
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum Mode {
+    /// Title and text, searched (AI Media Assist).
+    Clean,
+    /// The statements kept below the text, searched (MA Script media overlay).
+    Searched,
+}
+
+fn paint(ui: &mut egui::Ui, view: &TranscriptView, theme: &qnc_desktop_theme::Theme, timecode: Option<&SourceTimecode>, mode: Mode) -> Option<ActionEvent> {
+    let statements = false;
+    let clean = mode == Mode::Clean;
     let rect = ui.available_rect_before_wrap();
     ui.painter().rect_filled(rect, 0.0, theme.bg);
     let inner = rect.shrink(8.0);
@@ -41,36 +72,34 @@ fn paint(ui: &mut egui::Ui, view: &TranscriptView, theme: &qnc_desktop_theme::Th
     }
     let opened = paint_queue(&mut ui, view, theme);
     ui.add_space(6.0);
-    let quoted = quotes::show(&mut ui, view, theme, statements);
-    if statements || !view.quotes.is_empty() {
+    let quoted = if clean { None } else { quotes::show(&mut ui, view, theme, statements) };
+    if !clean && !view.quotes.is_empty() {
         ui.add_space(6.0);
     }
     let early = opened.or(quoted);
-    if view.lines.is_empty() && view.silences.is_empty() {
+    let no_silences: &[(u64, u64)] = &[];
+    let silences_shown = if clean { no_silences } else { &view.silences[..] };
+    if view.lines.is_empty() && silences_shown.is_empty() {
         let empty = if view.clip_id.is_some() { "transcript.empty" } else { "transcript.no_clip" };
         ui.label(RichText::new(qnc_ui_text::text(empty)).color(theme.text_muted).size(theme.font_ui));
         return early;
     }
     let mut asked = None;
     let at = |frame: u64| timecode.map_or_else(|| frame.to_string(), |tc| tc.label(frame));
-    let ends = marked_ends(view);
-    let found = if statements {
-        None
-    } else {
-        Some(search::shown(ui.ctx(), &view.search))
-    };
+    let ends = if clean { None } else { marked_ends(view) };
+    let found = Some(search::shown(ui.ctx(), &view.search));
     // New IN/OUT (a statement opened, a cut made): its text is brought into view once.
     let seen = egui::Id::new("qnc-transcript-panel-marks");
     let bring = ui.ctx().memory_mut(|memory| memory.data.get_temp::<Option<(u64, u64)>>(seen)) != Some(view.marks);
     ui.ctx().memory_mut(|memory| memory.data.insert_temp(seen, view.marks));
     egui::ScrollArea::vertical().auto_shrink([false, false]).show(&mut ui, |ui| {
         // Lines and silences in the order of their frames.
-        let mut silences = view.silences.iter().peekable();
+        let mut silences = silences_shown.iter().peekable();
         for line in view.lines.iter() {
             while let Some((from, to)) = silences.next_if(|(from, _)| *from < line.from) {
                 paint_silence(ui, &at(*from), &at(*to), theme);
             }
-            let (word, rect) = paint_line(ui, line, view, ends, found.as_ref(), theme);
+            let (word, rect) = paint_line(ui, line, view, ends, !clean, found.as_ref(), theme);
             if found.as_ref().is_some_and(|found| found.bring && line_words(line).iter().any(|w| found.current.first() == Some(&(w.1, w.2)))) {
                 ui.scroll_to_rect(rect, Some(egui::Align::Center));
             }
@@ -175,7 +204,7 @@ fn clock(seconds: f64) -> String {
 /// One line as one text wrapped at the panel's width (user 2026-10-26: "sentences go out of the
 /// panel, they should wrap"), the word said at the playhead lit; returns the first frame of a
 /// clicked word.
-fn paint_line(ui: &mut egui::Ui, line: &Line, view: &TranscriptView, ends: Option<((u64, u64), (u64, u64))>, found: Option<&search::Shown>, theme: &qnc_desktop_theme::Theme) -> (Option<(u64, u64, bool)>, egui::Rect) {
+fn paint_line(ui: &mut egui::Ui, line: &Line, view: &TranscriptView, ends: Option<((u64, u64), (u64, u64))>, show_marks: bool, found: Option<&search::Shown>, theme: &qnc_desktop_theme::Theme) -> (Option<(u64, u64, bool)>, egui::Rect) {
     let running = view.running.is_some_and(|(from, to)| line.from >= from && line.to <= to);
     let base = if running { theme.text_muted } else { theme.text };
     let font = egui::FontId::proportional(theme.font_ui);
@@ -195,7 +224,7 @@ fn paint_line(ui: &mut egui::Ui, line: &Line, view: &TranscriptView, ends: Optio
             bracket(&mut job, "[ ");
         }
         let lit = said(view, *from, *to);
-        let marked = view.marks.is_some_and(|(a, b)| (a..b).contains(&((from + to) / 2)));
+        let marked = show_marks && view.marks.is_some_and(|(a, b)| (a..b).contains(&((from + to) / 2)));
         let mut format = egui::TextFormat::simple(font.clone(), if lit { theme.black } else { base });
         let current = found.is_some_and(|found| found.current.contains(&(*from, *to)));
         let hit = found.is_some_and(|found| found.lit.contains(&(*from, *to)));

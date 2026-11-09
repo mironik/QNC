@@ -2,7 +2,7 @@ use super::*;
 
 /// One segment of the edited program. Stored kind is `tonovi` or `offovi`.
 /// Frames are source frames of its clip in the timebase `fps_num/fps_den`.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct ProgramSegment {
     pub segment_id: String,
@@ -72,6 +72,10 @@ pub struct ProgramSegment {
     /// clip: an S-Story keeps them, sent to the Story they become M markers.
     #[serde(default)]
     pub text_marks: Vec<u64>,
+    /// The parts of a compound statement, one segment in the story (user 2026-11-09); empty for a
+    /// segment of one clip. With parts, IN and OUT are a window on the statement's own axis.
+    #[serde(default)]
+    pub parts: Vec<crate::CompoundPart>,
 }
 
 /// One point of a level curve (docs/98 2.1): a frame of the item's clip (source frames, so
@@ -242,6 +246,10 @@ pub struct AppendSegment {
     /// Story makes them M markers.
     #[serde(default)]
     pub marks: Vec<u64>,
+    /// The parts of a compound statement: one segment (user 2026-11-09). `in_frame` and `out_frame`
+    /// are then a window on its axis; both 0 is all of it.
+    #[serde(default)]
+    pub parts: Vec<crate::CompoundPart>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]

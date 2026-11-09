@@ -30,16 +30,32 @@ impl ProgramSegments {
         }
     }
 
-    /// Alt+arrows: marker after marker, slot after slot, else segment after segment.
+    /// The playhead placed at `frame`: a slot it leaves is let go, so Ctrl+I/O take the slot
+    /// under the playhead, and nothing picked stays picked, so Backspace is the undo in time.
+    pub(crate) fn place_playhead(&mut self, frame: u64) {
+        let inside = self.view.slots.iter().any(|slot| self.selected_slot.as_deref() == Some(slot.slot_id.as_str()) && (slot.start_frame..slot.end_frame).contains(&frame));
+        // The stored selection goes too, or a later reread brings it back (user 2026-10-23:
+        // after Sync the B-roll button did nothing).
+        if !inside && self.selected_slot.take().is_some() {
+            self.write(Operation::SelectSlot { slot_id: String::new() });
+        }
+        self.drop_selected_cover();
+        self.selected_marker = None;
+        self.cue_at(frame);
+    }
+
+    /// Alt+arrows (user 2026-11-09: everywhere they only move the playhead): the next M marker
+    /// or start of a segment from the playhead. Nothing is taken; with something taken they do
+    /// nothing.
     pub(crate) fn navigate_object(&mut self, up: bool) {
-        let command = if self.selected_marker.is_some() {
-            SegmentCommand::StepMarker { up }
-        } else if self.selected_slot.is_some() {
-            SegmentCommand::StepSlot { up }
-        } else {
-            SegmentCommand::Step { up }
-        };
-        self.apply(command);
+        if self.held().is_some() {
+            return;
+        }
+        let last = self.view.rows.iter().map(|row| row.end_frame).max().unwrap_or(0).saturating_sub(1);
+        let stops: Vec<u64> = self.view.rows.iter().map(|row| row.start_frame).chain(self.view.markers.iter().map(|marker| marker.frame.min(last))).collect();
+        if let Some(frame) = qnc_edit_step::next_stop(&stops, self.playhead.unwrap_or(0), up) {
+            self.place_playhead(frame);
+        }
     }
 
     /// Shift+I on the source (v5 `mark_in_fit_duration`): the selected slot, else the

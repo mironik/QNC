@@ -58,6 +58,8 @@ pub struct SidePieces {
     views: SideViews,
     /// The form's segment panel shows a version of the S-Story.
     draft_story: bool,
+    /// The messages of the script and the transcript at the last look.
+    said: [String; 2],
 }
 
 impl SidePieces {
@@ -74,6 +76,7 @@ impl SidePieces {
             versions: has(DRAFT_SEGMENT_PANEL).then(SkeletonVersions::new),
             views: SideViews::default(),
             draft_story: has(DRAFT_SEGMENT_PANEL),
+            said: Default::default(),
         }
     }
 
@@ -134,6 +137,21 @@ impl SidePieces {
         if let Some(versions) = &mut self.versions {
             if versions.poll(preview) {
                 self.views.versions = Arc::new(versions.view().clone());
+            }
+        }
+        self.warn_of_refusals();
+    }
+
+    /// A message newly saying that a command could not be done is raised as a warning.
+    fn warn_of_refusals(&mut self) {
+        let script = self.script.as_ref().map_or("", |script| script.view().message.as_str());
+        let transcript = self.transcript.as_ref().map_or("", |transcript| transcript.view().message.as_str());
+        for (said, now) in self.said.iter_mut().zip([script, transcript]) {
+            if said != now {
+                if qnc_notice::is_refusal(now) {
+                    qnc_notice::raise(now);
+                }
+                *said = now.to_string();
             }
         }
     }

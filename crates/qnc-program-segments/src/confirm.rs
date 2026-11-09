@@ -139,6 +139,29 @@ impl ProgramSegments {
         self.cover_taken.clone().map(Take::Cover)
     }
 
+    /// In the zoom a choice of the picture, the sound or the slot replaces what is taken while
+    /// nothing of it has moved (user 2026-11-09); what has moved waits for Enter as always.
+    pub(crate) fn let_go_if_unmoved(&mut self) {
+        let unmoved = match self.held() {
+            Some(Take::Marker(id)) => {
+                let stored = self.cut_frame(&id);
+                let drafted = self.marker_edit.as_ref().map(|(_, frame)| *frame);
+                match self.cut_part {
+                    crate::CutPart::Sound { stored, draft, .. } => stored == draft,
+                    crate::CutPart::Picture => drafted == self.join_picture_frame(&id).or(stored),
+                    crate::CutPart::Whole => drafted == stored,
+                }
+            }
+            Some(Take::Slot(_)) => self.slot_move.as_ref().is_some_and(|slot| slot.shift == 0),
+            Some(Take::SlotEdge(..)) => self.slot_trim.as_ref().is_some_and(|trim| trim.frames == 0),
+            _ => false,
+        };
+        if unmoved {
+            self.let_go_edits(false);
+            self.selected_marker = None;
+        }
+    }
+
     /// Something new is not taken while something else waits for Enter (user 2026-10-21:
     /// a marker taken while a Sync waited for Enter left the Sync hanging for minutes): the
     /// take is refused with a warning the user cannot miss. Taking again what is taken goes.

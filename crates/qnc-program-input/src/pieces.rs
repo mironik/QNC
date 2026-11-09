@@ -54,154 +54,62 @@ pub fn load_pieces(
         u32::try_from(own.timebase.fps_den).map_err(|_| qnc_ui_text::text("story.msg.bad_clip_timebase"))?,
     );
     resolver.story_rate = rate;
-    let program_timebase = timebase(rate.0, rate.1, "subsegment")?;
-    let crossfade = i64::from(clips.crossfade_frames()?);
-    let (mut segments, mut joins, mut start) = (Vec::new(), Vec::new(), 0i64);
-    // The story frames per frame of the part before (its L is counted in its own clip).
-    let mut before_scale = (1i64, 1i64);
-    for (index, piece) in pieces.iter().enumerate() {
-        // A pause may come before the first part too (a draft story that starts with an OFF
-        // not recorded yet, user 2026-10-30).
-        let gap = frame(piece.gap_before)?;
-        if gap > 0 {
-            // The pause: an Off with A1 off, black and silence.
-            segments.push(gap_segment(index, &pieces[index.saturating_sub(1)].clip_id, (start, start + gap), program_timebase)?);
-        }
+    let crossfade = clips.crossfade_frames()?;
+    // One layout for a SubSegment and a compound segment of a story (user 2026-11-09).
+    let mut parts = Vec::with_capacity(pieces.len());
+    for piece in pieces {
         let media = resolver.resolve(&piece.clip_id)?;
         let own = (u32::try_from(media.timebase.fps_num).unwrap_or(0), u32::try_from(media.timebase.fps_den).unwrap_or(0));
-        let (num, den) = qnc_program_db::story_per_source(rate, own)?;
-        let source_in = frame(piece.from_frame)? * num / den;
-        let frames = (frame(piece.to_frame)? - frame(piece.from_frame)?) * num / den;
-        if frames <= 0 {
-            return Err(qnc_ui_text::text("script.sot_marks").into());
-        }
         // The part's own A1 (user 2026-10-29), else the sound kept for its clip.
         let kept = qnc_clip_sound::read(target, &piece.clip_id)?.map(|sound| (sound.a1.channel, sound.a1.level_db, sound.a1.off));
         let sound = match piece.a1 {
             Some((channel, level, off)) => Some((channel.or(kept.map(|kept| kept.0)).unwrap_or(0), level, off)),
             None => kept,
         };
-        let record_range = ProgramFrameRange::new(start + gap, start + gap + frames).map_err(|error| error.message)?;
-        // The J and L of the join (only where two parts meet, no pause): the sounds cross as at
-        // a story's cut, in place of the join's crossfade.
-        let (lead, tail) = if index > 0 && gap == 0 { (piece.sound_lead * num / den, piece.sound_tail * before_scale.0 / before_scale.1) } else { (0, 0) };
-        // A negative side is a hole in the sound (user 2026-11-04), the playlist's as at every
-        // story's cut; a positive side crosses.
-        if lead != 0 || tail != 0 {
-            if let Some(before) = segments.last_mut() {
-                before.a1_tail_frames = tail;
-            }
-        }
-        // The J and L of the picture, as at a story's cut (`picture_lead.rs` of the playlist).
-        let joined = index > 0 && gap == 0;
-        let picture_lead = if joined { frame(piece.picture_lead)? * num / den } else { 0 };
-        if joined && piece.picture_tail > 0 {
-            if let Some(before) = segments.last_mut() {
-                before.v_tail_frames = (frame(piece.picture_tail)? * before_scale.0 / before_scale.1).try_into().unwrap_or_default();
-            }
-        }
-        if index > 0 {
-            let shaped = piece.sound_lead != 0 || piece.sound_tail != 0;
-            joins.push(qnc_program_playlist::A1Join { end: start, start: start + gap, frames: if piece.crossfade && !shaped { crossfade } else { 0 } });
-        }
-        // The in-between pictures of a smooth cut: what falls before the join on the part
-        // before, the rest on this one (only between parts at the story's own rate).
-        let mut covers = Vec::new();
-        if let Some((clip, n)) = piece.smooth.as_ref().filter(|_| joined && (num, den) == (1, 1) && before_scale == (1, 1)) {
-            let n = frame(*n)?;
-            let half = n / 2;
-            if let Some(before) = segments.last_mut() {
-                before.covers.push(smooth_cover(index, "before", clip, (start - half, start), (0, half), program_timebase)?);
-            }
-            covers.push(smooth_cover(index, "after", clip, (start, start + n - half), (half, n), program_timebase)?);
-        }
-        before_scale = (num, den);
-        segments.push(ProgramSegmentInput {
-            segment_id: format!("piece-{index}"),
-            kind: "tonovi".into(),
-            clip_id: piece.clip_id.clone(),
-            virtual_shot_id: String::new(),
-            record_range,
-            source_range: FrameRange { source_in, source_out: source_in + frames, timebase: program_timebase },
-            a1_source_channel: sound.map_or(0, |sound| sound.0),
-            a1_level_db: sound.map_or(0, |sound| sound.1),
-            a1_off: sound.is_some_and(|sound| sound.2),
-            covers,
-            v_lead_frames: picture_lead.try_into().unwrap_or_default(),
-            v_tail_frames: 0,
-            a1_lead_frames: lead,
-            a1_tail_frames: 0,
-            a2_source_channel: 0,
-            a2_level_db: 0,
-            a2_off: false,
-            a2_lead_frames: 0,
-            a2_tail_frames: 0,
-            // The part's level curve, on the story's frames (as a segment's points).
-            a1_points: piece
-                .level_keys
-                .iter()
-                .map(|(at, db10)| qnc_program_playlist::LevelPoint { source_frame: i64::try_from(*at).unwrap_or(i64::MAX / 4) * num / den, db10: *db10 })
-                .collect(),
-        });
-        start = record_range.out_frame;
+        parts.push(compound_part(piece, own, sound.unwrap_or((0, 0, false))));
     }
-    let build = ProgramPlaylistBuildInput {
-        playlist_id: format!("subsegment:{project_id}"),
-        project_id: project_id.to_string(),
-        revision: 0,
-        program_timebase,
-        audio_layout: ProgramAudioLayout::discrete(channels).map_err(|error| error.message)?,
-        duration_frames: start,
-        segments,
-        a2_crossfade_frames: 0,
+    let total = qnc_program_db::compound_frames(&parts, rate)?;
+    let segment = qnc_program_db::ProgramSegment {
+        segment_id: "subsegment".into(),
+        kind: "tonovi".into(),
+        clip_id: first.clip_id.clone(),
+        out_frame: total,
+        fps_num: rate.0,
+        fps_den: rate.1,
+        active: true,
+        duration_frames: total,
+        parts,
+        ..qnc_program_db::ProgramSegment::default()
     };
+    let segments = [segment];
+    let mut build = build_input(project_id, rate, &segments, &[], channels)?;
+    build.playlist_id = format!("subsegment:{project_id}");
     let mut playlist = build_flat_program_playlist(&build, &mut resolver)?;
-    qnc_program_playlist::join_a1(&mut playlist.items, &joins)?;
+    apply_joins(&mut playlist, &segments, rate, crossfade)?;
     playlist.validate().map_err(|error| error.message)?;
     ProgramInput::new(playlist, resolver.prepared).map_err(|error| error.to_string())
 }
 
-/// A part of the in-between pictures of a smooth cut as a cover without sound.
-fn smooth_cover(index: usize, side: &str, clip_id: &str, (from, to): (i64, i64), (source_in, source_out): (i64, i64), timebase: FrameTimebase) -> Result<qnc_program_playlist::ProgramCoverInput, String> {
-    Ok(qnc_program_playlist::ProgramCoverInput {
-        cover_id: format!("smooth-{index}-{side}"),
-        clip_id: clip_id.to_string(),
-        virtual_shot_id: String::new(),
-        record_range: ProgramFrameRange::new(from, to).map_err(|error| error.message)?,
-        source_range: FrameRange { source_in, source_out, timebase },
-        a2_source_channel: 0,
-        a2_level_db: 0,
-        a2_off: true,
-        active: true,
-        a2_lead_frames: 0,
-        a2_tail_frames: 0,
-        a2_points: Vec::new(),
-    })
-}
-
-fn gap_segment(index: usize, clip_id: &str, (from, to): (i64, i64), timebase: FrameTimebase) -> Result<ProgramSegmentInput, String> {
-    Ok(ProgramSegmentInput {
-        segment_id: format!("pause-{index}"),
-        kind: "offovi".into(),
-        clip_id: clip_id.to_string(),
-        virtual_shot_id: String::new(),
-        record_range: ProgramFrameRange::new(from, to).map_err(|error| error.message)?,
-        source_range: FrameRange { source_in: 0, source_out: to - from, timebase },
-        a1_source_channel: 0,
-        a1_level_db: 0,
-        a1_off: true,
-        covers: Vec::new(),
-        v_lead_frames: 0,
-        v_tail_frames: 0,
-        a1_lead_frames: 0,
-        a1_tail_frames: 0,
-        a2_source_channel: 0,
-        a2_level_db: 0,
-        a2_off: false,
-        a2_lead_frames: 0,
-        a2_tail_frames: 0,
-        a1_points: Vec::new(),
-    })
+/// A part as a compound segment keeps it: `own` the rate of its clip, `sound` its A1.
+pub fn compound_part(piece: &PieceInput, own: (u32, u32), sound: (u16, i8, bool)) -> qnc_program_db::CompoundPart {
+    qnc_program_db::CompoundPart {
+        clip_id: piece.clip_id.clone(),
+        from_frame: piece.from_frame,
+        to_frame: piece.to_frame,
+        fps_num: own.0,
+        fps_den: own.1,
+        gap_before: piece.gap_before,
+        crossfade: piece.crossfade,
+        a1_channel: sound.0,
+        a1_level_db: sound.1,
+        a1_off: sound.2,
+        sound_lead: piece.sound_lead,
+        sound_tail: piece.sound_tail,
+        picture_lead: piece.picture_lead,
+        picture_tail: piece.picture_tail,
+        level_keys: piece.level_keys.iter().map(|(frame, db10)| qnc_program_db::LevelKey { frame: *frame, db10: *db10 }).collect(),
+        smooth: piece.smooth.clone(),
+    }
 }
 
 /// The program of a SubSegment, built where the player is prepared.

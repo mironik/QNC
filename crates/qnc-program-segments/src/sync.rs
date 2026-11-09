@@ -136,7 +136,7 @@ impl ProgramSegments {
                 SyncSpace::Start(preview)
             }
             Err(error) => {
-                self.refresh_view(error);
+                self.refuse_with(error);
                 SyncSpace::Blocked
             }
         }
@@ -232,7 +232,7 @@ impl ProgramSegments {
                 self.after_sync_finish(qnc_ui_text::text("story.msg.sync_slot_chosen"));
                 self.cue_program(end);
             }
-            Err(error) => self.refresh_view(error),
+            Err(error) => self.refuse_with(error),
         }
         true
     }

@@ -217,6 +217,9 @@
     "zoom_pick_side": {
       "label": "Zoom reza: strana reza u fokusu (klik na sliku prije ili poslije reza)"
     },
+    "zoom_take_slot": {
+      "label": "Zoom reza: slot slike (klik na traku trajanja)"
+    },
     "subsegment_take": {
       "label": "Uzmi dio SubSegmenta cijeli kao slot (desni klik na traku s duljinom)"
     },
@@ -726,7 +729,7 @@
       { "keys": "Shift + lijevi klik", "meaning": "Kao Shift + M: dodaje M marker na mjesto klika." },
       { "keys": "Srednja tipka / kotačić", "meaning": "Srednja tipka reže (IN i OUT na source timelineu, M marker u segmentima). Kotačić je kao strelice lijevo/desno, Ctrl + kotačić kao Ctrl + strelice." },
       { "keys": "Shift + tipka", "meaning": "Dodaje nešto novo (segment, marker u nastavku, pokrivalica, IN i OUT po trajanju slota)." },
-      { "keys": "Alt + strelice", "meaning": "Skače po objektima: marker, slot, segment; na source timelineu početak, IN, OUT." },
+      { "keys": "Alt + strelice", "meaning": "Playhead skače na sljedeći objekt i ništa ne uzima: M marker ili početak segmenta; na source timelineu početak, IN, OUT; u složenoj izjavi rubovi dijelova." },
       { "keys": "Strelice", "meaning": "Lijevo/desno za jedan frame, a kad je nešto uzeto mijenjaju to; gore/dolje prethodni ili sljedeći blok, a dok je rez uzet skok na prethodnu ili sljedeću ključnu sliku." },
       { "keys": "J / K / L", "meaning": "J unazad, L naprijed (ponovno 2x, 4x, 8x), K stani. Shift+K: play oko uzetog reza ukrug; K tada zaustavlja i uzeti rub ide na playhead." },
       { "keys": "Enter", "meaning": "Potvrda, uvijek u panelu u fokusu." },

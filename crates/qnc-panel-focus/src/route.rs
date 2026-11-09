@@ -292,41 +292,25 @@ impl PanelFocus {
             // the keyboard and the wheel is its left/right arrow.
             // Ctrl+wheel is Ctrl+left/right: the level of a taken A1/A2 sound, up louder.
             // The clip's level curve taken: Ctrl+wheel over the source timeline is its point.
-            wheel if qnc_edit_step::ctrl_frames(wheel).is_some() && wheel.starts_with("wheel_source") && self.source.level_taken() => {
-                self.panel = Panel::SourceTimeline;
-                return self.source.route(wheel, preview, timeline);
-            }
-            wheel if qnc_edit_step::ctrl_frames(wheel).is_some() => {
-                self.panel = if wheel.starts_with("wheel_source") { Panel::SourceTimeline } else { Panel::Segments };
-                // On the source timeline with no lane taken, Ctrl+wheel moves the taken IN/OUT or
-                // segment edge, as on the source timeline of every form (audit 2026-10-20: in
-                // Story it did nothing); with nothing taken it does nothing.
-                if self.panel == Panel::SourceTimeline && !self.source.lane_taken() {
-                    if !(self.taken(timeline) || segments.trimming_edge()) {
-                        return Some(false);
-                    }
-                    let arrow = qnc_edit_step::arrow(qnc_edit_step::ctrl_frames(wheel)?);
-                    return self.route_on_panel(arrow, (preview, wrap, segments, timeline));
-                }
-                let level = qnc_edit_step::level_action(qnc_edit_step::level(wheel)?);
-                return self.route_on_panel(level, (preview, wrap, segments, timeline));
-            }
-            // The wheel alone is the left/right arrow, its direction this computer's choice;
-            // where those arrows turn a taken sound off/on, the wheel moves the playhead
-            // (user 2026-10-16: the level never goes straight to the wheel, the playhead does).
+            // The one rule of the wheel is `qnc_edit_step::wheel`; here only which panel it is on
+            // and what that panel holds. A segment edge (Ctrl+Shift+I/O) is taken on the source
+            // timeline: the plain wheel moves it wherever the pointer is (live 2026-10-16).
             wheel if qnc_edit_step::is_wheel(wheel) => {
-                // A segment edge (Ctrl+Shift+I/O) is taken on the source timeline: the wheel
-                // moves it wherever the pointer is (live 2026-10-16: over the segment panel the
-                // wheel did nothing).
-                self.panel = if wheel.starts_with("wheel_source") || segments.trimming_edge() { Panel::SourceTimeline } else { Panel::Segments };
-                let frames = qnc_edit_step::frames(wheel)?;
-                if self.panel == Panel::Segments && segments.part_sound_taken() {
-                    return Some(wrap.step(frames));
-                }
-                if self.panel == Panel::SourceTimeline && self.source.lane_taken() {
-                    return self.source.route(wheel, preview, timeline); // the playhead moves
-                }
-                return self.route_on_panel(qnc_edit_step::arrow(frames), (preview, wrap, segments, timeline));
+                let ctrl = qnc_edit_step::ctrl_frames(wheel).is_some();
+                let source = wheel.starts_with("wheel_source") || (!ctrl && segments.trimming_edge());
+                self.panel = if source { Panel::SourceTimeline } else { Panel::Segments };
+                let held = if source {
+                    qnc_edit_step::WheelHeld { sound: self.source.lane_taken(), level: self.source.level_taken(), mark: self.taken(timeline) || segments.trimming_edge() }
+                } else {
+                    qnc_edit_step::WheelHeld { sound: segments.part_sound_taken(), level: segments.level_line_taken(), mark: false }
+                };
+                return match qnc_edit_step::wheel(wheel, held)? {
+                    qnc_edit_step::WheelDoes::Playhead(frames) if source => Some(preview.step(frames)),
+                    qnc_edit_step::WheelDoes::Playhead(frames) => Some(wrap.step(frames)),
+                    qnc_edit_step::WheelDoes::Arrow(frames) => self.route_on_panel(qnc_edit_step::arrow(frames), (preview, wrap, segments, timeline)),
+                    qnc_edit_step::WheelDoes::Level(steps) => self.route_on_panel(qnc_edit_step::level_action(steps), (preview, wrap, segments, timeline)),
+                    qnc_edit_step::WheelDoes::Nothing => source.then_some(false),
+                };
             }
             _ => {}
         }
@@ -401,7 +385,7 @@ impl PanelFocus {
                 return self.source.route(action_id, preview, timeline);
             }
             // Home on the source timeline: the start of the clip (the V label does the same).
-            "playlist_input_start" if on_source => return Some(preview.cue(timeline.range_start_frame)),
+            "playlist_input_start" if on_source => return self.source.route(action_id, preview, timeline),
             // Alt+I from any panel: the source view, the playhead on IN of the shown clip (the
             // start of the SubClip), the keyboard on the source timeline (user 2026-10-28).
             "go_to_mark_in" => {

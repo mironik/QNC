@@ -134,6 +134,20 @@ pub fn show(ui: &mut Ui, view: &ScriptView, theme: &qnc_desktop_theme::Theme) ->
             ui.add_space(3.0);
         }
     });
+    // While the whole story records (user 2026-11-09): only the Stop button and the press count.
+    if let Some((seconds, peak, marks)) = view.session {
+        ui.painter().rect_filled(row.expand(6.0), 4.0, theme.bg);
+        let said = qnc_ui_text::fill("script.session_running", &[("time", &seconds_label(seconds)), ("count", &(marks + 1).to_string())]);
+        ui.painter().text(row.center() - egui::vec2(0.0, 7.0), egui::Align2::CENTER_CENTER, said, egui::FontId::proportional(theme.font_ui + 3.0), theme.danger);
+        // The level of the microphone, as beside an OFF being recorded.
+        let bar = egui::Rect::from_center_size(row.center() + egui::vec2(0.0, 11.0), egui::vec2(row.width().min(360.0), 8.0));
+        ui.painter().rect_filled(bar, 2.0, theme.surface_alt);
+        let level = if peak > 0.0 { ((20.0 * peak.log10() + 48.0) / 48.0).clamp(0.0, 1.0) } else { 0.0 };
+        let mut lit = bar;
+        lit.set_width(bar.width() * level);
+        ui.painter().rect_filled(lit, 2.0, if peak > 0.7 { theme.danger } else { theme.focus });
+    }
+    qnc_script_panel::recording_press(ui, rect, view, &mut asked);
     ui.allocate_rect(rect, Sense::hover());
     asked
 }
@@ -147,6 +161,12 @@ fn paint_header(ui: &mut Ui, view: &ScriptView, theme: &qnc_desktop_theme::Theme
     ui.horizontal(|ui| {
         let title = view.title.as_deref().unwrap_or(qnc_ui_text::text("writer.untitled"));
         ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
+            // The reading of the whole story (user 2026-11-09).
+            let recording = view.session.is_some();
+            let (label, red) = (qnc_ui_text::text(if recording { "script.stop" } else { "script.session" }), qnc_ui_kit::ChromeButtonStyle { text: theme.danger, border: theme.danger, focus: theme.danger, ..style });
+            if qnc_ui_kit::chrome_button(ui, label, !view.session_busy && view.recording.is_none(), recording, red).on_hover_text(qnc_ui_text::text("script.session_hint")).clicked() {
+                asked = Some(ActionEvent::key(qnc_script::SESSION).at(PANEL));
+            }
             // The document group: what leaves the script (user 2026-11-01).
             if qnc_ui_kit::chrome_button(ui, qnc_ui_text::text("script.send_story"), out, false, style).on_hover_text(qnc_ui_text::text("script.send_story_hint")).clicked() {
                 asked = Some(ActionEvent::key(SEND_STORY).at(PANEL));

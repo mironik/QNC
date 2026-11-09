@@ -34,3 +34,4 @@ qnc-virtual-short-cards = { workspace = true }
 qnc-virtual-shots = { workspace = true }
 qnc-shot-stills = { workspace = true }
 qnc-work-settings = { workspace = true }
+qnc-notice.workspace = true

@@ -9,7 +9,8 @@
     "script_blocks",
     "script_profile",
     "script_voice",
-    "script_voice_takes"
+    "script_voice_takes",
+    "script_sessions"
   ],
   "public_read_views": [
     "public_script_blocks",

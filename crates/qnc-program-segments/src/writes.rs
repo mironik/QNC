@@ -19,6 +19,7 @@ impl ProgramSegments {
                 a2: (segment.a2_source_channel, segment.a2_level_db, segment.a2_off),
                 origin: format!("draft:{}", segment.segment_id),
                 marks: segment.text_marks.clone(),
+                parts: segment.parts.clone(),
             })
             .collect();
         if segments.is_empty() {
@@ -52,7 +53,7 @@ impl ProgramSegments {
             match StoryWriter::spawn(target) { // never waits on the form thread
                 Ok(writer) => self.writer = Some(writer),
                 Err(error) => {
-                    self.refresh_view(error);
+                    self.refuse_with(error);
                     return None;
                 }
             }
@@ -64,7 +65,7 @@ impl ProgramSegments {
                 Some(key)
             }
             Err(error) => {
-                self.refresh_view(error);
+                self.refuse_with(error);
                 None
             }
         }
@@ -81,7 +82,7 @@ impl ProgramSegments {
             // B-roll shots are the project's, also for a cover of the draft story.
             match VirtualShotsWriter::spawn(target.main_story()) { // never waits on the form thread
                 Ok(shots) => self.shots = Some(shots),
-                Err(error) => return self.refresh_view(error),
+                Err(error) => return self.refuse_with(error),
             }
         }
         let sent = self.shots.as_ref().map(|shots| {
@@ -121,6 +122,7 @@ impl ProgramSegments {
             }
             Err(error) => {
                 let message = qnc_ui_text::fill("export.failed", &[("error", &error)]);
+                self.warn(&message);
                 self.export_alert = Some(message.clone());
                 message
             }
@@ -133,7 +135,10 @@ impl ProgramSegments {
             self.send_draft = None;
             let message = match sent {
                 Ok(count) => qnc_ui_text::fill("story.msg.sent_draft", &[("n", &count.to_string())]),
-                Err(error) => error,
+                Err(error) => {
+                    self.warn(&error);
+                    error
+                }
             };
             self.refresh_view(message);
             return true;
@@ -151,7 +156,10 @@ impl ProgramSegments {
                     match result {
                         Ok(ShotData::Created(shot_id)) => place.push((cover, shot_id)),
                         Ok(_) => message = qnc_ui_text::text("story.msg.bad_broll_reply").into(),
-                        Err(error) => message = error,
+                        Err(error) => {
+                            self.warn(&error);
+                            message = error;
+                        }
                     }
                 }
             }
@@ -208,6 +216,7 @@ impl ProgramSegments {
                         }
                         Ok(_) => {}
                         Err(error) => {
+                            self.warn(&error);
                             message = error;
                             // A refused cover leaves no B-roll shot behind.
                             if let Some(index) = self.cover_writes.iter().position(|(written, _)| *written == key) {

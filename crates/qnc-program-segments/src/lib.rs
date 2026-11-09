@@ -30,6 +30,7 @@ mod sync;
 mod commands;
 mod create;
 mod refresh;
+mod refused;
 mod select;
 mod story_read;
 mod writes;
@@ -491,6 +492,11 @@ impl ProgramSegments {
         view.export = self.export.clone();
         view.video_compact = self.video_compact;
         if !self.video_compact {
+            // The taken picture of a cut as drafted, so the filmstrip follows it before Enter.
+            for (id, (lead, tail)) in self.join_picture_draft().unwrap_or_default() {
+                view.picture_overhangs.retain(|(known, _, _)| *known != id);
+                view.picture_overhangs.push((id, lead, tail));
+            }
             view.pictures = self.filmstrips.pictures(&view.picture_placements(), |id| durations.get(id).copied(), |id| posters.get(id).cloned());
         }
         // A zoom picture at its clip's first or last frame (user 2026-10-13).

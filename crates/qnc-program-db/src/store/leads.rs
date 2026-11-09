@@ -181,25 +181,36 @@ fn lead_seconds(conn: &Connection) -> Result<(f64, f64)> {
 fn real_parts(conn: &Connection) -> Result<Vec<Neighbour>> {
     let mut statement = conn
         .prepare(
-            "SELECT kind, clip_id, source_in_frame, source_out_frame, source_fps_num, source_fps_den, a1_source_channel
+            "SELECT kind, clip_id, source_in_frame, source_out_frame, source_fps_num, source_fps_den, a1_source_channel, parts_json
              FROM story_items WHERE role = 'segment' AND active = 1 AND lead = '' ORDER BY sort_index, rowid",
         )
         .map_err(err)?;
     let rows = statement
         .query_map([], |row| {
-            Ok(Neighbour {
+            let neighbour = Neighbour {
                 kind: row.get(0)?,
                 clip_id: row.get(1)?,
                 in_frame: row.get(2)?,
                 out_frame: row.get(3)?,
                 fps: (row.get(4)?, row.get(5)?),
                 channel: row.get(6)?,
-            })
+            };
+            Ok((neighbour, serde_json::from_str::<Vec<crate::CompoundPart>>(&row.get::<_, String>(7)?).unwrap_or_default()))
         })
         .map_err(err)?
         .collect::<rusqlite::Result<Vec<_>>>()
-        .map_err(err);
-    rows
+        .map_err(err)?;
+    // A lead continues the clip it touches: a compound statement's first and last part.
+    Ok(rows
+        .into_iter()
+        .flat_map(|(neighbour, parts)| {
+            let of = |part: &crate::CompoundPart| Neighbour { kind: neighbour.kind.clone(), clip_id: part.clip_id.clone(), in_frame: part.from_frame as i64, out_frame: part.to_frame as i64, fps: (part.fps_num, part.fps_den), channel: i64::from(part.a1_channel) };
+            match (parts.first(), parts.last()) {
+                (Some(first), Some(last)) => vec![of(first), of(last)],
+                _ => vec![neighbour],
+            }
+        })
+        .collect())
 }
 
 fn stored_pieces(conn: &Connection) -> Result<Vec<Piece>> {

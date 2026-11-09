@@ -19,7 +19,7 @@ impl ProgramSegments {
             // player builds its program from.
             let read = StoryReader::open(&target).and_then(|mut client| {
                 let story = client.program_snapshot()?;
-                let clips = story.segments.iter().map(|segment| &segment.clip_id).chain(story.covers.iter().map(|cover| &cover.clip_id));
+                let clips = story.segments.iter().map(|segment| &segment.clip_id).chain(story.segments.iter().flat_map(|segment| segment.parts.iter().map(|part| &part.clip_id))).chain(story.covers.iter().map(|cover| &cover.clip_id));
                 let channels = clips
                     .filter(|clip| !known.contains(*clip))
                     .collect::<std::collections::BTreeSet<_>>()

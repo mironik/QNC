@@ -378,7 +378,7 @@ impl EditorialApplication {
                 let target = self.content_target.as_ref().map(|targets| &targets.1);
                 let marks = self.view.preview.timeline.visible_source_marks();
                 if let Err(message) = self.short_save.start(self.view.chosen_clip_id(), &self.view.clips, marks, target, self.shown_project.as_deref(), &self.view.shorts) {
-                    self.view.message = message;
+                    self.view.message = qnc_notice::raised(message);
                 }
                 true
             }
@@ -392,7 +392,7 @@ impl EditorialApplication {
     fn short_saved(&mut self, saved: Result<qnc_short_save::Saved, String>) {
         let saved = match saved {
             Ok(saved) => saved,
-            Err(error) => return self.view.message = error,
+            Err(error) => return self.view.message = qnc_notice::raised(error),
         };
         self.store_short_stills(Some((&saved.shot_id, &saved.clip_id, saved.marks)));
         self.reload_shorts();

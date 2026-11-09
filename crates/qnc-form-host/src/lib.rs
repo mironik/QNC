@@ -62,6 +62,7 @@ impl FormHost {
                 dispatch(ctx, application, A::intent_of(action_id));
             }
         });
+        qnc_alert::show_raised(ctx);
     }
 }
 

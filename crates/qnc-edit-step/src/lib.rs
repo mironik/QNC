@@ -94,6 +94,58 @@ pub fn is_wheel(action_id: &str) -> bool {
     WHEELS.iter().any(|(back, forward)| action_id == *back || action_id == *forward) || ctrl_frames(action_id).is_some()
 }
 
+/// Alt+arrows, the same on every timeline (user 2026-11-09): the next or previous stop from
+/// `at`, the playhead only, nothing is taken; the owner says what its stops are. `None`: no stop
+/// on that side.
+pub fn next_stop(stops: &[u64], at: u64, back: bool) -> Option<u64> {
+    if back {
+        stops.iter().copied().filter(|stop| *stop < at).max()
+    } else {
+        stops.iter().copied().filter(|stop| *stop > at).min()
+    }
+}
+
+/// What the owner of a timeline holds when the wheel turns.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub struct WheelHeld {
+    /// A sound whose left/right arrows turn it off and on (a taken A1/A2).
+    pub sound: bool,
+    /// A level curve: Ctrl+wheel is its level, the arrows and the wheel the playhead.
+    pub level: bool,
+    /// Something the arrows move a frame: IN/OUT, an edge, a cut, a slot.
+    pub mark: bool,
+}
+
+/// What one wheel step does, the same on every timeline and its zoom (user 2026-11-09: "all
+/// timelines must be based on one code"); the owner does it on its own axis.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum WheelDoes {
+    /// The playhead that many frames, where the arrows mean something else.
+    Playhead(i64),
+    /// The left/right arrow of that step.
+    Arrow(i64),
+    /// The level step of the taken sound.
+    Level(i64),
+    /// Ctrl+wheel with nothing it could change.
+    Nothing,
+}
+
+/// The one rule of the wheel (user 2026-10-16, 2026-10-17): alone it is the arrow, except on a
+/// taken sound, where the arrows turn it off and on and the wheel moves the playhead; with Ctrl
+/// it is the level of a taken sound or curve, else it moves what is taken. `None`: not a wheel.
+pub fn wheel(action_id: &str, held: WheelHeld) -> Option<WheelDoes> {
+    if !is_wheel(action_id) {
+        return None;
+    }
+    Some(match ctrl_frames(action_id) {
+        Some(_) if held.sound || held.level => WheelDoes::Level(level(action_id)?),
+        Some(frames) if held.mark => WheelDoes::Arrow(frames),
+        Some(_) => WheelDoes::Nothing,
+        None if held.sound => WheelDoes::Playhead(frames(action_id)?),
+        None => WheelDoes::Arrow(frames(action_id)?),
+    })
+}
+
 /// The arrow of a step: forward for a positive one.
 pub fn arrow(step: i64) -> &'static str {
     if step > 0 {
@@ -138,6 +190,32 @@ mod tests {
         assert_eq!(level("wheel_source_forward"), None);
         assert_eq!(level_action(1), LEVEL_UP);
         assert!(is_wheel("wheel_segments_ctrl_back") && !is_wheel(FORWARD));
+    }
+
+    #[test]
+    fn the_stops_are_in_order_whatever_order_they_come_in() {
+        let stops = [40, 0, 10, 10];
+        assert_eq!(next_stop(&stops, 20, false), Some(40));
+        assert_eq!(next_stop(&stops, 20, true), Some(10));
+        assert_eq!(next_stop(&stops, 10, true), Some(0), "not the stop it stands on");
+        assert_eq!(next_stop(&stops, 40, false), None);
+    }
+
+    #[test]
+    fn the_wheel_has_one_rule_whatever_is_held_on_every_timeline() {
+        for (plain, ctrl) in [("wheel_source_forward", "wheel_source_ctrl_forward"), ("wheel_segments_forward", "wheel_segments_ctrl_forward")] {
+            let up = frames(plain).unwrap();
+            let held = |sound, level, mark| WheelHeld { sound, level, mark };
+            assert_eq!(wheel(plain, held(false, false, false)), Some(WheelDoes::Arrow(up)));
+            assert_eq!(wheel(plain, held(false, true, false)), Some(WheelDoes::Arrow(up)), "a curve: the arrows are the playhead");
+            assert_eq!(wheel(plain, held(false, false, true)), Some(WheelDoes::Arrow(up)));
+            assert_eq!(wheel(plain, held(true, false, false)), Some(WheelDoes::Playhead(up)), "the arrows turn it off and on");
+            assert_eq!(wheel(ctrl, held(true, false, false)), Some(WheelDoes::Level(1)));
+            assert_eq!(wheel(ctrl, held(false, true, false)), Some(WheelDoes::Level(1)));
+            assert_eq!(wheel(ctrl, held(false, false, true)), Some(WheelDoes::Arrow(up)));
+            assert_eq!(wheel(ctrl, held(false, false, false)), Some(WheelDoes::Nothing));
+        }
+        assert_eq!(wheel(FORWARD, WheelHeld::default()), None);
     }
 
     #[test]

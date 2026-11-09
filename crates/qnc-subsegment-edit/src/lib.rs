@@ -20,7 +20,7 @@ mod level;
 mod pointer;
 mod view;
 pub use level::LEVEL_KEEP_AT;
-pub use pointer::{drag_target, nearest_edge, own_action, ROW_ACTIONS};
+pub use pointer::{drag_target, nearest_edge, own_action};
 pub use view::*;
 
 pub const MODULE_ID: &str = "qnc.module.subsegment-edit";
@@ -204,6 +204,10 @@ pub struct SubsegmentEdit {
     writes: Vec<Write>,
     /// The clip block open as a SubSegment in place of the source timeline.
     open_subsegment: Option<i64>,
+    /// The narrow video row instead of the filmstrip.
+    video_compact: bool,
+    /// The part enlarged by a double click.
+    enlarged: Option<usize>,
     /// The parts the player should play and the frame it should show (once).
     pieces_request: Option<(Vec<qnc_source_preview::PieceInput>, u64)>,
     /// The edge of a part being trimmed on the SubSegment timeline, not written yet.
@@ -253,7 +257,7 @@ pub struct SubsegmentEdit {
 
 impl Default for SubsegmentEdit {
     fn default() -> Self {
-        Self { view: EditView::default(), blocks: Vec::new(), names: HashMap::new(), project: None, settled: true, writes: Vec::new(), open_subsegment: None, pieces_request: None, trim: None, chosen: None, chosen_to: None, sound_also: Vec::new(), join_sound: None, value: None, slide: None, slip_part: None, waves: qnc_program_waveform::ProgramWaves::new(), filmstrips: qnc_program_filmstrip::ProgramFilmstrips::new(), waves_project: None, trim_stills: qnc_trim_stills::TrimStills::new(), zoom_follow: Default::default(), sound: None, level: None, assist: false, assist_curves: Vec::new(), assisted: None, word: None }
+        Self { view: EditView::default(), blocks: Vec::new(), names: HashMap::new(), project: None, settled: true, writes: Vec::new(), open_subsegment: None, video_compact: false, enlarged: None, pieces_request: None, trim: None, chosen: None, chosen_to: None, sound_also: Vec::new(), join_sound: None, value: None, slide: None, slip_part: None, waves: qnc_program_waveform::ProgramWaves::new(), filmstrips: qnc_program_filmstrip::ProgramFilmstrips::new(), waves_project: None, trim_stills: qnc_trim_stills::TrimStills::new(), zoom_follow: Default::default(), sound: None, level: None, assist: false, assist_curves: Vec::new(), assisted: None, word: None }
     }
 }
 
@@ -338,6 +342,11 @@ impl SubsegmentEdit {
         shown.a1 = self.waves.peaks(shown.total_frames, &placements, &[], |clip| names.get(clip).map(|(_, frames, _)| *frames)).a1;
         let at = view::subsegment_pictures(&shown, &view::block_pieces(&block));
         shown.pictures = self.filmstrips.pictures(&at, |clip| names.get(clip).map(|(_, frames, _)| *frames), |_| None);
+        shown.video_compact = self.video_compact;
+        if self.video_compact {
+            shown.pictures.clear();
+        }
+        shown.enlarged = self.enlarged.and_then(|index| shown.parts.get(index)).map(|part| qnc_timeline_model::enlarged(part.start, part.end, shown.total_frames));
         shown.trim = self.trim.and_then(|trim| shown.parts.get(trim.index).map(|part| (trim.index, trim.out, if trim.out { part.end.saturating_sub(1) } else { part.start })));
         // The trim zoom of the taken edge: its pictures, fine wave and words come from the
         // same pieces as a cover's (`qnc-trim-stills`).
@@ -703,25 +712,17 @@ impl SubsegmentEdit {
             // "the basic arrow keys and the mouse wheel do not work on the timeline"; AGENTS
             // 0.12, the same on every timeline).
             step if qnc_edit_step::frames(step).is_some() => {
-                let forward = qnc_edit_step::frames(step)? > 0;
-                let total = self.view.subsegment.as_ref().map_or(0, |view| view.total_frames);
-                let at = self.pieces_request.as_ref().map(|(_, frame)| *frame).or(preview.program_frame()).unwrap_or(0);
-                let to = if forward { (at + 1).min(total.saturating_sub(1)) } else { at.saturating_sub(1) };
-                self.pieces_request = Some((view::piece_inputs(&block), to));
-                return Some(true);
+                return Some(self.step_playhead(qnc_edit_step::frames(step)? > 0, &block, preview));
             }
             // Home, Alt+arrows and Alt+I as on the source timeline: the start, the edge of the
             // part before or after the playhead, the IN of the part under it.
             "playlist_input_start" | "navigate_prev_object" | "navigate_next_object" | "go_to_mark_in" if self.trim.is_none() => {
                 let view = self.view.subsegment.as_ref()?;
                 let at = self.pieces_request.as_ref().map(|(_, frame)| *frame).or(preview.program_frame()).unwrap_or(0);
-                let mut edges: Vec<u64> = view.parts.iter().flat_map(|part| [part.start, part.end.saturating_sub(1)]).collect();
-                edges.sort_unstable();
-                edges.dedup();
+                let edges: Vec<u64> = view.parts.iter().flat_map(|part| [part.start, part.end.saturating_sub(1)]).collect();
                 let to = match action_id {
                     "playlist_input_start" => 0,
-                    "navigate_prev_object" => edges.iter().rev().find(|&&edge| edge < at).copied().unwrap_or(0),
-                    "navigate_next_object" => edges.iter().find(|&&edge| edge > at).copied().unwrap_or(at),
+                    "navigate_prev_object" | "navigate_next_object" => qnc_edit_step::next_stop(&edges, at, action_id == "navigate_prev_object").unwrap_or(at),
                     _ => view.parts.iter().find(|part| (part.start..part.end).contains(&at)).map_or(0, |part| part.start),
                 };
                 self.pieces_request = Some((view::piece_inputs(&block), to));
@@ -746,6 +747,15 @@ impl SubsegmentEdit {
         let drafted = self.drafted(block);
         self.pieces_request = Some((view::piece_inputs(&drafted), self.edge_frame(&drafted).unwrap_or(0)));
         Some(true)
+    }
+
+    /// The playhead a frame along the SubSegment's axis.
+    fn step_playhead(&mut self, forward: bool, block: &Block, preview: &SourcePreview) -> bool {
+        let total = self.view.subsegment.as_ref().map_or(0, |view| view.total_frames);
+        let at = self.pieces_request.as_ref().map(|(_, frame)| *frame).or(preview.program_frame()).unwrap_or(0);
+        let to = if forward { (at + 1).min(total.saturating_sub(1)) } else { at.saturating_sub(1) };
+        self.pieces_request = Some((view::piece_inputs(block), to));
+        true
     }
 
     /// The taken edge dragged by the mouse (user 2026-10-29): only the taken one moves (the
@@ -778,6 +788,7 @@ impl SubsegmentEdit {
     /// another; a statement of one range is one part), the playhead at `at` on its axis.
     fn open_as_subsegment(&mut self, block: &Block, at: u64) {
         self.open_subsegment = Some(block.id);
+        self.enlarged = None;
         (self.chosen, self.join_sound, self.trim, self.sound, self.slide, self.slip_part) = (None, None, None, None, None, None);
         self.level = None;
         self.pieces_request = Some((view::piece_inputs(block), at));
@@ -1274,6 +1285,35 @@ impl SubsegmentEdit {
     /// any other key or with nothing open.
     pub fn key(&mut self, action_id: &str, target: Option<&str>, preview: &SourcePreview) -> Option<bool> {
         self.open_subsegment?;
+        match action_id {
+            "toggle_wrap_video" => {
+                self.video_compact = !self.video_compact;
+                return Some(true);
+            }
+            // A double click on a part enlarges it; again, or Esc with nothing taken, closes it.
+            "wrap_zoom" => {
+                let index: usize = target?.parse().ok()?;
+                self.enlarged = (self.enlarged != Some(index)).then_some(index);
+                return Some(true);
+            }
+            "clear_focus" if self.enlarged.is_some() && self.trim.is_none() && self.sound.is_none() && self.join_sound.is_none() && self.slide.is_none() && !self.level_taken() => {
+                self.enlarged = None;
+                return Some(true);
+            }
+            _ => {}
+        }
+        // The one rule of the wheel (`qnc_edit_step::wheel`), as on every timeline.
+        let held = qnc_edit_step::WheelHeld { sound: self.sound.is_some(), level: self.level_taken(), mark: self.trim.is_some() || self.join_sound.is_some() || self.slide.is_some() || self.slip_part.is_some() };
+        let action_id = match qnc_edit_step::wheel(action_id, held) {
+            Some(qnc_edit_step::WheelDoes::Arrow(frames)) => qnc_edit_step::arrow(frames),
+            Some(qnc_edit_step::WheelDoes::Level(steps)) => qnc_edit_step::level_action(steps),
+            Some(qnc_edit_step::WheelDoes::Playhead(frames)) => {
+                let block = self.block(self.open_subsegment)?.clone();
+                return Some(self.step_playhead(frames > 0, &block, preview));
+            }
+            Some(qnc_edit_step::WheelDoes::Nothing) => return Some(false),
+            None => action_id,
+        };
         let done = self.trim_key(action_id, target, preview);
         if qnc_dev_diagnostics::player_diagnostics_enabled() {
             let trim = self.trim.map(|trim| format!("{}:{}{}", trim.index, if trim.out { "out" } else { "in" }, if trim.roll.is_some() { ":cut" } else { "" }));

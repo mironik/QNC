@@ -160,7 +160,7 @@ fn every_take_of_an_off_is_one_more_channel_of_one_record_and_the_last_is_used()
     assert_eq!((voice.name.as_str(), voice.chosen, voice.takes.len()), ("P_OFF1", 2, 2));
     assert_eq!(voice.chosen_take().unwrap().text, "Prvi off, ispravljen.");
     let block = read(&target).unwrap().into_iter().find(|b| b.id == off_block).unwrap();
-    assert_eq!((block.voice_uri.as_str(), block.voice_seconds, block.voice_tc.as_str()), (clip.as_str(), 4.0, "18:01:02:03"), "the clip starts at its first take, its length is the take used");
+    assert_eq!((block.voice_uri.as_str(), block.voice_seconds, block.voice_tc.as_str()), (clip.as_str(), 4.0, "18:05:00:00"), "the block uses its last reading, its length is the take used");
     set_voice_chosen(&target, off_block, 1).unwrap();
     assert!(set_voice_chosen(&target, off_block, 3).is_err(), "only a take the record has");
     assert_eq!(read_voice(&target, off_block).unwrap().unwrap().chosen, 1);
@@ -171,14 +171,14 @@ fn every_take_of_an_off_is_one_more_channel_of_one_record_and_the_last_is_used()
 }
 
 #[test]
-fn a_record_has_at_most_eight_takes() {
+fn a_record_has_at_most_its_most_takes() {
     let (_dir, target) = written();
     let off_block = add(&target, None, off("Off.")).unwrap();
     let clip = "qnc://local/source/project-p1/file/products/voice/P_OFF1.mxf".to_string();
-    for number in 1..=8 {
+    for number in 1..=MAX_TAKES {
         add_voice_take(&target, off_block, "P_OFF1".into(), clip.clone(), take(number, 2.0, "18:00:00:00", "Off.")).unwrap();
     }
-    assert!(add_voice_take(&target, off_block, "P_OFF1".into(), clip, take(9, 2.0, "18:00:00:00", "Off.")).is_err());
+    assert!(add_voice_take(&target, off_block, "P_OFF1".into(), clip, take(MAX_TAKES + 1, 2.0, "18:00:00:00", "Off.")).is_err());
 }
 
 #[test]

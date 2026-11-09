@@ -28,6 +28,62 @@ impl Alert {
     }
 }
 
+/// The warning a command raised, for the host of the form to draw: one per process, shown for
+/// `SHOWN` (user 2026-11-09: a command that could not be done is told over the screen).
+static RAISED: std::sync::Mutex<Option<Alert>> = std::sync::Mutex::new(None);
+
+/// Raises the warning.
+pub fn raise(text: impl Into<String>) {
+    if let Ok(mut raised) = RAISED.lock() {
+        *raised = Some(Alert::new(text));
+    }
+}
+
+/// Raises the warning and gives its text back (for the status line).
+pub fn raised(text: String) -> String {
+    raise(text.clone());
+    text
+}
+
+/// The warning raised last.
+pub fn current() -> Option<Alert> {
+    RAISED.lock().ok().and_then(|raised| raised.clone())
+}
+
+/// The messages of the side panels that say a command could not be done.
+const REFUSALS: &[&str] = &[
+    "script.write_first",
+    "script.choose_text",
+    "script.sot_marks",
+    "script.no_project",
+    "script.choose_to_record",
+    "script.no_clip_kind",
+    "script.nothing_to_undo",
+    "script.nothing_to_redo",
+    "script.draft_empty",
+    "script.voice_local_only",
+    "db.script_last_piece",
+    "subsegment.slide_locked",
+    "subsegment.no_join_sound",
+    "subsegment.mark_in_pause",
+    "story.msg.sound_assist_keep_off",
+    "story.msg.sound_assist_keep_none",
+    "transcript.quote_marks",
+    "transcript.quote_empty",
+    "transcribe.running",
+    "transcribe.choose_clip",
+    "transcribe.empty_range",
+    "transcribe.off_in_project",
+    "transcribe.repass_marks",
+    "transcribe.repass_croatian",
+    "transcribe.no_channel",
+];
+
+/// Whether a message of a side panel says a command could not be done.
+pub fn is_refusal(message: &str) -> bool {
+    !message.is_empty() && REFUSALS.iter().copied().any(|code| qnc_ui_text::text(code) == message)
+}
+
 /// What the box shows.
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct Choice {

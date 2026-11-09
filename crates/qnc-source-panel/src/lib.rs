@@ -159,9 +159,7 @@ impl SourcePanel {
                 mark_cue(preview, key)
             }
             "navigate_prev_object" | "navigate_next_object" => {
-                let key = qnc_source_mark_focus::adjacent(timeline, action_id == "navigate_prev_object");
-                self.mark_taken = qnc_source_mark_focus::is_taken(timeline);
-                mark_cue(preview, key)
+                mark_cue(preview, qnc_source_mark_focus::adjacent(timeline, action_id == "navigate_prev_object"))
             }
             "playlist_input_start" => preview.cue(timeline.range_start_frame),
             // Alt+I: the playhead back to IN, the start of the SubClip (without a mark the start

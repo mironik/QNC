@@ -40,9 +40,13 @@ pub fn span(out_last: u64, in_first: u64, n: u64) -> Span {
 }
 
 /// The id of the clip of the in-between pictures of one cut: the same two parts cut at the
-/// same pictures with the same count are the same clip, whenever they are asked for.
-pub fn clip_id(before_clip: &str, after_clip: &str, out_last: u64, in_first: u64, n: u64) -> String {
-    let text = format!("{before_clip}|{after_clip}|{out_last}|{in_first}|{n}");
+/// same pictures with the same count and the same pause between them are the same clip,
+/// whenever they are asked for.
+pub fn clip_id(before_clip: &str, after_clip: &str, out_last: u64, in_first: u64, n: u64, pause: u64) -> String {
+    let mut text = format!("{before_clip}|{after_clip}|{out_last}|{in_first}|{n}");
+    if pause > 0 {
+        text.push_str(&format!("|{pause}"));
+    }
     let hash = text.bytes().fold(0xcbf2_9ce4_8422_2325u64, |hash, byte| (hash ^ u64::from(byte)).wrapping_mul(0x0100_0000_01b3));
     format!("smooth-{hash:016x}")
 }

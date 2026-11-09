@@ -7,3 +7,4 @@ description = "QNC public piece: a warning the user cannot miss, a red band at t
 [dependencies]
 qnc-notice = { workspace = true }
 eframe = { workspace = true }
+qnc-desktop-theme.workspace = true

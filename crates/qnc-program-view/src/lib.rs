@@ -45,11 +45,22 @@ pub struct SegmentRow {
     pub lead: bool,
     /// The level curve of its A1 (docs/98 2.1), points on frames of its clip.
     pub level_keys: Vec<qnc_program_db::LevelKey>,
+    /// A compound statement (user 2026-11-09): one row, and what lies where in it.
+    pub parts: Vec<SegmentRow>,
 }
 
 impl SegmentRow {
     pub fn duration_frames(&self) -> u64 {
         self.end_frame - self.start_frame
+    }
+
+    /// What plays: itself, or the parts of a compound statement.
+    pub fn pieces(&self) -> &[SegmentRow] {
+        if self.parts.is_empty() {
+            std::slice::from_ref(self)
+        } else {
+            &self.parts
+        }
     }
 }
 
@@ -301,6 +312,8 @@ pub struct SegmentsView {
     /// The filmstrip pictures of the program (segments with a picture, covers over
     /// them); empty with a narrow video row.
     pub pictures: Vec<qnc_program_filmstrip::ProgramPicture>,
+    /// The picture J and L of every segment with one: (segment, lead, tail), in story frames.
+    pub picture_overhangs: Vec<(String, u32, u32)>,
     /// The sound of a stored segment (A1) or cover (A2) taken on the Wrap row and its
     /// draft (user 2026-10-16).
     pub part_sound: Option<PartSoundView>,
@@ -371,7 +384,7 @@ impl SegmentsView {
     }
 
     pub fn wave_placements(&self) -> (Vec<qnc_program_waveform::Placement>, Vec<qnc_program_waveform::Placement>) {
-        let segments = self.rows.iter().map(|row| qnc_program_waveform::Placement {
+        let segments = self.rows.iter().flat_map(SegmentRow::pieces).map(|row| qnc_program_waveform::Placement {
             clip_id: row.clip_id.clone(),
             channel: row.a1_source_channel,
             program_start: row.start_frame,
@@ -399,12 +412,25 @@ impl SegmentsView {
     /// Where each clip's picture is in the program: segments with a picture, then the
     /// covers over them.
     pub fn picture_placements(&self) -> Vec<qnc_program_filmstrip::PicturePlacement> {
-        let segments = self.rows.iter().filter(|row| row.kind.has_base_video()).map(|row| qnc_program_filmstrip::PicturePlacement {
+        let segments = self.rows.iter().flat_map(SegmentRow::pieces).filter(|row| row.kind.has_base_video()).map(|row| qnc_program_filmstrip::PicturePlacement {
             clip_id: row.clip_id.clone(),
             program_start: row.start_frame,
             program_end: row.end_frame,
             source_in: row.source_in_frame,
             source_out: row.source_out_frame,
+        });
+        // A J or L of the picture (user 2026-11-09: no filmstrip on the added length): the clip
+        // goes on over its neighbour, drawn after the segments so it is on top of them.
+        let overhangs = self.rows.iter().filter(|row| row.kind.has_base_video() && row.parts.is_empty()).flat_map(|row| {
+            let (lead, tail) = self.picture_overhangs.iter().find(|(id, _, _)| *id == row.segment_id).map_or((0, 0), |(_, lead, tail)| (u64::from(*lead), u64::from(*tail)));
+            let source = |frames: u64| frames * row.source_out_frame.saturating_sub(row.source_in_frame) / row.duration_frames().max(1);
+            let at = |program_start, program_end, source_in, source_out| qnc_program_filmstrip::PicturePlacement { clip_id: row.clip_id.clone(), program_start, program_end, source_in, source_out };
+            [
+                (lead > 0).then(|| at(row.start_frame.saturating_sub(lead), row.start_frame, row.source_in_frame.saturating_sub(source(lead)), row.source_in_frame)),
+                (tail > 0).then(|| at(row.end_frame, row.end_frame + tail, row.source_out_frame, row.source_out_frame + source(tail))),
+            ]
+            .into_iter()
+            .flatten()
         });
         let covers = self.covers.iter().map(|cover| qnc_program_filmstrip::PicturePlacement {
             clip_id: cover.clip_id.clone(),
@@ -413,7 +439,7 @@ impl SegmentsView {
             source_in: cover.source_in_frame,
             source_out: cover.source_out_frame,
         });
-        segments.chain(covers).collect()
+        segments.chain(overhangs).chain(covers).collect()
     }
 
     pub fn selected(&self) -> Option<&SegmentRow> {

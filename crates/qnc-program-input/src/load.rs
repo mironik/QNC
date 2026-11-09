@@ -90,6 +90,7 @@ pub(crate) fn load(
     input.revision = revision;
     input.a2_crossfade_frames = i64::from(clips.crossfade_frames()?);
     let mut playlist = build_flat_program_playlist(&input, &mut resolver)?;
+    apply_joins(&mut playlist, &segments, story_rate, clips.crossfade_frames()?)?;
     // A window is only ever the A1 bed of a Sync (the story under the slot, user 2026-10-20).
     if let Some((start, end)) = window {
         let range =

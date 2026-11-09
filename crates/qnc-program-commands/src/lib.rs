@@ -139,6 +139,8 @@ pub enum SegmentCommand {
     /// of the taken cut it shows is in focus (`after`: the side after the cut); its sound is the
     /// one taken (the L of what is before, the J of what is after).
     ZoomSide { marker_id: String, after: bool },
+    /// The slot of a picture's strip in the zoom taken in place of what is taken and unmoved.
+    ZoomTakeSlot(String),
     /// Escape while a marker is edited.
     CancelMarkerEdit,
     /// Edit (user rule 2026-10-01): the segment opens in the source timeline with its
@@ -226,6 +228,7 @@ impl SegmentCommand {
             ("timeline_take_cut_edge", Some(marker_id), Some(frame)) => Self::TakeCutEdge { marker_id, frame },
             ("timeline_drag_cut_edge", Some(marker_id), Some(frame)) => Self::DragCutEdge { marker_id, frame },
             ("zoom_pick_side", Some(marker_id), Some(side)) => Self::ZoomSide { marker_id, after: side != 0 },
+            ("zoom_take_slot", Some(slot_id), _) => Self::ZoomTakeSlot(slot_id),
             // The buttons of the segment panel (user 2026-10-18: buttons are system actions too).
             ("segment_select", Some(id), _) => Self::Select(id),
             ("segment_exclude", Some(id), _) => Self::Exclude(id),

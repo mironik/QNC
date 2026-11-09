@@ -12,23 +12,35 @@ impl Store {
             let Some((_, rate)) = qnc_content_read::clip_timing_on(&self.conn, &segment.clip_id)? else {
                 return Err(qnc_ui_text::text("story.clip_timing_unknown").into());
             };
-            let Data::Created(segment_id) = self.create_segment(
-                project_id,
-                &segment.kind,
-                &segment.clip_id,
-                (segment.in_frame, segment.out_frame),
-                rate,
-                [
-                    (segment.a1.0, lane_level(segment.a1.1)?, segment.a1.2),
-                    (segment.a2.0, lane_level(segment.a2.1)?, segment.a2.2),
-                ],
-            )?
-            else {
+            let sound = [
+                (segment.a1.0, lane_level(segment.a1.1)?, segment.a1.2),
+                (segment.a2.0, lane_level(segment.a2.1)?, segment.a2.2),
+            ];
+            let mut parts = segment.parts.clone();
+            let (range, rate, checked) = if parts.is_empty() {
+                ((segment.in_frame, segment.out_frame), rate, true)
+            } else {
+                // A compound statement is one segment on its own axis, in story frames.
+                for part in &mut parts {
+                    require_imported_clip(&self.conn, &part.clip_id)?;
+                    let Some((_, own)) = qnc_content_read::clip_timing_on(&self.conn, &part.clip_id)? else {
+                        return Err(qnc_ui_text::text("story.clip_timing_unknown").into());
+                    };
+                    require_source_range(&self.conn, &part.clip_id, (part.from_frame, part.to_frame), own)?;
+                    (part.fps_num, part.fps_den) = own;
+                }
+                let story = story_rate(&self.conn)?.unwrap_or((parts[0].fps_num, parts[0].fps_den));
+                let total = crate::compound_frames(&parts, story)?;
+                let range = if segment.out_frame > 0 { (segment.in_frame, segment.out_frame.min(total)) } else { (0, total) };
+                (range, story, false)
+            };
+            let Data::Created(segment_id) = self.insert_segment(project_id, &segment.kind, &segment.clip_id, range, rate, sound, checked)? else {
                 return Err(qnc_ui_text::text("story.invalid_reply_story").into());
             };
             let marks = serde_json::to_string(&segment.marks).map_err(err)?;
+            let parts = serde_json::to_string(&parts).map_err(err)?;
             self.conn
-                .execute("UPDATE story_items SET origin = ?1, text_marks = ?2 WHERE item_id = ?3", params![segment.origin, marks, segment_id])
+                .execute("UPDATE story_items SET origin = ?1, text_marks = ?2, parts_json = ?3 WHERE item_id = ?4", params![segment.origin, marks, parts, segment_id])
                 .map_err(err)?;
             created.push(segment_id);
         }
@@ -54,9 +66,25 @@ impl Store {
         project_id: &str,
         kind: &str,
         clip_id: &str,
+        range: (u64, u64),
+        rate: (u32, u32),
+        sound: [(u16, i8, bool); 2],
+    ) -> Result<Data> {
+        self.insert_segment(project_id, kind, clip_id, range, rate, sound, true)
+    }
+
+    /// `checked`: the range is frames of the clip; a compound's is its own axis, its parts are
+    /// checked one by one.
+    #[allow(clippy::too_many_arguments)]
+    fn insert_segment(
+        &mut self,
+        project_id: &str,
+        kind: &str,
+        clip_id: &str,
         (in_frame, out_frame): (u64, u64),
         (fps_num, fps_den): (u32, u32),
         [(a1_source_channel, a1_level_db, a1_off), (a2_source_channel, a2_level_db, a2_off)]: [(u16, i8, bool); 2],
+        checked: bool,
     ) -> Result<Data> {
         let kind = story_kind(kind)?;
         qnc_media_records::valid_id(clip_id).map_err(err)?;
@@ -78,7 +106,9 @@ impl Store {
             return Err(qnc_ui_text::text("db.project_database_belongs_another_project").into());
         }
         require_imported_clip(&self.conn, clip_id)?;
-        require_source_range(&self.conn, clip_id, (in_frame, out_frame), (fps_num, fps_den))?;
+        if checked {
+            require_source_range(&self.conn, clip_id, (in_frame, out_frame), (fps_num, fps_den))?;
+        }
         let tx = self.conn.savepoint().map_err(err)?;
         // The first segment sets the rate of the story; later ones keep it.
         let rate = match story_rate(&tx)? {
@@ -395,7 +425,7 @@ impl Store {
                 in_seconds = ?5, out_seconds = ?6, source_fps = ?7, source_fps_num = ?8,
                 source_fps_den = ?9, source_in_frame = ?10, source_out_frame = ?11, duration_frames = ?12,
                 duration_label = ?13, duration_color_key = ?14, a1_source_channel = 0, a1_level_db = 0, a1_off = 0,
-                updated_at = ?15
+                parts_json = '[]', updated_at = ?15
              WHERE role = 'segment' AND item_id = ?1 AND active = 1",
             params![
                 segment_id,
@@ -456,17 +486,23 @@ impl Store {
             return Err(qnc_ui_text::text("story.out_after_in").into());
         }
         let tx = self.conn.savepoint().map_err(err)?;
-        let (old_in, fps_num, fps_den, clip_id): (i64, u32, u32, String) = tx
+        let (old_in, fps_num, fps_den, clip_id, parts): (i64, u32, u32, String, String) = tx
             .query_row(
-                "SELECT source_in_frame, source_fps_num, source_fps_den, clip_id FROM story_items
+                "SELECT source_in_frame, source_fps_num, source_fps_den, clip_id, parts_json FROM story_items
                  WHERE role = 'segment' AND item_id = ?1 AND active = 1",
                 [segment_id],
-                |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?, row.get(3)?)),
+                |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?, row.get(3)?, row.get(4)?)),
             )
             .optional()
             .map_err(err)?
             .ok_or_else(|| format!("part not found: {segment_id}"))?;
-        require_source_range(&tx, &clip_id, (in_frame, out_frame), (fps_num, fps_den))?;
+        let parts: Vec<crate::CompoundPart> = serde_json::from_str(&parts).unwrap_or_default();
+        if parts.is_empty() {
+            require_source_range(&tx, &clip_id, (in_frame, out_frame), (fps_num, fps_den))?;
+        } else if out_frame > crate::compound_frames(&parts, (fps_num, fps_den))? {
+            // A compound is trimmed on its own axis: past it there is no picture.
+            return Err(qnc_ui_text::text("story.msg.clip_at_end").into());
+        }
         let (start, end) = segment_window(&tx, segment_id)?
             .ok_or_else(|| format!("part not found: {segment_id}"))?;
         let (start, end) = (start as i64, end as i64);

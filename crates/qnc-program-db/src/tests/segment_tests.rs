@@ -374,7 +374,7 @@ fn the_markers_of_an_off_text_are_m_markers_in_the_story_and_kept_with_the_segme
     let dir = tempfile::tempdir().unwrap();
     let path = dir.path().join("db");
     let mut store = imported_store(&path);
-    let off = AppendSegment { kind: "offovi".into(), clip_id: "c1".into(), in_frame: 100, out_frame: 150, a1: (0, 0, false), a2: (1, 0, true), origin: "script:2:0".into(), marks: vec![120] };
+    let off = AppendSegment { kind: "offovi".into(), clip_id: "c1".into(), in_frame: 100, out_frame: 150, a1: (0, 0, false), a2: (1, 0, true), origin: "script:2:0".into(), marks: vec![120], parts: Vec::new() };
     run(&mut store, Operation::AppendSegments { project_id: "p1".into(), segments: vec![off] }).unwrap();
     assert_eq!(segments(&mut store).iter().find(|row| row.lead.is_empty()).unwrap().text_marks, [120]);
     let conn = Connection::open(&path).unwrap();
@@ -397,6 +397,7 @@ fn a_skeleton_is_appended_in_one_step_with_its_clips_rate_and_where_each_part_ca
         a2: (1, 0, true),
         origin: origin.into(),
         marks: Vec::new(),
+        parts: Vec::new(),
     };
     let segments_sent = vec![part("offovi", (100, 150), "script:2:0"), part("tonovi", (200, 260), "script:3:0")];
     run(&mut store, Operation::AppendSegments { project_id: "p1".into(), segments: segments_sent }).unwrap();

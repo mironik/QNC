@@ -44,7 +44,19 @@ pub fn show(ui: &mut egui::Ui, view: &ScriptView, transcript: &TranscriptView, t
     if let Some(event) = paint_editor(&mut ui_bottom, view, theme) {
         asked = Some(event);
     }
+    recording_press(ui, rect, view, &mut asked);
     asked
+}
+
+/// While a recording runs a mouse click or a tap on the pad anywhere on the panel marks a new
+/// reading (user 2026-11-09); only the Stop button still works.
+pub fn recording_press(ui: &egui::Ui, rect: egui::Rect, view: &ScriptView, asked: &mut Option<ActionEvent>) {
+    if view.session.is_none() && view.recording.is_none() {
+        return;
+    }
+    let pressed = ui.input(|i| i.pointer.primary_clicked() && i.pointer.interact_pos().is_some_and(|pos| rect.contains(pos)));
+    let stop = asked.take().filter(|event| event.action_id == qnc_script::SESSION || event.action_id == RECORD);
+    *asked = stop.or(pressed.then(|| ActionEvent::key(qnc_script::SESSION_MARK).at(PANEL)));
 }
 
 fn paint_script(ui: &mut egui::Ui, view: &ScriptView, transcript: &TranscriptView, theme: &qnc_desktop_theme::Theme) -> Option<ActionEvent> {
@@ -184,17 +196,7 @@ pub fn paint_block(ui: &mut egui::Ui, place: &'static str, row: &qnc_script::Blo
                 picked = true;
             }
             // A SubSegment of several parts: how many and how long all of them are.
-            let detail = if row.is_clip() && block.pieces.len() > 1 {
-                format!("{}  {}", block.length, seconds_label(row.seconds))
-            } else if row.is_clip() {
-                format!("{}  {} - {}  {}", block.clip_name, block.start_tc, block.end_tc, block.length)
-            } else if !block.voice_uri.is_empty() {
-                qnc_ui_text::fill("script.recorded", &[("length", &seconds_label(row.seconds)), ("tc", &block.voice_tc)])
-            } else if row.role == Some(Role::Note) {
-                String::new()
-            } else {
-                seconds_label(row.seconds)
-            };
+            let detail = if row.is_clip() && block.pieces.len() > 1 { format!("{}  {}", block.length, seconds_label(row.seconds)) } else { String::new() };
             ui.label(RichText::new(detail).color(theme.text_muted).size(theme.font_ui));
             ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
                 for (label, action, hint) in [("X", REMOVE, "script.remove"), ("v", MOVE_DOWN, "script.move_down"), ("^", MOVE_UP, "script.move_up")] {
@@ -234,9 +236,9 @@ pub fn paint_block(ui: &mut egui::Ui, place: &'static str, row: &qnc_script::Blo
                     let hint = qnc_ui_text::fill("script.voice_take_hint", &[("take", &take.take.to_string()), ("length", &seconds_label(take.seconds)), ("tc", &take.tc), ("text", &take.text)]);
                     // How much of the text the take read; ".." while it is being heard.
                     let label = match row.voice.as_ref().and_then(|voice| voice.check_of(take.take)) {
-                        Some(check) => format!("T{} {}%", take.take, check.percent),
-                        None if view.read_note.is_none() => format!("T{} ..", take.take),
-                        None => format!("T{}", take.take),
+                        Some(check) => format!("{}{} {}%", row.mark, qnc_script_db::take_letter(take.take), check.percent),
+                        None if view.read_note.is_none() => format!("{}{} ..", row.mark, qnc_script_db::take_letter(take.take)),
+                        None => format!("{}{}", row.mark, qnc_script_db::take_letter(take.take)),
                     };
                     if qnc_ui_kit::chrome_button(ui, &label, view.recording.is_none(), take.take == chosen, style).on_hover_text(hint).clicked() {
                         asked = Some(ActionEvent::key(VOICE_TAKE).with_target(format!("{}:{}", block.id, take.take)).at(PANEL));
@@ -250,7 +252,7 @@ pub fn paint_block(ui: &mut egui::Ui, place: &'static str, row: &qnc_script::Blo
         // The take being recorded: its time and the microphone's level.
         if let Some((_, seconds, peak)) = view.recording.filter(|(recording, _, _)| *recording == block.id) {
             ui.horizontal(|ui| {
-                ui.label(RichText::new(format!("● {}", seconds_label(seconds))).color(theme.danger).strong().size(theme.font_ui));
+                ui.label(RichText::new(format!("● {}  ·  {}", seconds_label(seconds), view.recording_marks + 1)).color(theme.danger).strong().size(theme.font_ui));
                 let (bar, _) = ui.allocate_exact_size(egui::vec2(ui.available_width().min(240.0), 8.0), Sense::hover());
                 ui.painter().rect_filled(bar, 2.0, theme.surface_alt);
                 let level = if peak > 0.0 { ((20.0 * peak.log10() + 48.0) / 48.0).clamp(0.0, 1.0) } else { 0.0 };
@@ -261,10 +263,21 @@ pub fn paint_block(ui: &mut egui::Ui, place: &'static str, row: &qnc_script::Blo
         }
         // A SubSegment of several parts: each part's clip and timecodes, its words under it, one
         // part under another (user 2026-10-29).
-        let parts: Vec<(Option<String>, &str)> = if block.pieces.len() > 1 {
-            block.pieces.iter().map(|piece| (Some(format!("{} - {}  {}", piece.start_tc, piece.end_tc, piece.length)), piece.text.as_str())).collect()
+        // Every block is this table (user 2026-11-09: as the composite statement): the time on
+        // the left, the text in the middle.
+        let parts: Vec<(String, &str)> = if block.pieces.len() > 1 {
+            block.pieces.iter().map(|piece| (format!("{} - {}  {}", piece.start_tc, piece.end_tc, piece.length), piece.text.as_str())).collect()
         } else {
-            vec![(None, block.text.as_str())]
+            let time = if row.is_clip() {
+                format!("{} - {}  {}", block.start_tc, block.end_tc, block.length)
+            } else if !block.voice_uri.is_empty() {
+                format!("{}  {}", block.voice_tc, seconds_label(row.seconds))
+            } else if row.role == Some(Role::Note) {
+                String::new()
+            } else {
+                seconds_label(row.seconds)
+            };
+            vec![(time, block.text.as_str())]
         };
         for (index, (detail, text)) in parts.into_iter().enumerate() {
             // The text of the part (the middle column of a SubSegment's table).
@@ -314,33 +327,29 @@ pub fn paint_block(ui: &mut egui::Ui, place: &'static str, row: &qnc_script::Blo
             let clicked = ui.add(egui::Label::new(RichText::new(shown).color(color).size(theme.font_ui + 1.0)).wrap().sense(Sense::click())).clicked();
             (asked, clicked)
             };
-            let answer = match detail {
-                // A SubSegment as a table (user 2026-11-08): timecode, the text, and on the right
-                // the smooth cut and pause of the join before the part.
-                Some(detail) => {
-                    let open_part = view.subsegment.as_ref().filter(|open| open.block_id == block.id && index > 0).and_then(|open| Some((open, open.parts.get(index)?)));
-                    let row = ui.horizontal_top(|ui| {
-                        let height = ui.spacing().interact_size.y;
-                        let middle = (ui.available_width() - TC_COLUMN - JOIN_COLUMN - 2.0 * ui.spacing().item_spacing.x).max(120.0);
-                        ui.allocate_ui(egui::vec2(TC_COLUMN, height), |ui| {
-                            ui.set_width(TC_COLUMN);
-                            ui.add(egui::Label::new(RichText::new(detail).color(theme.text_muted).size(theme.font_ui)).extend());
-                        });
-                        let text = ui.allocate_ui(egui::vec2(middle, height), |ui| {
-                            ui.set_width(middle);
-                            paint_text(ui)
-                        });
-                        let join = ui.allocate_ui(egui::vec2(JOIN_COLUMN, height), |ui| {
-                            ui.set_width(JOIN_COLUMN);
-                            open_part.and_then(|(open, part)| part_controls::join_cell(ui, open, index, part, theme))
-                        });
-                        (join.inner.or(text.inner.0), text.inner.1)
+            // Timecode, the text, and on the right the smooth cut and pause of the join before the
+            // part (user 2026-11-08).
+            let open_part = view.subsegment.as_ref().filter(|open| open.block_id == block.id && index > 0).and_then(|open| Some((open, open.parts.get(index)?)));
+            let answer = ui
+                .horizontal_top(|ui| {
+                    let height = ui.spacing().interact_size.y;
+                    let middle = (ui.available_width() - TC_COLUMN - JOIN_COLUMN - 2.0 * ui.spacing().item_spacing.x).max(120.0);
+                    ui.allocate_ui(egui::vec2(TC_COLUMN, height), |ui| {
+                        ui.set_width(TC_COLUMN);
+                        ui.add(egui::Label::new(RichText::new(detail).color(theme.text_muted).size(theme.font_ui)).extend());
                     });
-                    ui.separator();
-                    row.inner
-                }
-                None => paint_text(ui),
-            };
+                    let text = ui.allocate_ui(egui::vec2(middle, height), |ui| {
+                        ui.set_width(middle);
+                        paint_text(ui)
+                    });
+                    let join = ui.allocate_ui(egui::vec2(JOIN_COLUMN, height), |ui| {
+                        ui.set_width(JOIN_COLUMN);
+                        open_part.and_then(|(open, part)| part_controls::join_cell(ui, open, index, part, theme))
+                    });
+                    (join.inner.or(text.inner.0), text.inner.1)
+                })
+                .inner;
+            ui.separator();
             if answer.0.is_some() {
                 asked = answer.0;
             }

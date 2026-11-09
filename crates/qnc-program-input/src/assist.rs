@@ -21,7 +21,12 @@ pub(crate) fn assist_sound<R: ProgramMediaResolver>(
     let mut ratios = Vec::new();
     let mut start = 0u64;
     for (index, segment) in segments.iter().enumerate().filter(|(_, segment)| segment.active) {
-        let ratio = qnc_program_db::story_per_source(story_rate, (segment.fps_num, segment.fps_den))?;
+        // A compound statement keeps the levels of its parts as they were set.
+        if !segment.parts.is_empty() {
+            start += segment.duration_frames;
+            continue;
+        }
+        let ratio =qnc_program_db::story_per_source(story_rate, (segment.fps_num, segment.fps_den))?;
         let frames = segment.duration_frames;
         measures.read(&segment.clip_id, resolver)?;
         let source_in = segment.in_frame * ratio.0 as u64 / ratio.1 as u64;

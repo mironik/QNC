@@ -11,6 +11,8 @@ mod undo;
 mod object_undo;
 mod model;
 pub use model::*;
+mod compound;
+pub use compound::*;
 
 use std::sync::Arc;
 

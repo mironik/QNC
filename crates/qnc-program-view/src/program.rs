@@ -1,5 +1,39 @@
 use super::*;
 
+/// What lies where in a compound statement, on the program axis; none for a segment of one clip.
+fn compound_rows(segment: &ProgramSegment, start: u64, rate: Option<(u32, u32)>) -> Vec<SegmentRow> {
+    let (false, Some(rate)) = (segment.parts.is_empty(), rate) else { return Vec::new() };
+    let Ok(expanded) = qnc_program_db::expand_compounds(std::slice::from_ref(segment), rate) else { return Vec::new() };
+    let mut at = start;
+    expanded
+        .segments
+        .iter()
+        .filter_map(|piece| {
+            let kind = SegmentKind::from_db(&piece.kind)?;
+            let start_frame = at;
+            at += piece.duration_frames;
+            Some(SegmentRow {
+                segment_id: piece.segment_id.clone(),
+                kind,
+                clip_id: piece.clip_id.clone(),
+                source_in_frame: piece.in_frame,
+                source_out_frame: piece.out_frame,
+                a1_source_channel: piece.a1_source_channel,
+                a1_level_db: piece.a1_level_db,
+                a1_off: piece.a1_off,
+                start_frame,
+                end_frame: at,
+                duration_label: String::new(),
+                duration_color_key: "",
+                selected: false,
+                lead: false,
+                level_keys: piece.level_keys.clone(),
+                parts: Vec::new(),
+            })
+        })
+        .collect()
+}
+
 /// Builds the program: the stored order, one window after another, in story frames at
 /// the story rate (a source of twice or half that rate is counted in story frames).
 pub fn program(
@@ -52,10 +86,12 @@ pub fn program(
             selected: selected == Some(segment.segment_id.as_str()),
             lead: !segment.lead.is_empty(),
             level_keys: segment.level_keys.clone(),
+            parts: compound_rows(segment, start, timebase),
         });
         start += frames;
     }
     SegmentsView {
+        picture_overhangs: segments.iter().filter(|segment| segment.active && (segment.v_lead_frames, segment.v_tail_frames) != (0, 0)).map(|segment| (segment.segment_id.clone(), segment.v_lead_frames, segment.v_tail_frames)).collect(),
         parts,
         timebase,
         total_frames: start,

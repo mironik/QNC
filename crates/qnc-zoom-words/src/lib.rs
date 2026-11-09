@@ -160,7 +160,8 @@ impl ZoomWords {
 
     /// The words heard in the take `need` plays, on the zoom's axis.
     fn voice_words(&self, sound: &ZoomSound, need: &Need, fps: f64) -> Vec<ZoomWord> {
-        let heard = self.voices.iter().find(|voice| qnc_voice_take::clip_id(&voice.name) == need.clip_id).and_then(|voice| voice.takes.iter().find(|take| take.take == need.channel + 1)).and_then(|take| take.heard.as_ref());
+        // Every reading is its own clip (user 2026-11-09).
+        let heard = self.voices.iter().flat_map(|voice| voice.takes.iter().map(move |take| (voice, take))).find(|(voice, take)| qnc_voice_take::clip_id(&qnc_script_db::take_name(&voice.name, take.take)) == need.clip_id).and_then(|(_, take)| take.heard.as_ref());
         let (program_start, program_end, source_in, source_out) = need.piece;
         let axis = |frame: u64| to_axis(program_start, program_end, source_in, source_out, frame).clamp(sound.from, sound.to);
         heard

@@ -19,6 +19,11 @@ pub fn own_action(view: &SubsegmentView, action_id: &str, value: Option<i64>, ta
         "segments_keep_edit" => own("activate_focused_item", None),
         "timeline_cue_frame" | "timeline_select_slot" | "timeline_select_cover" if holding => own("activate_focused_item", None),
         "timeline_cue_frame" => own(SUBSEGMENT_CUE, Some(frame?.to_string())),
+        // A click on V is Home, as on every timeline: the start.
+        "playlist_input_start" => own(action_id, None),
+        // Ctrl+click on V and a double click on a part, as on a Wrap row.
+        "toggle_wrap_video" => own(action_id, None),
+        "wrap_zoom" => own(action_id, target?.strip_prefix("part-").map(str::to_string)),
         // A click on a part's length strip chooses the part, as a cover's strip chooses its slot.
         "timeline_select_slot" | "timeline_select_cover" => own(SUBSEGMENT_SELECT, Some(part_at(frame?)?.to_string())),
         // A drag over the strips (user 2026-11-07): the slots from the strip it started on to the
@@ -56,37 +61,11 @@ pub fn own_action(view: &SubsegmentView, action_id: &str, value: Option<i64>, ta
         }
         // A drag of the taken edge (only what is taken moves): the edge follows the pointer.
         "timeline_drag_marker" => own(DRAG_EDGE, Some(drag_target(target?, frame?)?)),
-        // The wheel: the arrows, Ctrl+wheel the Ctrl+arrows of the source lane (the part's level).
-        "wheel_segments_back" | "wheel_segments_forward" => own(qnc_edit_step::arrow(qnc_edit_step::frames(action_id)?), None),
-        "wheel_segments_ctrl_back" => own("wheel_source_ctrl_back", None),
-        "wheel_segments_ctrl_forward" => own("wheel_source_ctrl_forward", None),
+        // The wheel goes on as it is: its one rule is `qnc_edit_step::wheel`, in `key`.
+        wheel if qnc_edit_step::is_wheel(wheel) => own(wheel, None),
         _ => None,
     }
 }
-
-/// The mouse map's row actions the SubSegment takes; any other a row would send (an M marker,
-/// a Wrap zoom, a segment edit) is not the SubSegment's and goes nowhere.
-pub const ROW_ACTIONS: [&str; 19] = [
-    "timeline_cue_frame",
-    "select_level_a1",
-    "segments_keep_edit",
-    "timeline_select_slot",
-    "timeline_select_cover",
-    "timeline_select_slots",
-    "select_current_marker_slot",
-    "timeline_take_cover",
-    "select_audio_a1",
-    "source_choose_a1_channel",
-    "select_marker",
-    "select_mark_in",
-    "timeline_drag_marker",
-    "timeline_take_cut_edge",
-    "timeline_drag_cut_edge",
-    "wheel_segments_back",
-    "wheel_segments_forward",
-    "wheel_segments_ctrl_back",
-    "wheel_segments_ctrl_forward",
-];
 
 /// The frame an edge marker stands on.
 fn edge_frame(view: &SubsegmentView, id: &str) -> Option<u64> {
@@ -168,6 +147,9 @@ mod tests {
         let some = |action: &str, target: Option<&str>| Some((action.to_string(), target.map(str::to_string)));
         assert_eq!(own("timeline_cue_frame", Some(60), None, false), some(SUBSEGMENT_CUE, Some("60")), "a click: the playhead");
         assert_eq!(own("timeline_cue_frame", Some(60), None, true), some("activate_focused_item", None), "a click while holding keeps");
+        assert_eq!(own("toggle_wrap_video", None, None, false), some("toggle_wrap_video", None), "the narrow row or the filmstrip");
+        assert_eq!(own("wrap_zoom", Some(60), Some("part-1"), false), some("wrap_zoom", Some("1")), "a double click enlarges the part");
+        assert_eq!(own("playlist_input_start", None, None, false), some("playlist_input_start", None), "a click on V: Home");
         assert_eq!(own("segments_keep_edit", Some(60), None, true), some("activate_focused_item", None));
         assert_eq!(own("timeline_select_cover", Some(60), Some("part-1"), false), some(SUBSEGMENT_SELECT, Some("1")), "a click on the strip chooses the part");
         assert_eq!(own("timeline_take_cover", Some(100), Some("part-2"), false), some(TAKE_EDGE, Some("2:in:slot")), "a right click on the strip: the slot and its nearer IN");

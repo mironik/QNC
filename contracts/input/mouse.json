@@ -59,5 +59,15 @@
       "ctrl_wheel_back": "wheel_segments_ctrl_back",
       "ctrl_wheel_forward": "wheel_segments_ctrl_forward"
     }
+  },
+  "no_meaning": {
+    "subsegment": [
+      "source_choose_a2_channel",
+      "select_audio_a2",
+      "select_level_a2",
+      "segment_edit",
+      "add_marker",
+      "add_marker_continue"
+    ]
   }
 }

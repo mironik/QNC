@@ -254,6 +254,17 @@ pub fn read_take(path: &Path) -> Result<(Vec<f32>, u32)> {
     Ok((samples, rate))
 }
 
+/// Writes `samples` as a mono 24-bit WAV (a reading cut out of a recording).
+pub fn write_take(path: &Path, samples: &[f32], sample_rate: u32) -> Result<()> {
+    let mut bytes = Vec::with_capacity(44 + samples.len() * 3);
+    write_header(&mut bytes, sample_rate, samples.len() as u64)?;
+    for sample in samples {
+        let value = (sample.clamp(-1.0, 1.0) * 8_388_607.0).round() as i32;
+        bytes.extend_from_slice(&value.to_le_bytes()[..3]);
+    }
+    std::fs::write(path, bytes).map_err(|e| format!("{}: {e}", path.display()))
+}
+
 /// The header of a mono 24-bit PCM WAV file of `samples` samples.
 fn write_header(out: &mut impl Write, sample_rate: u32, samples: u64) -> Result<()> {
     let data = (samples * 3).min(u32::MAX as u64 - 36) as u32;
@@ -322,4 +333,37 @@ mod tests {
 /// The local date and time for a file name (`YYYYMMDD_HHMMSS`).
 pub fn file_stamp() -> String {
     chrono::Local::now().format("%Y%m%d_%H%M%S").to_string()
+}
+
+/// A short beep on the computer's output (user 2026-11-09: a press during a reading is
+/// answered). On its own thread; without an output it says nothing. Heard by the microphone
+/// over speakers: headphones keep it out of the recording.
+pub fn beep() {
+    let _ = std::thread::Builder::new().name("qnc-voice-beep".into()).spawn(|| {
+        let Some(device) = cpal::default_host().default_output_device() else { return };
+        let Ok(config) = device.default_output_config() else { return };
+        if config.sample_format() != cpal::SampleFormat::F32 {
+            return;
+        }
+        let (channels, rate) = (usize::from(config.channels()), config.sample_rate() as f32);
+        let stream_config: cpal::StreamConfig = config.into();
+        let mut at = 0f32;
+        let Ok(stream) = device.build_output_stream(
+            &stream_config,
+            move |data: &mut [f32], _: &cpal::OutputCallbackInfo| {
+                for frame in data.chunks_mut(channels.max(1)) {
+                    let sample = (at * 1000.0 * std::f32::consts::TAU / rate).sin() * 0.25;
+                    frame.fill(if at < rate * 0.09 { sample } else { 0.0 });
+                    at += 1.0;
+                }
+            },
+            |_| {},
+            None,
+        ) else {
+            return;
+        };
+        if stream.play().is_ok() {
+            std::thread::sleep(std::time::Duration::from_millis(160));
+        }
+    });
 }

@@ -27,6 +27,7 @@ fn stored(id: &str, kind: &str, range: (u64, u64)) -> ProgramSegment {
         a2_tail_frames: 0,
         level_keys: Vec::new(),
         text_marks: Vec::new(),
+        parts: Vec::new(),
     }
 }
 
@@ -262,6 +263,10 @@ fn navigation_asks_only_for_a_program_frame_never_for_a_source_clip() {
     assert_eq!(segments.take_seek(), Some(0));
     segments.apply(SegmentCommand::Cue(999));
     assert_eq!(segments.take_seek(), Some(40), "never past the program end");
+    segments.set_playhead(Some(20));
+    segments.apply(SegmentCommand::NavigateObject { up: false });
+    assert!(segments.take_seek().is_some_and(|frame| (21..=33).contains(&frame)), "to the next object");
+    assert!(segments.view().selected_marker().is_none(), "the jump moves the playhead, it takes nothing");
     assert!(ProgramSegments::new().take_seek().is_none());
 }
 
@@ -1083,11 +1088,26 @@ fn a_double_click_enlarges_a_cover_with_its_neighbours_else_the_segment_and_the_
     segments.apply(SegmentCommand::Zoom { slot: Some("S|m1".into()), frame: Some(5) });
     assert_eq!(segments.view().zoom, Some((0, 18)), "the covered slot S-m1 and 15 % beside it");
     segments.apply(SegmentCommand::Zoom { slot: Some("m1|m2".into()), frame: Some(20) });
-    assert_eq!(segments.view().zoom, Some((10, 30)), "no cover there: segment b");
+    assert_eq!(segments.view().zoom, Some((6, 34)), "no cover there: segment b in edit mode, 15 % beside it");
     segments.apply(SegmentCommand::ProgramZoom);
     assert_eq!(segments.view().zoom, Some((0, 40)));
     segments.apply(SegmentCommand::ProgramZoom);
     assert_eq!(segments.view().zoom, None, "the same again closes it");
+}
+
+#[test]
+fn one_click_calls_the_wrap_row_and_a_double_click_is_edit_mode() {
+    // User 2026-11-09: a click calls that wrap segment to the timeline; a double click is 15-70-15.
+    let mut segments = component();
+    segments.apply(SegmentCommand::Cue(20));
+    assert_eq!(segments.view().zoom, Some((10, 30)), "segment b as its Wrap row");
+    segments.apply(SegmentCommand::Zoom { slot: Some("m1|m2".into()), frame: Some(20) });
+    let edit = segments.view().zoom.expect("edit mode");
+    assert!(edit.0 < 10 && edit.1 > 30, "the segment with some of each side: {edit:?}");
+    segments.apply(SegmentCommand::Cue(25));
+    assert_eq!(segments.view().zoom, Some(edit), "a click inside edit mode only places the playhead");
+    segments.apply(SegmentCommand::Cue(35));
+    assert_ne!(segments.view().zoom, Some(edit), "a click elsewhere calls that row");
 }
 
 #[test]
@@ -1181,6 +1201,55 @@ fn the_picture_of_a_join_moves_alone_as_a_j_or_an_l() {
     assert!(draft.contains(&("a".to_string(), (0, 3))), "the picture L of the clip before: {draft:?}");
     assert!(segments.take_cut_part(Some(join), false, 0), "the A1 sound of the same cut");
     assert!(segments.join_picture_draft().is_none());
+}
+
+/// User 2026-11-09: the J of a segment's picture over the Off before it, with an M marker on
+/// the join and no cover at it: the picture of the marker's cut is the picture of the join.
+#[test]
+fn the_picture_of_an_m_marker_on_a_join_is_the_picture_of_the_join() {
+    let mut segments = component();
+    segments.stored = vec![stored("a", "offovi", (100, 140)), stored("b", "tonovi", (100, 160))];
+    segments.stored_markers = vec![marker("S", 0, "program_start"), marker("m1", 40, ""), marker("E", 100, "program_end")];
+    segments.refresh_view(String::new());
+    segments.apply(SegmentCommand::TakeMarker("m1".into()));
+    segments.set_playhead(Some(45));
+    segments.apply_action("wrap_zoom");
+    assert!(segments.take_cut_part(None, true, 0), "the picture alone");
+    assert!(segments.cut_picture_taken());
+    for _ in 0..4 {
+        segments.apply_action("step_back_frame");
+    }
+    let draft = segments.join_picture_draft().expect("the picture of the join drafted");
+    assert!(draft.contains(&("b".to_string(), (4, 0))), "the picture J of the clip after: {draft:?}");
+}
+
+/// User 2026-11-09: the filmstrip goes on over the frames a picture J or L added, as on a cover.
+#[test]
+fn the_filmstrip_is_laid_on_the_length_a_picture_j_or_l_added() {
+    let row = |id: &str, (start_frame, end_frame): (u64, u64)| qnc_program_view::SegmentRow {
+        segment_id: id.into(),
+        kind: SegmentKind::Ton,
+        clip_id: id.into(),
+        source_in_frame: 100,
+        source_out_frame: 100 + end_frame - start_frame,
+        a1_source_channel: 0,
+        a1_level_db: 0,
+        a1_off: false,
+        start_frame,
+        end_frame,
+        duration_label: String::new(),
+        duration_color_key: "",
+        selected: false,
+        lead: false,
+        level_keys: Vec::new(),
+        parts: Vec::new(),
+    };
+    let view = SegmentsView { rows: vec![row("a", (0, 40)), row("b", (40, 100))], picture_overhangs: vec![("b".into(), 4, 0), ("a".into(), 0, 3)], ..Default::default() };
+    let at = view.picture_placements();
+    let lead = at.iter().find(|place| place.clip_id == "b" && place.program_end == 40).expect("the J over the clip before");
+    assert_eq!((lead.program_start, lead.source_in, lead.source_out), (36, 96, 100));
+    let tail = at.iter().find(|place| place.clip_id == "a" && place.program_start == 40).expect("the L over the clip after");
+    assert_eq!((tail.program_end, tail.source_in, tail.source_out), (43, 140, 143));
 }
 
 /// User 2026-10-29: a cover is no layer above the clips, it overwrites the picture and A2 of its

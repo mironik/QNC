@@ -1,0 +1,18 @@
+[package]
+name = "qnc-session-readings"
+version = "0.1.0"
+edition = "2021"
+license = "UNLICENSED"
+
+[dependencies]
+qnc-db-broker = { workspace = true }
+qnc-read-check = { path = "../qnc-read-check" }
+qnc-script-db = { workspace = true }
+qnc-still-locator = { workspace = true }
+qnc-take-heard = { workspace = true }
+qnc-transcribe-jobs = { workspace = true }
+qnc-transcribe-run = { workspace = true }
+qnc-ui-text = { workspace = true }
+qnc-voice-catalog = { path = "../qnc-voice-catalog" }
+qnc-voice-record = { workspace = true }
+qnc-voice-take = { workspace = true }

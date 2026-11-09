@@ -160,8 +160,7 @@ impl PanelFocus {
         // 2026-10-22).
         if last != self.panel && matches!(self.panel, Panel::Pool | Panel::PoolTabs) && segments.view().zoom.is_some() {
             segments.apply(qnc_program_segments::SegmentCommand::CloseZoom);
-        }
-        // The shuttle's own speed moves the playhead; the play around a taken cut goes round.
+        }        // The shuttle's own speed moves the playhead; the play around a taken cut goes round.
         let cut = self.taken_cut(segments);
         self.moves.tick(preview, cut);
         qnc_segments_keys::dropped(preview, wrap, segments); // another edit took over

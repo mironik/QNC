@@ -2339,7 +2339,9 @@ fn video_intent_from_response(
     // A double click on the picture is its slot, enlarged (its first click placed the
     // playhead); A1 below the slot is the segment's (`paint_audio_band`).
     if response.double_clicked() {
-        if let Some(id) = slot_of_frame(input.marker_slots, frame) {
+        // A row whose covers are its slots (the parts of a SubSegment): the cover clicked.
+        let cover = || input.covers.iter().filter(|_| input.layers.covers_shown).find(|cover| (cover.start_frame..cover.end_frame).contains(&frame)).map(|cover| cover.id);
+        if let Some(id) = slot_of_frame(input.marker_slots, frame).or_else(cover) {
             return TimelineIntent::OpenSlot { id: id.to_string(), frame };
         }
     }
