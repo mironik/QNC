@@ -27,6 +27,7 @@ pub const ACTIONS: &[&str] = &[
     "playlist_input_start",
     "go_to_mark_in",
     "clear_focus",
+    "undo_object",
     "monitor_auto",
     "monitor_on",
 ];
@@ -44,6 +45,8 @@ pub struct SourcePanel {
     /// past its last): while the playhead stays there, O puts OUT at the word's end (user
     /// 2026-11-08: "OUT is set before the chosen word, it should be at its end").
     word: Option<(u64, u64)>,
+    /// Where IN and OUT were when they were taken (undo in the zoom).
+    origin: [Option<Option<u64>>; 2],
 }
 
 impl SourcePanel {
@@ -92,6 +95,27 @@ impl SourcePanel {
         self.mark_taken
     }
 
+    /// Before IN (`in_mark`) or OUT is taken: where it is now, kept while marks stay taken.
+    pub fn remember(&mut self, timeline: &TimelineProjection, in_mark: bool) {
+        if !self.mark_taken(timeline) {
+            self.origin = [None, None];
+        }
+        let now = if in_mark { timeline.source_in_frame } else { timeline.source_out_frame };
+        self.origin[usize::from(!in_mark)].get_or_insert(now);
+    }
+
+    /// The taken mark back where it was when it was first taken; it stays taken.
+    fn back_to_origin(&mut self, preview: &mut SourcePreview, timeline: &mut TimelineProjection) -> bool {
+        let in_mark = timeline.source_mark_focus == qnc_timeline_model::TimelineSourceMarkFocus::In;
+        let Some(origin) = self.origin[usize::from(!in_mark)] else { return false };
+        let (from, to) = if in_mark { (origin, timeline.source_out_frame) } else { (timeline.source_in_frame, origin) };
+        if from.zip(to).is_some_and(|(from, to)| from >= to) {
+            return false; // the other mark has moved past where this one was
+        }
+        (timeline.source_in_frame, timeline.source_out_frame) = (from, to);
+        mark_cue(preview, qnc_source_mark_focus::take(timeline, in_mark))
+    }
+
     /// A mark was taken by someone else (a segment edge opened with its mark taken).
     pub fn set_mark_taken(&mut self, taken: bool) {
         self.mark_taken = taken;
@@ -126,7 +150,10 @@ impl SourcePanel {
                 preview.pause();
                 true
             }
+            // Undo in the zoom (user 2026-11-09): the taken mark goes back to where it was.
+            "undo_object" if self.mark_taken(timeline) => self.back_to_origin(preview, timeline),
             "select_mark_in" | "select_mark_out" => {
+                self.remember(timeline, action_id == "select_mark_in");
                 let key = qnc_source_mark_focus::take(timeline, action_id == "select_mark_in");
                 self.mark_taken = key != MarkKey::Refused;
                 mark_cue(preview, key)
@@ -174,6 +201,22 @@ mod tests {
 
     fn marked() -> TimelineProjection {
         TimelineProjection::new(0, 100).with_playhead(10).with_source_in_at_confirmed().with_playhead(40).with_source_out_at_confirmed()
+    }
+
+    #[test]
+    fn undo_puts_only_the_taken_mark_back_where_it_was() {
+        let (mut panel, mut preview, mut timeline) = (SourcePanel::new(), SourcePreview::default(), marked());
+        panel.route("select_mark_in", &mut preview, &mut timeline);
+        panel.route("step_forward_frame", &mut preview, &mut timeline);
+        panel.route("select_mark_out", &mut preview, &mut timeline);
+        panel.route("step_forward_frame", &mut preview, &mut timeline);
+        assert_eq!((timeline.source_in_frame, timeline.source_out_frame), (Some(11), Some(41)));
+        panel.route("undo_object", &mut preview, &mut timeline);
+        assert_eq!((timeline.source_in_frame, timeline.source_out_frame), (Some(11), Some(40)), "OUT is the one taken");
+        panel.route("select_mark_in", &mut preview, &mut timeline);
+        panel.route("undo_object", &mut preview, &mut timeline);
+        assert_eq!((timeline.source_in_frame, timeline.source_out_frame), (Some(10), Some(40)), "back where IN was first taken");
+        assert!(panel.mark_taken(&timeline), "it stays taken");
     }
 
     #[test]

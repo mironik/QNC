@@ -1,6 +1,18 @@
 use super::*;
 
 #[test]
+fn undo_with_a_source_mark_taken_is_that_marks() {
+    let mut focus = PanelFocus::new();
+    let (mut preview, mut wrap, mut segments) = (SourcePreview::default(), WrapSession::new(), ProgramSegments::new());
+    let mut timeline = TimelineProjection { duration_frames: 100, playhead_frame: Some(0), source_in_frame: Some(10), source_out_frame: Some(40), ..Default::default() };
+    focus.route("select_mark_in", (&mut preview, &mut wrap, &mut segments, &mut timeline));
+    focus.route("step_forward_frame", (&mut preview, &mut wrap, &mut segments, &mut timeline));
+    assert_eq!(timeline.source_in_frame, Some(11));
+    focus.route("undo_object", (&mut preview, &mut wrap, &mut segments, &mut timeline));
+    assert_eq!(timeline.source_in_frame, Some(10));
+}
+
+#[test]
 fn a_pointer_event_belongs_to_the_panel_it_was_on() {
     let mut focus = PanelFocus::new();
     let (mut preview, mut wrap, mut segments) = (SourcePreview::default(), WrapSession::new(), ProgramSegments::new());

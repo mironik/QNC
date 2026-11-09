@@ -21,6 +21,11 @@ impl PanelFocus {
         // transport (Space, a click on a timeline) ends its own movement.
         // Dynamic trim (docs/98 1.4): the play around a taken cut, and K brings the taken
         // edge to where it stopped the playhead (JKL in trim, as in every editor).
+        // Undo while IN or OUT of the source timeline is taken (the zoom's button, Backspace):
+        // that mark back where it was (user 2026-11-09), before anything else undoes.
+        if action_id == "undo_object" && self.taken(pieces.3) {
+            return self.source.route(action_id, pieces.0, pieces.3);
+        }
         if action_id == qnc_playhead_moves::AROUND {
             let cut = self.taken_cut(pieces.2);
             return Some(self.moves.around(cut, pieces.0));

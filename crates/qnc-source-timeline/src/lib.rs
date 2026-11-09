@@ -371,6 +371,7 @@ impl SourceTimeline {
     /// IN or OUT dragged to `frame` of the clip: taken while it is dragged, the playhead
     /// on the cut; letting the button go keeps it (`KEEP_MARK`).
     pub fn drag(&mut self, in_mark: bool, frame: u64, preview: &mut SourcePreview, timeline: &mut TimelineProjection) -> bool {
+        self.keys.remember(timeline, in_mark);
         let key = qnc_source_mark_focus::drag(timeline, in_mark, frame);
         self.keys.set_mark_taken(key != qnc_source_mark_focus::MarkKey::Refused);
         qnc_source_panel::mark_cue(preview, key)
