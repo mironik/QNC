@@ -1302,3 +1302,14 @@ fn a_statement_enlarged_has_four_pictures_and_only_the_taken_edge_is_the_cut() {
     segments.set_source(pick);
     assert_eq!(frames(&segments), [(Some(9), false), (Some(10), false), (Some(39), true), (Some(40), false)]);
 }
+
+#[test]
+fn a_click_on_a_picture_of_a_statements_zoom_takes_its_edge() {
+    let mut segments = component();
+    let mut pick = marked(10).with_statement(true).with_taken(Some(true));
+    pick.marks = Some((10, 40));
+    segments.set_source(pick);
+    let clicks: Vec<_> = segments.view().source_edit_stills.iter().map(|still| still.click.as_ref().map(|click| click.action.clone())).collect();
+    let (edge_in, edge_out) = (Some("select_mark_in".to_string()), Some("select_mark_out".to_string()));
+    assert_eq!(clicks, [edge_in.clone(), edge_in, edge_out.clone(), edge_out]);
+}

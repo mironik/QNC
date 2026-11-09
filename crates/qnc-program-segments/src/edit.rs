@@ -133,6 +133,10 @@ impl ProgramSegments {
         let (mut first, mut second) = (in_cut.stills(), out_cut.stills());
         let other = if taken { &mut second } else { &mut first };
         other.iter_mut().for_each(|still| still.cut = false);
+        // A click on a picture takes its edge, as Ctrl+I or Ctrl+O (user 2026-11-09).
+        let click = |action: &str| Some(qnc_program_view::StillAction::new(action, None, None));
+        first.iter_mut().for_each(|still| still.click = click("select_mark_in"));
+        second.iter_mut().for_each(|still| still.click = click("select_mark_out"));
         first.append(&mut second);
         first
     }
