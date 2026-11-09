@@ -8634,3 +8634,11 @@ razvoja"): svaki zavrseni korak (testovi i conformance prolaze, zapis u AGENTS.m
 push na `libav-decoder` na kraju svakog bloka rada, bez mergea; oznaka `v-GGGG-MM-DD` na kraju dana; za svaki dan
 `docs/razvoj/GGGG-MM-DD.md` (koraci s commitom, sto je provjereno uzivo, sto je otvoreno, gdje se vratiti). Prvi je
 `docs/razvoj/2026-11-09.md`. Force push samo uz izricitu dozvolu.
+Otkljucano i izvedeno 2026-11-10 (vanjski audit grane `libav-decoder` 9b3fa29, nalaz "citac medija bez roka cekanja";
+korisnik: "da, otkljucaj i kreni s korakom 1"): `qnc-media-readahead` je dekoder koji ceka blok vrtio bez ukupnog roka
+(budio se svake sekunde i cekao dalje), pa je kartica koja zapne bez greske OS-a drzala dekoder zauvijek. Sada
+`Config.wait_limit` (zadano 10 s; budenje kartice traje oko 2,5 s): blok koji ne stigne u roku je greska citanja
+`TimedOut` tog toka (dekoder libav je dobiva kao EIO i javlja gresku umjesto da stoji), `Stats.timeouts` ih broji, a
+datoteka se odvaja od zapele veze, pa je tok otvoren poslije otvara iznova. Ostali blokovi i druge datoteke citaju se i
+dalje. Test `a_block_the_media_never_gives_is_a_read_error_after_the_wait_limit`, conformance. Uzivo nije provjereno.
+Ostali koraci audita (zakljucati verziju FFmpeg-a, ukljuciti libav kroz katalog, osnovni CI) cekaju.

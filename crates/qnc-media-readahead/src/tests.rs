@@ -101,6 +101,27 @@ fn many_streams_on_many_files_read_their_own_bytes() {
 }
 
 #[test]
+fn a_block_the_media_never_gives_is_a_read_error_after_the_wait_limit() {
+    let (_dir, path, bytes) = file_of(4 * BLOCK as usize);
+    let config = Config { ahead: 0, wait_limit: Duration::from_millis(300), ..Config::default() };
+    let reader = MediaReader::new(config);
+    let mut stream = reader.open(&path).unwrap();
+    // A read that never returns: the block counts as being read and nobody reads it.
+    lock(&reader.shared).inflight.insert((stream.file, 2));
+    stream.seek(SeekFrom::Start(2 * BLOCK)).unwrap();
+    let started = Instant::now();
+    let error = stream.read(&mut [0u8; 16]).unwrap_err();
+    assert_eq!(error.kind(), io::ErrorKind::TimedOut);
+    assert!(started.elapsed() >= Duration::from_millis(300) && started.elapsed() < Duration::from_secs(3));
+    assert_eq!(reader.stats().timeouts, 1);
+    // Other blocks still read, and a stream opened after it opens the file again.
+    assert_eq!(read_exact_at(&mut stream, 0, 16), &bytes[..16]);
+    let mut again = reader.open(&path).unwrap();
+    assert_ne!(again.file, stream.file, "a new stream does not share the hung handle");
+    assert_eq!(read_exact_at(&mut again, 2 * BLOCK, 16), &bytes[2 * BLOCK as usize..2 * BLOCK as usize + 16]);
+}
+
+#[test]
 fn a_missing_file_is_an_error_of_open() {
     let reader = MediaReader::new(Config::default());
     assert!(reader.open(Path::new("no/such/media.mxf")).is_err());

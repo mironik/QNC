@@ -45,6 +45,11 @@ pub struct Config {
     pub low_water: u64,
     /// Bytes per second read ahead at most while every stream has `low_water` ahead.
     pub paced_rate: u64,
+    /// How long a stream waits for one block at most. A card that stops answering without
+    /// an error (stuck in the reader, the system read never returns) is then a read error
+    /// of that stream, which the decoder reports, instead of a decoder that waits forever
+    /// (audit 2026-11-09). A card that wakes takes about 2.5 s, so this is well above it.
+    pub wait_limit: Duration,
 }
 
 impl Default for Config {
@@ -57,6 +62,7 @@ impl Default for Config {
             budget: 768 << 20,
             low_water: 8 << 20,
             paced_rate: 20 << 20,
+            wait_limit: Duration::from_secs(10),
         }
     }
 }
@@ -72,6 +78,8 @@ pub struct Stats {
     pub waits: u64,
     /// The time those streams waited, in total (microseconds).
     pub waited_us: u64,
+    /// Waits that ran past `Config::wait_limit` and became read errors.
+    pub timeouts: u64,
 }
 
 struct Block {
@@ -269,10 +277,23 @@ impl Stream {
             if let Some(message) = state.failed.remove(&(self.file, block)) {
                 return Err(io::Error::other(message));
             }
-            if waited.is_none() {
-                waited = Some(Instant::now());
+            let since = *waited.get_or_insert_with(|| {
                 state.stats.waits += 1;
-            }
+                Instant::now()
+            });
+            let limit = self.shared.config.wait_limit;
+            let Some(left) = limit.checked_sub(since.elapsed()).filter(|left| !left.is_zero()) else {
+                state.stats.timeouts += 1;
+                state.stats.waited_us += u64::try_from(since.elapsed().as_micros()).unwrap_or(u64::MAX);
+                // The handle may hang: a stream opened after this opens the file again
+                // instead of waiting on the same one.
+                let file = self.file;
+                state.by_path.retain(|_, id| *id != file);
+                return Err(io::Error::new(
+                    io::ErrorKind::TimedOut,
+                    format!("media read did not answer within {} s", limit.as_secs_f32()),
+                ));
+            };
             if !state.inflight.contains(&(self.file, block)) && !state.demand.contains(&(self.file, block)) {
                 state.demand.push_back((self.file, block));
             }
@@ -280,7 +301,7 @@ impl Stream {
             state = self
                 .shared
                 .ready
-                .wait_timeout(state, Duration::from_secs(1))
+                .wait_timeout(state, left.min(Duration::from_secs(1)))
                 .map(|(state, _)| state)
                 .unwrap_or_else(|poisoned| poisoned.into_inner().0);
         };
