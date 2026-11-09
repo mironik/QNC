@@ -2,6 +2,8 @@
 //! the level bar and the one source timeline, and the header's action buttons. Its state, keys
 //! and the clip's sound are the core piece `qnc-source-timeline`; this draws what it gives.
 
+use std::sync::Arc;
+
 use eframe::egui::{Rect, Ui};
 use qnc_source_dock::SourceTimeline as DockTimeline;
 use qnc_source_timeline::SourceTimelineView;
@@ -21,7 +23,25 @@ pub fn show(
     (projection, assets): (&TimelineProjection, &SourceTimelineAssets),
     view: &SourceTimelineView,
 ) -> TimelineIntent {
-    show_with(ui, rect, (theme, header_gap), title, header, (projection, assets), view, None).0
+    show_with(ui, rect, (theme, header_gap), title, header, (projection, assets, None), view, None).0
+}
+
+/// The window around the marks `[from, to)` (70 % of the width, 15 % each side) and the clip's
+/// filmstrip and wave of that window, made once per window and per pair of assets.
+fn enlarged_view(ui: &Ui, projection: &TimelineProjection, assets: &SourceTimelineAssets, (from, to): (u64, u64)) -> (TimelineProjection, Arc<SourceTimelineAssets>) {
+    let total = projection.range_start() + projection.duration_frames();
+    let (start, end) = qnc_timeline_model::enlarged(from, to, total);
+    let mut window = projection.clone();
+    (window.range_start_frame, window.duration_frames) = (start, end.saturating_sub(start).max(1));
+    let made = (assets.clip_id.clone(), start, end, assets.filmstrip_background.as_ref().map(|it| Arc::as_ptr(it) as usize), assets.wave.as_ref().map(|it| Arc::as_ptr(it) as usize));
+    let id = eframe::egui::Id::new(("qnc-source-timeline-enlarged", &made));
+    let cached = ui.data(|data| data.get_temp::<Arc<SourceTimelineAssets>>(id));
+    let shown = cached.unwrap_or_else(|| {
+        let shown = Arc::new(assets.window(start, end, total));
+        ui.data_mut(|data| data.insert_temp(id, Arc::clone(&shown)));
+        shown
+    });
+    (window, shown)
 }
 
 /// What a form draws under the header in place of the timeline, and its answer.
@@ -36,11 +56,14 @@ pub fn show_with(
     (theme, header_gap): (&qnc_desktop_theme::Theme, f32),
     title: &str,
     header: impl FnOnce(&mut Ui),
-    (projection, assets): (&TimelineProjection, &SourceTimelineAssets),
+    (projection, assets, enlarge): (&TimelineProjection, &SourceTimelineAssets, Option<(u64, u64)>),
     view: &SourceTimelineView,
     instead: Option<&mut Instead<'_>>,
 ) -> (TimelineIntent, Option<qnc_action_event::ActionEvent>) {
     let style = &qnc_theme_styles::dock(theme, header_gap);
+    // A statement enlarged (user 2026-11-09): the same timeline, a narrower window of its clip.
+    let enlarged = enlarge.filter(|_| projection.confirmed_frame().is_some()).map(|marks| enlarged_view(ui, projection, assets, marks));
+    let (projection, assets) = enlarged.as_ref().map_or((projection, assets), |(projection, assets)| (projection, assets.as_ref()));
     let timeline = DockTimeline::from_assets(projection, qnc_theme_styles::timeline(theme), assets)
         .with_timecode(view.timecode)
         .with_a1_channel(view.a1)

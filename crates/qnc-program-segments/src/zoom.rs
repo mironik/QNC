@@ -10,8 +10,7 @@ use qnc_program_view::SegmentsView;
 
 use crate::ProgramSegments;
 
-/// The share of the window each neighbour of the slot takes.
-const NEIGHBOUR_SHARE: f64 = 0.15;
+use qnc_timeline_model::enlarged as window;
 
 /// What is enlarged.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -75,13 +74,6 @@ impl ProgramSegments {
             ZoomOn::Program => (view.total_frames > 0).then_some((0, view.total_frames)),
         }
     }
-}
-
-/// The window of a slot `[start, end)`: it takes 70 % of the width, 15 % on each side.
-pub(crate) fn window(start: u64, end: u64, total: u64) -> (u64, u64) {
-    let length = end.saturating_sub(start).max(1) as f64;
-    let side = (length * NEIGHBOUR_SHARE / (1.0 - 2.0 * NEIGHBOUR_SHARE)).round() as u64;
-    (start.saturating_sub(side), end.saturating_add(side).min(total.max(end)))
 }
 
 #[cfg(test)]

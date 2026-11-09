@@ -4073,6 +4073,7 @@ dependencies = [
  "qnc-transcript",
  "qnc-transport-panel",
  "qnc-ui-kit",
+ "qnc-virtual-short-cards",
 ]
 
 [[package]]
@@ -5787,6 +5788,7 @@ dependencies = [
  "qnc-sound-assist",
  "qnc-source-channels",
  "qnc-sync-cover",
+ "qnc-timeline-model",
  "qnc-ui-text",
  "qnc-virtual-shots",
  "rusqlite",
@@ -6728,6 +6730,7 @@ dependencies = [
  "qnc-theme-styles",
  "qnc-timeline",
  "qnc-timeline-assets",
+ "qnc-timeline-model",
  "qnc-trim-overlay",
  "qnc-ui-kit",
 ]

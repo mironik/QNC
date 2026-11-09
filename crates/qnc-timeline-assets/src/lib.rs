@@ -48,6 +48,35 @@ pub struct SourceTimelineAssets {
 }
 
 impl SourceTimelineAssets {
+    /// What the clip's filmstrip and wave show of its frames `[from, to)` of `total`, for a
+    /// timeline enlarged on that window: the wave's part of it, and each picture place the
+    /// stored picture nearest it (a filmstrip has only its pictures; none is made).
+    pub fn window(&self, from: u64, to: u64, total: u64) -> Self {
+        let total = total.max(1) as f64;
+        let filmstrip_background = self.filmstrip_background.as_ref().map(|strip| {
+            let places = FILMSTRIP_FRAME_COUNT as f64;
+            let width = to.saturating_sub(from) as f64 / places;
+            let frames = strip.frames.first().map_or_else(Vec::new, |first| {
+                (0..FILMSTRIP_FRAME_COUNT)
+                    .map(|place| {
+                        let wanted = (from as f64 + (place as f64 + 0.5) * width) / total * places;
+                        let nearest = strip.frames.iter().fold(first, |best, frame| if (frame.index as f64 + 0.5 - wanted).abs() < (best.index as f64 + 0.5 - wanted).abs() { frame } else { best });
+                        FilmstripFrameAsset { index: place, ..nearest.clone() }
+                    })
+                    .collect()
+            });
+            Arc::new(FilmstripBackground { clip_id: strip.clip_id.clone(), frames })
+        });
+        let part = |peaks: &[f32]| {
+            let at = |frame: u64| ((frame as f64 / total * peaks.len() as f64).round() as usize).min(peaks.len());
+            peaks[at(from)..at(to).max(at(from))].to_vec()
+        };
+        let wave = self.wave.as_ref().map(|wave| {
+            Arc::new(WaveformPeaks { clip_id: wave.clip_id.clone(), a1_peaks: part(&wave.a1_peaks), a2_peaks: part(&wave.a2_peaks), a3_peaks: part(&wave.a3_peaks), a4_peaks: part(&wave.a4_peaks), coarse: wave.coarse })
+        });
+        Self { clip_id: self.clip_id.clone(), filmstrip_background, wave }
+    }
+
     pub fn empty() -> Self {
         Self::default()
     }
@@ -472,5 +501,28 @@ mod tests {
         assert_eq!(taken[0].0.clip_id, "clip-2");
         assert!(!assets.loading());
         assert_eq!(*reader.calls.lock().unwrap(), 3);
+    }
+}
+
+#[cfg(test)]
+mod window_tests {
+    use super::*;
+
+    #[test]
+    fn a_window_has_its_part_of_the_wave_and_the_nearest_picture_in_every_place() {
+        let frame = |index: usize| FilmstripFrameAsset { index, seek_sec: 0.0, uri: format!("f{index}"), image: qnc_image_assets::RgbaImage { size: [1, 1], pixels: vec![0; 4], content_key: index as u64 } };
+        let peaks: Vec<f32> = (0..100).map(|at| at as f32).collect();
+        let assets = SourceTimelineAssets {
+            clip_id: "c".into(),
+            filmstrip_background: Some(Arc::new(FilmstripBackground { clip_id: "c".into(), frames: (0..13).map(frame).collect() })),
+            wave: Some(Arc::new(WaveformPeaks { clip_id: "c".into(), a1_peaks: peaks.clone(), a2_peaks: peaks, a3_peaks: Vec::new(), a4_peaks: Vec::new(), coarse: false })),
+        };
+        let window = assets.window(500, 600, 1000);
+        let wave = window.wave.unwrap();
+        assert_eq!((wave.a1_peaks.first().copied(), wave.a1_peaks.len(), wave.a3_peaks.len()), (Some(50.0), 10, 0));
+        let strip = window.filmstrip_background.unwrap();
+        assert_eq!(strip.frames.len(), FILMSTRIP_FRAME_COUNT);
+        assert_eq!(strip.frames.iter().map(|frame| frame.index).collect::<Vec<_>>(), (0..13).collect::<Vec<_>>());
+        assert!(strip.frames.iter().all(|frame| frame.uri == "f6" || frame.uri == "f7"), "the stored pictures of that part of the clip");
     }
 }

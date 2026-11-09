@@ -6,6 +6,7 @@ description = "QNC Media Assist and Story blocks on the desktop board: preview, 
 
 [dependencies]
 qnc-source-timeline-view = { workspace = true }
+qnc-virtual-short-cards = { workspace = true }
 eframe = { workspace = true }
 qnc-action-event = { workspace = true }
 qnc-board = { workspace = true }

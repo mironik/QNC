@@ -40,6 +40,12 @@ pub fn chosen<'a>(cards: &'a [VirtualShortCard], shot_id: Option<&str>) -> Optio
     Some((card.shot_id.as_str(), card.clip_id.as_str(), (card.in_frame, card.out_frame)))
 }
 
+/// The IN/OUT of the chosen statement while its clip is the one shown: the source timeline
+/// enlarges them (user 2026-11-09).
+pub fn shown_marks(cards: &[VirtualShortCard], shot_id: Option<&str>, shown_clip: Option<&str>) -> Option<(u64, u64)> {
+    chosen(cards, shot_id).filter(|(_, clip, _)| Some(*clip) == shown_clip).map(|(_, _, marks)| marks)
+}
+
 /// The card of `shot_id` to open, or the text code of why it cannot be: it is gone or its clip
 /// is not in the pool.
 pub fn to_open<'a>(cards: &'a [VirtualShortCard], clips: &[qnc_clip_row::ClipRow], shot_id: &str) -> Result<&'a VirtualShortCard, &'static str> {

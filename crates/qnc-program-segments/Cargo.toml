@@ -6,6 +6,7 @@ description = "QNC public component: Ton/Off program segments of an edited story
 
 [dependencies]
 qnc-edit-step = { workspace = true }
+qnc-timeline-model = { workspace = true }
 qnc-image-assets = { workspace = true }
 qnc-ui-text = { workspace = true }
 qnc-notice = { workspace = true }
