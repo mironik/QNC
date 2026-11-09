@@ -106,9 +106,17 @@ pub struct SourcePick {
     /// The A1 and A2 level curves the source timeline keeps for the clip (clip frames, tenths of
     /// a dB; user 2026-11-07): a new segment takes A1's, a new cover A2's.
     pub curves: [Vec<(u64, i16)>; 2],
+    /// A statement is enlarged on the source timeline: its trim zoom has four pictures.
+    pub statement: bool,
 }
 
 impl SourcePick {
+    /// Whether a statement is enlarged on the source timeline.
+    pub fn with_statement(mut self, statement: bool) -> Self {
+        self.statement = statement;
+        self
+    }
+
     /// The clip's level curves as the source timeline keeps them.
     pub fn with_curves(mut self, curves: [Vec<(u64, i16)>; 2]) -> Self {
         self.curves = curves;
@@ -147,6 +155,7 @@ impl SourcePick {
             playing: None,
             lane_choices: [None, None],
             curves: [Vec::new(), Vec::new()],
+            statement: false,
         }
     }
 

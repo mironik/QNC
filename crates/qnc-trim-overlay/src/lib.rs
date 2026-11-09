@@ -77,7 +77,7 @@ pub fn show(ctx: &egui::Context, segments: &SegmentsView, theme: &TimelineTheme)
             ui.painter().rect_stroke(rect, 6.0, visuals.window_stroke, StrokeKind::Inside);
             let top = rect.min + Vec2::splat(MARGIN);
             let row_width = size.x - 2.0 * MARGIN;
-            let mut gap_at = None;
+            let (mut gap_at, mut gap_at_cut) = (None, false);
             // The side in focus (user 2026-11-04): its pictures framed red, the same in every zoom.
             let focus = sound.and_then(|sound| sound.focus_side);
             let taken_cut = sound.and_then(|sound| sound.taken_cut.clone());
@@ -116,6 +116,10 @@ pub fn show(ctx: &egui::Context, segments: &SegmentsView, theme: &TimelineTheme)
                 // The marker lies between the picture before it and the one after it.
                 if still.after && index > 0 && !stills[index - 1].after {
                     let x = left - GAP / 2.0;
+                    // The cut's line goes through the gap at the taken cut (four pictures: two gaps).
+                    if !gap_at_cut && (still.cut || stills[index - 1].cut) {
+                        (gap_at, gap_at_cut) = (Some(x), true);
+                    }
                     gap_at.get_or_insert(x);
                     let accent = visuals.selection.bg_fill;
                     ui.painter().line_segment([egui::pos2(x, pane.top() - 4.0), egui::pos2(x, pane.bottom() + 4.0)], Stroke::new(3.0, accent));

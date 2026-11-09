@@ -1290,3 +1290,15 @@ fn the_sound_assistants_proposal_is_kept_only_while_it_is_on_and_proposes() {
     assert!(!segments.apply_action("sound_assist_keep") || segments.view().message == qnc_ui_text::text("story.msg.sound_assist_keep_none"));
     assert_eq!(segments.view().message, qnc_ui_text::text("story.msg.sound_assist_keep_none"), "no waves read: nothing proposed");
 }
+
+#[test]
+fn a_statement_enlarged_has_four_pictures_and_only_the_taken_edge_is_the_cut() {
+    let mut segments = component();
+    let frames = |segments: &ProgramSegments| segments.view().source_edit_stills.iter().map(|still| (still.picture.as_ref().map(|p| p.source_frame), still.cut)).collect::<Vec<_>>();
+    segments.set_source(marked(10).with_statement(true).with_taken(Some(true)));
+    assert_eq!(frames(&segments), [(Some(9), false), (Some(10), true), (Some(59), false), (None, false)].into_iter().filter(|(frame, _)| frame.is_some()).collect::<Vec<_>>(), "OUT at the clip's end has nothing after it");
+    let mut pick = marked(10).with_statement(true).with_taken(Some(false));
+    pick.marks = Some((10, 40));
+    segments.set_source(pick);
+    assert_eq!(frames(&segments), [(Some(9), false), (Some(10), false), (Some(39), true), (Some(40), false)]);
+}

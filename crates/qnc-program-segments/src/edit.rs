@@ -123,11 +123,18 @@ impl ProgramSegments {
             return Vec::new();
         };
         let picture = |frame: u64| Some(StillPicture { clip_id: clip_id.clone(), source_frame: frame });
-        if taken {
-            CutPictures { cut: in_frame, before: (in_frame > 0).then(|| (picture(in_frame - 1), qnc_ui_text::text("story.still.before_in"))), after: Some((picture(in_frame), qnc_ui_text::text("story.still.in_first"))), moving_after: true }.stills()
-        } else {
-            CutPictures { cut: out_frame, before: Some((picture(out_frame.saturating_sub(1)), qnc_ui_text::text("story.still.out_last"))), after: (out_frame < self.source.duration_frames).then(|| (picture(out_frame), qnc_ui_text::text("story.still.after_out"))), moving_after: false }.stills()
+        let in_cut = CutPictures { cut: in_frame, before: (in_frame > 0).then(|| (picture(in_frame - 1), qnc_ui_text::text("story.still.before_in"))), after: Some((picture(in_frame), qnc_ui_text::text("story.still.in_first"))), moving_after: true };
+        let out_cut = CutPictures { cut: out_frame, before: Some((picture(out_frame.saturating_sub(1)), qnc_ui_text::text("story.still.out_last"))), after: (out_frame < self.source.duration_frames).then(|| (picture(out_frame), qnc_ui_text::text("story.still.after_out"))), moving_after: false };
+        if !self.source.statement {
+            return if taken { in_cut.stills() } else { out_cut.stills() };
         }
+        // A statement enlarged (user 2026-11-09): its four pictures, the last before it, its
+        // first, its last and the first after it; only the taken edge is the cut.
+        let (mut first, mut second) = (in_cut.stills(), out_cut.stills());
+        let other = if taken { &mut second } else { &mut first };
+        other.iter_mut().for_each(|still| still.cut = false);
+        first.append(&mut second);
+        first
     }
 
     /// The sound around the cut of the trim zoom (user 2026-10-25: "zoom the audio so the
