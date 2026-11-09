@@ -100,6 +100,19 @@ impl TrimStills {
         Self::default()
     }
 
+    /// Pictures of `clip` already made elsewhere (a statement's four on its enlarged timeline,
+    /// user 2026-11-09): the zoom takes them and does not decode them again.
+    pub fn give(&mut self, clip: Option<&str>, pictures: &[(u64, Arc<RgbaImage>)]) {
+        let Some(clip) = clip else { return };
+        for (frame, image) in pictures {
+            let picture = StillPicture { clip_id: clip.to_string(), source_frame: *frame };
+            if !self.cache.contains_key(&picture) {
+                self.order.push_back(picture.clone());
+                self.cache.insert(picture, image.clone());
+            }
+        }
+    }
+
     /// The picture on the monitor as the clip picture the story shows there (user
     /// 2026-10-13): a picture of the zoom that is it needs no decoding.
     /// Only a picture the zoom of `view` wants is taken (nothing is copied while playing).

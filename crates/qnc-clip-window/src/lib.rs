@@ -12,6 +12,7 @@ use std::sync::{
 };
 
 use qnc_fine_wave::FineWave;
+use qnc_image_assets::RgbaImage;
 use qnc_program_waveform::Placement;
 use qnc_still_locator::StillLocator;
 use qnc_timeline_assets::{FilmstripBackground, FilmstripFrameAsset, SourceTimelineAssets, FILMSTRIP_FRAME_COUNT};
@@ -31,6 +32,8 @@ pub struct Enlarged {
     pub from: u64,
     pub to: u64,
     pub assets: Arc<SourceTimelineAssets>,
+    /// The statement's pictures made so far, by their clip frame (the trim zoom takes them).
+    pub pictures: Vec<(u64, Arc<RgbaImage>)>,
 }
 
 /// The window of one form.
@@ -40,7 +43,8 @@ pub struct ClipWindow {
     enlarged: Option<Enlarged>,
     fine: FineWave,
     wave_done: bool,
-    pictures: Option<Receiver<(usize, FilmstripFrameAsset)>>,
+    pictures: Option<Receiver<(u64, Arc<RgbaImage>)>>,
+    marks: Option<(u64, u64)>,
     cancel: Arc<AtomicBool>,
 }
 
@@ -65,12 +69,13 @@ impl ClipWindow {
         if fresh {
             self.forget();
             self.shown = Some(key);
-            self.enlarged = Some(Enlarged { from, to, assets: Arc::new(stored.window(from, to, total)) });
+            self.marks = Some((start, end));
+            self.enlarged = Some(Enlarged { from, to, assets: Arc::new(stored.window(from, to, total)), pictures: Vec::new() });
         }
         if fresh || !self.wave_done {
             if let Some(locator) = locator() {
                 if fresh {
-                    self.start_pictures(clip, (from, to), &locator);
+                    self.start_pictures(clip, (start, end), total, &locator);
                 }
                 self.fill_wave(clip, (from, to), total, &locator);
             }
@@ -109,28 +114,41 @@ impl ClipWindow {
         }
     }
 
+    /// The pictures that came: the zoom takes them as they are, and every filmstrip place of
+    /// their part of the window shows one.
     fn take_pictures(&mut self) {
         let Some(pictures) = &self.pictures else { return };
         let arrived: Vec<_> = pictures.try_iter().collect();
-        let Some(enlarged) = self.enlarged.as_mut().filter(|_| !arrived.is_empty()) else { return };
+        let (Some(enlarged), Some(marks)) = (self.enlarged.as_mut().filter(|_| !arrived.is_empty()), self.marks) else { return };
+        enlarged.pictures.extend(arrived);
+        let (from, to) = (enlarged.from, enlarged.to);
+        let width = to.saturating_sub(from) as f64 / FILMSTRIP_FRAME_COUNT as f64;
         let assets = Arc::make_mut(&mut enlarged.assets);
         let mut strip = assets.filmstrip_background.as_deref().cloned().unwrap_or_else(|| FilmstripBackground { clip_id: assets.clip_id.clone(), frames: Vec::new() });
-        for (place, asset) in arrived {
-            match strip.frames.iter_mut().find(|frame| frame.index == place) {
-                Some(frame) => *frame = asset,
+        for index in 0..FILMSTRIP_FRAME_COUNT {
+            let wanted = picture_of(from as f64 + (index as f64 + 0.5) * width, marks);
+            let Some((frame, image)) = enlarged.pictures.iter().find(|(frame, _)| *frame == wanted) else { continue };
+            let asset = FilmstripFrameAsset { index, seek_sec: 0.0, uri: format!("qnc-clip-window:{}:{frame}", assets.clip_id), image: (**image).clone() };
+            match strip.frames.iter_mut().find(|frame| frame.index == index) {
+                Some(place) => *place = asset,
                 None => strip.frames.push(asset),
             }
         }
         assets.filmstrip_background = Some(Arc::new(strip));
     }
 
-    /// One picture a place, the middle of the place, one decoder call each, the window's first
-    /// place first; a new window stops them.
-    fn start_pictures(&mut self, clip: &str, (from, to): (u64, u64), locator: &StillLocator) {
+    /// The statement's four pictures (user 2026-11-09): the last before it, its first, its last
+    /// and the first after it, one decoder call each; a new window stops them.
+    fn start_pictures(&mut self, clip: &str, (start, end): (u64, u64), total: u64, locator: &StillLocator) {
         let (send, receive) = mpsc::channel();
         let (clip, locator, cancel) = (clip.to_string(), locator.clone(), self.cancel.clone());
+        let mut frames = vec![start.saturating_sub(1), start, end.saturating_sub(1)];
+        if end < total {
+            frames.push(end);
+        }
+        frames.dedup();
         let started = std::thread::Builder::new().name("qnc-clip-window".into()).spawn(move || {
-            if let Err(error) = decode_places(&clip, (from, to), &locator, &cancel, &send) {
+            if let Err(error) = decode_pictures(&clip, &frames, &locator, &cancel, &send) {
                 log(&format!("clip-window pictures {clip}: {error}"));
             }
         });
@@ -138,23 +156,34 @@ impl ClipWindow {
     }
 }
 
-fn decode_places(clip: &str, (from, to): (u64, u64), locator: &StillLocator, cancel: &AtomicBool, send: &mpsc::Sender<(usize, FilmstripFrameAsset)>) -> Result<(), String> {
+/// Which of the statement's four pictures a place at frame `at` of the window shows: around it
+/// the one next to it, inside it its first in the first half and its last in the second.
+fn picture_of(at: f64, (start, end): (u64, u64)) -> u64 {
+    if at < start as f64 {
+        start.saturating_sub(1)
+    } else if at >= end as f64 {
+        end
+    } else if at < (start + end) as f64 / 2.0 {
+        start
+    } else {
+        end.saturating_sub(1)
+    }
+}
+
+fn decode_pictures(clip: &str, frames: &[u64], locator: &StillLocator, cancel: &AtomicBool, send: &mpsc::Sender<(u64, Arc<RgbaImage>)>) -> Result<(), String> {
     let place = locator.locate(clip)?;
     let extractor = qnc_decoder_catalog::installed_filmstrip_extractor().map_err(|error| error.to_string())?.ok_or(qnc_ui_text::text("story.msg.no_still_extractor"))?;
-    let scratch = std::env::temp_dir().join(format!("qnc-clip-window-{}-{from}-{to}", std::process::id()));
-    let width = to.saturating_sub(from) as f64 / FILMSTRIP_FRAME_COUNT as f64;
-    for index in 0..FILMSTRIP_FRAME_COUNT {
+    let scratch = std::env::temp_dir().join(format!("qnc-clip-window-{}-{}", std::process::id(), frames.first().copied().unwrap_or(0)));
+    for &frame in frames {
         if cancel.load(Ordering::Relaxed) {
             break;
         }
-        let frame = (from as f64 + (index as f64 + 0.5) * width) as u64;
         let seek = (frame as f64 - 0.25).max(0.0) * f64::from(place.fps.1) / f64::from(place.fps.0.max(1));
         std::fs::create_dir_all(&scratch).map_err(|error| error.to_string())?;
         let made = extractor.extract_run_with_cancel(&place.file, seek, 1, PICTURE_SIZE, &scratch, cancel).and_then(|()| std::fs::read(scratch.join("000.jpg")).map_err(|error| error.to_string())).and_then(|bytes| qnc_image_assets::decode_thumbnail(&bytes));
         let _ = std::fs::remove_dir_all(&scratch);
-        let image = made.map(|image| qnc_image_assets::RgbaImage { content_key: frame, ..image })?;
-        let asset = FilmstripFrameAsset { index, seek_sec: seek, uri: format!("qnc-clip-window:{clip}:{frame}"), image };
-        if send.send((index, asset)).is_err() {
+        let image = made.map(|image| RgbaImage { content_key: frame, ..image })?;
+        if send.send((frame, Arc::new(image))).is_err() {
             break;
         }
     }
@@ -170,6 +199,15 @@ fn log(line: &str) {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn every_place_shows_one_of_the_four_pictures_of_the_statement() {
+        let marks = (100, 200);
+        assert_eq!(picture_of(80.0, marks), 99, "before it");
+        assert_eq!(picture_of(120.0, marks), 100, "its first half");
+        assert_eq!(picture_of(180.0, marks), 199, "its second half");
+        assert_eq!(picture_of(210.0, marks), 200, "after it");
+    }
 
     #[test]
     fn a_window_is_seventy_percent_around_the_marks_and_goes_without_them() {

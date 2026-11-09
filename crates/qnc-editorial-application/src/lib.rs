@@ -247,7 +247,7 @@ impl EditorialApplication {
         self.view.focus = qnc_dev_diagnostics::timed_block("poll-focus", || self.focus.poll((&mut self.preview, &mut self.wrap, &mut self.segments, &mut self.view.preview.timeline, &mut self.view.clips)));
         if self.view.focus.transcript.all_done { self.view.library_tab = LibraryTab::Transcript } // all asked are transcribed (user 2026-10-28)
         self.view.segments = qnc_dev_diagnostics::timed_block("poll-segments-view", || self.segments.view_with_waves(self.view.clips.iter().map(|clip| (clip.clip_id.as_str(), clip.duration_frames, clip.thumb_image.as_ref()))));
-        qnc_dev_diagnostics::timed_block("poll-trim", || self.trim_stills.fill(&mut self.view.segments, self.preview.still_locator(), self.preview.shown_program_picture().and_then(|s| Some((self.segments.stored_picture_at(s.frame)?, s))))); // edit pictures, the monitor's first
+        qnc_dev_diagnostics::timed_block("poll-trim", || { self.trim_stills.give(self.view.preview.clip_id.as_deref(), self.view.source_timeline.enlarged.as_ref().map_or(&[], |enlarged| &enlarged.pictures)); self.trim_stills.fill(&mut self.view.segments, self.preview.still_locator(), self.preview.shown_program_picture().and_then(|s| Some((self.segments.stored_picture_at(s.frame)?, s)))) }); // edit pictures, the monitor's first
     }
 
 
