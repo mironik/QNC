@@ -727,6 +727,7 @@
     "transcribe.no_channel": "The project names no channel of speech this clip has.",
     "transcribe.cancelled": "Transcription stopped.",
     "db.transcript_invalid": "A transcript must lie inside its clip range and name its language.",
+    "db.transcript_running": "This clip is being transcribed; delete it when that is done.",
     "db.transcript_reply": "The transcript store gave an answer outside its contract.",
     "sheet.title": "Story sheet",
     "sheet.save_values": "Save",

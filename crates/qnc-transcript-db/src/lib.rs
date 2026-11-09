@@ -178,6 +178,9 @@ pub enum Operation {
     ReadQuotes,
     /// The clips that have a kept transcript (user 2026-10-28: the pool's Transcript tab).
     ReadTranscribed,
+    /// Everything transcribed of a clip goes, and its entry of the queue (user 2026-11-09: the X
+    /// on its card); the statements chosen from it stay. Refused while the clip is transcribed.
+    ForgetClip { clip_id: String },
     /// The entries that are done leave the queue (user 2026-10-28: once all asked are
     /// transcribed, their list goes); failed ones stay, with why.
     ClearDone,
@@ -185,7 +188,7 @@ pub enum Operation {
 
 impl Operation {
     pub fn is_write(&self) -> bool {
-        matches!(self, Self::Save(_) | Self::Enqueue(_) | Self::SetQueued { .. } | Self::AddQuote(_) | Self::DeleteQuote { .. } | Self::ClearDone)
+        matches!(self, Self::Save(_) | Self::Enqueue(_) | Self::SetQueued { .. } | Self::AddQuote(_) | Self::DeleteQuote { .. } | Self::ForgetClip { .. } | Self::ClearDone)
     }
 }
 
@@ -276,6 +279,11 @@ pub fn read_transcribed(target: &ProjectDbTarget) -> Result<Vec<String>> {
 /// The entries of the queue that are done leave it; failed ones stay.
 pub fn clear_done(target: &ProjectDbTarget) -> Result<()> {
     write(target, Operation::ClearDone)
+}
+
+/// Forgets everything transcribed of `clip_id` in the project behind `target`.
+pub fn forget_clip(target: &ProjectDbTarget, clip_id: &str) -> Result<()> {
+    write(target, Operation::ForgetClip { clip_id: clip_id.into() })
 }
 
 /// Takes statement `id` off the list.

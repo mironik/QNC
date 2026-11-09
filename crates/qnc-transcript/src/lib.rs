@@ -49,6 +49,8 @@ pub const ADD_QUOTE: &str = "transcript_add_quote";
 pub const OPEN_QUOTE: &str = "transcript_open_quote";
 /// A statement leaves the list (target: its id).
 pub const DELETE_QUOTE: &str = "transcript_delete_quote";
+/// What was transcribed of a clip goes (target: the clip; the X on its card, tab Transcript).
+pub const FORGET_CLIP: &str = "transcript_forget_clip";
 /// The panel the transcript is shown on.
 pub const PANEL: &str = "transcript";
 /// How often the queue is read again.
@@ -262,6 +264,7 @@ impl Transcript {
                 true
             })),
             DELETE_QUOTE => Some(target.and_then(|id| id.parse::<i64>().ok()).is_some_and(|id| self.write(preview, move |target| qnc_transcript_db::delete_quote(target, id)))),
+            FORGET_CLIP => Some(target.map(str::to_string).is_some_and(|clip| self.write(preview, move |target| qnc_transcript_db::forget_clip(target, &clip)))),
             TRANSCRIBE => Some(self.start(preview, timeline)),
             REPASS => Some(self.repass(preview, timeline)),
             SEARCH_TERM => {

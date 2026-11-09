@@ -50,6 +50,9 @@ pub struct MediaCardFeatures {
     /// Top-right dot on the thumbnail.
     pub top_right_marker: bool,
     pub status_dots: StatusDotsMode,
+    /// The chosen card has an X over the top right of its picture (user 2026-11-09: what was
+    /// made wrongly is deleted from its card).
+    pub remove_chosen: bool,
 }
 
 /// What the check mark of a card marks.
@@ -108,6 +111,10 @@ pub struct CardStyle {
     pub check_mark: Color32,
     pub check_off: Color32,
     pub check_off_rim: Color32,
+    /// The see-through X of a chosen card: its fill, its fill under the pointer, its mark.
+    pub remove_fill: Color32,
+    pub remove_hover: Color32,
+    pub remove_mark: Color32,
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -226,6 +233,9 @@ pub fn paint_media_card(
             );
         }
     }
+    if input.features.remove_chosen && input.focused {
+        paint_remove(ui, thumb_rect, style);
+    }
     if !input.overlay_label.trim().is_empty() {
         let font = egui::FontId::proportional(11.0);
         let galley = painter.layout_no_wrap(input.overlay_label.to_string(), font, style.text);
@@ -308,6 +318,25 @@ pub fn paint_media_card(
 /// Hit zone of the check mark (independent of the card activation zone).
 pub fn selection_check_hit_rect(card_rect: Rect, metrics: &CardMetrics) -> Rect {
     selection_check_rect(thumb_rect(card_rect, metrics)).expand(4.0)
+}
+
+/// Hit zone of the X of a chosen card.
+pub fn remove_hit_rect(card_rect: Rect, metrics: &CardMetrics) -> Rect {
+    remove_rect(thumb_rect(card_rect, metrics))
+}
+
+fn remove_rect(thumb_rect: Rect) -> Rect {
+    let (size, pad) = (22.0, 5.0);
+    Rect::from_min_size(egui::pos2(thumb_rect.right() - pad - size, thumb_rect.top() + pad), Vec2::splat(size))
+}
+
+fn paint_remove(ui: &egui::Ui, thumb_rect: Rect, style: &CardStyle) {
+    let rect = remove_rect(thumb_rect);
+    let painter = ui.painter_at(thumb_rect);
+    painter.rect_filled(rect, 3.0, if ui.rect_contains_pointer(rect) { style.remove_hover } else { style.remove_fill });
+    let (mark, stroke) = (rect.shrink(6.5), egui::Stroke::new(2.0, style.remove_mark));
+    painter.line_segment([mark.left_top(), mark.right_bottom()], stroke);
+    painter.line_segment([mark.right_top(), mark.left_bottom()], stroke);
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -540,6 +569,8 @@ pub struct CardGridInput<'a> {
 pub enum CardGridAction {
     Activate(String),
     ToggleSelection(String),
+    /// The X of the chosen card.
+    Remove(String),
 }
 
 /// The card grid in keyboard focus (`input.panel_focused`): it keeps its focused card,
@@ -699,7 +730,10 @@ fn grid(
                         if resp.hovered() {
                             pointed = Some(card.id.to_string());
                         }
-                        if resp.clicked() {
+                        let on_remove = input.features.remove_chosen && focused && resp.interact_pointer_pos().is_some_and(|pos| remove_hit_rect(rect, metrics).contains(pos));
+                        if resp.clicked() && on_remove {
+                            clicked = Some(CardGridAction::Remove(card.id.to_string()));
+                        } else if resp.clicked() {
                             let is_checkbox_click = input.features.ticks != Ticks::Off
                                 && resp.interact_pointer_pos().is_some_and(|pos| {
                                     selection_check_hit_rect(rect, metrics).contains(pos)
@@ -777,6 +811,7 @@ mod tests {
                 ticks: Ticks::Selected,
                 top_right_marker: false,
                 status_dots: mode,
+                remove_chosen: false,
             },
             thumb: None,
             rgba_thumb: None,
@@ -852,6 +887,15 @@ mod tests {
         assert!(hit.left() >= thumb.left() - 4.0);
         assert!(hit.bottom() <= thumb.bottom() + 4.0);
         assert!(!hit.contains(egui::pos2(150.0, 20.0)));
+    }
+
+    #[test]
+    fn the_remove_zone_is_the_top_right_of_the_picture() {
+        let card = Rect::from_min_size(egui::pos2(0.0, 0.0), Vec2::new(190.0, 141.0));
+        let hit = remove_hit_rect(card, &metrics());
+        assert!(hit.contains(egui::pos2(175.0, 15.0)));
+        assert!(!hit.contains(egui::pos2(95.0, 50.0)));
+        assert!(!hit.intersects(selection_check_hit_rect(card, &metrics())));
     }
 
     #[test]

@@ -53,7 +53,23 @@ impl Store {
             Operation::ReadTranscribed if !self.schema_ready => Ok(Data::Clips(Vec::new())),
             Operation::ReadTranscribed => self.read_transcribed(),
             Operation::ClearDone => self.clear_done(),
+            Operation::ForgetClip { clip_id } => self.forget_clip(clip_id),
         }
+    }
+
+    fn forget_clip(&mut self, clip_id: &str) -> Result<Data> {
+        valid_clip(clip_id)?;
+        let tx = qnc_db_broker::begin_write(&mut self.conn).map_err(err)?;
+        let running: bool = tx
+            .query_row("SELECT EXISTS(SELECT 1 FROM transcript_queue WHERE clip_id = ?1 AND state = 'running')", params![clip_id], |row| row.get(0))
+            .map_err(err)?;
+        if running {
+            return Err(qnc_ui_text::text("db.transcript_running").into());
+        }
+        tx.execute("DELETE FROM clip_transcripts WHERE clip_id = ?1", params![clip_id]).map_err(err)?;
+        tx.execute("DELETE FROM transcript_queue WHERE clip_id = ?1", params![clip_id]).map_err(err)?;
+        tx.commit().map_err(err)?;
+        Ok(Data::Changed)
     }
 
     fn read_transcribed(&mut self) -> Result<Data> {

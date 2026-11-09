@@ -169,6 +169,12 @@
     "script_remove": {
       "label": "Ukloni blok iz scenarija"
     },
+    "short_remove": {
+      "label": "Obrisi izjavu ili SubClip s kartice"
+    },
+    "transcript_forget_clip": {
+      "label": "Obrisi prijepis klipa s kartice"
+    },
     "script_field_text": {
       "label": "Tekst polja bloka scenarija"
     },

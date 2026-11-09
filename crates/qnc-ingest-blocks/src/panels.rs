@@ -97,7 +97,7 @@ pub(super) fn pool(ui: &mut Ui, contracts: &IngestContracts, theme: &Theme, view
     let clips = view.pool_clips();
     match qnc_media_pool_panel::show(ui, theme, &spec, &now, &clips)? {
         CardGridAction::ToggleSelection(id) => Some(IngestIntent::new(action_ids::INGEST_CLIP_TOGGLE, IngestPayload::ClipId(id))),
-        CardGridAction::Activate(id) => Some(IngestIntent::new(action_ids::INGEST_PREVIEW_FOCUS, IngestPayload::ClipId(id))),
+        CardGridAction::Activate(id) | CardGridAction::Remove(id) => Some(IngestIntent::new(action_ids::INGEST_PREVIEW_FOCUS, IngestPayload::ClipId(id))),
     }
 }
 

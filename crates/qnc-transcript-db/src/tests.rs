@@ -43,6 +43,23 @@ fn a_kept_transcript_is_read_back_and_a_range_said_again_replaces_it() {
 }
 
 #[test]
+fn a_clip_forgotten_loses_its_transcripts_and_its_queue_entry_but_not_while_it_runs() {
+    let (_dir, target) = project();
+    save(&target, transcript(0, 100, "a")).unwrap();
+    save(&target, transcript(200, 300, "b")).unwrap();
+    let entry = Queued { clip_id: "c1".into(), from_frame: 0, to_frame: 100, quality: QueueQuality::Fast, state: QueueState::Waiting, error: String::new(), took_ms: 0 };
+    enqueue(&target, vec![entry.clone()]).unwrap();
+    set_queued(&target, &entry, QueueState::Running, "", 0).unwrap();
+    assert!(forget_clip(&target, "c1").is_err(), "it is being transcribed");
+    assert_eq!(read_clip(&target, "c1").unwrap().len(), 2);
+    set_queued(&target, &entry, QueueState::Done, "", 0).unwrap();
+    forget_clip(&target, "c1").unwrap();
+    assert!(read_clip(&target, "c1").unwrap().is_empty());
+    assert!(read_queue(&target).unwrap().is_empty());
+    assert!(read_transcribed(&target).unwrap().is_empty());
+}
+
+#[test]
 fn a_word_outside_its_range_is_refused_and_nothing_is_kept() {
     let (_dir, target) = project();
     let mut outside = transcript(100, 200, "Dobar");

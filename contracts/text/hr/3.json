@@ -89,6 +89,7 @@
     "transcribe.no_channel": "Projekt ne navodi kanal govora koji ovaj klip ima.",
     "transcribe.cancelled": "Prijepis je zaustavljen.",
     "db.transcript_invalid": "Prijepis mora biti unutar raspona svog klipa i navesti svoj jezik.",
+    "db.transcript_running": "Ovaj klip se upravo prepisuje; obrišite ga kad završi.",
     "db.transcript_reply": "Spremište prijepisa dalo je odgovor izvan svog ugovora.",
     "sheet.title": "Obrazac priloga",
     "sheet.save_values": "Spremi",

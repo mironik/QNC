@@ -107,6 +107,9 @@ pub fn cards(theme: &Theme) -> qnc_media_card::CardStyle {
         check_mark: Color32::from_rgb(0x1a, 0x1a, 0x1a),
         check_off: Color32::from_rgba_unmultiplied(0, 0, 0, 90),
         check_off_rim: Color32::from_rgba_unmultiplied(255, 255, 255, 140),
+        remove_fill: Color32::from_rgba_unmultiplied(0, 0, 0, 120),
+        remove_hover: theme.danger.gamma_multiply(0.85),
+        remove_mark: Color32::from_rgba_unmultiplied(255, 255, 255, 220),
     }
 }
 

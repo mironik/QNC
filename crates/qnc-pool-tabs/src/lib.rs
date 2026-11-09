@@ -17,6 +17,12 @@ pub const VOICE: &str = "editorial_tab_voice";
 /// The versions of the S-Story (user 2026-10-31).
 pub const STORIES: &str = "editorial_tab_stories";
 
+/// The catalog actions of the X on a chosen card (target: the card's id): a statement, the
+/// transcript of a clip, a composite statement (a block of the script).
+pub const REMOVE_SHORT: &str = "short_remove";
+pub const REMOVE_TRANSCRIPT: &str = "transcript_forget_clip";
+pub const REMOVE_SUBSEGMENT: &str = "script_remove";
+
 /// Ingest's one tab of the pool: its clips.
 pub const INGEST_ALL: &str = "ingest_tab_all";
 
@@ -85,6 +91,17 @@ impl LibraryTab {
     pub fn lists_shots(self) -> bool {
         matches!(self, Self::Virtual | Self::Broll)
     }
+
+    /// What the X on a chosen card of this tab does (user 2026-11-09: what was made wrongly is
+    /// deleted from its card); `None`: its cards have no X.
+    pub fn remove_action(self) -> Option<&'static str> {
+        match self {
+            Self::Virtual => Some(REMOVE_SHORT),
+            Self::Transcript => Some(REMOVE_TRANSCRIPT),
+            Self::Subsegment => Some(REMOVE_SUBSEGMENT),
+            _ => None,
+        }
+    }
 }
 
 #[cfg(test)]
@@ -99,6 +116,16 @@ mod tests {
         assert_eq!(LibraryTab::from_action("play_pause"), None);
         assert!(LibraryTab::Virtual.lists_shots() && LibraryTab::Broll.lists_shots());
         assert!(!LibraryTab::Transcript.lists_shots() && !LibraryTab::All.lists_shots());
+    }
+
+    #[test]
+    fn only_statements_transcripts_and_composite_statements_have_an_x() {
+        assert_eq!(LibraryTab::Virtual.remove_action(), Some(REMOVE_SHORT));
+        assert_eq!(LibraryTab::Transcript.remove_action(), Some(REMOVE_TRANSCRIPT));
+        assert_eq!(LibraryTab::Subsegment.remove_action(), Some(REMOVE_SUBSEGMENT));
+        for tab in [LibraryTab::All, LibraryTab::Broll, LibraryTab::Segment, LibraryTab::Voice, LibraryTab::Stories] {
+            assert_eq!(tab.remove_action(), None);
+        }
     }
 
     #[test]

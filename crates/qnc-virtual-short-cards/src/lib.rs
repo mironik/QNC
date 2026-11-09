@@ -40,6 +40,13 @@ pub fn chosen<'a>(cards: &'a [VirtualShortCard], shot_id: Option<&str>) -> Optio
     Some((card.shot_id.as_str(), card.clip_id.as_str(), (card.in_frame, card.out_frame)))
 }
 
+/// The card of `shot_id` to open, or the text code of why it cannot be: it is gone or its clip
+/// is not in the pool.
+pub fn to_open<'a>(cards: &'a [VirtualShortCard], clips: &[qnc_clip_row::ClipRow], shot_id: &str) -> Result<&'a VirtualShortCard, &'static str> {
+    let card = cards.iter().find(|card| card.shot_id == shot_id).ok_or("story.msg.subclip_not_found")?;
+    clips.iter().any(|clip| clip.clip_id == card.clip_id).then_some(card).ok_or("ingest.msg.clip_not_found")
+}
+
 /// The short's card in the media pool (piece `qnc-media-card`).
 impl qnc_clip_row::PoolItem for VirtualShortCard {
     fn card_id(&self) -> &str { &self.shot_id }

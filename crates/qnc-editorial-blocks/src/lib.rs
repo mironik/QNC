@@ -6,7 +6,7 @@ use eframe::egui::{self, Align, Layout, Rect, Ui};
 
 use qnc_editorial_application::{EditorialIntent, EditorialView, LibraryTab};
 use qnc_editorial_layout::{theme::Theme, EditorialContracts};
-use qnc_media_card::{CardGridAction, CardMetrics, StatusDotsMode, Ticks};
+use qnc_media_card::CardGridAction;
 use {qnc_panel_focus::Panel, qnc_ui_kit::paint_focus};
 use qnc_timeline::TimelineIntent;
 
@@ -84,29 +84,24 @@ fn pool(ui: &mut Ui, contracts: &EditorialContracts, theme: &Theme, view: &Edito
     }
     let cards = &contracts.editorial.media_card;
     let composition = &contracts.composition().media_card;
-    let spec = qnc_media_pool_panel::PoolSpec {
-        pad: contracts.editorial.board.block_pad,
-        metrics: CardMetrics { min_card_width: cards.min_card_width, card_text_height: cards.card_text_height, grid_gap: cards.grid_gap },
-        ticks: if composition.ticks_several { Ticks::Selected } else { Ticks::chosen_if(composition.selection_check) },
-        status_dots: StatusDotsMode::from_contract(&composition.status_dots).unwrap_or(StatusDotsMode::Off),
-        imported_marker: None,
-        saving: "",
-        save_failed: "",
-    };
+    let spec = contracts.pool_spec();
     // Virtual lists the shorts, B-roll the shots of the covers (v5 pool tabs).
-    let shot_tab = view.library_tab.lists_shots();
+    let (tab, shot_tab) = (view.library_tab, view.library_tab.lists_shots());
+    let open_statement = view.focus.script.subsegment.as_ref().map_or(String::new(), |open| open.block_id.to_string());
+    let on = |action: &str, id: String| EditorialIntent::Action(qnc_action_event::ActionEvent::key(action).with_target(id));
+    let (themed, mut card_action) = ((theme, tab.remove_action().is_some()), None);
     let now = qnc_media_pool_panel::PoolNow {
-        chosen_id: if shot_tab { view.chosen_shot_id.as_deref().unwrap_or("") } else { view.chosen_clip_id().unwrap_or("") },
+        chosen_id: if tab == LibraryTab::Subsegment { &open_statement } else if shot_tab { view.chosen_shot_id.as_deref().unwrap_or("") } else { view.chosen_clip_id().unwrap_or("") },
         panel_focused: view.focus.panel == Panel::Pool,
         step: view.focus.pool_step,
         empty_message: cards.empty_message(view.library_tab, view.loading, &view.message),
         id_salt: "editorial_clip_grid",
     };
-    let clicked = match view.library_tab {
+    let clicked = match tab {
         // A SubSegment is a virtual clip of the script (user 2026-10-29): a click opens it in place of the source timeline.
-        tab @ (LibraryTab::Subsegment | LibraryTab::Voice | LibraryTab::Stories) => { let (cards, action) = view.focus.tab_cards(tab, &view.clips); return qnc_media_pool_panel::show(ui, theme, &spec, &now, &cards.iter().collect::<Vec<_>>()).map(|(CardGridAction::Activate(id) | CardGridAction::ToggleSelection(id))| EditorialIntent::Action(qnc_action_event::ActionEvent::key(action).with_target(id))) }
-        _ if shot_tab => qnc_media_pool_panel::show(ui, theme, &spec, &now, &view.shorts.iter().filter(|shot| shot.b_roll == (view.library_tab == LibraryTab::Broll)).collect::<Vec<_>>()),
-        tab => qnc_media_pool_panel::show(ui, theme, &spec, &now, &view.focus.transcript.pool_clips(tab == LibraryTab::Transcript, &view.clips)),
+        LibraryTab::Subsegment | LibraryTab::Voice | LibraryTab::Stories => { let (cards, action) = view.focus.tab_cards(tab, &view.clips); card_action = Some(action); qnc_media_pool_panel::show_removable(ui, themed, &spec, &now, &cards.iter().collect::<Vec<_>>()) }
+        _ if shot_tab => qnc_media_pool_panel::show_removable(ui, themed, &spec, &now, &view.shorts.iter().filter(|shot| shot.b_roll == (tab == LibraryTab::Broll)).collect::<Vec<_>>()),
+        _ => qnc_media_pool_panel::show_removable(ui, themed, &spec, &now, &view.focus.transcript.pool_clips(tab == LibraryTab::Transcript, &view.clips)),
     };
-    Some(match clicked? { CardGridAction::ToggleSelection(id) if composition.ticks_several && !shot_tab => EditorialIntent::Action(qnc_action_event::ActionEvent::key(qnc_transcript::MARK).with_target(id)), CardGridAction::Activate(id) | CardGridAction::ToggleSelection(id) => if shot_tab { EditorialIntent::PreviewShort(id) } else { EditorialIntent::PreviewClip(id) } })
+    Some(match clicked? { CardGridAction::Remove(id) => on(tab.remove_action()?, id), CardGridAction::Activate(id) | CardGridAction::ToggleSelection(id) if card_action.is_some() => on(card_action?, id), CardGridAction::ToggleSelection(id) if composition.ticks_several && !shot_tab => on(qnc_transcript::MARK, id), CardGridAction::Activate(id) | CardGridAction::ToggleSelection(id) => if shot_tab { EditorialIntent::PreviewShort(id) } else { EditorialIntent::PreviewClip(id) } })
 }

@@ -353,10 +353,10 @@ impl EditorialApplication {
             EditorialIntent::PreviewShort(shot_id) => self.open_short(&shot_id) && self.focus.chose_clip(&mut self.wrap),
             EditorialIntent::Action(event) => {
                 let pieces = (&mut self.preview, &mut self.wrap, &mut self.segments, &mut self.view.preview.timeline);
-                let action_id = event.action_id.clone();
+                let (action_id, target) = (event.action_id.clone(), event.target.clone());
                 match self.focus.route(event, pieces) {
                     Some(changed) => changed, // the action acts on its panel
-                    None => self.application_action(&action_id),
+                    None => self.application_action(&action_id, target.as_deref()),
                 }
             }
         };
@@ -365,7 +365,7 @@ impl EditorialApplication {
     }
 
     /// The actions of the application itself: library tabs and saving a short.
-    fn application_action(&mut self, action_id: &str) -> bool {
+    fn application_action(&mut self, action_id: &str, target: Option<&str>) -> bool {
         let picked = self.focus.take_pick(); // an arrow on the pool tabs, Enter on a dock button
         let action_id = picked.as_deref().unwrap_or(action_id);
         match action_id {
@@ -379,6 +379,13 @@ impl EditorialApplication {
                 let marks = self.view.preview.timeline.visible_source_marks();
                 if let Err(message) = self.short_save.start(self.view.chosen_clip_id(), &self.view.clips, marks, target, self.shown_project.as_deref(), &self.view.shorts) {
                     self.view.message = message;
+                }
+                true
+            }
+            qnc_pool_tabs::REMOVE_SHORT => {
+                if let (Some(shot), Some((_, db))) = (target, &self.content_target) {
+                    self.pool_shots.remove(db, shot);
+                    self.view.chosen_shot_id = None;
                 }
                 true
             }
@@ -410,25 +417,13 @@ impl EditorialApplication {
     }
 
     fn open_short(&mut self, shot_id: &str) -> bool {
-        let Some(shot) = self
-            .view
-            .shorts
-            .iter()
-            .find(|shot| shot.shot_id == shot_id)
-            .cloned()
-        else {
-            self.view.message = qnc_ui_text::text("story.msg.subclip_not_found").into();
-            return true;
+        let shot = match qnc_virtual_short_cards::to_open(&self.view.shorts, &self.view.clips, shot_id) {
+            Ok(shot) => shot.clone(),
+            Err(code) => {
+                self.view.message = qnc_ui_text::text(code).into();
+                return true;
+            }
         };
-        if !self
-            .view
-            .clips
-            .iter()
-            .any(|clip| clip.clip_id == shot.clip_id)
-        {
-            self.view.message = qnc_ui_text::text("ingest.msg.clip_not_found").into();
-            return true;
-        }
         self.view.chosen_shot_id = Some(shot.shot_id);
         self.open_marked(&shot.clip_id, (shot.in_frame, shot.out_frame), None)
     }

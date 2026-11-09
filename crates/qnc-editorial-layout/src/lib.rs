@@ -78,6 +78,21 @@ impl EditorialContracts {
         })
     }
 
+    /// The media pool of this group as its contract says it.
+    pub fn pool_spec(&self) -> qnc_media_pool_panel::PoolSpec<'static> {
+        use qnc_media_card::{CardMetrics, StatusDotsMode, Ticks};
+        let (cards, composition) = (&self.editorial.media_card, &self.composition().media_card);
+        qnc_media_pool_panel::PoolSpec {
+            pad: self.editorial.board.block_pad,
+            metrics: CardMetrics { min_card_width: cards.min_card_width, card_text_height: cards.card_text_height, grid_gap: cards.grid_gap },
+            ticks: if composition.ticks_several { Ticks::Selected } else { Ticks::chosen_if(composition.selection_check) },
+            status_dots: StatusDotsMode::from_contract(&composition.status_dots).unwrap_or(StatusDotsMode::Off),
+            imported_marker: None,
+            saving: "",
+            save_failed: "",
+        }
+    }
+
     pub fn composition(&self) -> &GroupComposition {
         &self.editorial.groups[&self.group]
     }

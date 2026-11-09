@@ -4102,6 +4102,8 @@ dependencies = [
  "qnc-contracts",
  "qnc-desktop-theme",
  "qnc-keyboard-shortcut",
+ "qnc-media-card",
+ "qnc-media-pool-panel",
  "qnc-pool-tabs",
  "qnc-segment-panel",
  "qnc-ui-text",

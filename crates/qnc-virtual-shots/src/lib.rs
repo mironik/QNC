@@ -187,6 +187,18 @@ impl PoolShotsReader {
         self.reading = spawned.is_ok().then_some(receive);
     }
 
+    /// Removes the SubClip `shot_id` off the form thread; what is left comes through `take`.
+    pub fn remove(&mut self, target: &ProjectDbTarget, shot_id: &str) {
+        let (send, receive) = std::sync::mpsc::channel();
+        let (target, shot_id) = (target.clone(), shot_id.to_string());
+        let spawned = std::thread::Builder::new()
+            .name("qnc-pool-shots".into())
+            .spawn(move || _ = send.send(forget_short_now(&target, &shot_id).and_then(|()| list_pool_shots(&target))));
+        if spawned.is_ok() {
+            (self.reading, self.again) = (Some(receive), None); // a read under way is older than this
+        }
+    }
+
     pub fn take(&mut self) -> Option<Result<Vec<ShortClip>>> {
         let result = match self.reading.as_ref()?.try_recv() {
             Ok(result) => result,
