@@ -3,7 +3,7 @@
   "exceptions": {
     "C1 form paints primitives|crates/qnc-project-blocks/src/list.rs": 6,
     "C1 form paints primitives|crates/qnc-project-blocks/src/settings.rs": 2,
-    "C10 size ceiling (runtime lines)|qnc-editorial-application": 499,
+    "C10 size ceiling (runtime lines)|qnc-editorial-application": 495,
     "C10 size ceiling (runtime lines)|qnc-editorial-blocks": 87,
     "C10 size ceiling (runtime lines)|qnc-editorial-desktop": 82,
     "C10 size ceiling (runtime lines)|qnc-ingest-application": 1129,

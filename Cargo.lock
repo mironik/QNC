@@ -3729,6 +3729,23 @@ dependencies = [
 ]
 
 [[package]]
+name = "qnc-clip-window"
+version = "0.1.0"
+dependencies = [
+ "qnc-decoder-catalog",
+ "qnc-dev-diagnostics",
+ "qnc-filmstrip",
+ "qnc-fine-wave",
+ "qnc-image-assets",
+ "qnc-program-waveform",
+ "qnc-still-locator",
+ "qnc-timeline-assets",
+ "qnc-timeline-model",
+ "qnc-ui-text",
+ "qnc-wave",
+]
+
+[[package]]
 name = "qnc-confirm-dialog"
 version = "0.1.0"
 dependencies = [
@@ -4073,7 +4090,6 @@ dependencies = [
  "qnc-transcript",
  "qnc-transport-panel",
  "qnc-ui-kit",
- "qnc-virtual-short-cards",
 ]
 
 [[package]]
@@ -6695,6 +6711,7 @@ version = "0.1.0"
 dependencies = [
  "qnc-action-event",
  "qnc-clip-sound",
+ "qnc-clip-window",
  "qnc-dev-diagnostics",
  "qnc-edit-edge",
  "qnc-edit-step",
@@ -6730,7 +6747,6 @@ dependencies = [
  "qnc-theme-styles",
  "qnc-timeline",
  "qnc-timeline-assets",
- "qnc-timeline-model",
  "qnc-trim-overlay",
  "qnc-ui-kit",
 ]

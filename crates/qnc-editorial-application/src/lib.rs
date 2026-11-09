@@ -221,7 +221,7 @@ impl EditorialApplication {
         let timebase = self.preview.player_view().source_timebase();
         let timeline = self.view.preview.timeline;
         let source = self.focus.source_timeline_mut(); // the one source timeline: lanes, channels, timecode
-        self.view.source_timeline = qnc_dev_diagnostics::timed_block("poll-source-sync", || source.sync(self.view.preview.clip_id.as_deref(), self.content_target.as_ref().map(|targets| &targets.0), &mut self.preview, &timeline).clone()).with_question(self.short_save.question());
+        self.view.source_timeline = qnc_dev_diagnostics::timed_block("poll-source-sync", || source.sync(self.view.preview.clip_id.as_deref(), self.content_target.as_ref().map(|targets| &targets.0), &mut self.preview, &timeline, qnc_virtual_short_cards::shown_marks(&self.view.shorts, self.view.chosen_shot_id.as_deref(), self.view.preview.clip_id.as_deref())).clone()).with_question(self.short_save.question());
         self.segments.set_source(SourcePick::new(
             self.view.chosen_clip_id(),
             self.view.current_clip_label(),
@@ -382,13 +382,8 @@ impl EditorialApplication {
                 }
                 true
             }
-            qnc_pool_tabs::REMOVE_SHORT => {
-                if let (Some(shot), Some((_, db))) = (target, &self.content_target) {
-                    self.pool_shots.remove(db, shot);
-                    self.view.chosen_shot_id = None;
-                }
-                true
-            }
+            qnc_pool_tabs::REMOVE_SHORT => { self.pool_shots.remove(self.content_target.as_ref().map(|targets| &targets.1), target); self.view.chosen_shot_id = None; true }
+            qnc_short_save::UPDATE => self.short_save.update(qnc_virtual_short_cards::chosen(&self.view.shorts, self.view.chosen_shot_id.as_deref()), self.view.preview.clip_id.as_deref(), self.view.preview.timeline.visible_source_marks(), self.content_target.as_ref().map(|targets| &targets.1)),
             other => self.short_save.answer(other), // Overwrite or Cancel of the same statement (user 2026-11-01)
         }
     }

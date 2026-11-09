@@ -48,6 +48,14 @@ struct Asked {
 /// A SubClip open on the source timeline: its id, clip and saved IN/OUT.
 pub type OpenShort<'a> = (&'a str, &'a str, (u64, u64));
 
+/// The action of the Update button of an open statement.
+pub const UPDATE: &str = "statement_update";
+
+/// Whether the marks shown differ from the saved IN/OUT of the statement open on its clip.
+pub fn changed(open: Option<OpenShort<'_>>, shown_clip: Option<&str>, marks: Option<(u64, u64)>) -> bool {
+    open.is_some_and(|(_, clip, saved)| Some(clip) == shown_clip && marks.is_some_and(|cut| cut != saved))
+}
+
 impl ShortSave {
     pub fn new() -> Self {
         Self::default()
@@ -86,6 +94,24 @@ impl ShortSave {
         if started.is_ok() {
             self.pending = Some(receiver);
         }
+    }
+
+    /// Update of the open statement (user 2026-11-09): the IN/OUT its source timeline shows now
+    /// become its IN/OUT, however they got there (keys, a drag).
+    pub fn update(&mut self, open: Option<OpenShort<'_>>, shown_clip: Option<&str>, marks: Option<(u64, u64)>, target: Option<&ProjectDbTarget>) -> bool {
+        let (Some((shot, clip_id, _)), Some(cut), Some(target), None) = (open.filter(|open| changed(Some(*open), shown_clip, marks)), marks, target, &self.pending) else { return true };
+        log(&format!("short-save update {shot} -> {cut:?}"));
+        self.written = Some((shot.to_string(), cut));
+        let (target, shot, clip_id) = (target.clone(), shot.to_string(), clip_id.to_string());
+        let (sender, receiver) = mpsc::channel();
+        let started = std::thread::Builder::new().name("qnc-short-trim".into()).spawn(move || {
+            let trimmed = qnc_virtual_shots::trim_short_now(&target, &shot, cut.0, cut.1).map(|_| Saved { shot_id: shot, clip_id, marks: cut });
+            let _ = sender.send(trimmed);
+        });
+        if started.is_ok() {
+            self.pending = Some(receiver);
+        }
+        true
     }
 
     /// Checks what is asked and starts the write: the chosen clip of `clips`, the marks the
@@ -218,6 +244,15 @@ mod tests {
 
     fn clip(imported: bool) -> ClipRow {
         ClipRow { clip_id: "c".into(), name: "C".into(), imported, ..ClipRow::default() }
+    }
+
+    #[test]
+    fn update_is_there_only_when_the_marks_of_the_open_statement_changed() {
+        let open = Some(("s", "c", (10, 20)));
+        assert!(!changed(open, Some("c"), Some((10, 20))));
+        assert!(changed(open, Some("c"), Some((12, 20))));
+        assert!(!changed(open, Some("other"), Some((12, 20))));
+        assert!(!changed(None, Some("c"), Some((12, 20))));
     }
 
     #[test]

@@ -138,6 +138,7 @@
     "story.talking_head": "SOT",
     "story.add_subclip": "Add SubClip",
     "story.add_statement": "Add statement",
+    "story.update_statement": "Update",
     "statement.exists_title": "Statement already created",
     "statement.exists": "This statement (the same clip, IN and OUT) is already in the Statement tab.",
     "statement.exists_solution": "Overwrite makes it again (its pictures too); Cancel keeps it as it is.",

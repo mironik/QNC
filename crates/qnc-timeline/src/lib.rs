@@ -615,7 +615,8 @@ pub fn show_source_player_timeline_with_channel(
 ) -> TimelineIntent {
     let duration = state.duration_frames();
     let (draft_in, draft_out, in_active, out_active) = match state.visible_source_marks() {
-        Some((start, end)) => (start, end, true, true),
+        // The timeline paints them from where its window starts (a statement enlarged).
+        Some((start, end)) => (start.saturating_sub(state.range_start()), end.saturating_sub(state.range_start()), true, true),
         None => (0, duration, false, false),
     };
     let mut out = TimelineIntent::None;
@@ -1268,8 +1269,7 @@ fn mark_drag_intent(response: &egui::Response, track: Rect, input: &TimelineInpu
         let x = response.interact_pointer_pos()?.x;
         // Snapping (`qnc-snap`): the dragged IN or OUT sticks to the playhead or a cut.
         let at = qnc_snap::snapped(frame_for_x(track, range_start, duration, x), snap_targets(input, None), qnc_snap::reach_frames(track.width(), duration));
-        let frame = at.saturating_sub(range_start);
-        return Some(TimelineIntent::DragMark { in_mark, frame });
+        return Some(TimelineIntent::DragMark { in_mark, frame: at }); // a frame of the clip
     }
     response.ctx.data_mut(|data| data.remove::<bool>(key));
     Some(TimelineIntent::Keep(None))

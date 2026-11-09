@@ -82,6 +82,8 @@ pub struct SourceTimelineView {
     pub question: Option<qnc_notice::Choice>,
     /// The clip's A1/A2 level curves on its frames (the taken one as drafted; user 2026-11-07).
     pub level_curves: Vec<qnc_program_view::LevelCurve>,
+    /// The window of the clip shown instead of its whole length (a statement enlarged).
+    pub enlarged: Option<qnc_clip_window::Enlarged>,
 }
 
 impl SourceTimelineView {
@@ -95,6 +97,7 @@ impl SourceTimelineView {
 /// The state of the source timeline of one form.
 #[derive(Debug, Default)]
 pub struct SourceTimeline {
+    window: qnc_clip_window::ClipWindow,
     keys: SourcePanel,
     lanes: LaneChoice,
     channels: qnc_source_channels::SourceChannels,
@@ -137,8 +140,11 @@ impl SourceTimeline {
     /// Once a frame: the shown clip and the project content its stored record is read
     /// from. Another clip starts on the A1/A2 sound kept for it in the project database,
     /// else on A1 channel 1 and A2 channel 2 (user rules 2026-10-01, 2026-10-24).
-    pub fn sync(&mut self, clip_id: Option<&str>, content: Option<&ContentTarget>, preview: &mut SourcePreview, timeline: &TimelineProjection) -> &SourceTimelineView {
+    pub fn sync(&mut self, clip_id: Option<&str>, content: Option<&ContentTarget>, preview: &mut SourcePreview, timeline: &TimelineProjection, enlarge: Option<(u64, u64)>) -> &SourceTimelineView {
         self.keys.stop_on_out(preview, timeline);
+        // A statement enlarged, with its own wave and pictures (user 2026-11-09).
+        let enlarge = enlarge.filter(|_| timeline.confirmed_frame().is_some());
+        self.view.enlarged = self.window.follow(clip_id, enlarge, timeline.range_start() + timeline.duration_frames(), &preview.view().assets, || preview.still_locator());
         if self.clip.as_deref() != clip_id {
             self.clip = clip_id.map(str::to_string);
             self.first_cut = None; // a pair of cuts belongs to its clip
@@ -550,6 +556,7 @@ impl SourceTimeline {
             wave_over_video: wave_over_video(&self.lanes),
             timecode,
             message: self.message.clone(),
+            enlarged: self.view.enlarged.clone(),
             levels: self.view.levels,
             normalize: self.view.normalize,
             sound_assist: self.view.sound_assist,
@@ -710,7 +717,7 @@ mod tests {
         source.route("step_next_part", &mut preview, &mut timeline);
         source.route("activate_focused_item", &mut preview, &mut timeline);
         assert_eq!(source.kept(0).channel, 1);
-        source.sync(Some("b"), None, &mut SourcePreview::new(), &timeline);
+        source.sync(Some("b"), None, &mut SourcePreview::new(), &timeline, None);
         assert_eq!((source.kept(0).channel, source.kept(1).channel), (0, 1), "A1 on channel 1, A2 on channel 2");
     }
 }

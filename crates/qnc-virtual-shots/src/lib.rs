@@ -188,7 +188,8 @@ impl PoolShotsReader {
     }
 
     /// Removes the SubClip `shot_id` off the form thread; what is left comes through `take`.
-    pub fn remove(&mut self, target: &ProjectDbTarget, shot_id: &str) {
+    pub fn remove(&mut self, target: Option<&ProjectDbTarget>, shot_id: Option<&str>) {
+        let (Some(target), Some(shot_id)) = (target, shot_id) else { return };
         let (send, receive) = std::sync::mpsc::channel();
         let (target, shot_id) = (target.clone(), shot_id.to_string());
         let spawned = std::thread::Builder::new()

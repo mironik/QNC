@@ -175,6 +175,10 @@
           "@story.voice_over",
           "@story.talking_head",
           {
+            "label": "@story.update_statement",
+            "action_id": "statement_update"
+          },
+          {
             "label": "@story.add_statement",
             "action_id": "save_virtual_shot"
           }
@@ -252,6 +256,10 @@
             "action_id": "script_subsegment"
           },
           {
+            "label": "@story.update_statement",
+            "action_id": "statement_update"
+          },
+          {
             "label": "@story.add_statement",
             "action_id": "save_virtual_shot"
           }
@@ -306,6 +314,10 @@
           {
             "label": "@script.subsegment",
             "action_id": "script_subsegment"
+          },
+          {
+            "label": "@story.update_statement",
+            "action_id": "statement_update"
           },
           {
             "label": "@story.add_statement",
@@ -383,6 +395,10 @@
             "action_id": "add_ton_segment"
           },
           {
+            "label": "@story.update_statement",
+            "action_id": "statement_update"
+          },
+          {
             "label": "@story.add_subclip",
             "action_id": "save_virtual_shot"
           }
@@ -417,6 +433,10 @@
           "@story.broll",
           "@story.voice_over",
           "@story.talking_head",
+          {
+            "label": "@story.update_statement",
+            "action_id": "statement_update"
+          },
           {
             "label": "@story.add_subclip",
             "action_id": "save_virtual_shot"
@@ -483,6 +503,10 @@
           {
             "label": "@story.talking_head",
             "action_id": "add_ton_segment"
+          },
+          {
+            "label": "@story.update_statement",
+            "action_id": "statement_update"
           },
           {
             "label": "@story.add_subclip",

@@ -6,6 +6,7 @@ description = "QNC public piece: the one source timeline every form embeds. It k
 
 [dependencies]
 qnc-notice = { workspace = true }
+qnc-clip-window = { workspace = true }
 qnc-timeline-model = { workspace = true }
 qnc-action-event = { workspace = true }
 qnc-dev-diagnostics = { workspace = true }

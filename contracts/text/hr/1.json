@@ -138,6 +138,7 @@
     "story.talking_head": "Izjava",
     "story.add_subclip": "Dodaj SubClip",
     "story.add_statement": "Dodaj izjavu",
+    "story.update_statement": "Ažuriraj",
     "statement.exists_title": "Izjava je već kreirana",
     "statement.exists": "Ova izjava (isti klip, IN i OUT) već je u tabu Izjave.",
     "statement.exists_solution": "Prepiši je ponovno sprema (i njezine slike); Odustani je ostavlja kakva jest.",

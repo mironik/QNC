@@ -169,6 +169,9 @@
     "script_remove": {
       "label": "Ukloni blok iz scenarija"
     },
+    "statement_update": {
+      "label": "Spremi promjenu IN/OUT otvorene izjave"
+    },
     "short_remove": {
       "label": "Obrisi izjavu ili SubClip s kartice"
     },
