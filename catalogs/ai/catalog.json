@@ -6,7 +6,7 @@
   },
   "shot_content": {
     "program": "qnc-shot-content-siglip",
-    "model": "../../data/models/siglip-base-patch16-224",
+    "model": "../../data/models/siglip2-base-patch16-224",
     "pictures": 2
   },
   "letters": {

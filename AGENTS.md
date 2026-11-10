@@ -8866,3 +8866,12 @@ dodane oznake (postavljanje pozornice, snimatelj s kamerom, nogometni stadion) S
 29/29 oba). Zakljucak: SigLIP 2 je na engleskom nesto bolji, a popis oznaka vazniji od modela; "gori" rezultati od ranije
 dolazili su od niže sigurnosti i praga izjave (`statement_least`) podesenog za SigLIP. Probni programi
 `qnc-siglip/examples/score_image.rs`, `rank_pictures.rs`. Katalog racunala i popis oznaka nisu mijenjani (ceka odluku).
+Izmjena 2026-11-10 (korisnik: "da, sve tri, obrisi cache i prebaci na SigLIP2"): katalog AI racunala (`catalogs/ai/catalog.json`,
+`shot_content.model`) je SigLIP 2 base (`data/models/siglip2-base-patch16-224`); svi klipovi se jednom pregledaju ponovno
+(vektori su po modelu, kao i vektori oznaka i ispravci u `data/qnc-shot-examples.db`). Popis oznaka (`catalogs/ai/shot-labels.json`)
+dobio je Snimatelj (`camera`), Pozornica (`stage`) i Stadion (`stadium`) (rjecnik `shot.label.*`), a prag izjave
+`statement_least` je 0,011 umjesto 0,05: SigLIP 2 izjavama daje nize ocjene (izmjereno na 29 kadrova kartice D:: izjave
+0,012-0,125, pokrivalice najvise 0,010). Provjereno probnim programom `look_card` (kartica samo citana): Mironik 3625 svih 10
+dijelova izjava (prije 9 od 10), 3615, 3616 (knjiga, ljudi) pokrivalice. Debug cache obrisan uz dozvolu korisnika
+(`cargo clean --profile dev`, 66,1 GiB). Release `qnc-app` (s `libav`), `qnc-ingest-worker` i `qnc-shot-content-siglip` izgradeni.
+Uzivo nije provjereno.
