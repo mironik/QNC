@@ -8855,3 +8855,14 @@ pokrivalica), ispravak se zapisuje u pozadini, pa se tab ponovno cita i slicni k
 `db.shot_example_invalid`. Testovi (release, disk ima 5 GB): `qnc-shot-examples` (2), `qnc-ai-broll` (novi
 `a_corrected_shot_and_shots_like_it_take_the_group_the_computer_keeps`), `qnc-notice`, `qnc-pool-tabs`, dotaknute kocke,
 conformance. Uzivo nije provjereno.
+Provjera 2026-11-10 (korisnik: "cemu onda u SigLIP2 tolika baza ako su rezultati gori, provjeri koristis li ga krivo"; "provjeri
+koliko je SigLIP2 base dobar na engleskom"): koristi se ispravno. SigLIP base na Googleovoj probnoj slici (dvije macke,
+"a photo of 2 cats") daje 32,2 % prema objavljenih 31,9 % (razlika je smanjivanje slike); SigLIP 2 radi s istom obradom (64
+tokena, `<pad>`, mala slova, zadnji token). Datoteka SigLIP 2 je veca (1,5 GB prema 0,8 GB) zbog visejezicnog rjecnika
+(256000 tokena), slikovni dio je iste velicine. Googleove brojke za B/16 224: ImageNet 76,2 -> 78,2 %, ObjectNet 70,7 -> 73,6 %,
+COCO tekst->slika 47,2 -> 52,1 %, vise jezika 22,4 -> 40,3 %. Nas test: 29 kadrova s kartice D: (samo citanje), za svaki rucno
+zapisane tocne grupe; s danasnjim popisom oznaka prva oznaka tocna SigLIP 19/29, SigLIP 2 21/29 (medu prve tri 24 i 26); s tri
+dodane oznake (postavljanje pozornice, snimatelj s kamerom, nogometni stadion) SigLIP 26/29, SigLIP 2 28/29 (medu prve tri
+29/29 oba). Zakljucak: SigLIP 2 je na engleskom nesto bolji, a popis oznaka vazniji od modela; "gori" rezultati od ranije
+dolazili su od niže sigurnosti i praga izjave (`statement_least`) podesenog za SigLIP. Probni programi
+`qnc-siglip/examples/score_image.rs`, `rank_pictures.rs`. Katalog racunala i popis oznaka nisu mijenjani (ceka odluku).
