@@ -38,6 +38,7 @@ impl VersionsView {
                 title: qnc_ui_text::fill("skeleton.version_card", &[("n", &version.number.to_string())]).into(),
                 seconds: 0.0,
                 clip: None,
+                icon: qnc_clip_row::PoolIcon::None,
             })
             .collect()
     }

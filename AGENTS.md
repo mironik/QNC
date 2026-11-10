@@ -8709,3 +8709,15 @@ s vise kanala nego svako citanje. Nadeno citanje je prisutno kad je njegov klip.
 OFF-a n"; citanje klipa s LAN/Intranet izvora (prijepis cita samo lokalni medij; preuzeti klip u projekt radi). Testovi
 `qnc-session-readings` (5), `qnc-script-db`, `qnc-script-draft`, `qnc-script`, `qnc-panel-focus`, conformance. Uzivo
 nije provjereno.
+Izmjena 2026-11-10 (korisnik, slika taba Glas: kartice OFF-ova "..."; "nema ih ni u lokalnom racunalu, mozda najjednostavnije
+ikona mikrofona"): kartica citanja OFF-a (tab Glas) bez postera crta mikrofon umjesto "...", gdje god je njezin zvuk (projekt,
+kartica, LAN, intranet), bez citanja medija. `qnc-clip-row` `PoolIcon` (`None`, `Microphone`), `PoolItem::card_icon`,
+`TabCard.icon`; `qnc-script` `voice_cards` daje mikrofon; `qnc-media-card` (`CardRow.icon`, `MediaCardInput.icon`,
+`paint_microphone` u boji `style.muted`). Testovi `qnc-media-card`, `qnc-clip-row`, `qnc-script`, conformance. Posteri klipova
+na LAN/intranet izvoru i dalje se ne rade.
+Izmjena 2026-11-10 (CI, korak 4 vanjskog audita): `.gitattributes` drzi tekst s LF krajevima na svakom checkoutu (GitHub
+Windows je datoteke uzimao s CRLF, pa shema kataloga kamera citana `include_str` nije odgovarala pakiranoj bazi i padali su
+svi testovi kataloga kamera, Selecta i Ingesta). Preostali padovi CI-ja: testovi Selecta trebaju FFmpeg uz aplikaciju (katalog
+dekodera odbija format bez instaliranog dekodera), a BtbN build `n8.1.3-17-gc389840894-20261011` vise se ne moze preuzeti
+(autobuild se cuva oko dva tjedna); test zastite projekta (`the_files_of_the_prerender_cache...`) na runneru (administrator,
+elevated) moze obrisati zasticenu datoteku. Oba cekaju odluku korisnika.

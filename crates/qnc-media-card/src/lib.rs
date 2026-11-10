@@ -142,6 +142,28 @@ pub fn grid_metrics(available_w: f32, count: usize, metrics: &CardMetrics) -> Gr
     }
 }
 
+/// A microphone in the middle of `rect`, a third of its height: the head, the cradle, the stand.
+fn paint_microphone(painter: &egui::Painter, rect: Rect, colour: Color32) {
+    let h = rect.height() / 3.0;
+    let c = rect.center();
+    let w = h * 0.42;
+    let head = Rect::from_center_size(egui::pos2(c.x, c.y - h * 0.18), Vec2::new(w, h * 0.62));
+    painter.rect_filled(head, w / 2.0, colour);
+    let stroke = egui::Stroke::new((h * 0.06).max(1.5), colour);
+    let r = w * 0.85;
+    let centre = egui::pos2(c.x, head.center().y + h * 0.04);
+    let cradle: Vec<egui::Pos2> = (0..=16)
+        .map(|i| {
+            let a = std::f32::consts::PI * i as f32 / 16.0;
+            egui::pos2(centre.x - r * a.cos(), centre.y + r * a.sin())
+        })
+        .collect();
+    painter.add(egui::Shape::line(cradle, stroke));
+    let foot = centre.y + r;
+    painter.line_segment([egui::pos2(c.x, foot), egui::pos2(c.x, foot + h * 0.2)], stroke);
+    painter.line_segment([egui::pos2(c.x - w * 0.6, foot + h * 0.2), egui::pos2(c.x + w * 0.6, foot + h * 0.2)], stroke);
+}
+
 /// Neutral card model.
 pub struct MediaCardInput<'a> {
     pub title: &'a str,
@@ -161,6 +183,8 @@ pub struct MediaCardInput<'a> {
     pub features: MediaCardFeatures,
     pub thumb: Option<&'a TextureHandle>,
     pub rgba_thumb: Option<RgbaThumb<'a>>,
+    /// Painted in place of a poster the card has not got.
+    pub icon: qnc_clip_row::PoolIcon,
     pub tc: &'a dyn Fn(f64) -> String,
 }
 
@@ -211,7 +235,9 @@ pub fn paint_media_card(
     } else {
         false
     };
-    if !painted {
+    if !painted && input.icon == qnc_clip_row::PoolIcon::Microphone {
+        paint_microphone(&painter, thumb_rect, style.muted);
+    } else if !painted {
         painter.text(
             thumb_rect.center(),
             egui::Align2::CENTER_CENTER,
@@ -549,6 +575,7 @@ pub struct CardRow<'a> {
     pub top_right_marker: Option<Color32>,
     pub checked: bool,
     pub rgba_thumb: Option<RgbaThumb<'a>>,
+    pub icon: qnc_clip_row::PoolIcon,
 }
 
 #[derive(Clone, Copy)]
@@ -719,6 +746,7 @@ fn grid(
                                 features: input.features,
                                 thumb: thumb.as_ref(),
                                 rgba_thumb: card.rgba_thumb,
+                                icon: card.icon,
                                 tc: input.tc,
                             },
                         );
@@ -815,6 +843,7 @@ mod tests {
             },
             thumb: None,
             rgba_thumb: None,
+            icon: qnc_clip_row::PoolIcon::None,
             tc: &tc,
         }
     }

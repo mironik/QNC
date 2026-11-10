@@ -80,6 +80,7 @@ fn card_row<'a, T: PoolItem>(item: &'a T, grid: &PoolGrid<'_>, look: &PoolLook<'
             PoolMarker::NotImported => Some(look.not_imported_marker),
         },
         checked: if look.features.ticks == crate::Ticks::Selected { item.card_selected() } else { item.card_id() == grid.chosen_id },
+        icon: item.card_icon(),
         rgba_thumb: poster_uri.zip(poster).map(|(uri, image)| RgbaThumb {
             uri,
             content_key: image.content_key,

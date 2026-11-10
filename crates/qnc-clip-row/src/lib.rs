@@ -19,6 +19,15 @@ pub enum PoolMarker {
     NotImported,
 }
 
+/// What a card shows in place of a poster it has not got (user 2026-11-10: an OFF reading has a
+/// microphone, wherever its sound is, on this computer, a card or LAN/Intranet).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum PoolIcon {
+    #[default]
+    None,
+    Microphone,
+}
+
 /// A line over the picture while the card's record is being written.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum PoolOverlay {
@@ -49,6 +58,10 @@ pub trait PoolItem {
     }
     fn card_overlay(&self) -> PoolOverlay {
         PoolOverlay::None
+    }
+    /// Shown in place of the poster while the card has none.
+    fn card_icon(&self) -> PoolIcon {
+        PoolIcon::None
     }
     /// Ticked among several selected (where the pool shows a selection, not the chosen one).
     fn card_selected(&self) -> bool {
@@ -124,9 +137,13 @@ pub struct TabCard<'a> {
     pub title: String,
     pub seconds: f64,
     pub clip: Option<&'a ClipRow>,
+    pub icon: PoolIcon,
 }
 
 impl PoolItem for TabCard<'_> {
+    fn card_icon(&self) -> PoolIcon {
+        self.icon
+    }
     fn card_id(&self) -> &str {
         &self.id
     }

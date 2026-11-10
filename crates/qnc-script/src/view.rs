@@ -248,6 +248,7 @@ impl ScriptView {
                 title: qnc_ui_text::fill("script.subsegment_card", &[("mark", &row.mark), ("clip", &row.block.clip_name), ("n", &row.block.pieces.len().to_string())]).into(),
                 seconds: row.seconds,
                 clip: clips.iter().find(|clip| clip.clip_id == row.block.clip_id),
+                icon: qnc_clip_row::PoolIcon::None,
             })
             .collect()
     }
@@ -264,6 +265,7 @@ impl ScriptView {
                 title: qnc_ui_text::fill("script.voice_card", &[("mark", &row.mark), ("take", &voice.chosen.to_string()), ("n", &voice.takes.len().to_string())]).into(),
                 seconds: voice.takes.iter().find(|take| take.take == voice.chosen).map_or(0.0, |take| take.seconds),
                 clip: None,
+                icon: qnc_clip_row::PoolIcon::Microphone,
             })
             .collect()
     }
