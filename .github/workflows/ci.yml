@@ -4,10 +4,8 @@
 # development files and is not built here.
 name: ci
 
+# Run by hand only (user 2026-11-10: not needed at this stage; switched on again before the beta).
 on:
-  push:
-    branches: [main, libav-decoder]
-  pull_request:
   workflow_dispatch:
 
 concurrency:

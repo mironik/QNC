@@ -8721,3 +8721,8 @@ svi testovi kataloga kamera, Selecta i Ingesta). Preostali padovi CI-ja: testovi
 dekodera odbija format bez instaliranog dekodera), a BtbN build `n8.1.3-17-gc389840894-20261011` vise se ne moze preuzeti
 (autobuild se cuva oko dva tjedna); test zastite projekta (`the_files_of_the_prerender_cache...`) na runneru (administrator,
 elevated) moze obrisati zasticenu datoteku. Oba cekaju odluku korisnika.
+Odluka 2026-11-10 (korisnik: "CI samo rucno i sacuvaj FFmpeg lokalno"): CI (`.github/workflows/ci.yml`) se pokrece samo
+rucno (`workflow_dispatch`); ponovno se ukljucuje pred beta paket. FFmpeg build koji aplikacija trazi sacuvan je izvan gita:
+`C:\Users\miron\tools\qnc-ffmpeg-archive\ffmpeg-n8.1.3-17-gc389840894-20261011-win64-lgpl-shared.zip` (cijela mapa
+`FFMPEG_DIR`: programi, DLL-ovi, razvojne datoteke, licenca), uz `SHA256SUMS.txt` i `README.txt`. Provjera zastite projekta
+pokrenute kao administrator ostaje otvorena.
