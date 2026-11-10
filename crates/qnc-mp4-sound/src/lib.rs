@@ -37,6 +37,8 @@ pub struct Track {
     pub sync: Option<Vec<u32>>,
     /// H.264: the length of the NAL size fields and the parameter sets (SPS, PPS).
     pub avc: Option<(u8, Vec<Vec<u8>>)>,
+    /// H.265: the length of the NAL size fields and the parameter sets (VPS, SPS, PPS).
+    pub hevc: Option<(u8, Vec<Vec<u8>>)>,
     /// AAC: the AudioSpecificConfig of the track.
     pub aac_config: Option<Vec<u8>>,
 }
@@ -159,12 +161,16 @@ pub fn read_sound_and_pictures(
     Ok(())
 }
 
-/// The first key picture of the first H.264 picture track as an Annex B stream a decoder
-/// takes on its own (user 2026-11-10: the poster of a clip on LAN/Intranet, whose index is at
-/// the end of the file). `Err` for a picture that is not H.264.
-pub fn first_key_picture<R: Read + Seek + ?Sized>(file: &mut R, tracks: &[Track]) -> Result<Vec<u8>, String> {
+/// The first key picture of the first picture track as an Annex B stream a decoder takes on
+/// its own, and its codec (`h264`, `hevc`) (user 2026-11-10: the poster of a clip on
+/// LAN/Intranet, whose index is at the end of the file). `Err` for another picture codec.
+pub fn first_key_picture<R: Read + Seek + ?Sized>(file: &mut R, tracks: &[Track]) -> Result<(Vec<u8>, &'static str), String> {
     let video = tracks.iter().find(|track| track.is_picture()).ok_or("mp4: no picture track")?;
-    let (nal_length, parameter_sets) = video.avc.as_ref().ok_or("mp4: the picture is not H.264")?;
+    let ((nal_length, parameter_sets), codec) = match (&video.avc, &video.hevc) {
+        (Some(avc), _) => (avc, "h264"),
+        (None, Some(hevc)) => (hevc, "hevc"),
+        _ => return Err("mp4: the picture is neither H.264 nor H.265".into()),
+    };
     let number = video.key_at_or_after(0).ok_or("mp4: the picture track is empty")?;
     let (place, length) = *video.samples.get(number as usize).ok_or("mp4: no such picture")?;
     if length > MAX_SAMPLE {
@@ -172,7 +178,7 @@ pub fn first_key_picture<R: Read + Seek + ?Sized>(file: &mut R, tracks: &[Track]
     }
     let mut sample = vec![0u8; length as usize];
     read_at(file, place, &mut sample)?;
-    avc_annexb(&sample, *nal_length, parameter_sets)
+    Ok((avc_annexb(&sample, *nal_length, parameter_sets)?, codec))
 }
 
 /// An AAC frame with its ADTS header, as a decoder of an AAC stream takes it.
@@ -341,6 +347,8 @@ fn sample_entry(data: &[u8], at: usize, end: usize, track: &mut Track) {
         // A visual sample entry has 78 bytes before its boxes.
         if let Some((avcc, avcc_end)) = child(data, body + 78, entry_end, &[b"avcC"]) {
             track.avc = avc_config(&data[avcc..avcc_end]);
+        } else if let Some((hvcc, hvcc_end)) = child(data, body + 78, entry_end, &[b"hvcC"]) {
+            track.hevc = hevc_config(&data[hvcc..hvcc_end]);
         }
     } else if track.is_sound() {
         // A sound sample entry has 28 bytes before its boxes; QuickTime versions 1 and 2
@@ -357,6 +365,24 @@ fn sample_entry(data: &[u8], at: usize, end: usize, track: &mut Track) {
             track.aac_config = data.get(esds + 4..esds_end).and_then(decoder_specific_info);
         }
     }
+}
+
+/// The NAL length size and the parameter set arrays of an `hvcC` (ISO/IEC 14496-15 8.3.3).
+fn hevc_config(hvcc: &[u8]) -> Option<(u8, Vec<Vec<u8>>)> {
+    let nal_length = (hvcc.get(21)? & 3) + 1;
+    let arrays = *hvcc.get(22)?;
+    let mut sets = Vec::new();
+    let mut at = 23;
+    for _ in 0..arrays {
+        let count = usize::from(u16::from_be_bytes([*hvcc.get(at + 1)?, *hvcc.get(at + 2)?]));
+        at += 3;
+        for _ in 0..count {
+            let length = usize::from(u16::from_be_bytes([*hvcc.get(at)?, *hvcc.get(at + 1)?]));
+            sets.push(hvcc.get(at + 2..at + 2 + length)?.to_vec());
+            at += 2 + length;
+        }
+    }
+    Some((nal_length, sets))
 }
 
 fn avc_config(avcc: &[u8]) -> Option<(u8, Vec<Vec<u8>>)> {

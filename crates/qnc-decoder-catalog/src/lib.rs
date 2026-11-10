@@ -247,6 +247,7 @@ impl LocalFilmstripExtractor {
     ) -> std::result::Result<(), String> {
         let demuxer = match codec {
             "h264" => "h264",
+            "hevc" => "hevc",
             "mpeg2video" => "mpegvideo",
             other => return Err(format!("no picture decoding for codec {other}")),
         };

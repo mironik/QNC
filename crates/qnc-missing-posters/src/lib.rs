@@ -233,12 +233,12 @@ pub fn first_picture_file(media: &mut dyn MediaBytes, folder: &Path) -> Result<S
     }
     if &head[4..8] == b"ftyp" {
         let tracks = qnc_mp4_sound::read_index_from(&mut *media, size)?;
-        let picture = qnc_mp4_sound::first_key_picture(&mut *media, &tracks)?;
-        let file = folder.join("start.h264");
+        let (picture, codec) = qnc_mp4_sound::first_key_picture(&mut *media, &tracks)?;
+        let file = folder.join(format!("start.{codec}"));
         std::fs::File::create(&file)
             .and_then(|mut out| out.write_all(&picture))
             .map_err(|e| e.to_string())?;
-        return Ok(Start::Picture(file, "h264"));
+        return Ok(Start::Picture(file, codec));
     }
     Err(qnc_ui_text::text("posters.stream_container_unknown").into())
 }

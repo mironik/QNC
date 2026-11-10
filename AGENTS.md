@@ -8743,3 +8743,10 @@ umjesto svoje kopije) i `stream_of`; Select i pozadinski radnik predaju ga kocki
 citani samo kao tok bajtova): FX6 MXF (Mironik 3609) i FX3A MP4 (C0012) daju ispravan poster. Testovi `qnc-missing-posters`,
 `qnc-mp4-sound`, `qnc-poster-create`, `qnc-ingest-select`, `qnc-ingest-import-worker`, `qnc-ingest-worker`, conformance. Na pravom
 LAN izvoru nije provjereno. HEVC slika u MP4 (proxy FX3A) preko LAN-a jos nema poster.
+Dopuna 2026-11-10 (korisnik: "dodaj i HEVC poster preko LAN-a"): poster klipa na LAN/intranet izvoru i za MP4 s H.265 slikom
+(proxy FX3A). `qnc-mp4-sound` cita `hvcC` (`Track.hevc`), `first_key_picture` vraca i kodek (`h264`, `hevc`);
+`qnc-decoder-catalog` `decode_pictures_with_cancel` prima `hevc`. Provjereno: C0012S03.MP4 (HEVC proxy s kartice G:, citan
+samo kao tok bajtova) daje ispravan poster. Nalaz uz napomenu korisnika ("i lokalno nije kreirana"): pozadinski proces je
+danas napravio 17 postera OFF-ova i medjuslika u mapi projekta (`products/thumbnails`); kartice taba Glas ih ne koriste
+(kartica OFF-a nije klip kataloga), pa su pokazivale "...", sada mikrofon. Greske "Izvor klipa nije dostupan" u logu su od prije
+popravka postera iz mape projekta.
