@@ -71,26 +71,33 @@ impl AiBrollView {
 /// each part under the label it fits best (softmax of the model's logits), the labels in the
 /// order of the list, the longest part first within a label.
 pub fn sort_parts(content: &[qnc_shot_content_db::ClipContent], set: &qnc_shot_content_db::LabelSet, list: &qnc_shot_labels::Labels) -> Vec<AiPart> {
-    let texts = qnc_shot_content::Texts { vectors: set.labels.iter().map(|label| label.vector.clone()).collect(), scale: set.scale, bias: set.bias };
+    // The kept vectors in the order of the list (a label the kept set has not is never best).
+    let vectors: Vec<Vec<f32>> = list
+        .labels
+        .iter()
+        .map(|label| set.labels.iter().find(|kept| kept.code == label.code).map_or_else(Vec::new, |kept| kept.vector.clone()))
+        .collect();
+    let texts = qnc_shot_content::Texts { vectors, scale: set.scale, bias: set.bias };
     let order = |code: &str| list.labels.iter().position(|label| label.code == code).unwrap_or(usize::MAX);
     let mut parts: Vec<(usize, AiPart)> = content
         .iter()
         .flat_map(|clip| clip.parts.iter().map(move |part| (clip, part)))
         .filter_map(|(clip, part)| {
-            let logits = texts.logits(&part.vector);
-            let top = logits.iter().copied().fold(f32::NEG_INFINITY, f32::max);
-            let sum: f32 = logits.iter().map(|logit| (logit - top).exp()).sum();
-            let best = logits.iter().position(|logit| *logit == top)?;
-            let label = &set.labels[best].code;
+            let logits: Vec<f32> = (0..list.labels.len()).map(|n| if texts.vectors[n].is_empty() { f32::NEG_INFINITY } else { texts.logit(&part.vector, n) }).collect();
+            // A statement is not B-roll (user 2026-11-10).
+            if list.is_statement(&logits) {
+                return None;
+            }
+            let (label, share) = list.shares(&logits).into_iter().next()?;
             Some((
-                order(label),
+                order(&label),
                 AiPart {
                     clip_id: clip.clip_id.clone(),
                     from: part.from,
                     to: part.to,
-                    label: label.clone(),
-                    text: list.text_of(label).unwrap_or(label).to_string(),
-                    share: 1.0 / sum,
+                    text: list.text_of(&label).unwrap_or(&label).to_string(),
+                    label,
+                    share,
                 },
             ))
         })

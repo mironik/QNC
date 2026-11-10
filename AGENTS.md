@@ -8788,3 +8788,11 @@ modela; `qnc-shot-content-run` ih upisuje kad se popis oznaka promijeni (i bez n
 gumb "Dodaj SubClip" nije preimenovan. Katalog akcija `editorial_tab_ai_broll`, `ai_broll_open` (bez tipki). Testovi
 `qnc-ai-broll` (razvrstavanje, klik), `qnc-shot-content-db` (vektori oznaka), `qnc-pool-tabs`, `qnc-side-pieces`,
 `qnc-panel-focus` (zlatne tablice), conformance. Uzivo nije provjereno.
+Popravak 2026-11-10 (korisnik: "klipovi koji su izjave ne bi trebali biti u AI B-roll; grupa govor u kameru je neprecizna, stavljas
+knjigu i dvoje ljudi u govor u kameru"): oznaka izjave vise nije grupa. `qnc-shot-labels`: oznaka sa `statement: true` ne ulazi u
+usporedbu grupa (`shares`, `best`), a dio je izjava kad njezina vlastita vrijednost (sigmoid) dosegne `statement_least` (0,05;
+`is_statement`); `qnc-ai-broll` izjave izostavlja iz taba AI pokrivalice. Popis: "Izjava" (osoba govori u kameru) i "Izjava u
+mikrofon" (osoba govori u mikrofon) su oznake izjave, nova grupa "Ljudi" (dvoje ljudi), "Dokument, knjiga" pita za osobu koja drzi
+knjigu ili papir. Provjereno slikama s kartice (samo citanje): Mironik 3625 (izjava s mikrofonom) svih 7 dijelova izjava; 3615 i
+3617 (dvoje ljudi) Ljudi 0,94-0,96; 3616 (covjek drzi knjigu) Dokument 0,87; 3618 (novinarka u razgovoru) izjava. Test
+`a_statement_label_is_no_group_and_its_own_score_makes_a_part_a_statement`, conformance.

@@ -29,8 +29,10 @@ fn main() -> Result<(), String> {
     let pictures: usize = parts.iter().map(|part| part.frames.len()).sum();
     println!("content: {} parts, {pictures} pictures, {} ms", parts.len(), started.elapsed().as_millis());
     for part in &parts {
-        let best: Vec<String> = labels.best(&texts.logits(&part.vector)).into_iter().take(3).map(|(code, share)| format!("{code} {share:.2}")).collect();
-        println!("{:>6}-{:<6} frames {:?}: {}", part.from, part.to, part.frames, best.join(", "));
+        let logits = texts.logits(&part.vector);
+        let statement = if labels.is_statement(&logits) { "STATEMENT " } else { "" };
+        let best: Vec<String> = labels.shares(&logits).into_iter().take(3).map(|(code, share)| format!("{code} {share:.2}")).collect();
+        println!("{:>6}-{:<6} frames {:?}: {statement}{}", part.from, part.to, part.frames, best.join(", "));
     }
     Ok(())
 }
