@@ -45,6 +45,10 @@ pub fn look_missing(reader: &SettingsReader, settings: &WorkSettings, local_medi
         }
     };
     let model = engine.model_name();
+    // The vocabulary's vectors, once a model on this computer (user 2026-11-10: not in a project).
+    if let Err(error) = keep_vocabulary(&engine, &model) {
+        log(format!("shot-content vocabulary failed error={error}"));
+    }
     let db = ProjectDbTarget::for_project(reader, settings)?;
     // A clip looked at only through its poster is looked at again once its shots are analysed.
     let looked: Vec<String> = qnc_shot_content_db::read_all(&db, &model)?.into_iter().filter(|clip| !poster_only(clip)).map(|clip| clip.clip_id).collect();
@@ -287,6 +291,33 @@ const SHORTEST_GAP: u64 = 100;
 const SHORTEST_SHOT: u64 = 25;
 
 /// Whether the kept label vectors are of the same labels and prompts, in the same order.
+/// Asks the model for the vectors of the vocabulary (`qnc-shot-vocabulary`) and keeps them on this
+/// computer, unless they are kept for this model and this vocabulary already.
+fn keep_vocabulary(engine: &qnc_ai_catalog::ShotContentEngine, model: &str) -> Result<(), String> {
+    let root = qnc_dev_diagnostics::resolve_qnc_root().ok_or("no QNC root")?;
+    let list = qnc_shot_vocabulary::installed()?;
+    if qnc_shot_vocabulary::read(&root, model)?.is_some_and(|set| qnc_shot_vocabulary::same(&set, &list)) {
+        return Ok(());
+    }
+    let started = std::time::Instant::now();
+    let client = qnc_shot_content::ContentClient::new(&qnc_plugin_process::beside_application(&engine.program)?);
+    let (mut vectors, mut scoring) = (Vec::new(), (0.0, 0.0));
+    for prompts in list.prompts().chunks(qnc_shot_content::MOST_AT_ONCE) {
+        let texts = client.texts(&qnc_shot_content::TextsRequest { model: engine.model.clone(), texts: prompts.to_vec() })?;
+        scoring = (texts.scale, texts.bias);
+        vectors.extend(texts.vectors);
+    }
+    let set = qnc_shot_content_db::LabelSet {
+        model: model.to_string(),
+        scale: scoring.0,
+        bias: scoring.1,
+        labels: list.labels.iter().zip(vectors).map(|(term, vector)| qnc_shot_content_db::LabelVector { code: term.code.clone(), prompt: term.prompt.clone(), vector }).collect(),
+    };
+    qnc_shot_vocabulary::save(&root, &set)?;
+    log(format!("shot-content vocabulary model={model} terms={} ms={}", list.labels.len(), started.elapsed().as_millis()));
+    Ok(())
+}
+
 fn same_labels(set: &qnc_shot_content_db::LabelSet, list: &qnc_shot_labels::Labels) -> bool {
     set.labels.len() == list.labels.len() && set.labels.iter().zip(&list.labels).all(|(kept, label)| kept.code == label.code && kept.prompt == label.prompt)
 }

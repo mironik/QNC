@@ -8904,3 +8904,17 @@ grupe): PMW-300 19 kadrova SigLIP 2 6/19 -> 18/19 (SigLIP 5 -> 16), kadrovi vije
 cija analiza nije uspjela analiziraju se ponovno u sljedecem radu pozadinskog procesa. Release `qnc-ingest-worker` izgraden.
 Testovi `qnc-mp4-sound`, `qnc-shot-analysis`, `qnc-shot-labels`, `qnc-ui-text`, `qnc-ai-broll`, conformance. Uzivo nije
 provjereno.
+Izvedeno 2026-11-10 (korisnik: "SigLIP 2 nije poznao skoro nista, ponasa se kao da ne komunicira sa svojom bazom"; "ako misli da
+A rjesava problem mozemo probati"; "s obzirom da ce baza rasti, bi li bilo logicnije da to ne trpamo u projektnu bazu; AI agenti
+su dodatak"): model ne imenuje sto vidi, samo usporeduje sliku s ponudenim tekstovima, pa mu se daje rjecnik. Novi popis
+`catalogs/ai/shot-vocabulary.json` (oblik popisa oznaka): 365 vrsta mjesta Places365 (MIT, CSAIL; popis preuzet uz dozvolu) i
+34 predmeta koje redakcija snima, nazivi u rjecniku `vocab.*` (en, hr). Nova javna kocka `crates/qnc-shot-vocabulary` (+ ugovori
+modula i baze `shot-vocabulary`; conformance: jedini pisac baze racunala): tekstni vektori rjecnika jednom po modelu u bazi
+racunala `data/qnc-shot-vocabulary.db`, ne u projektu; `best_terms` daje najbolje pojmove vektora kadra. Pozadinski proces
+(`qnc-shot-content-run` `keep_vocabulary`) ih racuna kad ih nema ili se popis promijeni (13 zahtjeva po 32 teksta). Kartica
+taba AI pokrivalice pokazuje dva najbolja pojma ("Bazen na otvorenom, Hotel · klip") umjesto naziva grupe; grupe i poredak
+ostaju iz popisa oznaka. Provjereno `rank_pictures` s rjecnikom (kartice samo citane): PMW-300 fontana/trg, bazen na
+otvorenom, park, hotel, selo; vijesti knjiga, luka/vez, nogometni stadion, pozornica na otvorenom, TV kamera, policajac, pas.
+Testovi `qnc-shot-vocabulary`, `qnc-ai-broll`, `qnc-shot-content-run`, `qnc-ui-text`, conformance. Uzivo nije provjereno.
+Otvoreno (odluka korisnika: AI podaci ne u `project.db`): vektori kadrova, oznake i analiza kadrova projekta (`clip_content`,
+`shot_label_vectors`, `clip_shots`) jos su u `project.db`; seliti ih u zasebnu `ai.db` uz nju.

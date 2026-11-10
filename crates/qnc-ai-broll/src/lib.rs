@@ -69,6 +69,9 @@ pub struct AiPart {
     /// group (`None`: the labels' texts did).
     pub vector: Vec<f32>,
     pub taught: Option<Taught>,
+    /// The terms of the vocabulary it fits best (dictionary keys), best first (user 2026-11-10:
+    /// what the model saw, not only the group).
+    pub terms: Vec<String>,
 }
 
 /// The chosen card's button asks for another group (target: `clip|from|to`); an answer gives
@@ -118,7 +121,9 @@ impl AiBrollView {
                 let label = qnc_ui_text::host().ok().and_then(|texts| texts.get(&part.text).ok()).unwrap_or(&part.label);
                 let per_frame = if clip.duration_frames > 0 { clip.duration_seconds / clip.duration_frames as f64 } else { 0.0 };
                 let kind = kind_text(&part.kind);
-                let label = if kind.is_empty() { label.to_string() } else { format!("{label} · {kind}") };
+                // What the model saw (the vocabulary's best terms) says more than the group.
+                let words = |key: &str| qnc_ui_text::host().ok().and_then(|texts| texts.get(key).ok()).unwrap_or(key).to_string();
+                let label = if !part.terms.is_empty() { part.terms.iter().take(2).map(|term| words(term)).collect::<Vec<_>>().join(", ") } else if kind.is_empty() { label.to_string() } else { format!("{label} · {kind}") };
                 let seconds = (part.to - part.from) as f64 * per_frame;
                 let (long, like) = self.suggestion.as_ref().map_or((true, 0.0), |suggestion| (seconds >= suggestion.seconds, qnc_broll_suggest::likeness(suggestion, &part.vector)));
                 Some((
@@ -208,6 +213,7 @@ pub fn sort_parts(
                     poster: part.poster.clone(),
                     vector: part.vector.clone(),
                     taught,
+                    terms: Vec::new(),
                 },
             ))
         })
@@ -430,7 +436,15 @@ fn read_sorted(target: &ProjectDbTarget) -> Result<(Vec<AiPart>, String), String
     let speech = |clip: &str, from: u64, to: u64| spoken_share(transcripts.get(clip)?, from, to);
     // The corrections of this computer, outside every project (user 2026-11-10).
     let examples = qnc_dev_diagnostics::resolve_qnc_root().map_or_else(|| Ok(Vec::new()), |root| qnc_shot_examples::read(&root, &model))?;
-    Ok((sort_parts(&content, &set, &list, &speech, (target.uri(), &examples)), model))
+    let mut parts = sort_parts(&content, &set, &list, &speech, (target.uri(), &examples));
+    // The terms of the vocabulary of this computer, where its vectors are kept for this model.
+    let vocabulary = qnc_dev_diagnostics::resolve_qnc_root().and_then(|root| qnc_shot_vocabulary::read(&root, &model).ok().flatten()).zip(qnc_shot_vocabulary::installed().ok());
+    if let Some((set, list)) = vocabulary {
+        for part in &mut parts {
+            part.terms = qnc_shot_vocabulary::best_terms(&set, &list, &part.vector, 2).into_iter().filter_map(|(code, _)| list.text_of(&code).map(str::to_string)).collect();
+        }
+    }
+    Ok((parts, model))
 }
 
 #[cfg(test)]
@@ -516,7 +530,7 @@ mod tests {
     #[test]
     fn a_click_opens_only_a_part_the_tab_shows() {
         let mut broll = AiBroll::new();
-        broll.view.parts = vec![AiPart { clip_id: "clip|x".into(), from: 10, to: 90, label: "sea".into(), text: "shot.label.sea".into(), share: 1.0, spoken: false, kind: "steady".into(), poster: String::new(), vector: vec![], taught: None }];
+        broll.view.parts = vec![AiPart { clip_id: "clip|x".into(), from: 10, to: 90, label: "sea".into(), text: "shot.label.sea".into(), share: 1.0, spoken: false, kind: "steady".into(), poster: String::new(), vector: vec![], taught: None, terms: Vec::new() }];
         assert_eq!(broll.act(OPEN, Some("clip|x|10|90")), Some(true));
         assert_eq!(broll.take_source_request(), Some(("clip|x".to_string(), 10, 90)));
         assert_eq!(broll.act(OPEN, Some("clip|x|10|91")), Some(false));
@@ -526,7 +540,7 @@ mod tests {
     #[test]
     fn a_slots_suggestion_puts_the_parts_long_enough_and_most_like_its_words_first() {
         let clip = ClipRow { clip_id: "a".into(), name: "A".into(), duration_seconds: 10.0, duration_frames: 500, ..ClipRow::default() };
-        let shot = |from, to, vector: Vec<f32>| AiPart { clip_id: "a".into(), from, to, label: "sea".into(), text: "sea".into(), share: 1.0, spoken: false, kind: String::new(), poster: String::new(), vector, taught: None };
+        let shot = |from, to, vector: Vec<f32>| AiPart { clip_id: "a".into(), from, to, label: "sea".into(), text: "sea".into(), share: 1.0, spoken: false, kind: String::new(), poster: String::new(), vector, taught: None, terms: Vec::new() };
         let mut view = AiBrollView { parts: vec![shot(0, 100, vec![1.0, 0.0]), shot(100, 300, vec![0.0, 1.0]), shot(300, 500, vec![0.8, 0.6])], ..AiBrollView::default() };
         let ids = |view: &AiBrollView| view.cards(std::slice::from_ref(&clip)).iter().map(|card| card.id.clone()).collect::<Vec<_>>();
         assert_eq!(ids(&view), ["a|0|100", "a|100|300", "a|300|500"]);

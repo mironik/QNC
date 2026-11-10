@@ -3617,6 +3617,7 @@ dependencies = [
  "qnc-shot-content-db",
  "qnc-shot-examples",
  "qnc-shot-labels",
+ "qnc-shot-vocabulary",
  "qnc-source-preview",
  "qnc-transcript-db",
  "qnc-ui-text",
@@ -6724,6 +6725,7 @@ dependencies = [
  "qnc-shot-content-db",
  "qnc-shot-db",
  "qnc-shot-labels",
+ "qnc-shot-vocabulary",
  "qnc-ui-text",
  "qnc-work-settings",
 ]
@@ -6802,6 +6804,19 @@ dependencies = [
  "qnc-virtual-short-stills",
  "qnc-virtual-shots",
  "qnc-work-settings",
+ "tempfile",
+]
+
+[[package]]
+name = "qnc-shot-vocabulary"
+version = "0.1.0"
+dependencies = [
+ "qnc-shot-content",
+ "qnc-shot-content-db",
+ "qnc-shot-labels",
+ "qnc-ui-text",
+ "rusqlite",
+ "serde_json",
  "tempfile",
 ]
 

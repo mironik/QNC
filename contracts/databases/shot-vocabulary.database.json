@@ -1,0 +1,19 @@
+{
+  "database_id": "qnc.db.shot-vocabulary",
+  "database_owner": "host",
+  "owner_application": "qnc.module.shot-vocabulary",
+  "ownership_rule": "The vocabulary database of this computer (data/qnc-shot-vocabulary.db), outside every project: the same vocabulary for every project. qnc.module.shot-vocabulary is its only writer.",
+  "schema_version": "0.1.0",
+  "qnc_uri": "qnc://local/db/shot_vocabulary",
+  "tables": ["shot_vocabulary"],
+  "public_read_views": ["public_shot_vocabulary"],
+  "write_owner": "qnc.module.shot-vocabulary",
+  "public_read_policy": "public_read_views",
+  "rules": {
+    "set": "A row a model: the text vectors of the vocabulary list (code, prompt, vector) and how the model scores a picture against a text (scale, bias).",
+    "replace": "Made again when the list says something else than the kept terms and prompts."
+  },
+  "migration_policy": "owner_application_only",
+  "created_at": "2026-11-10T00:00:00Z",
+  "updated_at": "2026-11-10T00:00:00Z"
+}
