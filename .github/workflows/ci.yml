@@ -34,4 +34,15 @@ jobs:
       - name: Conformance
         run: cargo run --locked -p qnc-conformance
       - name: Tests
-        run: cargo test --workspace --locked --no-fail-fast
+        shell: bash
+        # The failed tests are also annotations of the run, readable without signing in.
+        run: |
+          set -o pipefail
+          cargo test --workspace --locked --no-fail-fast 2>&1 | tee test-output.txt
+          status=${PIPESTATUS[0]}
+          if [ "$status" -ne 0 ]; then
+            grep -E -A1 "^test .* FAILED$|panicked at|^error" test-output.txt | grep -v "^--$" | head -80 > failed.txt || true
+            split -l 8 failed.txt part- || true
+            for part in part-*; do echo "::error title=tests::$(tr '\n' '|' < "$part")"; done
+          fi
+          exit "$status"
