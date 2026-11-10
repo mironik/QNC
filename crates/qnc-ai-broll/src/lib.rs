@@ -20,6 +20,35 @@ pub const OPEN: &str = "ai_broll_open";
 
 const READ_EVERY: Duration = Duration::from_secs(3);
 
+/// A part whose A1 is spoken for at least this share of its frames (words of its transcript) is
+/// a statement (user 2026-11-10: "A1 as a help, where it exists").
+pub const SPOKEN: f32 = 0.3;
+
+/// The share of clip frames `[from, to)` the words of `transcripts` cover; `None` when no
+/// transcript covers the part (nothing is known of its speech then).
+pub fn spoken_share(transcripts: &[qnc_transcript_db::ClipTranscript], from: u64, to: u64) -> Option<f32> {
+    let covered = transcripts.iter().any(|transcript| transcript.from_frame <= from && to <= transcript.to_frame.max(transcript.from_frame));
+    if !covered || to <= from {
+        return None;
+    }
+    let mut spans: Vec<(u64, u64)> = transcripts
+        .iter()
+        .flat_map(|transcript| transcript.lines.iter().flat_map(|line| line.words.iter()))
+        .map(|word| (word.from.max(from), word.to.min(to)))
+        .filter(|(a, b)| a < b)
+        .collect();
+    spans.sort_unstable();
+    let (mut said, mut end) = (0u64, from);
+    for (a, b) in spans {
+        let a = a.max(end);
+        if a < b {
+            said += b - a;
+            end = b;
+        }
+    }
+    Some(said as f32 / (to - from) as f32)
+}
+
 /// One usable part as the tab shows it.
 #[derive(Debug, Clone, PartialEq)]
 pub struct AiPart {
@@ -31,6 +60,8 @@ pub struct AiPart {
     pub label: String,
     pub text: String,
     pub share: f32,
+    /// Its A1 is spoken (a transcript of the clip has words for most of it).
+    pub spoken: bool,
 }
 
 /// What the tab shows.
@@ -53,7 +84,7 @@ impl AiBrollView {
                 let per_frame = if clip.duration_frames > 0 { clip.duration_seconds / clip.duration_frames as f64 } else { 0.0 };
                 Some(TabCard {
                     id: format!("{}|{}|{}", part.clip_id, part.from, part.to),
-                    title: qnc_ui_text::fill("ai_broll.card", &[("label", label), ("clip", &clip.name)]).into(),
+                    title: qnc_ui_text::fill(if part.spoken { "ai_broll.card_spoken" } else { "ai_broll.card" }, &[("label", label), ("clip", &clip.name)]).into(),
                     seconds: (part.to - part.from) as f64 * per_frame,
                     clip: Some(clip),
                     icon: qnc_clip_row::PoolIcon::None,
@@ -70,7 +101,12 @@ impl AiBrollView {
 /// The parts in the tab's order from the kept content and label vectors and the list of labels:
 /// each part under the label it fits best (softmax of the model's logits), the labels in the
 /// order of the list, the longest part first within a label.
-pub fn sort_parts(content: &[qnc_shot_content_db::ClipContent], set: &qnc_shot_content_db::LabelSet, list: &qnc_shot_labels::Labels) -> Vec<AiPart> {
+pub fn sort_parts(
+    content: &[qnc_shot_content_db::ClipContent],
+    set: &qnc_shot_content_db::LabelSet,
+    list: &qnc_shot_labels::Labels,
+    speech: &dyn Fn(&str, u64, u64) -> Option<f32>,
+) -> Vec<AiPart> {
     // The kept vectors in the order of the list (a label the kept set has not is never best).
     let vectors: Vec<Vec<f32>> = list
         .labels
@@ -84,11 +120,16 @@ pub fn sort_parts(content: &[qnc_shot_content_db::ClipContent], set: &qnc_shot_c
         .flat_map(|clip| clip.parts.iter().map(move |part| (clip, part)))
         .filter_map(|(clip, part)| {
             let logits: Vec<f32> = (0..list.labels.len()).map(|n| if texts.vectors[n].is_empty() { f32::NEG_INFINITY } else { texts.logit(&part.vector, n) }).collect();
-            // A statement is not B-roll (user 2026-11-10).
-            if list.is_statement(&logits) {
+            // A statement is not B-roll (user 2026-11-10: "a picture that looks like a statement
+            // is not a statement; it must have A1 too"): its pictures look like one and its A1 is
+            // spoken. Without a transcript of the clip A1 is not known, the pictures decide.
+            let spoken = speech(&clip.clip_id, part.from, part.to).map(|share| share >= SPOKEN);
+            if list.is_statement(&logits) && spoken != Some(false) {
                 return None;
             }
             let (label, share) = list.shares(&logits).into_iter().next()?;
+            // Several people and A1 may be both (user 2026-11-10): it stays, marked spoken.
+            let spoken = spoken == Some(true);
             Some((
                 order(&label),
                 AiPart {
@@ -98,6 +139,7 @@ pub fn sort_parts(content: &[qnc_shot_content_db::ClipContent], set: &qnc_shot_c
                     text: list.text_of(&label).unwrap_or(&label).to_string(),
                     label,
                     share,
+                    spoken,
                 },
             ))
         })
@@ -190,7 +232,14 @@ fn read_parts(target: &ProjectDbTarget) -> Read {
         return Ok(Vec::new());
     };
     let content = qnc_shot_content_db::read_all(target, &model)?;
-    Ok(sort_parts(&content, &set, &list))
+    // The transcripts of the clips with parts (A1), where they exist.
+    let transcripts: std::collections::HashMap<&str, Vec<qnc_transcript_db::ClipTranscript>> = content
+        .iter()
+        .filter(|clip| !clip.parts.is_empty())
+        .filter_map(|clip| Some((clip.clip_id.as_str(), qnc_transcript_db::read_clip(target, &clip.clip_id).ok()?)))
+        .collect();
+    let speech = |clip: &str, from: u64, to: u64| spoken_share(transcripts.get(clip)?, from, to);
+    Ok(sort_parts(&content, &set, &list, &speech))
 }
 
 #[cfg(test)]
@@ -224,7 +273,7 @@ mod tests {
             ClipContent { clip_id: "a".into(), model: "m".into(), parts: vec![part(0, 100, vec![0.0, 1.0]), part(200, 500, vec![1.0, 0.0])], error: String::new(), took_ms: 0 },
             ClipContent { clip_id: "b".into(), model: "m".into(), parts: vec![part(0, 50, vec![0.9, 0.1])], error: String::new(), took_ms: 0 },
         ];
-        let parts = sort_parts(&content, &set, &list());
+        let parts = sort_parts(&content, &set, &list(), &|_, _, _| None);
         let shown: Vec<(&str, u64, &str)> = parts.iter().map(|p| (p.clip_id.as_str(), p.from, p.label.as_str())).collect();
         assert_eq!(shown, [("a", 200, "sea"), ("b", 0, "sea"), ("a", 0, "person")], "sea comes first in the list; the longer sea part first");
         assert!(parts[0].share > 0.99);
@@ -232,9 +281,51 @@ mod tests {
     }
 
     #[test]
+    fn a_part_spoken_on_a1_is_a_statement_and_one_without_a_transcript_is_judged_by_its_pictures() {
+        use qnc_transcript_db::{ClipTranscript, Line, Word};
+        let word = |from, to| Word { from, to, text: "w".into() };
+        let transcript = ClipTranscript {
+            clip_id: "a".into(),
+            from_frame: 0,
+            to_frame: 1000,
+            language: "hr".into(),
+            engine: "e".into(),
+            lines: vec![Line { from: 0, to: 300, text: "w w".into(), words: vec![word(0, 100), word(50, 200)] }],
+        };
+        assert_eq!(spoken_share(&[transcript.clone()], 0, 400), Some(0.5), "words overlapping are counted once");
+        assert_eq!(spoken_share(&[transcript.clone()], 500, 900), Some(0.0));
+        assert_eq!(spoken_share(&[transcript], 900, 1200), None, "the transcript does not cover the part");
+        let set = LabelSet { model: "m".into(), scale: 10.0, bias: 0.0, labels: vec![LabelVector { code: "sea".into(), prompt: "s".into(), vector: vec![1.0, 0.0] }] };
+        let content = vec![ClipContent { clip_id: "a".into(), model: "m".into(), parts: vec![part(0, 400, vec![1.0, 0.0]), part(500, 900, vec![1.0, 0.0])], error: String::new(), took_ms: 0 }];
+        let speech = |_: &str, from: u64, to: u64| Some(if from == 0 { 0.5 } else { 0.0 }).filter(|_| to > from);
+        let parts = sort_parts(&content, &set, &list(), &speech);
+        // The pictures are no statement: spoken or not both stay, the spoken one marked (people
+        // and A1 may be both).
+        assert_eq!(parts.iter().map(|p| (p.from, p.spoken)).collect::<Vec<_>>(), [(0, true), (500, false)]);
+        let talk = qnc_shot_labels::Labels::read(&{
+            let dir = tempfile::tempdir().unwrap().keep();
+            let path = dir.join("labels.json");
+            std::fs::write(&path, r#"{"version":1,"least":0.1,"statement_least":0.05,"labels":[
+                {"code":"talk","text":"t","prompt":"talk","statement":true},
+                {"code":"sea","text":"shot.label.sea","prompt":"s"}]}"#)
+            .unwrap();
+            path
+        })
+        .unwrap();
+        let set = LabelSet {
+            labels: vec![LabelVector { code: "talk".into(), prompt: "talk".into(), vector: vec![1.0, 0.0] }, LabelVector { code: "sea".into(), prompt: "s".into(), vector: vec![1.0, 0.0] }],
+            ..set
+        };
+        let parts = sort_parts(&content, &set, &talk, &speech);
+        assert_eq!(parts.iter().map(|p| p.from).collect::<Vec<_>>(), [500], "looks like a statement and spoken: a statement; not spoken: B-roll");
+        let parts = sort_parts(&content, &set, &talk, &|_, _, _| None);
+        assert!(parts.is_empty(), "without a transcript the pictures decide");
+    }
+
+    #[test]
     fn a_click_opens_only_a_part_the_tab_shows() {
         let mut broll = AiBroll::new();
-        broll.view.parts = vec![AiPart { clip_id: "clip|x".into(), from: 10, to: 90, label: "sea".into(), text: "shot.label.sea".into(), share: 1.0 }];
+        broll.view.parts = vec![AiPart { clip_id: "clip|x".into(), from: 10, to: 90, label: "sea".into(), text: "shot.label.sea".into(), share: 1.0, spoken: false }];
         assert_eq!(broll.act(OPEN, Some("clip|x|10|90")), Some(true));
         assert_eq!(broll.take_source_request(), Some(("clip|x".to_string(), 10, 90)));
         assert_eq!(broll.act(OPEN, Some("clip|x|10|91")), Some(false));

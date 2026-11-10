@@ -3612,6 +3612,7 @@ dependencies = [
  "qnc-shot-content-db",
  "qnc-shot-labels",
  "qnc-source-preview",
+ "qnc-transcript-db",
  "qnc-ui-text",
  "tempfile",
 ]
@@ -6646,6 +6647,7 @@ dependencies = [
  "qnc-dev-diagnostics",
  "qnc-filmstrip",
  "qnc-media-records",
+ "qnc-mp4-sound",
  "qnc-mxf-index",
  "qnc-shot-db",
  "qnc-shot-detect",
@@ -6684,7 +6686,6 @@ dependencies = [
  "qnc-decoder-catalog",
  "qnc-dev-diagnostics",
  "qnc-filmstrip",
- "qnc-mxf-index",
  "qnc-plugin-process",
  "qnc-shot-analysis",
  "qnc-shot-content",

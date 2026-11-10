@@ -43,8 +43,9 @@ pub struct PartRecord {
     pub key_frame: u64,
 }
 
-/// How the analysis is made; a row made another way is analysed again.
-pub const ANALYSIS_VERSION: u32 = 2;
+/// How the analysis is made; a row made another way is analysed again (3: MP4 originals through
+/// their index, 2026-11-10).
+pub const ANALYSIS_VERSION: u32 = 3;
 
 /// The analysis of one clip: its shots, from how many pictures, of which medium; or why it
 /// failed (`error` not empty, no shots).

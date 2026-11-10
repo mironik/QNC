@@ -12,7 +12,6 @@ qnc-content-store = { workspace = true }
 qnc-db-broker = { workspace = true }
 qnc-decoder-catalog = { workspace = true }
 qnc-filmstrip = { workspace = true }
-qnc-mxf-index = { workspace = true }
 qnc-plugin-process = { workspace = true }
 qnc-shot-analysis = { workspace = true }
 qnc-shot-content = { workspace = true }

@@ -23,6 +23,9 @@ use qnc_db_broker::{ProjectDbTarget, WriteLease};
 use qnc_shot_db::{ClipShots, PartRecord, ShotRecord};
 use qnc_work_settings::{SettingsReader, WorkSettings};
 
+mod keys;
+pub use keys::KeyPictures;
+
 pub const MODULE_ID: &str = "qnc.module.shot-analysis";
 
 /// Where a media URI is on this computer; `None` when it is not here.
@@ -150,29 +153,24 @@ pub struct Found {
     pub parts: Vec<PartRecord>,
 }
 
-/// The shots and usable parts of one MXF original at `path` whose pictures are `codec`
-/// (`h264`, `mpeg2video`); the file is only read.
+/// The shots and usable parts of one MXF or MP4 original at `path` whose pictures are `codec`
+/// (`h264`, `mpeg2video`; an MP4's own index names its codec); the file is only read.
 pub fn analyse_file(clip_id: &str, codec: &str, path: &Path, pace: &Pace<'_>) -> Result<Found, String> {
-    let index = qnc_mxf_index::MxfIndex::read(path)?.ok_or_else(|| qnc_ui_text::text("shots.no_index").to_string())?;
-    let frames = index.entries.len() as u64;
-    let (num, den) = index.rate;
-    if frames == 0 || num <= 0 || den <= 0 {
-        return Err(qnc_ui_text::text("shots.no_index").into());
-    }
-    let rate = num as f64 / den as f64;
+    let mut keys = KeyPictures::open(path)?.ok_or_else(|| qnc_ui_text::text("shots.no_index").to_string())?;
+    let codec = keys.codec().unwrap_or(codec);
+    let (frames, rate) = (keys.frames, keys.rate);
     // Every intra picture (about two a second for a camera's long GOP), at most
     // `MOST_A_SECOND` a second (an all-intra original); its frame is where it is shown.
-    let least_apart = (rate / MOST_A_SECOND).round().max(1.0) as usize;
-    let mut entries: Vec<usize> = Vec::new();
-    for entry in index.intra_frames() {
-        if entries.last().is_none_or(|&last| entry >= last + least_apart) {
-            entries.push(entry);
+    let least_apart = (rate / MOST_A_SECOND).round().max(1.0) as u64;
+    let mut entries: Vec<(usize, u64)> = Vec::new();
+    for &(id, shown) in &keys.keys {
+        if entries.last().is_none_or(|&(_, last)| shown >= last + least_apart) {
+            entries.push((id, shown));
         }
     }
     let extractor = qnc_decoder_catalog::installed_filmstrip_extractor().map_err(|e| e.to_string())?.ok_or_else(|| qnc_ui_text::text("shots.no_decoder").to_string())?;
     let temp = scratch_dir(clip_id);
     let result: Result<Vec<qnc_shot_detect::Picture>, String> = (|| {
-        let mut file = fs::File::open(path).map_err(|e| e.to_string())?;
         let mut pictures = Vec::with_capacity(entries.len());
         for batch in entries.chunks(BATCH) {
             if !wait_for_player(pace) {
@@ -181,19 +179,16 @@ pub fn analyse_file(clip_id: &str, codec: &str, path: &Path, pace: &Pace<'_>) ->
             let _ = fs::remove_dir_all(&temp);
             fs::create_dir_all(&temp).map_err(|e| e.to_string())?;
             let mut inputs = Vec::with_capacity(batch.len());
-            for (n, &entry) in batch.iter().enumerate() {
-                let picture = qnc_mxf_index::read_package(&mut file, &index, entry, true, false)?
-                    .picture
-                    .ok_or_else(|| qnc_ui_text::text("shots.no_index").to_string())?;
+            for (n, &(id, _)) in batch.iter().enumerate() {
+                let picture = keys.picture(id)?;
                 let input = temp.join(format!("{n:03}.{codec}"));
                 fs::write(&input, picture).map_err(|e| e.to_string())?;
                 inputs.push(input);
             }
             extractor.decode_pictures_with_cancel(codec, &inputs, PICTURE, &temp, pace.cancel)?;
-            for (n, &entry) in batch.iter().enumerate() {
+            for (n, &(_, shown)) in batch.iter().enumerate() {
                 let Ok(image) = image::open(temp.join(format!("{n:03}.jpg"))) else { continue };
                 let grey = image.into_luma8();
-                let shown = (entry as i64 + index.entries[entry].temporal_offset as i64).clamp(0, frames as i64 - 1) as u64;
                 pictures.push(qnc_shot_detect::Picture { frame: shown, width: grey.width() as usize, height: grey.height() as usize, luma: grey.into_raw() });
             }
         }

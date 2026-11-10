@@ -150,19 +150,14 @@ pub fn chosen_frames(part: &PartRecord, count: u8) -> Vec<u64> {
 /// (`h264`, `mpeg2video`), `count` pictures a part, by the agent behind `client`.
 #[allow(clippy::too_many_arguments)]
 pub fn look_file(clip_id: &str, codec: &str, path: &Path, parts: &[PartRecord], count: u8, model: &Path, client: &qnc_shot_content::ContentClient, pace: &Pace<'_>) -> Result<Vec<PartContent>, String> {
-    let index = qnc_mxf_index::MxfIndex::read(path)?.ok_or_else(|| qnc_ui_text::text("shots.no_index").to_string())?;
-    let frames = index.entries.len() as u64;
-    if frames == 0 {
-        return Err(qnc_ui_text::text("shots.no_index").into());
-    }
-    let shown = |entry: usize| (entry as i64 + index.entries[entry].temporal_offset as i64).clamp(0, frames as i64 - 1) as u64;
+    let mut keys = qnc_shot_analysis::KeyPictures::open(path)?.ok_or_else(|| qnc_ui_text::text("shots.no_index").to_string())?;
+    let codec = keys.codec().unwrap_or(codec);
     // Every part's pictures: the intra picture nearest each chosen frame, inside the part.
     let mut wanted: Vec<(usize, usize, u64)> = Vec::new(); // (part, entry, shown frame)
     for (n, part) in parts.iter().enumerate() {
         let mut taken: Vec<usize> = Vec::new();
         for frame in chosen_frames(part, count) {
-            let Some(entry) = index.intra_nearest(frame) else { continue };
-            let at = shown(entry);
+            let Some((entry, at)) = keys.nearest(frame) else { continue };
             if (part.from..=part.to).contains(&at) && !taken.contains(&entry) {
                 taken.push(entry);
                 wanted.push((n, entry, at));
@@ -175,7 +170,6 @@ pub fn look_file(clip_id: &str, codec: &str, path: &Path, parts: &[PartRecord], 
     let extractor = qnc_decoder_catalog::installed_filmstrip_extractor().map_err(|e| e.to_string())?.ok_or_else(|| qnc_ui_text::text("shots.no_decoder").to_string())?;
     let temp = scratch_dir(clip_id);
     let result: Result<Vec<Vec<f32>>, String> = (|| {
-        let mut file = fs::File::open(path).map_err(|e| e.to_string())?;
         let mut vectors = Vec::with_capacity(wanted.len());
         for batch in wanted.chunks(qnc_shot_content::MOST_AT_ONCE) {
             if !wait_for_player(pace) {
@@ -185,9 +179,7 @@ pub fn look_file(clip_id: &str, codec: &str, path: &Path, parts: &[PartRecord], 
             fs::create_dir_all(&temp).map_err(|e| e.to_string())?;
             let mut inputs = Vec::with_capacity(batch.len());
             for (n, (_, entry, _)) in batch.iter().enumerate() {
-                let picture = qnc_mxf_index::read_package(&mut file, &index, *entry, true, false)?
-                    .picture
-                    .ok_or_else(|| qnc_ui_text::text("shots.no_index").to_string())?;
+                let picture = keys.picture(*entry)?;
                 let input = temp.join(format!("{n:03}.{codec}"));
                 fs::write(&input, picture).map_err(|e| e.to_string())?;
                 inputs.push(input);

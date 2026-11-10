@@ -8796,3 +8796,14 @@ mikrofon" (osoba govori u mikrofon) su oznake izjave, nova grupa "Ljudi" (dvoje 
 knjigu ili papir. Provjereno slikama s kartice (samo citanje): Mironik 3625 (izjava s mikrofonom) svih 7 dijelova izjava; 3615 i
 3617 (dvoje ljudi) Ljudi 0,94-0,96; 3616 (covjek drzi knjigu) Dokument 0,87; 3618 (novinarka u razgovoru) izjava. Test
 `a_statement_label_is_no_group_and_its_own_score_makes_a_part_a_statement`, conformance.
+Popravak i izmjena 2026-11-10 (korisnik: "izjava mora imati i A1; ako je vise ljudi i A1 to moze biti i jedno i drugo"; "ingestirao
+sam jos klipova, ali AI Video ih ne analizira"): (1) Dio je izjava kad mu slika slici izjavi I kad je A1 izgovoren: prijepis klipa
+ima rijeci za barem 30 % dijela (`qnc-ai-broll` `SPOKEN`, `spoken_share`; prijepisi iz `qnc-transcript-db`); bez prijepisa klipa
+A1 se ne zna i odlucuje slika. Dio koji slici izjavi a A1 nije izgovoren je pokrivalica; dio s govorom na A1 koji nije izjava (vise
+ljudi) ostaje u AI pokrivalicama s oznakom "(A1)" (`AiPart.spoken`, rjecnik `ai_broll.card_spoken`). (2) Analiza kadrova citala je
+samo MXF originale (od 27. 10.), pa su FX3A MP4 klipovi zapisani s greskom "nema MXF indeks". Nova `qnc-shot-analysis`
+`KeyPictures` (`keys.rs`): kljucne slike originala kroz njegov indeks, MXF kroz tablicu indeksa, MP4/QuickTime kroz tablice uzoraka
+(`qnc-mp4-sound` `Track.timescale`, `sample_ticks`, `rate`, `key_samples`, `picture_codec`, `picture_at`); koriste je analiza kadrova
+i agent sadrzaja. `ANALYSIS_VERSION` 3: svi klipovi se analiziraju ponovno. Provjereno (kartica G: samo citana): C0013 (FX3A MP4)
+jedan dio, staklenik 0,99; C0012 ima samo 2 kljucne slike i nema upotrebljiv dio. Testovi `qnc-ai-broll` (A1 pravilo),
+`qnc-shot-analysis`, `qnc-shot-db`, `qnc-mp4-sound`, conformance.

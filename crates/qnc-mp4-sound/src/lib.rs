@@ -37,6 +37,10 @@ pub struct Track {
     pub sync: Option<Vec<u32>>,
     /// H.264: the length of the NAL size fields and the parameter sets (SPS, PPS).
     pub avc: Option<(u8, Vec<Vec<u8>>)>,
+    /// The track's time scale (ticks a second) and the length of its first sample in ticks
+    /// (`mdhd`, `stts`): its rate is `timescale / sample_ticks` for a stream of one rate.
+    pub timescale: u32,
+    pub sample_ticks: u32,
     /// H.265: the length of the NAL size fields and the parameter sets (VPS, SPS, PPS).
     pub hevc: Option<(u8, Vec<Vec<u8>>)>,
     /// AAC: the AudioSpecificConfig of the track.
@@ -166,19 +170,46 @@ pub fn read_sound_and_pictures(
 /// LAN/Intranet, whose index is at the end of the file). `Err` for another picture codec.
 pub fn first_key_picture<R: Read + Seek + ?Sized>(file: &mut R, tracks: &[Track]) -> Result<(Vec<u8>, &'static str), String> {
     let video = tracks.iter().find(|track| track.is_picture()).ok_or("mp4: no picture track")?;
-    let ((nal_length, parameter_sets), codec) = match (&video.avc, &video.hevc) {
-        (Some(avc), _) => (avc, "h264"),
-        (None, Some(hevc)) => (hevc, "hevc"),
-        _ => return Err("mp4: the picture is neither H.264 nor H.265".into()),
-    };
     let number = video.key_at_or_after(0).ok_or("mp4: the picture track is empty")?;
-    let (place, length) = *video.samples.get(number as usize).ok_or("mp4: no such picture")?;
+    let codec = video.picture_codec().ok_or("mp4: the picture is neither H.264 nor H.265")?;
+    Ok((picture_at(file, video, number)?, codec))
+}
+
+impl Track {
+    /// The picture codec as the decoder catalog names it (`h264`, `hevc`).
+    pub fn picture_codec(&self) -> Option<&'static str> {
+        match (&self.avc, &self.hevc) {
+            (Some(_), _) => Some("h264"),
+            (None, Some(_)) => Some("hevc"),
+            _ => None,
+        }
+    }
+
+    /// The key samples (numbered from 0), in order.
+    pub fn key_samples(&self) -> Vec<u64> {
+        match &self.sync {
+            None => (0..self.samples.len() as u64).collect(),
+            Some(keys) => keys.iter().map(|key| u64::from(*key)).collect(),
+        }
+    }
+
+    /// The track's rate (samples a second) when it has one: `timescale / sample_ticks`.
+    pub fn rate(&self) -> Option<f64> {
+        (self.timescale > 0 && self.sample_ticks > 0).then(|| f64::from(self.timescale) / f64::from(self.sample_ticks))
+    }
+}
+
+/// Picture sample `number` of an H.264/H.265 track as an Annex B stream a decoder takes on its
+/// own (user 2026-11-10: the shot analysis of MP4 originals through their index).
+pub fn picture_at<R: Read + Seek + ?Sized>(file: &mut R, track: &Track, number: u64) -> Result<Vec<u8>, String> {
+    let (nal_length, parameter_sets) = track.avc.as_ref().or(track.hevc.as_ref()).ok_or("mp4: the picture is neither H.264 nor H.265")?;
+    let (place, length) = *track.samples.get(number as usize).ok_or("mp4: no such picture")?;
     if length > MAX_SAMPLE {
         return Err("mp4: a picture sample is past what a file holds".into());
     }
     let mut sample = vec![0u8; length as usize];
     read_at(file, place, &mut sample)?;
-    Ok((avc_annexb(&sample, *nal_length, parameter_sets)?, codec))
+    avc_annexb(&sample, *nal_length, parameter_sets)
 }
 
 /// An AAC frame with its ADTS header, as a decoder of an AAC stream takes it.
@@ -289,7 +320,14 @@ fn track(data: &[u8], start: usize, end: usize) -> Option<Track> {
     let handler: [u8; 4] = data.get(hdlr + 8..hdlr + 12)?.try_into().ok()?;
     let (stbl, stbl_end) = child(data, start, end, &[b"mdia", b"minf", b"stbl"])?;
     let mut track = Track { handler, ..Track::default() };
+    if let Some((mdhd, _)) = child(data, start, end, &[b"mdia", b"mdhd"]) {
+        let at = if data.get(mdhd) == Some(&1) { mdhd + 20 } else { mdhd + 12 };
+        track.timescale = u32_at(data, at).unwrap_or(0);
+    }
     let table = |kind: &[u8; 4]| child(data, stbl, stbl_end, &[kind]);
+    if let Some((stts, _)) = table(b"stts") {
+        track.sample_ticks = if u32_at(data, stts + 4).unwrap_or(0) > 0 { u32_at(data, stts + 12).unwrap_or(0) } else { 0 };
+    }
     if let Some((stsd, stsd_end)) = table(b"stsd") {
         sample_entry(data, stsd + 8, stsd_end, &mut track);
     }
