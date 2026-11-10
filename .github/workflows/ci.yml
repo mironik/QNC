@@ -1,0 +1,37 @@
+# QNC basic CI (2026-11-10): the workspace builds, its tests pass and conformance holds.
+# No card, no GPU, no FFmpeg, no projects: tests that need them say so and return early.
+# The libav decoder (`crates/qnc-libav-decode`, outside the workspace) needs the FFmpeg
+# development files and is not built here.
+name: ci
+
+on:
+  push:
+    branches: [main, libav-decoder]
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  CARGO_TERM_COLOR: always
+  CARGO_INCREMENTAL: "0"
+  RUST_BACKTRACE: "1"
+
+jobs:
+  windows:
+    runs-on: windows-latest
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: "1.96.0"
+      - uses: Swatinem/rust-cache@v2
+      - name: Check
+        run: cargo check --workspace --all-targets --locked
+      - name: Conformance
+        run: cargo run --locked -p qnc-conformance
+      - name: Tests
+        run: cargo test --workspace --locked --no-fail-fast
