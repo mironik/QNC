@@ -8838,3 +8838,20 @@ mapu modela kao cetvrti argument. Izmjereno na 8 klipova kartice D: (samo citanj
 1,0-10,5 s po klipu kod oba), ucitavanje 6-13 s prema 4-6 s. Razvrstavanje nije bolje: grupe su iste (Ljudi, Dokument, Osoba),
 SigLIP 2 je manje siguran (Ljudi 0,66-0,88 prema 0,97-0,98), a oznaka izjave (`statement_least` podesen za SigLIP) daje 4 od 10
 izjava 3625 umjesto 9 od 10. Katalog racunala ostaje na SigLIP base; prelazak bi trazio novo podesavanje pragova bez dobitka.
+Izvedeno 2026-11-10 (korisnik: "kreni s ucenjem iz ispravaka"; zatim "projekti se brisu, onda se brisu i primjeri, to ne
+valja"; "da, spremi primjere u bazu racunala"): AI pokrivalice uce iz ispravaka redakcije, a primjeri zive izvan projekta.
+Nova javna kocka `crates/qnc-shot-examples` (+ ugovori modula `shot-examples.module.json` i baze
+`shot-examples.database.json`; conformance: jedini pisac baze racunala): baza primjera ovog racunala
+`data/qnc-shot-examples.db` (tablica `shot_examples`, pogled `public_shot_examples`): model, kljuc kadra (javni URI projekta,
+klip, slike), grupa (sifra oznake ili `none`: nije pokrivalica) i vektor; isti kadar ispravljen ponovno zamjenjuje red. Pravilo
+je jedno (`group_of`): vlastiti ispravak kadra, inace grupa najslicnijeg primjera od kosinusa 0,85 (prva procjena), inace
+oznake. Izabrana kartica taba AI pokrivalice ima gumb grupe umjesto X-a (`qnc-clip-row` `Corner::Regroup`, `qnc-media-card`,
+`qnc-pool-tabs` `corner`); klik postavlja pitanje preko forme (`qnc-notice` `ask`/`withdraw`, `ChoiceOption.target`),
+domacin forme ga crta (`qnc-form-host`, `FormKeys.theme`; `FormApplication::intent_of` prima `ActionEvent`, pa odgovor nosi
+cilj; `qnc-choice-box` `show_option`, gumbi se prelamaju) i salje odgovor kao radnju kataloga `ai_broll_group` (cilj: sifra
+grupe) ili `ai_broll_regroup_cancel` (katalog bez tipki). `qnc-ai-broll`: kadar odmah dobiva grupu (ili nestaje kad nije
+pokrivalica), ispravak se zapisuje u pozadini, pa se tab ponovno cita i slicni kadrovi slijede. Ingest ne postavlja pitanja
+(`theme: None`). Rjecnik `ai_broll.card_spoken` (falio je), `ai_broll.not_broll`, `ai_broll.regroup_*`,
+`db.shot_example_invalid`. Testovi (release, disk ima 5 GB): `qnc-shot-examples` (2), `qnc-ai-broll` (novi
+`a_corrected_shot_and_shots_like_it_take_the_group_the_computer_keeps`), `qnc-notice`, `qnc-pool-tabs`, dotaknute kocke,
+conformance. Uzivo nije provjereno.

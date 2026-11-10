@@ -16,6 +16,10 @@ qnc-ui-text = { workspace = true }
 qnc-transcript-db = { workspace = true }
 qnc-image-assets = { workspace = true }
 qnc-work-settings = { workspace = true }
+qnc-shot-examples = { workspace = true }
+qnc-notice = { workspace = true }
+qnc-pool-tabs = { workspace = true }
+qnc-dev-diagnostics = { workspace = true }
 
 [dev-dependencies]
 tempfile = "3"

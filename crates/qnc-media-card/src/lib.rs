@@ -52,7 +52,7 @@ pub struct MediaCardFeatures {
     pub status_dots: StatusDotsMode,
     /// The chosen card has an X over the top right of its picture (user 2026-11-09: what was
     /// made wrongly is deleted from its card).
-    pub remove_chosen: bool,
+    pub remove_chosen: Option<qnc_clip_row::Corner>,
 }
 
 /// What the check mark of a card marks.
@@ -259,8 +259,8 @@ pub fn paint_media_card(
             );
         }
     }
-    if input.features.remove_chosen && input.focused {
-        paint_remove(ui, thumb_rect, style);
+    if let Some(corner) = input.features.remove_chosen.filter(|_| input.focused) {
+        paint_corner(ui, thumb_rect, style, corner);
     }
     if !input.overlay_label.trim().is_empty() {
         let font = egui::FontId::proportional(11.0);
@@ -356,13 +356,26 @@ fn remove_rect(thumb_rect: Rect) -> Rect {
     Rect::from_min_size(egui::pos2(thumb_rect.right() - pad - size, thumb_rect.top() + pad), Vec2::splat(size))
 }
 
-fn paint_remove(ui: &egui::Ui, thumb_rect: Rect, style: &CardStyle) {
+fn paint_corner(ui: &egui::Ui, thumb_rect: Rect, style: &CardStyle, corner: qnc_clip_row::Corner) {
     let rect = remove_rect(thumb_rect);
     let painter = ui.painter_at(thumb_rect);
-    painter.rect_filled(rect, 3.0, if ui.rect_contains_pointer(rect) { style.remove_hover } else { style.remove_fill });
+    let hover = ui.rect_contains_pointer(rect);
     let (mark, stroke) = (rect.shrink(6.5), egui::Stroke::new(2.0, style.remove_mark));
-    painter.line_segment([mark.left_top(), mark.right_bottom()], stroke);
-    painter.line_segment([mark.right_top(), mark.left_bottom()], stroke);
+    match corner {
+        qnc_clip_row::Corner::Remove => {
+            painter.rect_filled(rect, 3.0, if hover { style.remove_hover } else { style.remove_fill });
+            painter.line_segment([mark.left_top(), mark.right_bottom()], stroke);
+            painter.line_segment([mark.right_top(), mark.left_bottom()], stroke);
+        }
+        // Another group: three lines of a list.
+        qnc_clip_row::Corner::Regroup => {
+            painter.rect_filled(rect, 3.0, if hover { style.dot_ready } else { style.remove_fill });
+            for n in 0..3 {
+                let y = mark.top() + mark.height() * n as f32 / 2.0;
+                painter.line_segment([egui::pos2(mark.left(), y), egui::pos2(mark.right(), y)], stroke);
+            }
+        }
+    }
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -758,7 +771,7 @@ fn grid(
                         if resp.hovered() {
                             pointed = Some(card.id.to_string());
                         }
-                        let on_remove = input.features.remove_chosen && focused && resp.interact_pointer_pos().is_some_and(|pos| remove_hit_rect(rect, metrics).contains(pos));
+                        let on_remove = input.features.remove_chosen.is_some() && focused && resp.interact_pointer_pos().is_some_and(|pos| remove_hit_rect(rect, metrics).contains(pos));
                         if resp.clicked() && on_remove {
                             clicked = Some(CardGridAction::Remove(card.id.to_string()));
                         } else if resp.clicked() {
@@ -839,7 +852,7 @@ mod tests {
                 ticks: Ticks::Selected,
                 top_right_marker: false,
                 status_dots: mode,
-                remove_chosen: false,
+                remove_chosen: None,
             },
             thumb: None,
             rgba_thumb: None,

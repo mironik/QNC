@@ -18,6 +18,11 @@ pub use qnc_notice::{Choice, ChoiceOption};
 /// Shows `choice` in the middle of the screen over everything; the action of the option the
 /// user clicked.
 pub fn show(ctx: &egui::Context, theme: &qnc_desktop_theme::Theme, choice: &Choice) -> Option<String> {
+    show_option(ctx, theme, choice).map(|option| option.action_id)
+}
+
+/// Shows `choice` like `show`; the option the user clicked, with its target.
+pub fn show_option(ctx: &egui::Context, theme: &qnc_desktop_theme::Theme, choice: &Choice) -> Option<ChoiceOption> {
     let mut chosen = None;
     egui::Area::new(egui::Id::new("qnc_choice_box"))
         .order(egui::Order::Foreground)
@@ -46,7 +51,8 @@ pub fn show(ctx: &egui::Context, theme: &qnc_desktop_theme::Theme, choice: &Choi
                         ui.label(RichText::new(&choice.solution).color(theme.text).size(theme.font_ui));
                     }
                     ui.add_space(12.0);
-                    ui.horizontal(|ui| {
+                    // Many options (the groups of a shot) wrap onto more lines.
+                    ui.horizontal_wrapped(|ui| {
                         for option in &choice.options {
                             let clicked = if option.strong {
                                 qnc_ui_kit::strong_button(ui, &option.label, true, theme.accent, theme.chrome_control_height).clicked()
@@ -54,7 +60,7 @@ pub fn show(ctx: &egui::Context, theme: &qnc_desktop_theme::Theme, choice: &Choi
                                 qnc_ui_kit::chrome_button(ui, &option.label, true, false, qnc_theme_styles::button(theme)).clicked()
                             };
                             if clicked {
-                                chosen = Some(option.action_id.clone());
+                                chosen = Some(option.clone());
                             }
                         }
                     });

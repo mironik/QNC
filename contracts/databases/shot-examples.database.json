@@ -1,0 +1,20 @@
+{
+  "database_id": "qnc.db.shot-examples",
+  "database_owner": "host",
+  "owner_application": "qnc.module.shot-examples",
+  "ownership_rule": "The examples database of this computer (data/qnc-shot-examples.db), outside every project: the corrections of the AI B-roll groups outlive the projects. qnc.module.shot-examples is its only writer.",
+  "schema_version": "0.1.0",
+  "qnc_uri": "qnc://local/db/shot_examples",
+  "tables": ["shot_examples"],
+  "public_read_views": ["public_shot_examples"],
+  "write_owner": "qnc.module.shot-examples",
+  "public_read_policy": "public_read_views",
+  "rules": {
+    "example": "A row is one shot whose group the user corrected (user 2026-11-10): the model of its vector, its key (the project's public URI, the clip and the clip frames [from, to)), the group (a label's code, or none: no B-roll) and its vector.",
+    "replace": "A shot corrected again replaces its row; the rows of a model are compared only with vectors of that model.",
+    "follow": "A shot takes its own correction; else the group of the example most like it, from a cosine of 0.85 (a first estimate); else the labels decide."
+  },
+  "migration_policy": "owner_application_only",
+  "created_at": "2026-11-10T00:00:00Z",
+  "updated_at": "2026-11-10T00:00:00Z"
+}

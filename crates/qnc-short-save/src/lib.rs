@@ -177,7 +177,7 @@ impl ShortSave {
     /// Cancel (user 2026-11-01).
     pub fn question(&self) -> Option<qnc_notice::Choice> {
         let asked = self.asked.as_ref()?;
-        let option = |action_id: &str, code: &'static str, strong| qnc_notice::ChoiceOption { action_id: action_id.into(), label: text(code), strong };
+        let option = |action_id: &str, code: &'static str, strong| qnc_notice::ChoiceOption::new(action_id, text(code), strong);
         Some(qnc_notice::Choice {
             title: text("statement.exists_title"),
             message: text("statement.exists"),

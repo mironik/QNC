@@ -34,11 +34,11 @@ pub struct PoolNow<'a> {
 }
 
 pub fn show<T: PoolItem>(ui: &mut Ui, theme: &qnc_desktop_theme::Theme, spec: &PoolSpec<'_>, now: &PoolNow<'_>, items: &[&T]) -> Option<CardGridAction> {
-    show_removable(ui, (theme, false), spec, now, items)
+    show_removable(ui, (theme, None), spec, now, items)
 }
 
 /// The pool whose chosen card has an X (`removes`) when what its tab lists can be deleted.
-pub fn show_removable<T: PoolItem>(ui: &mut Ui, (theme, removes): (&qnc_desktop_theme::Theme, bool), spec: &PoolSpec<'_>, now: &PoolNow<'_>, items: &[&T]) -> Option<CardGridAction> {
+pub fn show_removable<T: PoolItem>(ui: &mut Ui, (theme, corner): (&qnc_desktop_theme::Theme, Option<qnc_clip_row::Corner>), spec: &PoolSpec<'_>, now: &PoolNow<'_>, items: &[&T]) -> Option<CardGridAction> {
     let place = qnc_ui_kit::fill_block(ui, theme.bg);
     let look = PoolLook {
         style: qnc_theme_styles::cards(theme),
@@ -47,7 +47,7 @@ pub fn show_removable<T: PoolItem>(ui: &mut Ui, (theme, removes): (&qnc_desktop_
             ticks: spec.ticks,
             top_right_marker: spec.imported_marker.is_some(),
             status_dots: spec.status_dots,
-            remove_chosen: removes,
+            remove_chosen: corner,
         },
         imported_marker: spec.imported_marker.unwrap_or(theme.text_muted),
         not_imported_marker: theme.text_muted,

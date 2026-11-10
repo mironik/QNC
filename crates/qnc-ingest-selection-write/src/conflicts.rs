@@ -56,8 +56,8 @@ pub(crate) fn choice_of(found: &[InTheWay], needs: Needs, selected: usize) -> Ch
     let mut options = Vec::new();
     if selected > found.len() {
         let others = (selected - found.len()).to_string();
-        options.push(ChoiceOption { action_id: SKIP_CONFLICTS.into(), label: qnc_ui_text::fill("ingest.choice.import_others", &[("count", &others)]), strong: true });
+        options.push(ChoiceOption::new(SKIP_CONFLICTS, qnc_ui_text::fill("ingest.choice.import_others", &[("count", &others)]), true));
     }
-    options.push(ChoiceOption { action_id: CANCEL_IMPORT.into(), label: qnc_ui_text::text("ingest.choice.cancel").into(), strong: options.is_empty() });
+    options.push(ChoiceOption::new(CANCEL_IMPORT, qnc_ui_text::text("ingest.choice.cancel"), options.is_empty()));
     Choice { title: qnc_ui_text::text("ingest.choice.title").into(), message, items, solution: qnc_ui_text::text(solution).into(), options }
 }

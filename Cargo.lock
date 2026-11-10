@@ -3608,9 +3608,13 @@ dependencies = [
  "qnc-ai-catalog",
  "qnc-clip-row",
  "qnc-db-broker",
+ "qnc-dev-diagnostics",
  "qnc-image-assets",
+ "qnc-notice",
+ "qnc-pool-tabs",
  "qnc-shot-content",
  "qnc-shot-content-db",
+ "qnc-shot-examples",
  "qnc-shot-labels",
  "qnc-source-preview",
  "qnc-transcript-db",
@@ -4336,6 +4340,7 @@ name = "qnc-editorial-desktop"
 version = "0.1.0"
 dependencies = [
  "eframe",
+ "qnc-action-event",
  "qnc-board",
  "qnc-dev-diagnostics",
  "qnc-editorial-application",
@@ -4532,10 +4537,14 @@ name = "qnc-form-host"
 version = "0.1.0"
 dependencies = [
  "eframe",
+ "qnc-action-event",
  "qnc-alert",
+ "qnc-choice-box",
+ "qnc-desktop-theme",
  "qnc-dev-diagnostics",
  "qnc-key-intents",
  "qnc-keyboard-shortcut",
+ "qnc-notice",
  "qnc-paint-pace",
  "qnc-pool-pointer",
 ]
@@ -4733,6 +4742,7 @@ name = "qnc-ingest-desktop"
 version = "0.1.0"
 dependencies = [
  "eframe",
+ "qnc-action-event",
  "qnc-board",
  "qnc-form-host",
  "qnc-ingest-application",
@@ -5851,6 +5861,9 @@ dependencies = [
 [[package]]
 name = "qnc-pool-tabs"
 version = "0.1.0"
+dependencies = [
+ "qnc-clip-row",
+]
 
 [[package]]
 name = "qnc-pool-tabs-panel"
@@ -6727,6 +6740,16 @@ name = "qnc-shot-detect"
 version = "0.1.0"
 
 [[package]]
+name = "qnc-shot-examples"
+version = "0.1.0"
+dependencies = [
+ "qnc-ui-text",
+ "rusqlite",
+ "serde_json",
+ "tempfile",
+]
+
+[[package]]
 name = "qnc-shot-labels"
 version = "0.1.0"
 dependencies = [
@@ -6795,6 +6818,7 @@ dependencies = [
  "candle-nn",
  "candle-transformers",
  "image",
+ "serde_json",
  "tokenizers",
 ]
 

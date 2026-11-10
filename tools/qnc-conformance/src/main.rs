@@ -1931,6 +1931,8 @@ fn is_public_db_owner_path(relative: &str) -> bool {
         "crates/qnc-camera-patterns/",
         // The only writer of the camera database of this computer (text profiles kept there).
         "crates/qnc-camera-profiles/",
+        // The only writer of the examples database of this computer (corrected AI B-roll groups).
+        "crates/qnc-shot-examples/",
         "crates/qnc-work-settings/",
         "crates/qnc-virtual-shots/",
         // The serial writer of the project database: it opens the transaction of a write

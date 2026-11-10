@@ -1,0 +1,20 @@
+{
+  "module_id": "qnc.module.shot-examples",
+  "module_name": "Shot examples",
+  "module_version": "0.1.0",
+  "module_kind": "library",
+  "capabilities": ["shot.examples.keep", "shot.examples.read", "shot.examples.group"],
+  "input_contract_version": "0.1.0",
+  "output_contract_version": "0.1.0",
+  "transport_protocol_version": "0.1.0",
+  "supported_os": ["windows", "linux", "macos"],
+  "supported_cpu": ["x86_64", "aarch64"],
+  "forbidden_calls": ["media.decode", "media.read", "ffprobe", "card.write", "project.database.write", "player.command"],
+  "forbidden_dependencies": ["qnc.module.media-probe", "qnc.module.content-store"],
+  "state_policy": "stateless",
+  "database_write_policy": "public_db_owner_write_adapter_only",
+  "runtime_crate": "qnc-shot-examples",
+  "input": "A shot whose AI B-roll group the user corrected: the model of its vector, its key (project URI, clip, frames), the group and the vector.",
+  "output": "The examples of a model kept in the examples database of this computer (data/qnc-shot-examples.db, of which this block is the only writer), outside every project; the group they give a shot: its own correction, else the group of the example most like it (cosine from 0.85).",
+  "specification": "User 2026-11-10: the corrections of the AI B-roll groups must not be lost when projects are deleted; they are kept on this computer and a shot like a corrected one follows its group."
+}

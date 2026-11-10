@@ -610,6 +610,15 @@
     "ai_broll_open": {
       "label": "Otvori dio AI pokrivalice"
     },
+    "ai_broll_regroup": {
+      "label": "Druga grupa kadra AI pokrivalice"
+    },
+    "ai_broll_group": {
+      "label": "Daj kadru AI pokrivalice grupu"
+    },
+    "ai_broll_regroup_cancel": {
+      "label": "Odustani od grupe kadra"
+    },
     "skeleton_open_version": {
       "label": "Otvori verziju S-Storyja"
     },

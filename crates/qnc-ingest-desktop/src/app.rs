@@ -25,7 +25,7 @@ impl qnc_form_host::FormApplication for Hosted<'_> {
     fn playing(&self) -> bool { self.0.view().playback.playing() }
     fn next_repaint_delay(&self) -> Option<std::time::Duration> { self.0.next_repaint_delay() }
     fn key_scope(&self) -> Option<&'static str> { self.0.view().focus.key_scope() }
-    fn intent_of(action_id: String) -> IngestIntent { IngestIntent::empty(action_id) }
+    fn intent_of(event: qnc_action_event::ActionEvent) -> IngestIntent { IngestIntent::empty(event.action_id) }
     fn dispatch(&mut self, intent: IngestIntent) -> bool { self.0.dispatch(intent).request_repaint }
 }
 
@@ -37,7 +37,7 @@ impl IngestApp {
     }
 
     pub fn show_desktop(&mut self, ctx: &egui::Context, ui: &mut egui::Ui, frame: &mut qnc_board::Frame<'_>) {
-        let keys = qnc_form_host::FormKeys { catalog: &self.contracts.shortcuts, scopes: &["ingest"], play_action: action_ids::PLAY_PAUSE };
+        let keys = qnc_form_host::FormKeys { catalog: &self.contracts.shortcuts, scopes: &["ingest"], play_action: action_ids::PLAY_PAUSE, theme: None };
         self.host.before_paint(ctx, &mut Hosted(&mut self.application), &keys);
         let theme = Theme::from_contract(&self.contracts.shell);
         theme::apply(ctx, &theme);

@@ -89,7 +89,7 @@ fn pool(ui: &mut Ui, contracts: &EditorialContracts, theme: &Theme, view: &Edito
     let (tab, shot_tab) = (view.library_tab, view.library_tab.lists_shots());
     let open_statement = view.focus.script.subsegment.as_ref().map_or(String::new(), |open| open.block_id.to_string());
     let on = |action: &str, id: String| EditorialIntent::Action(qnc_action_event::ActionEvent::key(action).with_target(id));
-    let (themed, mut card_action) = ((theme, tab.remove_action().is_some()), None);
+    let (themed, mut card_action) = ((theme, tab.corner()), None);
     let now = qnc_media_pool_panel::PoolNow {
         chosen_id: if tab == LibraryTab::Subsegment { &open_statement } else if shot_tab { view.chosen_shot_id.as_deref().unwrap_or("") } else { view.chosen_clip_id().unwrap_or("") },
         panel_focused: view.focus.panel == Panel::Pool,

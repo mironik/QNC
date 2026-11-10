@@ -202,6 +202,7 @@ impl SidePieces {
         }
         if let Some(ai_broll) = &mut self.ai_broll {
             if let Some(done) = ai_broll.act(action_id, target) {
+                self.views.ai_broll = Arc::new(ai_broll.view().clone());
                 return Some(done);
             }
         }

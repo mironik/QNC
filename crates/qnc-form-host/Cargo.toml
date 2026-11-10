@@ -12,3 +12,7 @@ qnc-key-intents = { workspace = true }
 qnc-keyboard-shortcut = { workspace = true }
 qnc-paint-pace = { workspace = true }
 qnc-alert.workspace = true
+qnc-action-event.workspace = true
+qnc-choice-box.workspace = true
+qnc-desktop-theme.workspace = true
+qnc-notice.workspace = true

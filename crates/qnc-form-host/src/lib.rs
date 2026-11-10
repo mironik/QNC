@@ -26,7 +26,8 @@ pub trait FormApplication {
     fn next_repaint_delay(&self) -> Option<Duration>;
     /// The catalog scope of the panel with the keyboard.
     fn key_scope(&self) -> Option<&'static str>;
-    fn intent_of(action_id: String) -> Self::Intent;
+    /// The intent of an action (a key, or an answer to the question asked, with its target).
+    fn intent_of(event: qnc_action_event::ActionEvent) -> Self::Intent;
     /// Runs an intent; whether the view changed.
     fn dispatch(&mut self, intent: Self::Intent) -> bool;
 }
@@ -36,6 +37,8 @@ pub struct FormKeys<'a> {
     pub catalog: &'a ShortcutCatalog,
     pub scopes: &'a [&'a str],
     pub play_action: &'a str,
+    /// The theme a question asked over the form is drawn in (none: the form asks none).
+    pub theme: Option<&'a qnc_desktop_theme::Theme>,
 }
 
 #[derive(Debug, Default)]
@@ -59,10 +62,18 @@ impl FormHost {
         self.pace.after_poll(ctx, changed, application.playing(), application.next_repaint_delay());
         qnc_dev_diagnostics::timed_block("form-keys", || {
             for action_id in qnc_key_intents::action_ids_in(ctx, keys.catalog, application.key_scope(), keys.scopes, keys.play_action) {
-                dispatch(ctx, application, A::intent_of(action_id));
+                dispatch(ctx, application, A::intent_of(qnc_action_event::ActionEvent::key(action_id)));
             }
         });
         qnc_alert::show_raised(ctx);
+        // A question a piece asked over the form (qnc-notice): its answer is an action of the
+        // form, with the target the option carries.
+        let answer = keys.theme.zip(qnc_notice::asked()).and_then(|(theme, choice)| qnc_choice_box::show_option(ctx, theme, &choice));
+        if let Some(option) = answer {
+            qnc_notice::withdraw();
+            let event = qnc_action_event::ActionEvent::key(option.action_id);
+            dispatch(ctx, application, A::intent_of(match option.target { Some(target) => event.with_target(target), None => event }));
+        }
     }
 }
 

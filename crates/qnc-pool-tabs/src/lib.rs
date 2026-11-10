@@ -1,6 +1,8 @@
 //! The tabs of the editorial pool, by their catalog actions. Neutral: it knows no clip, no
 //! database and no form; a form's layout contract says which of them it shows.
 
+pub use qnc_clip_row::Corner;
+
 pub const MODULE_ID: &str = "qnc.module.pool-tabs";
 
 pub const ALL: &str = "editorial_tab_all";
@@ -25,6 +27,8 @@ pub const AI_BROLL: &str = "editorial_tab_ai_broll";
 pub const REMOVE_SHORT: &str = "short_remove";
 pub const REMOVE_TRANSCRIPT: &str = "transcript_forget_clip";
 pub const REMOVE_SUBSEGMENT: &str = "script_remove";
+/// The button of a chosen AI B-roll card: another group for the shot (target: `clip|from|to`).
+pub const REGROUP_AI_BROLL: &str = "ai_broll_regroup";
 
 /// Ingest's one tab of the pool: its clips.
 pub const INGEST_ALL: &str = "ingest_tab_all";
@@ -106,7 +110,17 @@ impl LibraryTab {
             Self::Virtual => Some(REMOVE_SHORT),
             Self::Transcript => Some(REMOVE_TRANSCRIPT),
             Self::Subsegment => Some(REMOVE_SUBSEGMENT),
+            // An AI B-roll card's button gives the shot another group (user 2026-11-10).
+            Self::AiBroll => Some(REGROUP_AI_BROLL),
             _ => None,
+        }
+    }
+
+    /// The button the chosen card of this tab has: an X, or the list mark of another group.
+    pub fn corner(self) -> Option<Corner> {
+        match self {
+            Self::AiBroll => Some(Corner::Regroup),
+            _ => self.remove_action().map(|_| Corner::Remove),
         }
     }
 }
@@ -131,8 +145,10 @@ mod tests {
         assert_eq!(LibraryTab::Transcript.remove_action(), Some(REMOVE_TRANSCRIPT));
         assert_eq!(LibraryTab::Subsegment.remove_action(), Some(REMOVE_SUBSEGMENT));
         for tab in [LibraryTab::All, LibraryTab::Broll, LibraryTab::Segment, LibraryTab::Voice, LibraryTab::Stories] {
-            assert_eq!(tab.remove_action(), None);
+            assert_eq!((tab.remove_action(), tab.corner()), (None, None));
         }
+        assert_eq!((LibraryTab::AiBroll.remove_action(), LibraryTab::AiBroll.corner()), (Some(REGROUP_AI_BROLL), Some(Corner::Regroup)));
+        assert_eq!(LibraryTab::Virtual.corner(), Some(Corner::Remove));
     }
 
     #[test]

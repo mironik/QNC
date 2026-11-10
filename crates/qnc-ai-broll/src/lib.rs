@@ -65,7 +65,18 @@ pub struct AiPart {
     /// How the shot looks (steady, pan, moving, soft, still, shot) and its poster (a project URI).
     pub kind: String,
     pub poster: String,
+    /// Its vector (kept with a correction) and how the examples of this computer gave it its
+    /// group (`None`: the labels' texts did).
+    pub vector: Vec<f32>,
+    pub taught: Option<Taught>,
 }
+
+/// The chosen card's button asks for another group (target: `clip|from|to`); an answer gives
+/// it (target: the group's code, `NOT_BROLL`: no B-roll) or withdraws the question.
+pub use qnc_pool_tabs::REGROUP_AI_BROLL as REGROUP;
+pub const GROUP: &str = "ai_broll_group";
+pub const REGROUP_CANCEL: &str = "ai_broll_regroup_cancel";
+pub use qnc_shot_examples::{Taught, NOT_BROLL};
 
 /// What the tab shows.
 #[derive(Debug, Clone, Default, PartialEq)]
@@ -126,6 +137,7 @@ pub fn sort_parts(
     set: &qnc_shot_content_db::LabelSet,
     list: &qnc_shot_labels::Labels,
     speech: &dyn Fn(&str, u64, u64) -> Option<f32>,
+    (project, examples): (&str, &[qnc_shot_examples::Example]),
 ) -> Vec<AiPart> {
     // The kept vectors in the order of the list (a label the kept set has not is never best).
     let vectors: Vec<Vec<f32>> = list
@@ -147,7 +159,19 @@ pub fn sort_parts(
             if list.is_statement(&logits) && spoken != Some(false) {
                 return None;
             }
-            let (label, share) = list.shares(&logits).into_iter().next()?;
+            let (mut label, mut share) = list.shares(&logits).into_iter().next()?;
+            // The corrections of this computer come before the labels' texts (user 2026-11-10:
+            // the agent learns from what the newsroom corrects): this shot's own, else the
+            // group of a corrected shot it looks like; a shot that is no B-roll is left out.
+            let key = qnc_shot_examples::key(project, &clip.clip_id, part.from, part.to);
+            let taught = match qnc_shot_examples::group_of(examples, &key, &part.vector) {
+                Some((NOT_BROLL, _)) => return None,
+                Some((code, taught)) if list.text_of(code).is_some() => {
+                    (label, share) = (code.to_string(), 1.0);
+                    Some(taught)
+                }
+                _ => None,
+            };
             // Several people and A1 may be both (user 2026-11-10): it stays, marked spoken.
             let spoken = spoken == Some(true);
             Some((
@@ -162,6 +186,8 @@ pub fn sort_parts(
                     spoken,
                     kind: part.kind.clone(),
                     poster: part.poster.clone(),
+                    vector: part.vector.clone(),
+                    taught,
                 },
             ))
         })
@@ -170,8 +196,8 @@ pub fn sort_parts(
     parts.into_iter().map(|(_, part)| part).collect()
 }
 
-/// The parts in order and the posters newly read.
-type Read = Result<(Vec<AiPart>, Vec<(String, std::sync::Arc<qnc_image_assets::RgbaImage>)>), String>;
+/// The parts in order, the posters newly read and the model of the parts' vectors.
+type Read = Result<(Vec<AiPart>, Vec<(String, std::sync::Arc<qnc_image_assets::RgbaImage>)>, String), String>;
 
 /// The AI B-roll of the project on the preview.
 #[derive(Debug, Default)]
@@ -181,6 +207,11 @@ pub struct AiBroll {
     reading: Option<mpsc::Receiver<Read>>,
     read_at: Option<Instant>,
     source_request: Option<(String, u64, u64)>,
+    /// The model of the parts read, the card a group is being chosen for and a correction
+    /// being kept.
+    model: String,
+    regroup: Option<String>,
+    keeping: Option<mpsc::Receiver<Result<(), String>>>,
 }
 
 impl AiBroll {
@@ -202,22 +233,34 @@ impl AiBroll {
         let project = preview.project_target().cloned();
         let key = project.as_ref().map(|target| target.uri().to_string());
         if key != self.project {
+            if self.regroup.is_some() {
+                qnc_notice::withdraw();
+            }
             *self = Self { project: key, ..Self::default() };
         }
         if let Some(reading) = &self.reading {
             if let Ok(result) = reading.try_recv() {
                 match result {
-                    Ok((parts, posters)) => {
+                    Ok((parts, posters, model)) => {
                         self.view.posters.extend(posters);
                         self.view.parts = parts;
                         self.view.message.clear();
+                        self.model = model;
                     }
                     Err(error) => self.view.message = error,
                 }
                 self.reading = None;
             }
         }
-        if let Some(project) = project.filter(|_| self.reading.is_none() && self.read_at.is_none_or(|at| at.elapsed() >= READ_EVERY)) {
+        // A correction kept: the parts are read again (shots like it follow it).
+        if let Some(Ok(kept)) = self.keeping.as_ref().map(mpsc::Receiver::try_recv) {
+            self.keeping = None;
+            self.read_at = None;
+            if let Err(error) = kept {
+                qnc_notice::raise(error);
+            }
+        }
+        if let Some(project) = project.filter(|_| self.reading.is_none() && self.keeping.is_none() && self.read_at.is_none_or(|at| at.elapsed() >= READ_EVERY)) {
             self.read_at = Some(Instant::now());
             let (send, read) = mpsc::channel();
             let (settings, known) = (preview.project_settings(), self.view.posters.keys().cloned().collect::<std::collections::HashSet<_>>());
@@ -230,16 +273,68 @@ impl AiBroll {
 
     /// Its own actions; `None` for any other.
     pub fn act(&mut self, action_id: &str, target: Option<&str>) -> Option<bool> {
-        if action_id != OPEN {
-            return None;
+        match action_id {
+            OPEN => {
+                let Some(part) = target.and_then(|id| self.part_of(id)).cloned() else { return Some(false) };
+                self.source_request = Some((part.clip_id, part.from, part.to));
+                Some(true)
+            }
+            REGROUP => {
+                let id = target?.to_string();
+                let Some(part) = self.part_of(&id) else { return Some(false) };
+                qnc_notice::ask(regroup_choice(part, &self.groups_of()));
+                self.regroup = Some(id);
+                Some(true)
+            }
+            GROUP => Some(self.keep(target?)),
+            REGROUP_CANCEL => {
+                self.regroup = None;
+                qnc_notice::withdraw();
+                Some(true)
+            }
+            _ => None,
         }
-        let mut fields = target?.rsplitn(3, '|');
+    }
+
+    /// The part of a card's id (`clip|from|to`) the tab shows.
+    fn part_of(&self, id: &str) -> Option<&AiPart> {
+        let mut fields = id.rsplitn(3, '|');
         let (to, from, clip) = (fields.next()?.parse::<u64>().ok()?, fields.next()?.parse::<u64>().ok()?, fields.next()?);
-        let known = self.view.parts.iter().any(|part| part.clip_id == clip && part.from == from && part.to == to);
-        if known {
-            self.source_request = Some((clip.to_string(), from, to));
+        self.view.parts.iter().find(|part| part.clip_id == clip && part.from == from && part.to == to)
+    }
+
+    /// The groups a shot can be given: the list's labels that are no statement, then no B-roll.
+    fn groups_of(&self) -> Vec<(String, String)> {
+        let list = qnc_shot_labels::installed_path().and_then(|path| qnc_shot_labels::Labels::read(&path));
+        let mut groups: Vec<(String, String)> = list.map_or_else(|_| Vec::new(), |list| list.labels.into_iter().filter(|label| !label.statement).map(|label| (label.code, label.text)).collect());
+        groups.push((NOT_BROLL.into(), "ai_broll.not_broll".into()));
+        groups
+    }
+
+    /// Gives the shot asked about the group `code`: shown at once, kept in the examples of this
+    /// computer in the background, then the parts are read again.
+    fn keep(&mut self, code: &str) -> bool {
+        qnc_notice::withdraw();
+        let Some(id) = self.regroup.take() else { return false };
+        let (Some(part), Some(project)) = (self.part_of(&id).cloned(), self.project.clone()) else { return false };
+        let Some(root) = qnc_dev_diagnostics::resolve_qnc_root() else { return false };
+        let example = qnc_shot_examples::Example {
+            model: self.model.clone(),
+            key: qnc_shot_examples::key(&project, &part.clip_id, part.from, part.to),
+            label: code.to_string(),
+            vector: part.vector.clone(),
+        };
+        if code == NOT_BROLL {
+            self.view.parts.retain(|shown| !(shown.clip_id == part.clip_id && shown.from == part.from && shown.to == part.to));
+        } else if let Some((text, shown)) = self.groups_of().into_iter().find(|(group, _)| group == code).map(|(_, text)| text).zip(self.view.parts.iter_mut().find(|shown| shown.clip_id == part.clip_id && shown.from == part.from && shown.to == part.to)) {
+            (shown.label, shown.text, shown.share, shown.taught) = (code.to_string(), text, 1.0, Some(Taught::Corrected));
         }
-        Some(known)
+        let (send, kept) = mpsc::channel();
+        let spawned = std::thread::Builder::new().name("qnc-ai-broll-keep".into()).spawn(move || _ = send.send(qnc_shot_examples::save(&root, &example))).is_ok();
+        if spawned {
+            self.keeping = Some(kept);
+        }
+        spawned
     }
 
     /// A clip and IN/OUT a chosen part opens on the source timeline, once.
@@ -248,10 +343,24 @@ impl AiBroll {
     }
 }
 
+/// The question of another group for `part`: every group (its own one proposed) and Cancel.
+fn regroup_choice(part: &AiPart, groups: &[(String, String)]) -> qnc_notice::Choice {
+    let words = |text: &str| qnc_ui_text::host().ok().and_then(|texts| texts.get(text).ok()).unwrap_or(text).to_string();
+    let mut options: Vec<qnc_notice::ChoiceOption> =
+        groups.iter().map(|(code, text)| qnc_notice::ChoiceOption::new(GROUP, words(text), *code == part.label).with_target(code.clone())).collect();
+    options.push(qnc_notice::ChoiceOption::new(REGROUP_CANCEL, qnc_ui_text::text("common.cancel"), false));
+    qnc_notice::Choice {
+        title: qnc_ui_text::text("ai_broll.regroup_title").into(),
+        message: qnc_ui_text::fill("ai_broll.regroup_message", &[("group", &words(&part.text))]).into(),
+        options,
+        ..qnc_notice::Choice::default()
+    }
+}
+
 /// The parts of the project behind `target` for the model of this host, and the posters of its
 /// shots not in `known`, read from the project folder.
 fn read_parts(target: &ProjectDbTarget, settings: Option<(qnc_work_settings::SettingsReader, qnc_work_settings::WorkSettings)>, known: &std::collections::HashSet<String>) -> Read {
-    let parts = read_sorted(target)?;
+    let (parts, model) = read_sorted(target)?;
     let folder = settings.and_then(|(reader, settings)| Some((reader.local_workspace_dir(&settings).ok()??, settings.output_root_uri)));
     let posters = folder.map_or_else(Vec::new, |(dir, root)| {
         parts
@@ -267,16 +376,17 @@ fn read_parts(target: &ProjectDbTarget, settings: Option<(qnc_work_settings::Set
             })
             .collect()
     });
-    Ok((parts, posters))
+    Ok((parts, posters, model))
 }
 
 /// The parts of the project behind `target` for the model of this host, in the tab's order.
-fn read_sorted(target: &ProjectDbTarget) -> Result<Vec<AiPart>, String> {
+/// With the model of their vectors.
+fn read_sorted(target: &ProjectDbTarget) -> Result<(Vec<AiPart>, String), String> {
     let engine = qnc_ai_catalog::installed_shot_content()?;
     let model = engine.model_name();
     let list = qnc_shot_labels::Labels::read(&qnc_shot_labels::installed_path()?)?;
     let Some(set) = qnc_shot_content_db::read_labels(target, &model)? else {
-        return Ok(Vec::new());
+        return Ok((Vec::new(), model));
     };
     let content = qnc_shot_content_db::read_all(target, &model)?;
     // The transcripts of the clips with parts (A1), where they exist.
@@ -286,7 +396,9 @@ fn read_sorted(target: &ProjectDbTarget) -> Result<Vec<AiPart>, String> {
         .filter_map(|clip| Some((clip.clip_id.as_str(), qnc_transcript_db::read_clip(target, &clip.clip_id).ok()?)))
         .collect();
     let speech = |clip: &str, from: u64, to: u64| spoken_share(transcripts.get(clip)?, from, to);
-    Ok(sort_parts(&content, &set, &list, &speech))
+    // The corrections of this computer, outside every project (user 2026-11-10).
+    let examples = qnc_dev_diagnostics::resolve_qnc_root().map_or_else(|| Ok(Vec::new()), |root| qnc_shot_examples::read(&root, &model))?;
+    Ok((sort_parts(&content, &set, &list, &speech, (target.uri(), &examples)), model))
 }
 
 #[cfg(test)]
@@ -320,7 +432,7 @@ mod tests {
             ClipContent { clip_id: "a".into(), model: "m".into(), parts: vec![part(0, 100, vec![0.0, 1.0]), part(200, 500, vec![1.0, 0.0])], error: String::new(), took_ms: 0 },
             ClipContent { clip_id: "b".into(), model: "m".into(), parts: vec![part(0, 50, vec![0.9, 0.1])], error: String::new(), took_ms: 0 },
         ];
-        let parts = sort_parts(&content, &set, &list(), &|_, _, _| None);
+        let parts = sort_parts(&content, &set, &list(), &|_, _, _| None, ("p", &[]));
         let shown: Vec<(&str, u64, &str)> = parts.iter().map(|p| (p.clip_id.as_str(), p.from, p.label.as_str())).collect();
         assert_eq!(shown, [("a", 200, "sea"), ("b", 0, "sea"), ("a", 0, "person")], "sea comes first in the list; the longer sea part first");
         assert!(parts[0].share > 0.99);
@@ -345,7 +457,7 @@ mod tests {
         let set = LabelSet { model: "m".into(), scale: 10.0, bias: 0.0, labels: vec![LabelVector { code: "sea".into(), prompt: "s".into(), vector: vec![1.0, 0.0] }] };
         let content = vec![ClipContent { clip_id: "a".into(), model: "m".into(), parts: vec![part(0, 400, vec![1.0, 0.0]), part(500, 900, vec![1.0, 0.0])], error: String::new(), took_ms: 0 }];
         let speech = |_: &str, from: u64, to: u64| Some(if from == 0 { 0.5 } else { 0.0 }).filter(|_| to > from);
-        let parts = sort_parts(&content, &set, &list(), &speech);
+        let parts = sort_parts(&content, &set, &list(), &speech, ("p", &[]));
         // The pictures are no statement: spoken or not both stay, the spoken one marked (people
         // and A1 may be both).
         assert_eq!(parts.iter().map(|p| (p.from, p.spoken)).collect::<Vec<_>>(), [(0, true), (500, false)]);
@@ -363,19 +475,47 @@ mod tests {
             labels: vec![LabelVector { code: "talk".into(), prompt: "talk".into(), vector: vec![1.0, 0.0] }, LabelVector { code: "sea".into(), prompt: "s".into(), vector: vec![1.0, 0.0] }],
             ..set
         };
-        let parts = sort_parts(&content, &set, &talk, &speech);
+        let parts = sort_parts(&content, &set, &talk, &speech, ("p", &[]));
         assert_eq!(parts.iter().map(|p| p.from).collect::<Vec<_>>(), [500], "looks like a statement and spoken: a statement; not spoken: B-roll");
-        let parts = sort_parts(&content, &set, &talk, &|_, _, _| None);
+        let parts = sort_parts(&content, &set, &talk, &|_, _, _| None, ("p", &[]));
         assert!(parts.is_empty(), "without a transcript the pictures decide");
     }
 
     #[test]
     fn a_click_opens_only_a_part_the_tab_shows() {
         let mut broll = AiBroll::new();
-        broll.view.parts = vec![AiPart { clip_id: "clip|x".into(), from: 10, to: 90, label: "sea".into(), text: "shot.label.sea".into(), share: 1.0, spoken: false, kind: "steady".into(), poster: String::new() }];
+        broll.view.parts = vec![AiPart { clip_id: "clip|x".into(), from: 10, to: 90, label: "sea".into(), text: "shot.label.sea".into(), share: 1.0, spoken: false, kind: "steady".into(), poster: String::new(), vector: vec![], taught: None }];
         assert_eq!(broll.act(OPEN, Some("clip|x|10|90")), Some(true));
         assert_eq!(broll.take_source_request(), Some(("clip|x".to_string(), 10, 90)));
         assert_eq!(broll.act(OPEN, Some("clip|x|10|91")), Some(false));
         assert_eq!(broll.act("other", Some("clip|x|10|90")), None);
+    }
+
+    #[test]
+    fn a_corrected_shot_and_shots_like_it_take_the_group_the_computer_keeps() {
+        let set = LabelSet {
+            model: "m".into(),
+            scale: 10.0,
+            bias: 0.0,
+            labels: vec![LabelVector { code: "person".into(), prompt: "p".into(), vector: vec![0.0, 1.0] }, LabelVector { code: "sea".into(), prompt: "s".into(), vector: vec![1.0, 0.0] }],
+        };
+        let content = vec![ClipContent {
+            clip_id: "a".into(),
+            model: "m".into(),
+            parts: vec![part(0, 100, vec![1.0, 0.0]), part(200, 300, vec![0.99, 0.141]), part(400, 500, vec![0.0, 1.0]), part(600, 700, vec![0.6, 0.8])],
+            error: String::new(),
+            took_ms: 0,
+        }];
+        let example = |key: &str, label: &str, vector: Vec<f32>| qnc_shot_examples::Example { model: "m".into(), key: key.into(), label: label.into(), vector };
+        // The pictures say sea; the user said person, and that a shot of the sea far from it is
+        // no B-roll.
+        let examples = [example(&qnc_shot_examples::key("p", "a", 0, 100), "person", vec![1.0, 0.0]), example("other project|z|0|9", NOT_BROLL, vec![0.6, 0.8])];
+        let parts = sort_parts(&content, &set, &list(), &|_, _, _| None, ("p", &examples));
+        let shown: Vec<(u64, &str, Option<Taught>)> = parts.iter().map(|p| (p.from, p.label.as_str(), p.taught)).collect();
+        assert_eq!(
+            shown,
+            [(0, "person", Some(Taught::Corrected)), (200, "person", Some(Taught::LikeCorrected)), (400, "person", None)],
+            "its own correction, one like it follows it, one like a shot that is no B-roll is left out, the rest as the labels say"
+        );
     }
 }

@@ -29,7 +29,7 @@ impl qnc_form_host::FormApplication for Hosted<'_> {
     fn playing(&self) -> bool { self.0.view().preview.playing }
     fn next_repaint_delay(&self) -> Option<std::time::Duration> { self.0.next_repaint_delay() }
     fn key_scope(&self) -> Option<&'static str> { self.0.view().focus.key_scope() }
-    fn intent_of(action_id: String) -> EditorialIntent { EditorialIntent::action(&action_id) }
+    fn intent_of(event: qnc_action_event::ActionEvent) -> EditorialIntent { EditorialIntent::Action(event) }
     fn dispatch(&mut self, intent: EditorialIntent) -> bool { self.0.dispatch(intent) }
 }
 
@@ -41,7 +41,7 @@ impl EditorialApp {
     }
 
     pub fn show_desktop(&mut self, ctx: &egui::Context, ui: &mut egui::Ui, frame: &mut qnc_board::Frame<'_>) {
-        let keys = qnc_form_host::FormKeys { catalog: self.form.shortcuts(), scopes: &EDITORIAL_SHORTCUT_SCOPES, play_action: action_ids::PLAY_PAUSE };
+        let keys = qnc_form_host::FormKeys { catalog: self.form.shortcuts(), scopes: &EDITORIAL_SHORTCUT_SCOPES, play_action: action_ids::PLAY_PAUSE, theme: Some(&self.form.theme) };
         self.host.before_paint(ctx, &mut Hosted(&mut self.application), &keys);
         qnc_dev_diagnostics::timed_block("form-theme", || self.form.apply_theme(ctx));
         if let Some(intent) = qnc_dev_diagnostics::timed_block("form-paint", || self.form.show_desktop(ui, frame, self.application.view())) {

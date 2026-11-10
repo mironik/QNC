@@ -104,4 +104,56 @@ pub struct ChoiceOption {
     pub label: String,
     /// The proposed one.
     pub strong: bool,
+    /// What the action is about (a group's code, an id), carried with it.
+    pub target: Option<String>,
+}
+
+impl ChoiceOption {
+    /// An option of `action_id` with `label`.
+    pub fn new(action_id: impl Into<String>, label: impl Into<String>, strong: bool) -> Self {
+        Self { action_id: action_id.into(), label: label.into(), strong, target: None }
+    }
+
+    /// The option with the target its action carries.
+    pub fn with_target(mut self, target: impl Into<String>) -> Self {
+        self.target = Some(target.into());
+        self
+    }
+}
+
+/// The question a piece asks over the form, for the host of the form to draw (user 2026-11-10:
+/// another group for an AI B-roll shot): one per process, until it is answered or withdrawn.
+static ASKED: std::sync::Mutex<Option<Choice>> = std::sync::Mutex::new(None);
+
+/// Asks `choice` over the form.
+pub fn ask(choice: Choice) {
+    if let Ok(mut asked) = ASKED.lock() {
+        *asked = Some(choice);
+    }
+}
+
+/// Withdraws the question asked.
+pub fn withdraw() {
+    if let Ok(mut asked) = ASKED.lock() {
+        *asked = None;
+    }
+}
+
+/// The question asked over the form.
+pub fn asked() -> Option<Choice> {
+    ASKED.lock().ok().and_then(|asked| asked.clone())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn a_question_is_asked_until_it_is_withdrawn() {
+        let choice = Choice { title: "t".into(), options: vec![ChoiceOption::new("a", "A", true).with_target("x")], ..Choice::default() };
+        ask(choice.clone());
+        assert_eq!(asked(), Some(choice));
+        withdraw();
+        assert_eq!(asked(), None);
+    }
 }

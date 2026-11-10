@@ -5,3 +5,4 @@ edition = "2021"
 description = "QNC public component: the editorial pool tabs (All, SubClip, B-roll, Segment, Transcript) and their catalog actions"
 
 [dependencies]
+qnc-clip-row = { workspace = true }

@@ -28,6 +28,15 @@ pub enum PoolIcon {
     Microphone,
 }
 
+/// The button over the top right of the chosen card's picture: an X deletes what was made wrongly
+/// (user 2026-11-09), a list mark gives the shot another group (user 2026-11-10: the AI learns
+/// from what is corrected).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Corner {
+    Remove,
+    Regroup,
+}
+
 /// A line over the picture while the card's record is being written.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum PoolOverlay {
