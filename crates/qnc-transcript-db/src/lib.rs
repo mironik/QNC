@@ -296,5 +296,34 @@ fn write(target: &ProjectDbTarget, operation: Operation) -> Result<()> {
     writer.call(MODULE_ID, encode(&operation)?).map(drop)
 }
 
+/// A part whose A1 is spoken for at least this share of its frames (words of its transcript) has
+/// speech (user 2026-11-10: a statement has A1).
+pub const SPOKEN: f32 = 0.3;
+
+/// The share of clip frames `[from, to)` the words of `transcripts` cover; `None` when no
+/// transcript covers the part (nothing is known of its speech then).
+pub fn spoken_share(transcripts: &[ClipTranscript], from: u64, to: u64) -> Option<f32> {
+    let covered = transcripts.iter().any(|transcript| transcript.from_frame <= from && to <= transcript.to_frame.max(transcript.from_frame));
+    if !covered || to <= from {
+        return None;
+    }
+    let mut spans: Vec<(u64, u64)> = transcripts
+        .iter()
+        .flat_map(|transcript| transcript.lines.iter().flat_map(|line| line.words.iter()))
+        .map(|word| (word.from.max(from), word.to.min(to)))
+        .filter(|(a, b)| a < b)
+        .collect();
+    spans.sort_unstable();
+    let (mut said, mut end) = (0u64, from);
+    for (a, b) in spans {
+        let a = a.max(end);
+        if a < b {
+            said += b - a;
+            end = b;
+        }
+    }
+    Some(said as f32 / (to - from) as f32)
+}
+
 #[cfg(test)]
 mod tests;

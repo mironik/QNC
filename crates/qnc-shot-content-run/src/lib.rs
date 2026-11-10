@@ -147,6 +147,13 @@ pub fn look_missing(reader: &SettingsReader, settings: &WorkSettings, local_medi
         if pace.cancel.load(Ordering::Relaxed) {
             break;
         }
+        // A statement is not cut by its pictures (user 2026-11-10: "a shot with A1 must not be cut
+        // into many small pieces; if it is cut, by its sound, not by its picture"): it stays a
+        // whole shot.
+        let looked = looked.map(|parts| match (&labels, &label_texts) {
+            (Some(list), Some(texts)) if quick && is_statement(&parts, list, texts, &qnc_transcript_db::read_clip(&db, &clip_id).unwrap_or_default()) => whole_shots(&shots, parts),
+            _ => parts,
+        });
         let content = match looked {
             Ok(parts) => ClipContent { clip_id: clip_id.clone(), model: model.clone(), parts, error: String::new(), took_ms: 0 },
             Err(error) => ClipContent { clip_id: clip_id.clone(), model: model.clone(), parts: Vec::new(), error, took_ms: 0 },
@@ -191,7 +198,8 @@ pub fn look_posters(reader: &SettingsReader, settings: &WorkSettings, local_medi
     let wanted: Vec<(String, u64, String, PathBuf)> = qnc_content_read::ContentReader::for_project(reader, settings)?
         .summaries()?
         .into_iter()
-        .filter(|clip| clip.imported && !looked.contains(&clip.clip_id))
+        // Every clip of the catalog with a poster, imported or not (user 2026-11-10: at Ingest).
+        .filter(|clip| !looked.contains(&clip.clip_id))
         .filter_map(|clip| {
             let uri = clip.thumbnail_uri?;
             let file = local(&uri)?;
@@ -241,6 +249,46 @@ fn poster_only(clip: &ClipContent) -> bool {
 /// Whether a shot kind is a usable part of the analysis (steady, pan).
 fn is_part(kind: &str) -> bool {
     matches!(kind, "steady" | "pan")
+}
+
+/// The kind of a shot of a statement (kept whole, never looked at finely, never B-roll).
+pub const STATEMENT: &str = "statement";
+
+/// Whether a clip looked at quickly is a statement: most of its frames look like one (a
+/// statement label's own score) and its A1 is spoken where a transcript covers it (without a
+/// transcript the pictures decide, as in the AI B-roll).
+pub fn is_statement(parts: &[PartContent], list: &qnc_shot_labels::Labels, texts: &qnc_shot_content::Texts, transcripts: &[qnc_transcript_db::ClipTranscript]) -> bool {
+    let (Some(from), Some(to)) = (parts.iter().map(|part| part.from).min(), parts.iter().map(|part| part.to).max()) else { return false };
+    let frames = |part: &PartContent| part.to - part.from;
+    let looks: u64 = parts.iter().filter(|part| list.is_statement(&texts.logits(&part.vector))).map(frames).sum();
+    let all: u64 = parts.iter().map(frames).sum();
+    let spoken = qnc_transcript_db::spoken_share(transcripts, from, to).map(|share| share >= qnc_transcript_db::SPOKEN);
+    all > 0 && looks * 2 > all && spoken != Some(false)
+}
+
+/// A statement's look as its whole shots: each shot one unit of kind `STATEMENT`, its pictures
+/// those of the units inside it and its vector their mean.
+pub fn whole_shots(shots: &qnc_shot_db::ClipShots, parts: Vec<PartContent>) -> Vec<PartContent> {
+    shots
+        .shots
+        .iter()
+        .filter_map(|shot| {
+            let inside: Vec<&PartContent> = parts.iter().filter(|part| shot.from <= part.from && part.to <= shot.to).collect();
+            let first = inside.first()?;
+            let mut vector = vec![0.0f32; first.vector.len()];
+            for part in &inside {
+                for (sum, value) in vector.iter_mut().zip(&part.vector) {
+                    *sum += value;
+                }
+            }
+            let norm = vector.iter().map(|v| v * v).sum::<f32>().sqrt().max(1e-12);
+            vector.iter_mut().for_each(|v| *v /= norm);
+            let mut frames: Vec<u64> = inside.iter().flat_map(|part| part.frames.iter().copied()).collect();
+            frames.sort_unstable();
+            frames.dedup();
+            Some(PartContent { from: shot.from, to: shot.to, kind: STATEMENT.into(), frames, vector, poster: first.poster.clone(), fine: true })
+        })
+        .collect()
 }
 
 /// The shots a clip is looked at in (user 2026-11-10: "every shot the analysis found: steady,
@@ -461,6 +509,26 @@ mod tests {
 
     fn part(from: u64, to: u64, key: u64) -> PartRecord {
         PartRecord { from, to, camera: "steady".into(), key_frame: key }
+    }
+
+    #[test]
+    fn a_statement_is_kept_whole_not_cut_by_its_pictures() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("labels.json");
+        std::fs::write(&path, r#"{"version":1,"least":0.1,"statement_least":0.5,"labels":[
+            {"code":"talk","text":"t","prompt":"talk","statement":true},{"code":"sea","text":"s","prompt":"sea"}]}"#)
+        .unwrap();
+        let list = qnc_shot_labels::Labels::read(&path).unwrap();
+        let texts = qnc_shot_content::Texts { vectors: vec![vec![1.0, 0.0], vec![0.0, 1.0]], scale: 10.0, bias: -5.0 };
+        let content = |from, to, vector: Vec<f32>| PartContent { from, to, kind: "steady".into(), frames: vec![from], vector, poster: String::new(), fine: false };
+        let talking = vec![content(0, 100, vec![1.0, 0.0]), content(100, 300, vec![1.0, 0.0]), content(300, 340, vec![0.0, 1.0])];
+        assert!(is_statement(&talking, &list, &texts, &[]), "most frames look like a statement, no transcript");
+        assert!(!is_statement(&[content(0, 300, vec![0.0, 1.0])], &list, &texts, &[]));
+        let shot = qnc_shot_db::ShotRecord { from: 0, to: 340, looks: Vec::new(), key_frame: 10, brightness: 0.5, sharpness: 0.5, motion: 0.0 };
+        let shots = qnc_shot_db::ClipShots { clip_id: "c".into(), media_uri: "qnc://x".into(), pictures: 3, shots: vec![shot], parts: Vec::new(), error: String::new(), took_ms: 0 };
+        let whole = whole_shots(&shots, talking);
+        assert_eq!(whole.iter().map(|part| (part.from, part.to, part.kind.as_str())).collect::<Vec<_>>(), [(0, 340, STATEMENT)]);
+        assert_eq!(whole[0].frames, [0, 100, 300]);
     }
 
     #[test]

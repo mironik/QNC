@@ -1318,6 +1318,7 @@
     "shots.parts_title": "Usable parts (B-roll)",
     "shots.parts_hint": "A click sets the part's IN/OUT on the source timeline; Add SubClip (Shift+S) keeps it.",
     "shots.no_parts": "No usable part: the camera never stands or pans evenly, sharp, for 3 seconds.",
+    "shots.statement_whole": "A statement: it is kept whole, not cut by its pictures (if it is cut, by its sound).",
     "shots.camera.steady": "steady camera",
     "shots.camera.pan": "even pan",
     "shots.look.black": "black",

@@ -182,6 +182,9 @@ fn run_once(root: &Path) -> Result<bool, String> {
             // Select gets its poster from the start of the clip.
             if !closed.load(std::sync::atomic::Ordering::Relaxed) {
                 make_posters(root, &config, &lease, &cancel);
+                // The AI looks at the posters right away (user 2026-11-10), before the waves,
+                // the filmstrips and the import.
+                make_shots(root, &config, &lease, &cancel, true);
             }
             completing.store(false, std::sync::atomic::Ordering::Relaxed);
             let stuck: std::collections::BTreeSet<String> = records_waiting(root).unwrap_or_default().into_iter().collect();
@@ -226,7 +229,7 @@ fn run_once(root: &Path) -> Result<bool, String> {
             make_posters(root, &config, &lease, &cancel);
             // The shots after the filmstrips and waves (user 2026-10-27: Video AI, a job of
             // its own, lower than the player).
-            make_shots(root, &config, &lease, &cancel);
+            make_shots(root, &config, &lease, &cancel, false);
         }
         artifacts.and(import).map(|()| true)
     })
@@ -357,6 +360,9 @@ fn make_shots(
     config: &qnc_ingest_select::selection_config::SelectionConfig,
     lease: &qnc_playback_activity::Lease,
     cancel: &std::sync::atomic::AtomicBool,
+    // Only the first look, from the posters (right after Select: user 2026-11-10 "first the AI
+    // look at the card's posters").
+    only_posters: bool,
 ) {
     let local_media = |uri: &str| {
         let reference = qnc_source_reader::SourceReference::from_uri(uri).ok()?;
@@ -379,6 +385,9 @@ fn make_shots(
         // picture of a shot is read.
         if let Err(error) = qnc_shot_content_run::look_posters(active.settings_reader(), &snapshot.settings, &local_media, Some(lease.write_lease()), &pace) {
             qnc_dev_diagnostics::log_line(qnc_dev_diagnostics::DiagnosticsStream::Player, format!("shot-content posters failed error={error}"));
+        }
+        if only_posters {
+            return Ok(0);
         }
         let analysed = qnc_shot_analysis::analyse_missing(&project, &local_media, Some(lease.write_lease()), &pace);
         // What the usable parts show (user 2026-11-10: sorting the B-roll by content), right

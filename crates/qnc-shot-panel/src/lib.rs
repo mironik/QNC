@@ -45,7 +45,8 @@ pub fn show(ui: &mut egui::Ui, view: &ShotsView, theme: &qnc_desktop_theme::Them
     egui::ScrollArea::vertical().auto_shrink([false, false]).show(&mut ui, |ui| {
         ui.label(RichText::new(qnc_ui_text::text("shots.parts_title")).color(theme.text).strong());
         if analysis.parts.is_empty() {
-            ui.add(egui::Label::new(muted(qnc_ui_text::text("shots.no_parts"))).wrap());
+            let empty = if view.statement { "shots.statement_whole" } else { "shots.no_parts" };
+            ui.add(egui::Label::new(muted(qnc_ui_text::text(empty))).wrap());
         } else {
             ui.add(egui::Label::new(muted(qnc_ui_text::text("shots.parts_hint"))).wrap());
         }

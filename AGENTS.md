@@ -8933,3 +8933,18 @@ se nije ponovno razvrstalo (rjecnik je izracunat: 399 pojmova za 47 s). `qnc-sho
 sam salje u dijelovima od 32, za sve koji ga koriste. Provjereno `look_card` na PMW-300 594_9488 (samo citanje): 39 oznaka,
 dijelovi bazen 0,78 i vrt. Analiza PMW klipova poslije nove gradnje nije se pokrenula dok je player radio (pozadinski proces
 ceka player); stari pozadinski proces jos je radio pa novi nije mogao biti ugraden.
+Izmjena 2026-11-10 (korisnik: "dugacki klip je izjava, njih ne bi trebalo tretirati kao ostale kadrove; ako kadar ima A1 ne bi
+se smio sjeckati na puno malih komada u AI Video; ako se sijece, sijece se po tonu, ne po videu"; "ne mora se rezati po tonu, to
+je bila opaska"; "preskocio si da se najprije prilikom ingesta radi AI analiza postera koji su na kartici"): (1) Izjava je
+kadar ciji vecina slika izgleda kao izjava (vlastita ocjena oznake izjave) i ciji A1 ima govor gdje ga prijepis pokriva (bez
+prijepisa odlucuje slika, kao u AI pokrivalicama). Pravilo udjela govora (`spoken_share`, `SPOKEN`) premjesteno je iz
+`qnc-ai-broll` u `qnc-transcript-db`. `qnc-shot-content-run`: nakon brzog pregleda izjava ostaje cijela (`is_statement`,
+`whole_shots`: jedan dio po kadru vrste `statement`, slike dijelova unutar njega, vektor njihova srednja vrijednost); ne
+pregledava se fino; `CONTENT_VERSION` 3 (svi klipovi se jednom pregledaju ponovno). AI pokrivalice izostavljaju dijelove vrste
+`statement`; Video AI panel (`qnc-clip-shots` `ShotsView.statement`, `qnc-shot-panel`) za izjavu ne nudi sitne dijelove nego
+kaze "Izjava: ostaje cijela, ne reze se po slici" (`shots.statement_whole`). Analiza kadrova (rezovi i mirni dijelovi) ostaje
+ista. (2) Pregled postera (`look_posters`) radi odmah nakon Selecta (`qnc-ingest-worker` `make_shots(.., only_posters)` iza
+dovrsetka zapisa i postera), prije valova, filmstripa i uvoza, i za klipove koji jos nisu uvezeni. Testovi `qnc-shot-content-run`
+(novi `a_statement_is_kept_whole_not_cut_by_its_pictures`), `qnc-ai-broll`, `qnc-transcript-db`, `qnc-clip-shots`,
+`qnc-shot-panel`, conformance. Nije izvedeno: rezanje izjave po tonu, prijepis izjave vec tijekom analize (prijedlog korisnika).
+Uzivo nije provjereno.

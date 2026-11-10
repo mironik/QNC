@@ -662,6 +662,7 @@
     "shots.parts_title": "Upotrebljivi dijelovi (Pokrivalice)",
     "shots.parts_hint": "Klik postavlja IN/OUT dijela na source timelineu; Add SubClip (Shift+S) ga sprema.",
     "shots.no_parts": "Nema upotrebljivog dijela: kamera nigdje ne stoji niti jednoliko švenka, oštro, 3 sekunde.",
+    "shots.statement_whole": "Izjava: ostaje cijela, ne reže se po slici (ako se reže, reže se po tonu).",
     "shots.camera.steady": "mirna kamera",
     "shots.camera.pan": "jednoliki švenk",
     "shots.look.black": "crno",

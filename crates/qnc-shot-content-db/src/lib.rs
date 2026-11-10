@@ -21,8 +21,9 @@ pub const MODULE_ID: &str = "qnc.module.shot-content-db";
 pub type Result<T> = std::result::Result<T, String>;
 
 /// How the content is made; a row made another way is looked at again (2: every shot of the
-/// analysis, with its poster, user 2026-11-10).
-pub const CONTENT_VERSION: u32 = 2;
+/// analysis, with its poster, user 2026-11-10; 3: a statement is kept whole, not cut by its
+/// pictures).
+pub const CONTENT_VERSION: u32 = 3;
 
 /// What one shot of a clip shows (user 2026-11-10: "the agent split the clips into shots, steady,
 /// moving, panning; each gets a poster and a quick split by content"): clip frames `[from, to)`,

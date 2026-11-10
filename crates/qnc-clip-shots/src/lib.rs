@@ -27,6 +27,9 @@ pub struct ShotsView {
     /// The clip's analysis, once read; `None` while it has none (or it is read).
     pub analysis: Option<Arc<Analysis>>,
     pub playhead: Option<u64>,
+    /// The clip is a statement (user 2026-11-10): kept whole, its parts are not cut by its
+    /// pictures, so none are shown.
+    pub statement: bool,
     /// Why the analysis could not be read.
     pub message: String,
 }
@@ -49,7 +52,7 @@ impl ShotsView {
 pub struct ClipShots {
     view: ShotsView,
     /// The shown clip's analysis as the database holds it, read again in a rhythm.
-    follow: qnc_clip_follow::ClipFollow<Option<Arc<Analysis>>>,
+    follow: qnc_clip_follow::ClipFollow<Option<(Arc<Analysis>, bool)>>,
     /// A clip and IN/OUT a chosen part opens on the source timeline.
     source_request: Option<(String, u64, u64)>,
 }
@@ -93,9 +96,20 @@ impl ClipShots {
         if let (Some(project), Some(clip_id)) = (project.as_ref(), clip_id.as_deref()) {
             let analysis = self.follow.get(project.uri(), clip_id, true, || {
                 let (target, clip) = (project.clone(), clip_id.to_string());
-                move || qnc_shot_db::read_clip(&target, &clip).map(|analysis| analysis.map(Arc::new))
+                move || {
+                    // A statement the look kept whole (`statement` shots) shows no parts.
+                    let statement = qnc_shot_content_db::read_clip(&target, &clip).ok().flatten().is_some_and(|content| content.parts.iter().any(|part| part.kind == "statement"));
+                    qnc_shot_db::read_clip(&target, &clip).map(|analysis| analysis.map(|mut analysis| {
+                        if statement {
+                            analysis.parts.clear();
+                        }
+                        (Arc::new(analysis), statement)
+                    }))
+                }
             });
-            self.view.analysis = analysis.flatten();
+            let analysis = analysis.flatten();
+            self.view.statement = analysis.as_ref().is_some_and(|(_, statement)| *statement);
+            self.view.analysis = analysis.map(|(analysis, _)| analysis);
             self.view.message = self.follow.error(project.uri(), clip_id).unwrap_or_default().to_string();
         }
         self.view != before

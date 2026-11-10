@@ -20,34 +20,10 @@ pub const OPEN: &str = "ai_broll_open";
 
 const READ_EVERY: Duration = Duration::from_secs(3);
 
-/// A part whose A1 is spoken for at least this share of its frames (words of its transcript) is
-/// a statement (user 2026-11-10: "A1 as a help, where it exists").
-pub const SPOKEN: f32 = 0.3;
+/// What a statement is (user 2026-11-10: "A1 as a help, where it exists"): the one rule of the
+/// transcripts.
+pub use qnc_transcript_db::{spoken_share, SPOKEN};
 
-/// The share of clip frames `[from, to)` the words of `transcripts` cover; `None` when no
-/// transcript covers the part (nothing is known of its speech then).
-pub fn spoken_share(transcripts: &[qnc_transcript_db::ClipTranscript], from: u64, to: u64) -> Option<f32> {
-    let covered = transcripts.iter().any(|transcript| transcript.from_frame <= from && to <= transcript.to_frame.max(transcript.from_frame));
-    if !covered || to <= from {
-        return None;
-    }
-    let mut spans: Vec<(u64, u64)> = transcripts
-        .iter()
-        .flat_map(|transcript| transcript.lines.iter().flat_map(|line| line.words.iter()))
-        .map(|word| (word.from.max(from), word.to.min(to)))
-        .filter(|(a, b)| a < b)
-        .collect();
-    spans.sort_unstable();
-    let (mut said, mut end) = (0u64, from);
-    for (a, b) in spans {
-        let a = a.max(end);
-        if a < b {
-            said += b - a;
-            end = b;
-        }
-    }
-    Some(said as f32 / (to - from) as f32)
-}
 
 /// One usable part as the tab shows it.
 #[derive(Debug, Clone, PartialEq)]
@@ -202,7 +178,8 @@ pub fn sort_parts(
             // is not a statement; it must have A1 too"): its pictures look like one and its A1 is
             // spoken. Without a transcript of the clip A1 is not known, the pictures decide.
             let spoken = speech(&clip.clip_id, part.from, part.to).map(|share| share >= SPOKEN);
-            if list.is_statement(&logits) && spoken != Some(false) {
+            // A statement kept whole by the look (`statement`) is never B-roll.
+            if part.kind == "statement" || (list.is_statement(&logits) && spoken != Some(false)) {
                 return None;
             }
             let (mut label, mut share) = list.shares(&logits).into_iter().next()?;

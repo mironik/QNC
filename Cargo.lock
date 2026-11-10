@@ -3961,6 +3961,7 @@ name = "qnc-clip-shots"
 version = "0.1.0"
 dependencies = [
  "qnc-clip-follow",
+ "qnc-shot-content-db",
  "qnc-shot-db",
  "qnc-source-preview",
 ]
@@ -6727,8 +6728,10 @@ dependencies = [
  "qnc-shot-db",
  "qnc-shot-labels",
  "qnc-shot-vocabulary",
+ "qnc-transcript-db",
  "qnc-ui-text",
  "qnc-work-settings",
+ "tempfile",
 ]
 
 [[package]]
