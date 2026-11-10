@@ -1935,6 +1935,8 @@ fn is_public_db_owner_path(relative: &str) -> bool {
         "crates/qnc-shot-examples/",
         // The only writer of the vocabulary database of this computer (text vectors of the terms).
         "crates/qnc-shot-vocabulary/",
+        // The only writer of the captions database of this computer (the shots' captions).
+        "crates/qnc-shot-captions/",
         "crates/qnc-work-settings/",
         "crates/qnc-virtual-shots/",
         // The serial writer of the project database: it opens the transaction of a write

@@ -8948,3 +8948,23 @@ dovrsetka zapisa i postera), prije valova, filmstripa i uvoza, i za klipove koji
 (novi `a_statement_is_kept_whole_not_cut_by_its_pictures`), `qnc-ai-broll`, `qnc-transcript-db`, `qnc-clip-shots`,
 `qnc-shot-panel`, conformance. Nije izvedeno: rezanje izjave po tonu, prijepis izjave vec tijekom analize (prijedlog korisnika).
 Uzivo nije provjereno.
+Izvedeno 2026-11-10 (korisnik: "preuzmi oba i usporedi" Florence-2 i moondream; "mozemo ih imati kao alternative"; "da,
+uvedi Florence-2 kao drugi motor"): usporedba na 29 kadrova vijesti i 19 PMW-300 (kartice samo citane): moondream q4 (candle,
+procesor) nije opisao ni pet slika za 10 minuta i odbacen je. Florence-2 base (Microsoft, MIT, ONNX; `data/models/
+florence-2-base-ft`, izvan gita) opisuje 4,4-6,9 s po slici na procesoru (SigLIP oko 0,45 s): PMW-300 gotovo sve tocno (bazen,
+fontana, cvijece, mutna slika), vijesti ljudi, knjiga, mikrofon, pas, auto, brodovi; ne zna stadion, pozornicu, TV kameru.
+Drugi motor, uz SigLIP, ne umjesto njega. Nove kocke (s ugovorima modula): `crates/qnc-florence2` (model kroz ONNX Runtime
+biblioteku uz program, `ort` 2.0.0-rc.10 load-dynamic; detaljan opis, pohlepno dekodiranje bez ponovljene rijeci i niza od
+tri, bez uvoda "In this image we can see"), `crates/qnc-shot-caption` (ugovor dodatka `contracts/plugins/shot-caption.v1.json`,
+`qnc.shot-caption` 1, obje strane, najvise 8 slika po zahtjevu), program `tools/qnc-shot-caption-florence` (model ucitan
+jednom, ispod normalnog prioriteta, 4 niti, `onnxruntime.dll` uz program), `crates/qnc-shot-captions` (baza racunala
+`data/qnc-shot-captions.db`, jedini pisac, ugovor baze `shot-captions.database.json`; opis po modelu i kljucu kadra kao
+`qnc-shot-examples`; conformance: na popisu javnih DB vlasnika), `crates/qnc-shot-caption-run` (svaki kadar koji je SigLIP
+pogledao opisuje se iz svog postera (poster kartice ili poster kadra u projektu), kopija u privremenoj mapi, nista se ne
+dekodira, ceka dok player svira, klip u previewu prvi). AI katalog racunala ima `shot_caption` (`qnc-ai-catalog`
+`installed_shot_captioner`); pozadinski radnik ga pokrece iza pregleda kadrova, uz projektnu postavku `ai.enabled`. Video AI
+panel (`qnc-clip-shots` `ShotsView.captions`, `caption_of`; `qnc-shot-panel`) pokazuje opis ispod svakog dijela i kadra.
+Primjer `qnc-shot-caption-run/examples/caption_files.rs`. Izbor motora u projektu nije izveden (trazi otkljucavanje Projecta);
+sljedeci korak: Florence kao korektor i trener SigLIP-a (opis -> grupa -> primjer u bazi primjera racunala, nizi prioritet od
+korisnikova ispravka) i opis kadra u prijedlogu serije za OFF. Testovi `qnc-florence2`, `qnc-shot-captions`, `qnc-ai-catalog`,
+conformance, release build. Uzivo nije provjereno.

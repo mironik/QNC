@@ -9,6 +9,10 @@
     "model": "../../data/models/siglip2-base-patch16-224",
     "pictures": 2
   },
+  "shot_caption": {
+    "program": "qnc-shot-caption-florence",
+    "model": "../../data/models/florence-2-base-ft"
+  },
   "letters": {
     "program": "qnc-align-wav2vec2",
     "model": "../../data/models/wav2vec2-parlaspeech-hr"

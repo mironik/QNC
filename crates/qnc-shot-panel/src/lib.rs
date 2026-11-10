@@ -63,7 +63,7 @@ pub fn show(ui: &mut egui::Ui, view: &ShotsView, theme: &qnc_desktop_theme::Them
             let length = fps.map(|fps| qnc_program_view::duration_label(frames, fps, 1));
             let band = fps.and_then(|fps| cover_fill(frames, Some((fps, 1)), lengths));
             let what = length.map_or_else(|| camera.to_string(), |length| format!("{length}  {camera}"));
-            if row(ui, theme, (index, lit, band), &format!("{} – {}", at(part.from), at(part.to)), &what) {
+            if row(ui, theme, (index, lit, band), &format!("{} – {}", at(part.from), at(part.to)), &what, view.caption_of(part.from, part.to)) {
                 asked = Some(ActionEvent::key(OPEN_PART).with_target(index.to_string()).at(PANEL));
             }
         }
@@ -72,7 +72,7 @@ pub fn show(ui: &mut egui::Ui, view: &ShotsView, theme: &qnc_desktop_theme::Them
         let lit = view.shot_at_playhead();
         for (index, shot) in analysis.shots.iter().enumerate() {
             let looks: Vec<&str> = shot.looks.iter().map(|look| look_text(look)).collect();
-            if row(ui, theme, (index, lit, None), &format!("{} – {}", at(shot.from), at(shot.to)), &looks.join(", ")) {
+            if row(ui, theme, (index, lit, None), &format!("{} – {}", at(shot.from), at(shot.to)), &looks.join(", "), view.caption_of(shot.from, shot.to)) {
                 asked = Some(ActionEvent::key(CUE_SHOT).with_target(shot.from.to_string()).at(PANEL));
             }
         }
@@ -92,8 +92,9 @@ pub fn show(ui: &mut egui::Ui, view: &ShotsView, theme: &qnc_desktop_theme::Them
 }
 
 /// One clickable row: the time span and what it is, framed in `band` (the colour of its length)
-/// when given; true when clicked.
-fn row(ui: &mut egui::Ui, theme: &qnc_desktop_theme::Theme, (index, lit, band): (usize, Option<usize>, Option<egui::Color32>), span: &str, what: &str) -> bool {
+/// when given, and below them the caption a model wrote of it (user 2026-11-10: Florence-2);
+/// true when clicked.
+fn row(ui: &mut egui::Ui, theme: &qnc_desktop_theme::Theme, (index, lit, band): (usize, Option<usize>, Option<egui::Color32>), span: &str, what: &str, caption: Option<&str>) -> bool {
     let fill = if lit == Some(index) { theme.focus.gamma_multiply(0.35) } else if index % 2 == 0 { theme.surface_alt } else { egui::Color32::TRANSPARENT };
     let stroke = band.map_or(egui::Stroke::NONE, |colour| egui::Stroke::new(2.0, colour));
     let frame = egui::Frame::new().fill(fill).stroke(stroke).inner_margin(egui::Margin::symmetric(4, 3)).show(ui, |ui| {
@@ -104,6 +105,9 @@ fn row(ui: &mut egui::Ui, theme: &qnc_desktop_theme::Theme, (index, lit, band): 
                 ui.label(RichText::new(what).color(theme.text_muted).size(theme.font_ui));
             }
         });
+        if let Some(caption) = caption {
+            ui.add(egui::Label::new(RichText::new(caption).color(theme.text_muted).size(theme.font_ui).italics()).wrap());
+        }
     });
     let response = ui.interact(frame.response.rect, ui.id().with(("row", span, index)), Sense::click());
     if response.hovered() {

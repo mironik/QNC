@@ -1,0 +1,14 @@
+[package]
+name = "qnc-shot-caption-florence"
+version = "0.1.0"
+edition = "2021"
+description = "QNC shot-caption plug-in: a sentence of what a picture shows with Florence-2 (ONNX Runtime beside the program; contract qnc.shot-caption 1), as its own program"
+
+[dependencies]
+qnc-dev-diagnostics = { workspace = true }
+qnc-shot-caption = { workspace = true }
+qnc-florence2 = { workspace = true }
+image = { version = "0.25.10", default-features = false, features = ["jpeg"] }
+
+[target.'cfg(windows)'.dependencies]
+windows-sys = { version = "0.59", features = ["Win32_Foundation", "Win32_System_Threading"] }

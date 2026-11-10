@@ -862,6 +862,7 @@
     "db.story_sheet_invalid": "The story sheet is not a description of fields.",
     "db.shot_example_invalid": "A shot example must name its model, its shot and its group and give one vector.",
     "db.shot_vocabulary_invalid": "The vocabulary of shots must name its model and give one vector of the same width for every term.",
+    "db.shot_caption_invalid": "A caption of a shot must name its model and its shot and have a text of at most 2000 characters.",
     "db.story_sheet_code": "'{code}' is not a field code (lower-case letters, digits and _).",
     "db.shot_invalid": "A shot analysis must give whole shots one after another inside its clip, or only why it failed.",
     "db.shot_reply": "The shot store gave an answer outside its contract.",

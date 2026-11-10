@@ -1,0 +1,20 @@
+{
+  "module_id": "qnc.module.shot-captions",
+  "module_name": "Shot captions",
+  "module_version": "0.1.0",
+  "module_kind": "library",
+  "capabilities": ["shot.captions.keep", "shot.captions.read"],
+  "input_contract_version": "0.1.0",
+  "output_contract_version": "0.1.0",
+  "transport_protocol_version": "0.1.0",
+  "supported_os": ["windows", "linux", "macos"],
+  "supported_cpu": ["x86_64", "aarch64"],
+  "forbidden_calls": ["media.decode", "media.read", "ffprobe", "card.write", "project.database.write", "player.command"],
+  "forbidden_dependencies": ["qnc.module.media-probe"],
+  "state_policy": "stateless",
+  "database_write_policy": "public_db_owner_write_adapter_only",
+  "runtime_crate": "qnc-shot-captions",
+  "input": "A model, a shot (project URI, clip, frames) and its caption.",
+  "output": "The captions kept in data/qnc-shot-captions.db of this computer (its only writer).",
+  "specification": "User 2026-11-10: Florence-2 as the second AI engine beside SigLIP; it names what it sees without a vocabulary. The AI agents are an add-on: their growing data is kept on this computer, not in the project database."
+}

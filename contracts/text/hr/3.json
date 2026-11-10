@@ -211,6 +211,7 @@
     "db.shot_content_invalid": "Sadržaj kadrova mora za svaki upotrebljivi dio unutar klipa dati slike na kojima je viđen i jedan vektor iste širine, ili samo razlog neuspjeha.",
     "db.shot_example_invalid": "Primjer kadra mora imati model, kadar, grupu i jedan vektor.",
     "db.shot_vocabulary_invalid": "Rječnik kadrova mora imati model i jedan vektor iste širine za svaki pojam.",
+    "db.shot_caption_invalid": "Opis kadra mora imati model, kadar i tekst od najviše 2000 znakova.",
     "shots.content_no_parts": "Analiza kadrova nije našla upotrebljiv dio za pregled.",
     "shot.label.person": "Osoba",
     "shot.label.speaker": "Izjava",

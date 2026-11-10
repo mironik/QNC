@@ -29,6 +29,10 @@ struct File {
     /// without it has none.
     #[serde(default)]
     shot_content: Option<ContentJob>,
+    /// A sentence of what a shot shows (user 2026-11-10: Florence-2 as the second AI engine); a
+    /// host without it has none.
+    #[serde(default)]
+    shot_caption: Option<LettersJob>,
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -77,6 +81,39 @@ pub fn shot_content(path: &Path) -> Result<ShotContentEngine, String> {
         return Err(format!("shot content: the model {} is not on this host", model.display()));
     }
     Ok(ShotContentEngine { program: job.program, model, pictures: job.pictures })
+}
+
+/// The engine that writes a sentence of what a shot shows, on this host.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ShotCaptioner {
+    /// The program's name beside the application.
+    pub program: String,
+    /// The model's folder.
+    pub model: PathBuf,
+}
+
+impl ShotCaptioner {
+    /// The model's name the kept captions carry: the last folder of its path.
+    pub fn model_name(&self) -> String {
+        self.model.file_name().map_or_else(|| self.model.display().to_string(), |name| name.to_string_lossy().into_owned())
+    }
+}
+
+/// The shot captioner of this host's catalog; its model must be there.
+pub fn installed_shot_captioner() -> Result<ShotCaptioner, String> {
+    shot_captioner(&installed_path()?)
+}
+
+/// The shot captioner of the catalog at `path`.
+pub fn shot_captioner(path: &Path) -> Result<ShotCaptioner, String> {
+    let text = std::fs::read_to_string(path).map_err(|e| format!("{}: {e}", path.display()))?;
+    let file: File = serde_json::from_str(&text).map_err(|e| format!("{}: {e}", path.display()))?;
+    let job = file.shot_caption.ok_or("the AI catalog of this host has no shot captioner")?;
+    let model = path.parent().ok_or("the AI catalog has no folder")?.join(&job.model);
+    if !model.exists() {
+        return Err(format!("shot captioner: the model {} is not on this host", model.display()));
+    }
+    Ok(ShotCaptioner { program: job.program, model })
 }
 
 /// The engine that makes the in-between pictures of a smooth cut on this host.

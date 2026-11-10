@@ -282,12 +282,17 @@ members = [
     "crates/qnc-shot-content-run",
     "crates/qnc-shot-content-db",
     "crates/qnc-shot-content",
+    "crates/qnc-shot-caption",
+    "crates/qnc-shot-captions",
+    "crates/qnc-shot-caption-run",
+    "crates/qnc-florence2",
     "crates/qnc-ctc-align",
     "crates/qnc-letter-align",
     "crates/qnc-letter-db",
     "crates/qnc-letter-times",
     "tools/qnc-align-wav2vec2",
     "tools/qnc-shot-content-siglip",
+    "tools/qnc-shot-caption-florence",
     "crates/qnc-match-frame",
     "crates/qnc-segments-keys",
     "crates/qnc-sync-session",
@@ -609,6 +614,10 @@ qnc-shot-vocabulary = { path = "crates/qnc-shot-vocabulary" }
 qnc-shot-content-run = { path = "crates/qnc-shot-content-run" }
 qnc-shot-content-db = { path = "crates/qnc-shot-content-db" }
 qnc-shot-content = { path = "crates/qnc-shot-content" }
+qnc-shot-caption = { path = "crates/qnc-shot-caption" }
+qnc-shot-captions = { path = "crates/qnc-shot-captions" }
+qnc-shot-caption-run = { path = "crates/qnc-shot-caption-run" }
+qnc-florence2 = { path = "crates/qnc-florence2" }
 qnc-ctc-align = { path = "crates/qnc-ctc-align" }
 qnc-letter-align = { path = "crates/qnc-letter-align" }
 qnc-letter-db = { path = "crates/qnc-letter-db" }

@@ -23,4 +23,5 @@ qnc-ingest-select = { workspace = true }
 qnc-source-reader = { workspace = true }
 qnc-shot-analysis = { workspace = true }
 qnc-shot-content-run = { workspace = true }
+qnc-shot-caption-run = { workspace = true }
 qnc-transcribe-queue = { workspace = true }

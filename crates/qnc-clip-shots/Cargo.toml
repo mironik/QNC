@@ -9,3 +9,7 @@ qnc-shot-content-db = { workspace = true }
 qnc-clip-follow = { workspace = true }
 qnc-shot-db = { workspace = true }
 qnc-source-preview = { workspace = true }
+qnc-ai-catalog = { workspace = true }
+qnc-db-broker = { workspace = true }
+qnc-dev-diagnostics = { workspace = true }
+qnc-shot-captions = { workspace = true }

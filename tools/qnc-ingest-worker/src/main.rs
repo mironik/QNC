@@ -396,6 +396,11 @@ fn make_shots(
         if let Err(error) = &looked {
             qnc_dev_diagnostics::log_line(qnc_dev_diagnostics::DiagnosticsStream::Player, format!("shot-content failed error={error}"));
         }
+        // A sentence of what each looked-at shot shows, from its poster (user 2026-11-10:
+        // Florence-2 as the second AI engine), kept on this computer.
+        if let Err(error) = qnc_shot_caption_run::caption_missing(root, active.settings_reader(), &snapshot.settings, &local_media, &pace) {
+            qnc_dev_diagnostics::log_line(qnc_dev_diagnostics::DiagnosticsStream::Player, format!("shot-caption failed error={error}"));
+        }
         analysed
     })();
     match result {

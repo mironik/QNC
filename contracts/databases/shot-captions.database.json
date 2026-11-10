@@ -1,0 +1,19 @@
+{
+  "database_id": "qnc.db.shot-captions",
+  "database_owner": "host",
+  "owner_application": "qnc.module.shot-captions",
+  "ownership_rule": "The captions database of this computer (data/qnc-shot-captions.db), outside every project: the AI agents are an add-on and their growing data is not put into the project database. qnc.module.shot-captions is its only writer.",
+  "schema_version": "0.1.0",
+  "qnc_uri": "qnc://local/db/shot_captions",
+  "tables": ["shot_captions"],
+  "public_read_views": ["public_shot_captions"],
+  "write_owner": "qnc.module.shot-captions",
+  "public_read_policy": "public_read_views",
+  "rules": {
+    "caption": "A row a model and a shot (its project's public URI, clip and frames): the sentence the model wrote of what the shot shows.",
+    "replace": "A shot captioned again by the same model replaces its caption."
+  },
+  "migration_policy": "owner_application_only",
+  "created_at": "2026-11-10T00:00:00Z",
+  "updated_at": "2026-11-10T00:00:00Z"
+}

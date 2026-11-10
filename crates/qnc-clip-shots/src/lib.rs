@@ -30,6 +30,9 @@ pub struct ShotsView {
     /// The clip is a statement (user 2026-11-10): kept whole, its parts are not cut by its
     /// pictures, so none are shown.
     pub statement: bool,
+    /// The sentences a model wrote of its shots (user 2026-11-10: Florence-2), by their frames,
+    /// kept on this computer; none where this host has no captioner.
+    pub captions: Arc<Vec<qnc_shot_captions::Caption>>,
     /// Why the analysis could not be read.
     pub message: String,
 }
@@ -52,7 +55,7 @@ impl ShotsView {
 pub struct ClipShots {
     view: ShotsView,
     /// The shown clip's analysis as the database holds it, read again in a rhythm.
-    follow: qnc_clip_follow::ClipFollow<Option<(Arc<Analysis>, bool)>>,
+    follow: qnc_clip_follow::ClipFollow<Option<(Arc<Analysis>, bool, Arc<Vec<qnc_shot_captions::Caption>>)>>,
     /// A clip and IN/OUT a chosen part opens on the source timeline.
     source_request: Option<(String, u64, u64)>,
 }
@@ -90,6 +93,7 @@ impl ClipShots {
         self.view.playhead = preview.view().timeline.playhead_frame;
         if self.view.clip_id != clip_id {
             self.view.analysis = None;
+            self.view.captions = Arc::default();
             self.view.message.clear();
             self.view.clip_id = clip_id.clone();
         }
@@ -103,15 +107,30 @@ impl ClipShots {
                         if statement {
                             analysis.parts.clear();
                         }
-                        (Arc::new(analysis), statement)
+                        (Arc::new(analysis), statement, Arc::new(captions(&target, &clip)))
                     }))
                 }
             });
             let analysis = analysis.flatten();
-            self.view.statement = analysis.as_ref().is_some_and(|(_, statement)| *statement);
-            self.view.analysis = analysis.map(|(analysis, _)| analysis);
+            self.view.statement = analysis.as_ref().is_some_and(|(_, statement, _)| *statement);
+            self.view.captions = analysis.as_ref().map(|(_, _, captions)| captions.clone()).unwrap_or_default();
+            self.view.analysis = analysis.map(|(analysis, _, _)| analysis);
             self.view.message = self.follow.error(project.uri(), clip_id).unwrap_or_default().to_string();
         }
         self.view != before
+    }
+}
+
+/// The captions of this host's captioner of a clip, kept on this computer; none without one.
+fn captions(target: &qnc_db_broker::ProjectDbTarget, clip: &str) -> Vec<qnc_shot_captions::Caption> {
+    let (Some(root), Ok(captioner)) = (qnc_dev_diagnostics::resolve_qnc_root(), qnc_ai_catalog::installed_shot_captioner()) else { return Vec::new() };
+    qnc_shot_captions::read_clip(&root, &captioner.model_name(), target.uri(), clip).unwrap_or_default()
+}
+
+impl ShotsView {
+    /// The caption of the shot of frames `from`..`to`: its own, else the first inside it.
+    pub fn caption_of(&self, from: u64, to: u64) -> Option<&str> {
+        let own = self.captions.iter().find(|caption| caption.from == from && caption.to == to);
+        own.or_else(|| self.captions.iter().find(|caption| from <= caption.from && caption.to <= to)).map(|caption| caption.text.as_str())
     }
 }
