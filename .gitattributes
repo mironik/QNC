@@ -1,0 +1,9 @@
+# Text is LF on every machine: code reads some files with include_str (the camera catalog
+# schema is compared with the database), so a CRLF checkout would change what it reads.
+* text=auto eol=lf
+*.sqlite binary
+*.db binary
+*.png binary
+*.jpg binary
+*.exe binary
+*.dll binary
