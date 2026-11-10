@@ -5235,6 +5235,7 @@ dependencies = [
  "qnc-content-store",
  "qnc-filmstrip",
  "qnc-poster-create",
+ "qnc-source-contract",
  "qnc-ui-text",
  "qnc-work-settings",
  "tempfile",

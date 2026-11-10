@@ -8683,3 +8683,11 @@ sljedeci rez preuzima tek na Play. Log 10. 11.: dekoder klipa 2 slozene izjave o
 u 864803, zapis 9931 ms; isto 3761 ms (cue) i 1674 ms (sync-bed). Nije bilo sporog otvaranja ni cekanja Playa.
 `qnc-broadcast-engine` `decode_input.rs`: nit javlja koliko je otvaranje trajalo, zapis je `decoder-open open_ms=
 taken_after_ms=`. Ponasanje playera isto. Testovi `qnc-broadcast-engine`.
+Popravak 2026-11-10 (korisnik: "pogledaj poster OFF-ova"; log: svaki poster snimljenog OFF-a "Izvor klipa nije dostupan na
+ovom racunalu"): kocka postera (`qnc-missing-posters`) medij je trazila samo u vezama izvora koje daje pozivatelj (kartice
+iz `ingest-transport.json`), a snimljeni OFF (i klip medjuslika Smootha) je u mapi projekta. `make_missing_posters` sada
+medij pod izvorom mape projekta (`project_media_source_uri`) nalazi u mapi projekta (`in_project_folder`, samo datoteka
+unutar projekta), ostalo kao prije kroz pozivatelja; vrijedi za Select i pozadinskog radnika. OFF s kartice ide kroz veze
+kartice kao i prije. Medij na LAN/Intranet izvoru i dalje nema poster (`local_media_path` daje samo lokalnu datoteku;
+poster bi trebao citanje kroz transport). Test `a_medium_of_the_project_itself_is_found_in_the_project_folder`,
+conformance. Uzivo nije provjereno.

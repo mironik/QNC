@@ -80,6 +80,12 @@ pub fn make_missing_posters(
         .local_workspace_dir(settings)
         .map_err(|e| e.to_string())?
         .ok_or(qnc_ui_text::text("import.import_needs_local_access_project_folder"))?;
+    // A medium the project made itself (a recorded OFF, a smooth join) is in the project
+    // folder, which no card binding of the caller names (2026-11-10: every OFF poster
+    // failed with "the clip's source is not on this computer").
+    let project_source = settings.project_media_source_uri().map_err(|e| e.message)?;
+    let local_media = |uri: &str| in_project_folder(uri, &project_source, &project_dir).or_else(|| local_media(uri));
+    let local_media: &LocalMedia<'_> = &local_media;
     let target = ContentTarget::for_project(reader, settings)?;
     let mut client = target.open(Access::ReadOnly)?;
     let mut writer = Writer::start(target, lease)?;
@@ -149,6 +155,16 @@ pub fn copy_card_poster(uri: &str, local_media: &LocalMedia<'_>, output: &Path) 
     std::fs::copy(&source, output).map(|_| ()).map_err(|e| e.to_string())
 }
 
+/// The file of a medium under the project's own media source, inside the project folder.
+pub fn in_project_folder(uri: &str, project_source: &str, project_dir: &Path) -> Option<PathBuf> {
+    let reference = qnc_source_contract::SourceReference::from_uri(uri).ok()?;
+    if reference.source_uri() != project_source {
+        return None;
+    }
+    let file = project_dir.join(reference.relative_path());
+    (inside_project(project_dir, &file).is_ok() && file.is_file()).then_some(file)
+}
+
 /// A path the project may be written at: inside its folder, no step back out of it.
 pub fn inside_project(project_dir: &Path, path: &Path) -> Result<(), String> {
     let plain = path
@@ -209,6 +225,21 @@ mod tests {
         assert_eq!(std::fs::read(&output).unwrap(), b"jpeg");
         assert_eq!(std::fs::read(&poster).unwrap(), b"jpeg", "the card is only read");
         assert!(copy_card_poster("qnc://local/source/other/file/x.JPG", &local, &output).is_err(), "not on this computer");
+    }
+
+    #[test]
+    fn a_medium_of_the_project_itself_is_found_in_the_project_folder() {
+        let project = tempfile::tempdir().unwrap();
+        let voice = project.path().join("products/voice");
+        std::fs::create_dir_all(&voice).unwrap();
+        std::fs::write(voice.join("P_OFF1_T1.mxf"), b"mxf").unwrap();
+        let source = "qnc://local/source/project-p1";
+        let uri = qnc_source_contract::SourceReference::new(source, "products/voice/P_OFF1_T1.mxf").unwrap().uri();
+        assert_eq!(in_project_folder(&uri, source, project.path()), Some(voice.join("P_OFF1_T1.mxf")));
+        let card = qnc_source_contract::SourceReference::new("qnc://local/source/card", "products/voice/P_OFF1_T1.mxf").unwrap().uri();
+        assert_eq!(in_project_folder(&card, source, project.path()), None, "a card's medium is the caller's");
+        let missing = qnc_source_contract::SourceReference::new(source, "products/voice/none.mxf").unwrap().uri();
+        assert_eq!(in_project_folder(&missing, source, project.path()), None);
     }
 
     #[test]
