@@ -8677,3 +8677,9 @@ radi bez probe). Izmjereno (Mironik 3608, 20 s originala 1080p50 s kartice): Ope
 dodatne niti ne ubrzavaju), Quick Sync 9,6 s; PSNR 46,4 dB prema 48,9 dB; po sekundi 28,7-35,0 Mbit/s uz 35 (Quick
 Sync 30,5-38,3). AMD racunalo dobiva AMF, NVIDIA NVENC, kao i prije. Testovi `qnc-program-render`,
 `qnc-media-optimize`. Uzivo kroz aplikaciju nije provjereno (ovo racunalo uvijek bira Quick Sync).
+Nalaz i popravak dijagnostike 2026-11-10 (korisnik: "pogledaj onaj 9,9 s decoder-open"): `decoder-open background_ms`
+mjerio je od pocetka otvaranja do trenutka kad ga nit playera preuzme, a player u pauzi dekoder otvoren unaprijed za
+sljedeci rez preuzima tek na Play. Log 10. 11.: dekoder klipa 2 slozene izjave otvoren unaprijed u 855030 (pauza), Play
+u 864803, zapis 9931 ms; isto 3761 ms (cue) i 1674 ms (sync-bed). Nije bilo sporog otvaranja ni cekanja Playa.
+`qnc-broadcast-engine` `decode_input.rs`: nit javlja koliko je otvaranje trajalo, zapis je `decoder-open open_ms=
+taken_after_ms=`. Ponasanje playera isto. Testovi `qnc-broadcast-engine`.

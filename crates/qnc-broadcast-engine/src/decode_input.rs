@@ -96,12 +96,14 @@ impl DecodeInput {
         std::thread::Builder::new()
             .name("qnc-decoder-open".into())
             .spawn(move || {
+                let started = std::time::Instant::now();
                 let context = decode_open_context(&request);
                 let access = opener
                     .lock()
                     .map_err(|_| error("decoder media binding poisoned"))
                     .and_then(|mut open| open(&uri).map_err(|err| error(format!("{context}: {err}"))));
-                let _ = send.send(access.and_then(|access| open_access(request, access, config, &context)));
+                let opened = access.and_then(|access| open_access(request, access, config, &context));
+                let _ = send.send((opened, started.elapsed()));
             })
             .map_err(|_| error("cannot start decoder open thread"))?;
         Ok(Opening::Waiting(receive, std::time::Instant::now()))
@@ -142,9 +144,12 @@ fn open_access(request: DecodeRequest, access: DecodeMediaAccess, config: Decode
     .map_err(|err| error(format!("{context}: {err}")))
 }
 
-/// A decoder that is being opened on its own thread, or is open.
+/// A decoder that is being opened on its own thread, or is open. The thread sends the
+/// decoder with how long opening it took: the wait until the playback thread takes it
+/// (a paused player takes an opened-ahead decoder only at Play) is not opening time
+/// (2026-11-10: "9.9 s" was a decoder opened ahead in a pause and taken at Play).
 pub(crate) enum Opening {
-    Waiting(std::sync::mpsc::Receiver<Result<Decoder>>, std::time::Instant),
+    Waiting(std::sync::mpsc::Receiver<(Result<Decoder>, std::time::Duration)>, std::time::Instant),
     Ready(Decoder),
 }
 
@@ -153,12 +158,16 @@ impl Opening {
     pub fn ready(&mut self) -> Result<Option<&mut Decoder>> {
         if let Opening::Waiting(receive, started) = self {
             match receive.try_recv() {
-                Ok(opened) => {
+                Ok((opened, took)) => {
                     let decoder = opened?;
                     if qnc_dev_diagnostics::player_diagnostics_enabled() {
                         qnc_dev_diagnostics::log_line(
                             qnc_dev_diagnostics::DiagnosticsStream::Player,
-                            format!("decoder-open background_ms={}", started.elapsed().as_millis()),
+                            format!(
+                                "decoder-open open_ms={} taken_after_ms={}",
+                                took.as_millis(),
+                                started.elapsed().as_millis()
+                            ),
                         );
                     }
                     *self = Opening::Ready(decoder);
