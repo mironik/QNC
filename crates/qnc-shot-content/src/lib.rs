@@ -99,9 +99,17 @@ impl ContentClient {
     }
 
     /// The vectors of texts and how they score against pictures.
+    /// A longer list is asked in parts of `MOST_AT_ONCE` (live 2026-11-10: a list of 39 labels
+    /// stopped the whole look at the shots).
     pub fn texts(&self, request: &TextsRequest) -> Result<Texts, String> {
         if request.texts.len() > MOST_AT_ONCE {
-            return Err(format!("more than {MOST_AT_ONCE} texts at once"));
+            let mut all = Texts { vectors: Vec::with_capacity(request.texts.len()), scale: 0.0, bias: 0.0 };
+            for texts in request.texts.chunks(MOST_AT_ONCE) {
+                let part = self.texts(&TextsRequest { model: request.model.clone(), texts: texts.to_vec() })?;
+                (all.scale, all.bias) = (part.scale, part.bias);
+                all.vectors.extend(part.vectors);
+            }
+            return Ok(all);
         }
         let body = serde_json::to_value(request).map_err(|error| error.to_string())?;
         let answer: Texts = serde_json::from_value(self.plugin.call(TEXTS, body)?).map_err(|error| format!("an answer outside the contract: {error}"))?;

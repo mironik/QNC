@@ -8927,3 +8927,9 @@ Tab AI pokrivalice: za recenicu rangiranje kao prije ("1. ..."), za cijeli OFF n
 zatim ostali dijelovi. Sve se racuna samo, bez klika (za breaking news). Polje za pretrazivanje tekstom (pomocni nacin) nije
 izvedeno. Testovi `qnc-broll-suggest` (novi `a_series_gives_each_slot_its_best_part_long_enough_and_none_twice`),
 `qnc-ai-broll` (prosiren), conformance. Uzivo nije provjereno. Nije izvedeno: upis serije kao pokrivalica jednom potvrdom.
+Popravak 2026-11-10 (korisnik: "provjeri log, nista nije napravljeno"; log: "shot-content failed error=more than 32 texts at
+once"): popis oznaka ima 39 oznaka, a program sadrzaja prima najvise 32 teksta po zahtjevu, pa je predaja oznaka padala i nista
+se nije ponovno razvrstalo (rjecnik je izracunat: 399 pojmova za 47 s). `qnc-shot-content` `ContentClient::texts` duzi popis
+sam salje u dijelovima od 32, za sve koji ga koriste. Provjereno `look_card` na PMW-300 594_9488 (samo citanje): 39 oznaka,
+dijelovi bazen 0,78 i vrt. Analiza PMW klipova poslije nove gradnje nije se pokrenula dok je player radio (pozadinski proces
+ceka player); stari pozadinski proces jos je radio pa novi nije mogao biti ugraden.
