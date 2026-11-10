@@ -20,18 +20,28 @@ pub const MODULE_ID: &str = "qnc.module.shot-content-db";
 
 pub type Result<T> = std::result::Result<T, String>;
 
-/// How the content is made; a row made another way is looked at again.
-pub const CONTENT_VERSION: u32 = 1;
+/// How the content is made; a row made another way is looked at again (2: every shot of the
+/// analysis, with its poster, user 2026-11-10).
+pub const CONTENT_VERSION: u32 = 2;
 
-/// What one usable part of a clip shows: clip frames `[from, to)` (as the shot analysis has
-/// them), the frames its pictures were taken at and their vector (unit length).
+/// What one shot of a clip shows (user 2026-11-10: "the agent split the clips into shots, steady,
+/// moving, panning; each gets a poster and a quick split by content"): clip frames `[from, to)`,
+/// how the shot looks (`steady`, `pan` for a usable part; `moving`, `soft`, `still`, `shot` for a
+/// shot without one), the frames its pictures were taken at, their vector (unit length), its
+/// poster (a QNC URI in the project) and whether it was looked at finely (more pictures).
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct PartContent {
     pub from: u64,
     pub to: u64,
+    #[serde(default)]
+    pub kind: String,
     pub frames: Vec<u64>,
     pub vector: Vec<f32>,
+    #[serde(default)]
+    pub poster: String,
+    #[serde(default)]
+    pub fine: bool,
 }
 
 /// What the parts of one clip show, by which model; or why the clip was not looked at

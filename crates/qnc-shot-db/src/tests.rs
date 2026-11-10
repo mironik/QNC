@@ -37,7 +37,7 @@ fn a_kept_analysis_is_read_back_and_a_new_one_replaces_it() {
     assert_eq!(read_clip(&target, "c3").unwrap(), Some(failed));
     save(&target, analysis("c1", vec![shot(0, 300, &[])]), None).unwrap();
     assert_eq!(read_clip(&target, "c1").unwrap().unwrap().shots, [shot(0, 300, &[])]);
-    assert_eq!(read_analysed(&target).unwrap(), ["c1", "c2", "c3"]);
+    assert_eq!(read_analysed(&target).unwrap(), ["c1", "c2"], "the failed c3 is analysed again");
 }
 
 #[test]

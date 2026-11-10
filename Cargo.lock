@@ -3608,12 +3608,14 @@ dependencies = [
  "qnc-ai-catalog",
  "qnc-clip-row",
  "qnc-db-broker",
+ "qnc-image-assets",
  "qnc-shot-content",
  "qnc-shot-content-db",
  "qnc-shot-labels",
  "qnc-source-preview",
  "qnc-transcript-db",
  "qnc-ui-text",
+ "qnc-work-settings",
  "tempfile",
 ]
 

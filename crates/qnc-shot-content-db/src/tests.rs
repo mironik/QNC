@@ -18,7 +18,7 @@ fn project() -> (tempfile::TempDir, ProjectDbTarget) {
 }
 
 fn part(from: u64, to: u64, vector: Vec<f32>) -> PartContent {
-    PartContent { from, to, frames: vec![from], vector }
+    PartContent { from, to, kind: "steady".into(), frames: vec![from], vector, poster: String::new(), fine: false }
 }
 
 fn content(clip: &str, parts: Vec<PartContent>) -> ClipContent {

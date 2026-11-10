@@ -249,6 +249,7 @@ impl ScriptView {
                 seconds: row.seconds,
                 clip: clips.iter().find(|clip| clip.clip_id == row.block.clip_id),
                 icon: qnc_clip_row::PoolIcon::None,
+                poster: None,
             })
             .collect()
     }
@@ -266,6 +267,7 @@ impl ScriptView {
                 seconds: voice.takes.iter().find(|take| take.take == voice.chosen).map_or(0.0, |take| take.seconds),
                 clip: None,
                 icon: qnc_clip_row::PoolIcon::Microphone,
+                poster: None,
             })
             .collect()
     }

@@ -62,6 +62,9 @@ pub struct AiPart {
     pub share: f32,
     /// Its A1 is spoken (a transcript of the clip has words for most of it).
     pub spoken: bool,
+    /// How the shot looks (steady, pan, moving, soft, still, shot) and its poster (a project URI).
+    pub kind: String,
+    pub poster: String,
 }
 
 /// What the tab shows.
@@ -69,25 +72,42 @@ pub struct AiPart {
 pub struct AiBrollView {
     /// In the order shown.
     pub parts: Vec<AiPart>,
+    /// The shots' posters read so far, by URI.
+    pub posters: std::collections::HashMap<String, std::sync::Arc<qnc_image_assets::RgbaImage>>,
     pub message: String,
+}
+
+/// The words of a shot's kind.
+fn kind_text(kind: &str) -> &'static str {
+    match kind {
+        "steady" => qnc_ui_text::text("shots.camera.steady"),
+        "pan" => qnc_ui_text::text("shots.camera.pan"),
+        "moving" => qnc_ui_text::text("shots.look.moving"),
+        "soft" => qnc_ui_text::text("shots.look.soft"),
+        "still" => qnc_ui_text::text("shots.look.still"),
+        _ => "",
+    }
 }
 
 impl AiBrollView {
     /// The parts of the clips of the pool as cards: "Label · clip", the part's duration, the
     /// clip's poster. A part of a clip the pool has not is left out.
-    pub fn cards<'a>(&self, clips: &'a [ClipRow]) -> Vec<TabCard<'a>> {
+    pub fn cards<'a>(&'a self, clips: &'a [ClipRow]) -> Vec<TabCard<'a>> {
         self.parts
             .iter()
             .filter_map(|part| {
                 let clip = clips.iter().find(|clip| clip.clip_id == part.clip_id)?;
                 let label = qnc_ui_text::host().ok().and_then(|texts| texts.get(&part.text).ok()).unwrap_or(&part.label);
                 let per_frame = if clip.duration_frames > 0 { clip.duration_seconds / clip.duration_frames as f64 } else { 0.0 };
+                let kind = kind_text(&part.kind);
+                let label = if kind.is_empty() { label.to_string() } else { format!("{label} · {kind}") };
                 Some(TabCard {
                     id: format!("{}|{}|{}", part.clip_id, part.from, part.to),
-                    title: qnc_ui_text::fill(if part.spoken { "ai_broll.card_spoken" } else { "ai_broll.card" }, &[("label", label), ("clip", &clip.name)]).into(),
+                    title: qnc_ui_text::fill(if part.spoken { "ai_broll.card_spoken" } else { "ai_broll.card" }, &[("label", &label), ("clip", &clip.name)]).into(),
                     seconds: (part.to - part.from) as f64 * per_frame,
                     clip: Some(clip),
                     icon: qnc_clip_row::PoolIcon::None,
+                    poster: self.posters.get(&part.poster).map(|image| (part.poster.as_str(), image.as_ref())),
                 })
             })
             .collect()
@@ -140,6 +160,8 @@ pub fn sort_parts(
                     label,
                     share,
                     spoken,
+                    kind: part.kind.clone(),
+                    poster: part.poster.clone(),
                 },
             ))
         })
@@ -148,7 +170,8 @@ pub fn sort_parts(
     parts.into_iter().map(|(_, part)| part).collect()
 }
 
-type Read = Result<Vec<AiPart>, String>;
+/// The parts in order and the posters newly read.
+type Read = Result<(Vec<AiPart>, Vec<(String, std::sync::Arc<qnc_image_assets::RgbaImage>)>), String>;
 
 /// The AI B-roll of the project on the preview.
 #[derive(Debug, Default)]
@@ -184,7 +207,8 @@ impl AiBroll {
         if let Some(reading) = &self.reading {
             if let Ok(result) = reading.try_recv() {
                 match result {
-                    Ok(parts) => {
+                    Ok((parts, posters)) => {
+                        self.view.posters.extend(posters);
                         self.view.parts = parts;
                         self.view.message.clear();
                     }
@@ -196,7 +220,8 @@ impl AiBroll {
         if let Some(project) = project.filter(|_| self.reading.is_none() && self.read_at.is_none_or(|at| at.elapsed() >= READ_EVERY)) {
             self.read_at = Some(Instant::now());
             let (send, read) = mpsc::channel();
-            if std::thread::Builder::new().name("qnc-ai-broll-read".into()).spawn(move || _ = send.send(read_parts(&project))).is_ok() {
+            let (settings, known) = (preview.project_settings(), self.view.posters.keys().cloned().collect::<std::collections::HashSet<_>>());
+            if std::thread::Builder::new().name("qnc-ai-broll-read".into()).spawn(move || _ = send.send(read_parts(&project, settings, &known))).is_ok() {
                 self.reading = Some(read);
             }
         }
@@ -223,8 +248,30 @@ impl AiBroll {
     }
 }
 
-/// The parts of the project behind `target` for the model of this host.
-fn read_parts(target: &ProjectDbTarget) -> Read {
+/// The parts of the project behind `target` for the model of this host, and the posters of its
+/// shots not in `known`, read from the project folder.
+fn read_parts(target: &ProjectDbTarget, settings: Option<(qnc_work_settings::SettingsReader, qnc_work_settings::WorkSettings)>, known: &std::collections::HashSet<String>) -> Read {
+    let parts = read_sorted(target)?;
+    let folder = settings.and_then(|(reader, settings)| Some((reader.local_workspace_dir(&settings).ok()??, settings.output_root_uri)));
+    let posters = folder.map_or_else(Vec::new, |(dir, root)| {
+        parts
+            .iter()
+            .filter(|part| !part.poster.is_empty() && !known.contains(&part.poster))
+            .filter_map(|part| {
+                let relative = part.poster.strip_prefix(root.trim_end_matches('/'))?.strip_prefix('/')?;
+                let file = dir.join(relative);
+                // A poster inside the project only.
+                (file.starts_with(&dir) && !relative.contains("..")).then_some(())?;
+                let image = qnc_image_assets::decode_thumbnail(&std::fs::read(file).ok()?).ok()?;
+                Some((part.poster.clone(), std::sync::Arc::new(image)))
+            })
+            .collect()
+    });
+    Ok((parts, posters))
+}
+
+/// The parts of the project behind `target` for the model of this host, in the tab's order.
+fn read_sorted(target: &ProjectDbTarget) -> Result<Vec<AiPart>, String> {
     let engine = qnc_ai_catalog::installed_shot_content()?;
     let model = engine.model_name();
     let list = qnc_shot_labels::Labels::read(&qnc_shot_labels::installed_path()?)?;
@@ -258,7 +305,7 @@ mod tests {
     }
 
     fn part(from: u64, to: u64, vector: Vec<f32>) -> PartContent {
-        PartContent { from, to, frames: vec![from], vector }
+        PartContent { from, to, kind: "steady".into(), frames: vec![from], vector, poster: String::new(), fine: false }
     }
 
     #[test]
@@ -325,7 +372,7 @@ mod tests {
     #[test]
     fn a_click_opens_only_a_part_the_tab_shows() {
         let mut broll = AiBroll::new();
-        broll.view.parts = vec![AiPart { clip_id: "clip|x".into(), from: 10, to: 90, label: "sea".into(), text: "shot.label.sea".into(), share: 1.0, spoken: false }];
+        broll.view.parts = vec![AiPart { clip_id: "clip|x".into(), from: 10, to: 90, label: "sea".into(), text: "shot.label.sea".into(), share: 1.0, spoken: false, kind: "steady".into(), poster: String::new() }];
         assert_eq!(broll.act(OPEN, Some("clip|x|10|90")), Some(true));
         assert_eq!(broll.take_source_request(), Some(("clip|x".to_string(), 10, 90)));
         assert_eq!(broll.act(OPEN, Some("clip|x|10|91")), Some(false));

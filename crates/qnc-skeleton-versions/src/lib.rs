@@ -39,6 +39,7 @@ impl VersionsView {
                 seconds: 0.0,
                 clip: None,
                 icon: qnc_clip_row::PoolIcon::None,
+                poster: None,
             })
             .collect()
     }

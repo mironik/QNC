@@ -110,7 +110,7 @@ impl Store {
     }
 
     fn read_analysed(&mut self) -> Result<Data> {
-        let mut statement = self.conn.prepare("SELECT clip_id FROM public_clip_shots WHERE version = ?1 ORDER BY clip_id").map_err(err)?;
+        let mut statement = self.conn.prepare("SELECT clip_id FROM public_clip_shots WHERE version = ?1 AND error = '' ORDER BY clip_id").map_err(err)?;
         let clips = statement.query_map(params![ANALYSIS_VERSION], |r| r.get(0)).map_err(err)?.collect::<std::result::Result<Vec<String>, _>>().map_err(err)?;
         Ok(Data::Analysed(clips))
     }

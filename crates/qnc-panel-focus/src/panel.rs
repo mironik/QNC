@@ -92,7 +92,7 @@ pub struct FocusView {
 impl FocusView {
     /// The cards of a pool tab the right panel's pieces fill (SubSegment, Voice, Stories) and
     /// the action a click sends with the card's id.
-    pub fn tab_cards<'a>(&self, tab: qnc_pool_tabs::LibraryTab, clips: &'a [qnc_clip_row::ClipRow]) -> (Vec<qnc_clip_row::TabCard<'a>>, &'static str) {
+    pub fn tab_cards<'a>(&'a self, tab: qnc_pool_tabs::LibraryTab, clips: &'a [qnc_clip_row::ClipRow]) -> (Vec<qnc_clip_row::TabCard<'a>>, &'static str) {
         match tab {
             qnc_pool_tabs::LibraryTab::Stories => (self.versions.cards(), qnc_skeleton_versions::OPEN),
             qnc_pool_tabs::LibraryTab::AiBroll => (self.ai_broll.cards(clips), qnc_ai_broll::OPEN),

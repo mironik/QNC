@@ -8807,3 +8807,18 @@ samo MXF originale (od 27. 10.), pa su FX3A MP4 klipovi zapisani s greskom "nema
 i agent sadrzaja. `ANALYSIS_VERSION` 3: svi klipovi se analiziraju ponovno. Provjereno (kartica G: samo citana): C0013 (FX3A MP4)
 jedan dio, staklenik 0,99; C0012 ima samo 2 kljucne slike i nema upotrebljiv dio. Testovi `qnc-ai-broll` (A1 pravilo),
 `qnc-shot-analysis`, `qnc-shot-db`, `qnc-mp4-sound`, conformance.
+Izmjena 2026-11-10 (korisnik: "AI agent je bio podijelio klipove po kadrovima: miran, pokretan, svenk; za te kadrove trebalo je
+generirati po jedan poster i na osnovu njih napraviti brzu AI podjelu po sadrzaju; ovako si ostao bez kadrova za pokrivalice";
+"moras vratiti staru analizu od jucer koja je trazila iskoristive kadrove"; "posteri pa ucenje"): (1) Analiza kadrova od jucer je
+vracena: `ANALYSIS_VERSION` ostaje 2 (podizanje na 3 sakrilo je jucerasnje upotrebljive dijelove dok se klip ne analizira ponovno), a
+ponovno se analiziraju samo klipovi cija analiza nije uspjela (`qnc-shot-db` `read_analysed` vraca samo uspjele; tako MP4 klipovi
+dobivaju analizu). (2) Jedinica sadrzaja je svaki kadar analize (`qnc-shot-content-run` `units`): svaki upotrebljivi dio (miran,
+svenk), ostatak kadra izmedju i oko njih od barem 2 s (pokretan), i kadar bez dijela kakav jest (pokretan, mutan, miran) od barem 0,5 s;
+crni se izostavlja. (3) Brzo pa fino: najprije svaki klip, jedna slika po kadru (najostrija, ostatak kadra njegova sredina),
+dekodirana 384x216, ujedno poster kadra u projektu (`products/thumbnails/<klip>/shots/<od>-<do>.jpg`); zatim fino, upotrebljivi
+dijelovi s brojem slika iz AI kataloga. `qnc-shot-content-db` `PartContent.kind`, `poster`, `fine`, `CONTENT_VERSION` 2. (4) Tab AI
+pokrivalice: poster kadra na kartici (`qnc-clip-row` `TabCard.poster`; posteri se citaju u pozadini iz mape projekta,
+`qnc-source-preview` `project_settings`), naslov "Oznaka · vrsta kadra · klip". (5) Nova oznaka "Automobil". Provjereno (kartice samo
+citane): 3615 dva mirna dijela Ljudi 0,97 i pokretni dio izmedju njih Dokument 0,97; C0012 (FX3A, bez upotrebljivog dijela) kadar
+Staklenik 1,00; C0014 Automobil 0,94 (prije bez oznake auta "sport"). Testovi `qnc-shot-content-run` (`units`), `qnc-shot-db`,
+`qnc-ai-broll`, conformance. Nije izvedeno: ucenje iz ispravaka (sljedece).

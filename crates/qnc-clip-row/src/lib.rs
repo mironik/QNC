@@ -138,6 +138,8 @@ pub struct TabCard<'a> {
     pub seconds: f64,
     pub clip: Option<&'a ClipRow>,
     pub icon: PoolIcon,
+    /// A poster of its own (where it is and the loaded picture), shown before the clip's.
+    pub poster: Option<(&'a str, &'a RgbaImage)>,
 }
 
 impl PoolItem for TabCard<'_> {
@@ -151,7 +153,10 @@ impl PoolItem for TabCard<'_> {
         &self.title
     }
     fn card_poster(&self) -> (Option<&str>, Option<&RgbaImage>) {
-        self.clip.map_or((None, None), |clip| clip.card_poster())
+        match self.poster {
+            Some((uri, image)) => (Some(uri), Some(image)),
+            None => self.clip.map_or((None, None), |clip| clip.card_poster()),
+        }
     }
     fn card_seconds(&self) -> f64 {
         self.seconds

@@ -25,14 +25,16 @@ fn main() -> Result<(), String> {
     let texts = client.texts(&qnc_shot_content::TextsRequest { model: engine.model.clone(), texts: labels.prompts() })?;
     println!("agent ready and {} labels: {} ms", labels.labels.len(), started.elapsed().as_millis());
     let started = Instant::now();
-    let parts = qnc_shot_content_run::look_file("look-card", codec, path, &found.parts, count, &engine.model, &client, &pace)?;
+    let shots = qnc_shot_db::ClipShots { clip_id: "look-card".into(), media_uri: String::new(), pictures: found.pictures, shots: found.shots.clone(), parts: found.parts.clone(), error: String::new(), took_ms: 0 };
+    let units = qnc_shot_content_run::units(&shots);
+    let parts = qnc_shot_content_run::look_file("look-card", codec, path, &units, count, &engine.model, &client, &pace, None)?;
     let pictures: usize = parts.iter().map(|part| part.frames.len()).sum();
     println!("content: {} parts, {pictures} pictures, {} ms", parts.len(), started.elapsed().as_millis());
     for part in &parts {
         let logits = texts.logits(&part.vector);
         let statement = if labels.is_statement(&logits) { "STATEMENT " } else { "" };
         let best: Vec<String> = labels.shares(&logits).into_iter().take(3).map(|(code, share)| format!("{code} {share:.2}")).collect();
-        println!("{:>6}-{:<6} frames {:?}: {statement}{}", part.from, part.to, part.frames, best.join(", "));
+        println!("{:>6}-{:<6} {:<7} frames {:?}: {statement}{}", part.from, part.to, part.kind, part.frames, best.join(", "));
     }
     Ok(())
 }

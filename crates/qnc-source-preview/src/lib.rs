@@ -535,6 +535,13 @@ impl SourcePreview {
         self.context.as_ref()?.project_target.as_ref()
     }
 
+    /// The project's settings and their reader, for a piece that reads the project's own files
+    /// off the UI thread (the posters of the shots, user 2026-11-10).
+    pub fn project_settings(&self) -> Option<(SettingsReader, WorkSettings)> {
+        let context = self.context.as_ref()?;
+        Some((context.reader.clone(), context.settings.clone()))
+    }
+
     /// The reader of the project's published waves and filmstrips (a SubSegment draws its
     /// parts' waves with it).
     pub fn artifact_reader(&self) -> Option<Arc<dyn TimelineArtifactRead>> {

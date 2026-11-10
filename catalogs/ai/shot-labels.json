@@ -17,6 +17,7 @@
     { "code": "interior", "text": "shot.label.interior", "prompt": "a photo of a room inside a building" },
     { "code": "street", "text": "shot.label.street", "prompt": "a photo of a city street" },
     { "code": "traffic", "text": "shot.label.traffic", "prompt": "a photo of cars and traffic" },
+    { "code": "car", "text": "shot.label.car", "prompt": "a photo of a car" },
     { "code": "police", "text": "shot.label.police", "prompt": "a photo of police" },
     { "code": "hospital", "text": "shot.label.hospital", "prompt": "a photo of a hospital" },
     { "code": "school", "text": "shot.label.school", "prompt": "a photo of a school or a classroom" },

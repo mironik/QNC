@@ -43,9 +43,8 @@ pub struct PartRecord {
     pub key_frame: u64,
 }
 
-/// How the analysis is made; a row made another way is analysed again (3: MP4 originals through
-/// their index, 2026-11-10).
-pub const ANALYSIS_VERSION: u32 = 3;
+/// How the analysis is made; a row made another way is analysed again.
+pub const ANALYSIS_VERSION: u32 = 2;
 
 /// The analysis of one clip: its shots, from how many pictures, of which medium; or why it
 /// failed (`error` not empty, no shots).
@@ -72,7 +71,8 @@ pub enum Operation {
     Save(ClipShots),
     /// The analysis of a clip.
     ReadClip { clip_id: String },
-    /// The clips that have an analysis of this `ANALYSIS_VERSION` (done or failed).
+    /// The clips analysed well with this `ANALYSIS_VERSION`; a clip whose analysis failed is analysed
+    /// again (2026-11-10: MP4 originals were refused until their index was read).
     ReadAnalysed,
 }
 

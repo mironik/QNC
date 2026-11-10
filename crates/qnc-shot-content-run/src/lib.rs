@@ -26,8 +26,9 @@ use qnc_work_settings::{SettingsReader, WorkSettings};
 
 pub const MODULE_ID: &str = "qnc.module.shot-content-run";
 
-/// The side of the square picture the model is given.
-const PICTURE: [u32; 2] = [224, 224];
+/// The pictures decoded for a shot: its poster and what the model is given (the model makes it
+/// square itself).
+const PICTURE: [u32; 2] = [384, 216];
 
 /// Looks at every clip of the project whose usable parts are not looked at yet by the model of
 /// this host; returns how many it kept. Nothing is done when the project has AI off or this host
@@ -78,16 +79,29 @@ pub fn look_missing(reader: &SettingsReader, settings: &WorkSettings, local_medi
         }
         None => stored.map(|set| qnc_shot_content::Texts { vectors: set.labels.into_iter().map(|label| label.vector).collect(), scale: set.scale, bias: set.bias }),
     };
+    // Where the shots' posters go: the project's thumbnails, a folder a clip.
+    let project_dir = reader.local_workspace_dir(settings).map_err(|e| e.to_string())?.ok_or(qnc_ui_text::text("import.import_needs_local_access_project_folder"))?;
+    let thumbnails = (settings.product_local_dir(&project_dir, qnc_work_settings::ProductArea::Thumbnails), settings.product_uri(qnc_work_settings::ProductArea::Thumbnails));
+    // First quickly, every clip: one picture a shot, its poster (user 2026-11-10); then finely,
+    // the usable parts with as many pictures as this host says.
+    let mut fine: Vec<String> = if engine.pictures > 1 {
+        qnc_shot_content_db::read_all(&db, &model)?.into_iter().filter(|clip| clip.parts.iter().any(|part| !part.fine && is_part(&part.kind))).map(|clip| clip.clip_id).collect()
+    } else {
+        Vec::new()
+    };
     let mut kept = 0;
-    while !remaining.is_empty() {
+    while !remaining.is_empty() || !fine.is_empty() {
         if !wait_for_player(pace) {
             break;
         }
-        let at = (pace.wanted)().and_then(|clip| remaining.iter().position(|id| *id == clip)).unwrap_or(0);
-        let clip_id = remaining.remove(at);
+        let quick = !remaining.is_empty();
+        let queue = if quick { &mut remaining } else { &mut fine };
+        let at = (pace.wanted)().and_then(|clip| queue.iter().position(|id| *id == clip)).unwrap_or(0);
+        let clip_id = queue.remove(at);
         let Some(shots) = qnc_shot_db::read_clip(&db, &clip_id)? else { continue };
-        if shots.parts.is_empty() {
-            // Nothing usable to look at (or the analysis failed): kept as looked at, with why.
+        let units = units(&shots);
+        if units.is_empty() {
+            // Nothing to look at (or the analysis failed): kept as looked at, with why.
             let why = if shots.error.is_empty() { qnc_ui_text::text("shots.content_no_parts").to_string() } else { shots.error.clone() };
             qnc_shot_content_db::save(&db, ClipContent { clip_id, model: model.clone(), parts: Vec::new(), error: why, took_ms: 0 }, lease.clone())?;
             continue;
@@ -103,7 +117,24 @@ pub fn look_missing(reader: &SettingsReader, settings: &WorkSettings, local_medi
             continue;
         };
         let started = Instant::now();
-        let looked = look_file(&clip_id, codec, &path, &shots.parts, engine.pictures, &engine.model, &client, pace);
+        let looked = if quick {
+            let folder = thumbnails.0.join(&clip_id).join("shots");
+            let base = format!("{}/{clip_id}/shots", thumbnails.1.trim_end_matches('/'));
+            look_file(&clip_id, codec, &path, &units, 1, &engine.model, &client, pace, Some((&folder, &base)))
+        } else {
+            // Finely: the parts with more pictures; a shot without one keeps its quick look.
+            let before = qnc_shot_content_db::read_clip(&db, &clip_id)?.map(|clip| clip.parts).unwrap_or_default();
+            let parts: Vec<PartRecord> = units.iter().filter(|unit| is_part(&unit.camera)).cloned().collect();
+            look_file(&clip_id, codec, &path, &parts, engine.pictures, &engine.model, &client, pace, None).map(|finer| {
+                before
+                    .into_iter()
+                    .map(|old| match finer.iter().find(|new| new.from == old.from && new.to == old.to) {
+                        Some(new) => PartContent { frames: new.frames.clone(), vector: new.vector.clone(), fine: true, ..old },
+                        None => PartContent { fine: true, ..old },
+                    })
+                    .collect()
+            })
+        };
         if pace.cancel.load(Ordering::Relaxed) {
             break;
         }
@@ -112,18 +143,74 @@ pub fn look_missing(reader: &SettingsReader, settings: &WorkSettings, local_medi
             Err(error) => ClipContent { clip_id: clip_id.clone(), model: model.clone(), parts: Vec::new(), error, took_ms: 0 },
         };
         let content = ClipContent { took_ms: started.elapsed().as_millis() as u64, ..content };
-        log(format!("shot-content clip={clip_id} parts={} ms={} error={}", content.parts.len(), content.took_ms, content.error));
+        log(format!("shot-content clip={clip_id} {} shots={} ms={} error={}", if quick { "quick" } else { "fine" }, content.parts.len(), content.took_ms, content.error));
         if let (Some(list), Some(texts)) = (&labels, &label_texts) {
             for part in &content.parts {
                 let best: Vec<String> = list.best(&texts.logits(&part.vector)).into_iter().take(3).map(|(code, score)| format!("{code}:{score:.2}")).collect();
-                log(format!("shot-content clip={clip_id} part={}-{} frames={:?} labels={}", part.from, part.to, part.frames, best.join(",")));
+                log(format!("shot-content clip={clip_id} shot={}-{} kind={} frames={:?} labels={}", part.from, part.to, part.kind, part.frames, best.join(",")));
             }
+        }
+        // A quick look of a clip that has parts goes on to be looked at finely.
+        if quick && engine.pictures > 1 && content.parts.iter().any(|part| is_part(&part.kind)) {
+            fine.push(clip_id.clone());
         }
         qnc_shot_content_db::save(&db, content, lease.clone())?;
         kept += 1;
     }
     Ok(kept)
 }
+
+/// Whether a shot kind is a usable part of the analysis (steady, pan).
+fn is_part(kind: &str) -> bool {
+    matches!(kind, "steady" | "pan")
+}
+
+/// The shots a clip is looked at in (user 2026-11-10: "every shot the analysis found: steady,
+/// moving, panning"): each usable part, and each shot that has no usable part as it is (its look
+/// as its kind: moving, soft, still), except a black one and one shorter than half a second.
+pub fn units(shots: &qnc_shot_db::ClipShots) -> Vec<PartRecord> {
+    let mut units = Vec::new();
+    for shot in &shots.shots {
+        if shot.looks.iter().any(|look| look == "black") {
+            continue;
+        }
+        let inside: Vec<&PartRecord> = shots.parts.iter().filter(|part| shot.from <= part.from && part.to <= shot.to).collect();
+        if inside.is_empty() {
+            if shot.to - shot.from >= SHORTEST_SHOT {
+                let kind = ["moving", "soft", "still"].into_iter().find(|look| shot.looks.iter().any(|l| l == look)).unwrap_or("shot");
+                units.push(PartRecord { from: shot.from, to: shot.to, camera: kind.into(), key_frame: shot.key_frame });
+            }
+        } else {
+            // The usable parts, and what lies between and around them in the shot (the camera
+            // moving or not steady enough): a potential B-roll too.
+            let mut at = shot.from;
+            for part in inside {
+                if part.from >= at + SHORTEST_GAP {
+                    units.push(gap(shot, at, part.from));
+                }
+                units.push(part.clone());
+                at = at.max(part.to);
+            }
+            if shot.to >= at + SHORTEST_GAP {
+                units.push(gap(shot, at, shot.to));
+            }
+        }
+    }
+    units
+}
+
+/// The rest of a shot outside its usable parts, as a unit of the shot's look (moving when it
+/// has none), its middle as its picture.
+fn gap(shot: &qnc_shot_db::ShotRecord, from: u64, to: u64) -> PartRecord {
+    let kind = ["moving", "soft", "still"].into_iter().find(|look| shot.looks.iter().any(|l| l == look)).unwrap_or("moving");
+    PartRecord { from, to, camera: kind.into(), key_frame: from + (to - from) / 2 }
+}
+
+/// The shortest rest of a shot looked at (frames; two seconds at 50p).
+const SHORTEST_GAP: u64 = 100;
+
+/// The shortest shot looked at (frames; half a second at 50p).
+const SHORTEST_SHOT: u64 = 25;
 
 /// Whether the kept label vectors are of the same labels and prompts, in the same order.
 fn same_labels(set: &qnc_shot_content_db::LabelSet, list: &qnc_shot_labels::Labels) -> bool {
@@ -149,7 +236,7 @@ pub fn chosen_frames(part: &PartRecord, count: u8) -> Vec<u64> {
 /// The content of the parts of one MXF original at `path` (only read), its pictures `codec`
 /// (`h264`, `mpeg2video`), `count` pictures a part, by the agent behind `client`.
 #[allow(clippy::too_many_arguments)]
-pub fn look_file(clip_id: &str, codec: &str, path: &Path, parts: &[PartRecord], count: u8, model: &Path, client: &qnc_shot_content::ContentClient, pace: &Pace<'_>) -> Result<Vec<PartContent>, String> {
+pub fn look_file(clip_id: &str, codec: &str, path: &Path, parts: &[PartRecord], count: u8, model: &Path, client: &qnc_shot_content::ContentClient, pace: &Pace<'_>, posters: Option<(&Path, &str)>) -> Result<Vec<PartContent>, String> {
     let mut keys = qnc_shot_analysis::KeyPictures::open(path)?.ok_or_else(|| qnc_ui_text::text("shots.no_index").to_string())?;
     let codec = keys.codec().unwrap_or(codec);
     // Every part's pictures: the intra picture nearest each chosen frame, inside the part.
@@ -189,6 +276,17 @@ pub fn look_file(clip_id: &str, codec: &str, path: &Path, parts: &[PartRecord], 
             if let Some(missing) = decoded.iter().find(|file| !file.is_file()) {
                 return Err(format!("{}: {}", qnc_ui_text::text("shots.no_pictures"), missing.display()));
             }
+            // The first picture of a shot is its poster (the sharpest), kept in the project.
+            if let Some((folder, _)) = posters {
+                fs::create_dir_all(folder).map_err(|e| e.to_string())?;
+                for (n, (part, _, _)) in batch.iter().enumerate() {
+                    let unit = &parts[*part];
+                    let poster = folder.join(poster_name(unit));
+                    if !poster.is_file() {
+                        fs::copy(&decoded[n], &poster).map_err(|e| e.to_string())?;
+                    }
+                }
+            }
             vectors.extend(client.pictures(&qnc_shot_content::PicturesRequest { model: model.to_path_buf(), pictures: decoded })?);
         }
         Ok(vectors)
@@ -203,11 +301,19 @@ pub fn look_file(clip_id: &str, codec: &str, path: &Path, parts: &[PartRecord], 
             (!of_part.is_empty()).then(|| PartContent {
                 from: part.from,
                 to: part.to,
+                kind: part.camera.clone(),
                 frames: of_part.iter().map(|(_, at)| *at).collect(),
                 vector: mean(of_part.iter().map(|(vector, _)| vector.as_slice())),
+                poster: posters.map(|(_, base)| format!("{base}/{}", poster_name(part))).unwrap_or_default(),
+                fine: count > 1,
             })
         })
         .collect())
+}
+
+/// The file name of a shot's poster.
+fn poster_name(part: &PartRecord) -> String {
+    format!("{}-{}.jpg", part.from, part.to)
 }
 
 
@@ -258,6 +364,23 @@ mod tests {
         assert_eq!(chosen_frames(&part(100, 600, 350), 2), [350, 200]);
         assert_eq!(chosen_frames(&part(100, 600, 350), 3), [350, 200, 499]);
         assert_eq!(chosen_frames(&part(10, 12, 10), 3), [10, 11], "a short part has no frame twice");
+    }
+
+    #[test]
+    fn every_shot_is_looked_at_as_its_usable_parts_or_as_itself() {
+        let shot = |from, to, looks: &[&str], key| qnc_shot_db::ShotRecord { from, to, looks: looks.iter().map(|l| l.to_string()).collect(), key_frame: key, brightness: 100.0, sharpness: 50.0, motion: 0.0 };
+        let shots = qnc_shot_db::ClipShots {
+            clip_id: "c".into(),
+            media_uri: "qnc://x".into(),
+            pictures: 10,
+            shots: vec![shot(0, 300, &["still"], 100), shot(300, 400, &["moving"], 350), shot(400, 410, &["moving"], 405), shot(410, 600, &["black"], 500)],
+            parts: vec![part(20, 200, 80)],
+            error: String::new(),
+            took_ms: 0,
+        };
+        let units = units(&shots);
+        let shown: Vec<(u64, u64, &str)> = units.iter().map(|u| (u.from, u.to, u.camera.as_str())).collect();
+        assert_eq!(shown, [(20, 200, "steady"), (200, 300, "still"), (300, 400, "moving")], "the part of the first shot and its rest after it (before it too short), the moving shot as it is; too short and black left out");
     }
 
     #[test]
