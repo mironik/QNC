@@ -1,0 +1,21 @@
+{
+  "module_id": "qnc.module.broll-suggest",
+  "module_name": "B-roll suggestion",
+  "module_version": "0.1.0",
+  "module_kind": "library",
+  "capabilities": ["broll.suggest.slot", "broll.suggest.rank"],
+  "input_contract_version": "0.1.0",
+  "output_contract_version": "0.1.0",
+  "transport_protocol_version": "0.1.0",
+  "transport_scope": ["local", "lan", "intranet"],
+  "supported_os": ["windows", "linux", "macos"],
+  "supported_cpu": ["x86_64", "aarch64"],
+  "forbidden_calls": ["db.write", "media.decode", "media.probe.full", "source.write", "playback.clock"],
+  "forbidden_dependencies": ["qnc.module.media-probe"],
+  "state_policy": "session_local",
+  "database_write_policy": "no_db_writes",
+  "runtime_crate": "qnc-broll-suggest",
+  "input": "The slot chosen in the story (its length and the A1 pieces it plays, from the story's placements); the words said there, read off the form thread from the project database: a clip's transcript, or the words heard in an OFF reading; the shot-content program of this host's AI catalog for the text's vector.",
+  "output": "The suggestion of the slot: its length, its words and their vector; how like it a usable part's vector is (cosine). The AI B-roll tab puts the parts long enough first, the most like the words first, numbered.",
+  "specification": "User 2026-11-10: B-roll suggested for the words of an OFF: the text gives the length, the shots long enough are ranked by how like the text they are."
+}

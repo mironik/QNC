@@ -174,6 +174,7 @@ impl PanelFocus {
         self.keyframes.poll(preview, segments, timeline); // a key picture found moves its edit
         let button = (self.panel == Panel::SourceButtons).then(|| self.walk.chosen_in(qnc_focus_walk::SOURCE_BUTTONS).map(str::to_string)).flatten();
         qnc_dev_diagnostics::timed_block("poll-side", || self.side.poll(preview, timeline, clips));
+        self.side.follow_slot(|| qnc_ai_broll::ask_of(segments.view()), preview); // B-roll for the words of the chosen slot
         // A take of a voice record clicked: its clip on the source timeline, A1 on its channel,
         // played from its start (a reading found in a recording made elsewhere: from its start
         // in that clip).

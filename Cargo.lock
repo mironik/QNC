@@ -3606,6 +3606,7 @@ name = "qnc-ai-broll"
 version = "0.1.0"
 dependencies = [
  "qnc-ai-catalog",
+ "qnc-broll-suggest",
  "qnc-clip-row",
  "qnc-db-broker",
  "qnc-dev-diagnostics",
@@ -3803,6 +3804,21 @@ dependencies = [
  "serde_json",
  "wgpu",
  "winit",
+]
+
+[[package]]
+name = "qnc-broll-suggest"
+version = "0.1.0"
+dependencies = [
+ "qnc-ai-catalog",
+ "qnc-db-broker",
+ "qnc-dev-diagnostics",
+ "qnc-plugin-process",
+ "qnc-program-view",
+ "qnc-script-db",
+ "qnc-shot-content",
+ "qnc-transcript-db",
+ "qnc-voice-take",
 ]
 
 [[package]]

@@ -277,6 +277,7 @@ members = [
     "crates/qnc-ai-broll",
     "crates/qnc-shot-labels",
     "crates/qnc-shot-examples",
+    "crates/qnc-broll-suggest",
     "crates/qnc-shot-content-run",
     "crates/qnc-shot-content-db",
     "crates/qnc-shot-content",
@@ -602,6 +603,7 @@ qnc-siglip = { path = "crates/qnc-siglip" }
 qnc-ai-broll = { path = "crates/qnc-ai-broll" }
 qnc-shot-labels = { path = "crates/qnc-shot-labels" }
 qnc-shot-examples = { path = "crates/qnc-shot-examples" }
+qnc-broll-suggest = { path = "crates/qnc-broll-suggest" }
 qnc-shot-content-run = { path = "crates/qnc-shot-content-run" }
 qnc-shot-content-db = { path = "crates/qnc-shot-content-db" }
 qnc-shot-content = { path = "crates/qnc-shot-content" }

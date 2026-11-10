@@ -8875,3 +8875,18 @@ dobio je Snimatelj (`camera`), Pozornica (`stage`) i Stadion (`stadium`) (rjecni
 dijelova izjava (prije 9 od 10), 3615, 3616 (knjiga, ljudi) pokrivalice. Debug cache obrisan uz dozvolu korisnika
 (`cargo clean --profile dev`, 66,1 GiB). Release `qnc-app` (s `libav`), `qnc-ingest-worker` i `qnc-shot-content-siglip` izgradeni.
 Uzivo nije provjereno.
+Izvedeno 2026-11-10 (korisnik: "da, napravi prijedlog pokrivalica prema tekstu OFF-a"; usporedba s tekstom o NLE-u: "tekst daje
+duljinu, kadrovi dovoljne duljine rangirani po slicnosti s tekstom"): nova javna kocka `crates/qnc-broll-suggest` (+ ugovor
+`contracts/modules/broll-suggest.module.json`): slot izabran u prici (Story, S-Story; izmedu dva M markera) daje duljinu u
+sekundama i komade A1 u njemu (`ask_of`, iz postojecih `wave_placements` price, u slikama klipa); rijeci izgovorene ondje su
+rijeci prijepisa klipa (sredina rijeci u komadu) ili rijeci cute u citanju OFF-a (`heard`, sekunde klipa citanja) (`words_of`);
+jedna pozadinska nit cita ih iz baze projekta i od istog programa sadrzaja kadra (`qnc-shot-content`, SigLIP 2 cita hrvatski)
+dobiva vektor teksta; program ostaje pokrenut za sljedeci slot, vrijedi samo zadnji izabrani slot. Tab AI pokrivalice
+(`qnc-ai-broll` `AiBrollView.suggestion`, `cards`) tada stavlja upotrebljive dijelove dovoljno duge za slot prve, najslicnije
+rijecima prve, s rednim brojem u naslovu ("1. Luka · ..."); kraci dolaze iza bez broja. Bez izabranog slota ili bez rijeci
+poredak je kao prije. Spoj: `qnc-side-pieces` `follow_slot`, `qnc-panel-focus` (jedan redak). Ishod i greska idu u player log
+(`broll-suggest`). Provjereno: testovi `qnc-broll-suggest` (2), `qnc-ai-broll` (novi
+`a_slots_suggestion_puts_the_parts_long_enough_and_most_like_its_words_first`), `qnc-side-pieces`, `qnc-panel-focus`,
+conformance; pet hrvatskih recenica OFF-a protiv 29 kadrova kartice D: (samo citanje) svrstava knjige, stadion i pozornicu,
+policiju i kolica uz svoje recenice. Nije izvedeno: oznaka slota s tekstom iznad kartica (vidi se samo poredak i brojevi),
+prijedlog iz teksta scenarija prije slanja u pricu. Uzivo nije provjereno.

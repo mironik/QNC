@@ -241,6 +241,16 @@ impl SidePieces {
     }
 
     /// Whether a read or write of a piece runs (the form repaints soon).
+    /// The slot chosen in the story orders the AI B-roll by the words A1 says there (user
+    /// 2026-11-10); the ask is made only where the form has that tab.
+    pub fn follow_slot(&mut self, ask: impl FnOnce() -> Option<qnc_ai_broll::Ask>, preview: &SourcePreview) {
+        if let Some(ai_broll) = &mut self.ai_broll {
+            if ai_broll.follow_slot(ask(), preview) {
+                self.views.ai_broll = Arc::new(ai_broll.view().clone());
+            }
+        }
+    }
+
     pub fn busy(&self) -> bool {
         self.transcripts.busy() || self.transcript.as_ref().is_some_and(Transcript::busy) || self.script.as_ref().is_some_and(Script::busy) || self.versions.as_ref().is_some_and(SkeletonVersions::busy) || self.ai_broll.as_ref().is_some_and(AiBroll::busy)
     }

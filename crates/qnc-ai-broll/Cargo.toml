@@ -20,6 +20,7 @@ qnc-shot-examples = { workspace = true }
 qnc-notice = { workspace = true }
 qnc-pool-tabs = { workspace = true }
 qnc-dev-diagnostics = { workspace = true }
+qnc-broll-suggest = { workspace = true }
 
 [dev-dependencies]
 tempfile = "3"
