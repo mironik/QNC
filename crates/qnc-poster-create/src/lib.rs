@@ -66,6 +66,31 @@ pub fn create_poster(
     result
 }
 
+/// Creates the poster at `output` from one encoded key picture (`codec` as saved: `h264`,
+/// `mpeg2video`) already taken out of its medium, e.g. through the index of an MP4 read over
+/// LAN/Intranet (user 2026-11-10). `Ok(false)` when this machine has no local extractor.
+pub fn create_poster_from_picture(picture: &Path, codec: &str, output: &Path, cancel: &AtomicBool) -> Result<bool, String> {
+    let Some(extractor) = qnc_decoder_catalog::installed_filmstrip_extractor().map_err(|e| e.to_string())? else {
+        return Ok(false);
+    };
+    let scratch = scratch_dir();
+    fs::create_dir_all(&scratch).map_err(|e| e.to_string())?;
+    let result = (|| {
+        extractor.decode_pictures_with_cancel(codec, &[picture.to_path_buf()], POSTER_SIZE, &scratch, cancel)?;
+        let made = scratch.join("000.jpg");
+        if !made.is_file() {
+            return Err("poster frame was not made".to_string());
+        }
+        if let Some(parent) = output.parent() {
+            fs::create_dir_all(parent).map_err(|e| e.to_string())?;
+        }
+        fs::copy(&made, output).map_err(|e| e.to_string())?;
+        Ok(true)
+    })();
+    let _ = fs::remove_dir_all(&scratch);
+    result
+}
+
 fn scratch_dir() -> PathBuf {
     let unique = std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)

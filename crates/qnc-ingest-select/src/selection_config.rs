@@ -101,6 +101,29 @@ impl SourceConfig {
         self.location.source()
     }
 
+    /// The bytes of a medium of this source, read only: directly from a local binding, through
+    /// the media stream endpoint for a LAN or intranet binding. The caller never sees a path.
+    pub fn media_stream(&self, media_uri: &str) -> Result<qnc_media_stream::MediaStream> {
+        if let Some(root) = &self.location.file {
+            qnc_dir_browser::verify_local_volume_serial(root, &self.serial_number)?;
+            let local = qnc_media_stream::LocalSource::new(&self.location.uri, root)?;
+            return Ok(qnc_media_stream::MediaStream::local(&local, media_uri)?);
+        }
+        let resolver = self.location.resolver()?;
+        let token = self
+            .location
+            .token()?
+            .ok_or_else(|| qnc_ui_text::text("import.source_credential_missing").to_string())?;
+        Ok(qnc_media_stream::MediaStream::remote(&resolver, media_uri, &token)?)
+    }
+
+    /// The media stream of a URI as poster bytes, from the source it belongs to.
+    fn poster_bytes(&self, media_uri: &str) -> Option<Box<dyn qnc_missing_posters::MediaBytes>> {
+        self.media_stream(media_uri)
+            .map(|stream| Box::new(stream) as Box<dyn qnc_missing_posters::MediaBytes>)
+            .ok()
+    }
+
     pub fn local_media_path(&self, media_uri: &str) -> Result<Option<PathBuf>> {
         let Some(root) = &self.location.file else {
             return Ok(None);
@@ -303,4 +326,14 @@ fn source_scope(value: &str) -> Result<qnc_camera_detector::SourceScope> {
         "reel_relative" => Ok(qnc_camera_detector::SourceScope::ReelRelative),
         _ => Err("invalid source scope".into()),
     }
+}
+
+/// The bytes of a media URI through the transport of the source it belongs to, for the poster
+/// block (a medium on LAN/Intranet; user 2026-11-10).
+pub fn stream_of(sources: &[SourceConfig], media_uri: &str) -> Option<Box<dyn qnc_missing_posters::MediaBytes>> {
+    let reference = SourceReference::from_uri(media_uri).ok()?;
+    sources
+        .iter()
+        .find(|source| source.location.uri == reference.source_uri())?
+        .poster_bytes(media_uri)
 }

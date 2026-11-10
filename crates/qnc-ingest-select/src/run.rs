@@ -119,6 +119,7 @@ pub(crate) fn run_inner(
     // project and the missing ones made at once, on the block's own thread.
     if let Some(project) = posters {
         let sources = config.sources.clone();
+        let streamed = config.sources.clone();
         qnc_missing_posters::start(
             project,
             Box::new(move |uri: &str| {
@@ -126,6 +127,7 @@ pub(crate) fn run_inner(
                 let source = sources.iter().find(|source| source.location.uri == reference.source_uri())?;
                 source.local_media_path(uri).ok().flatten()
             }),
+            Box::new(move |uri: &str| crate::selection_config::stream_of(&streamed, uri)),
         );
     }
     Ok(Summary {

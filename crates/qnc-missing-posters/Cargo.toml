@@ -12,6 +12,8 @@ qnc-content-store = { workspace = true }
 qnc-work-settings = { workspace = true }
 qnc-filmstrip = { workspace = true }
 qnc-poster-create = { workspace = true }
+qnc-mp4-sound = { workspace = true }
+qnc-frame-timebase = { workspace = true }
 qnc-source-contract = { workspace = true }
 
 [dev-dependencies]

@@ -10,6 +10,7 @@
 //! source bindings); this block reads no card index and runs no probe.
 
 use std::{
+    io::{Read, Seek, SeekFrom, Write},
     path::{Path, PathBuf},
     sync::atomic::{AtomicBool, Ordering},
 };
@@ -21,6 +22,21 @@ pub const MODULE_ID: &str = "qnc.module.missing-posters";
 
 /// Where a media URI is on this computer; `None` when it is not here.
 pub type LocalMedia<'a> = dyn Fn(&str) -> Option<PathBuf> + 'a;
+
+/// The bytes of a medium, read only and seekable (a medium on LAN/Intranet through its
+/// transport).
+pub trait MediaBytes: Read + Seek + Send {}
+impl<T: Read + Seek + Send + ?Sized> MediaBytes for T {}
+
+/// The bytes of a media URI through its source's transport; `None` when the caller cannot
+/// open it (user 2026-11-10: posters of clips on LAN/Intranet).
+pub type StreamMedia<'a> = dyn Fn(&str) -> Option<Box<dyn MediaBytes>> + 'a;
+
+/// The head of an MXF read for its first picture: OP1a keeps the header and the first pictures
+/// at its start (measured on an FX6 original: 16 MB give the poster).
+const MXF_HEAD: u64 = 16 << 20;
+/// A card poster read through the transport is a small JPEG.
+const POSTER_BYTES: u64 = 16 << 20;
 
 /// The project whose posters are brought in: its settings as read from its database.
 #[derive(Debug, Clone)]
@@ -45,10 +61,14 @@ impl PosterProject {
 
 /// Starts the block on its own thread (Select runs it when a card is selected and does not
 /// wait for it).
-pub fn start(project: PosterProject, local_media: Box<dyn Fn(&str) -> Option<PathBuf> + Send>) {
+pub fn start(
+    project: PosterProject,
+    local_media: Box<dyn Fn(&str) -> Option<PathBuf> + Send>,
+    stream_media: Box<dyn Fn(&str) -> Option<Box<dyn MediaBytes>> + Send>,
+) {
     let _ = std::thread::Builder::new().name("qnc-missing-posters".into()).spawn(move || {
         let cancel = AtomicBool::new(false);
-        match make_missing_posters(&project, &*local_media, None, &cancel) {
+        match make_missing_posters(&project, &*local_media, &*stream_media, None, &cancel) {
             Ok(_) => {}
             Err(error) => eprintln!("posters: {error}"),
         }
@@ -61,6 +81,7 @@ pub fn start(project: PosterProject, local_media: Box<dyn Fn(&str) -> Option<Pat
 pub fn make_missing_posters(
     project: &PosterProject,
     local_media: &LocalMedia<'_>,
+    stream_media: &StreamMedia<'_>,
     lease: Option<WriteLease>,
     cancel: &AtomicBool,
 ) -> Result<usize, String> {
@@ -96,9 +117,12 @@ pub fn make_missing_posters(
         }
         let output = poster_file(settings, &project_dir, &clip_id)?;
         let brought = match card_poster {
-            Some(uri) => copy_card_poster(&uri, local_media, &output),
+            Some(uri) => copy_card_poster(&uri, local_media, &output).or_else(|error| {
+                stream_media(&uri).map_or(Err(error), |mut media| copy_streamed_poster(&mut *media, &output))
+            }),
             None => match client.read(&clip_id)? {
-                Some(clip) => poster_from_start(&clip, settings, local_media, &output, cancel),
+                Some(clip) => poster_from_start(&clip, settings, local_media, &output, cancel)
+                    .or_else(|_| streamed_poster(&clip, settings, stream_media, &output, cancel)),
                 None => continue,
             },
         };
@@ -143,6 +167,107 @@ pub fn poster_from_start(
     match qnc_poster_create::create_poster(&source, 0.0, filmstrip.source_timebase, output, cancel)? {
         true => Ok(()),
         false => Err(qnc_ui_text::text("import.this_computer_local_picture_extractor").into()),
+    }
+}
+
+/// The poster of a clip whose medium is not on this computer (LAN/Intranet), from the bytes
+/// its transport gives (user 2026-11-10). Only what the first picture needs is read into a
+/// file of its own in the system's temp folder, removed afterwards: the head of an MXF, or
+/// the first key picture of an MP4/QuickTime from its index (which may be at the file's end).
+pub fn streamed_poster(
+    clip: &StoredClip,
+    settings: &WorkSettings,
+    stream_media: &StreamMedia<'_>,
+    output: &Path,
+    cancel: &AtomicBool,
+) -> Result<(), String> {
+    let filmstrip = qnc_filmstrip::plan_from_snapshot_with_artifact_name(
+        &clip.clip.snapshot,
+        &settings.product_uri(ProductArea::Filmstrip),
+        Some(&clip.clip.name),
+    )?;
+    let mut media = stream_media(&filmstrip.source_uri)
+        .ok_or(qnc_ui_text::text("import.source_clip_available_this_computer"))?;
+    poster_from_bytes(&mut *media, filmstrip.source_timebase, output, cancel)
+}
+
+/// The poster of a medium read only through its bytes, into `output`.
+pub fn poster_from_bytes(
+    media: &mut dyn MediaBytes,
+    timebase: qnc_frame_timebase::FrameTimebase,
+    output: &Path,
+    cancel: &AtomicBool,
+) -> Result<(), String> {
+    let scratch = Scratch::new()?;
+    let made = match first_picture_file(media, &scratch.0)? {
+        Start::Medium(file) => qnc_poster_create::create_poster(&file, 0.0, timebase, output, cancel)?,
+        Start::Picture(file, codec) => qnc_poster_create::create_poster_from_picture(&file, codec, output, cancel)?,
+    };
+    match made {
+        true => Ok(()),
+        false => Err(qnc_ui_text::text("import.this_computer_local_picture_extractor").into()),
+    }
+}
+
+/// What the first picture of a medium is decoded from.
+#[derive(Debug, PartialEq, Eq)]
+pub enum Start {
+    /// The head of the medium, decoded as the medium.
+    Medium(PathBuf),
+    /// One encoded key picture of this codec.
+    Picture(PathBuf, &'static str),
+}
+
+/// A file in `folder` a decoder takes the first picture of the medium from.
+pub fn first_picture_file(media: &mut dyn MediaBytes, folder: &Path) -> Result<Start, String> {
+    let size = media.seek(SeekFrom::End(0)).map_err(|e| e.to_string())?;
+    let mut head = [0u8; 8];
+    media.seek(SeekFrom::Start(0)).map_err(|e| e.to_string())?;
+    media.read_exact(&mut head).map_err(|e| e.to_string())?;
+    if head[..4] == [0x06, 0x0e, 0x2b, 0x34] {
+        let file = folder.join("start.mxf");
+        media.seek(SeekFrom::Start(0)).map_err(|e| e.to_string())?;
+        let mut out = std::fs::File::create(&file).map_err(|e| e.to_string())?;
+        std::io::copy(&mut media.take(MXF_HEAD.min(size)), &mut out).map_err(|e| e.to_string())?;
+        return Ok(Start::Medium(file));
+    }
+    if &head[4..8] == b"ftyp" {
+        let tracks = qnc_mp4_sound::read_index_from(&mut *media, size)?;
+        let picture = qnc_mp4_sound::first_key_picture(&mut *media, &tracks)?;
+        let file = folder.join("start.h264");
+        std::fs::File::create(&file)
+            .and_then(|mut out| out.write_all(&picture))
+            .map_err(|e| e.to_string())?;
+        return Ok(Start::Picture(file, "h264"));
+    }
+    Err(qnc_ui_text::text("posters.stream_container_unknown").into())
+}
+
+/// A card's poster read through its transport into the project.
+pub fn copy_streamed_poster(media: &mut dyn MediaBytes, output: &Path) -> Result<(), String> {
+    if let Some(folder) = output.parent() {
+        std::fs::create_dir_all(folder).map_err(|e| e.to_string())?;
+    }
+    let mut bytes = Vec::new();
+    media.take(POSTER_BYTES).read_to_end(&mut bytes).map_err(|e| e.to_string())?;
+    std::fs::write(output, bytes).map_err(|e| e.to_string())
+}
+
+/// An empty folder of its own in the system's temp folder, removed when dropped.
+struct Scratch(PathBuf);
+
+impl Scratch {
+    fn new() -> Result<Self, String> {
+        let stamp = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).map_or(0, |d| d.as_nanos());
+        let folder = std::env::temp_dir().join(format!("qnc-stream-poster-{}-{stamp}", std::process::id()));
+        std::fs::create_dir_all(&folder).map_err(|e| e.to_string())?;
+        Ok(Self(folder))
+    }
+}
+
+impl Drop for Scratch {
+    fn drop(&mut self) {
+        let _ = std::fs::remove_dir_all(&self.0);
     }
 }
 
@@ -240,6 +365,40 @@ mod tests {
         assert_eq!(in_project_folder(&card, source, project.path()), None, "a card's medium is the caller's");
         let missing = qnc_source_contract::SourceReference::new(source, "products/voice/none.mxf").unwrap().uri();
         assert_eq!(in_project_folder(&missing, source, project.path()), None);
+    }
+
+    #[test]
+    fn a_streamed_medium_gives_the_head_of_an_mxf_and_refuses_what_it_does_not_know() {
+        let folder = tempfile::tempdir().unwrap();
+        let mut mxf = vec![0x06, 0x0e, 0x2b, 0x34];
+        mxf.resize(1000, 7);
+        let Start::Medium(file) = first_picture_file(&mut std::io::Cursor::new(mxf.clone()), folder.path()).unwrap() else {
+            panic!("an MXF is decoded as its head");
+        };
+        assert_eq!(std::fs::read(file).unwrap(), mxf, "a short MXF is taken whole");
+        let other = first_picture_file(&mut std::io::Cursor::new(vec![1u8; 64]), folder.path());
+        assert!(other.is_err(), "no guess for an unknown container");
+        let output = folder.path().join("thumbs/c/poster.jpg");
+        copy_streamed_poster(&mut std::io::Cursor::new(b"jpeg".to_vec()), &output).unwrap();
+        assert_eq!(std::fs::read(&output).unwrap(), b"jpeg");
+    }
+
+    /// A clip read only through its bytes, as a LAN/Intranet transport gives them. Runs on a
+    /// real medium: `QNC_STREAM_POSTER_SAMPLE` names an MXF or MP4 (read only).
+    #[test]
+    fn a_real_medium_read_only_as_bytes_gives_a_poster() {
+        let Some(sample) = std::env::var_os("QNC_STREAM_POSTER_SAMPLE") else {
+            return eprintln!("QNC_STREAM_POSTER_SAMPLE not set");
+        };
+        let folder = tempfile::tempdir().unwrap();
+        let mut media = std::fs::File::open(sample).unwrap();
+        let output = folder.path().join("poster.jpg");
+        let timebase = qnc_frame_timebase::FrameTimebase::new(50, 1).unwrap();
+        poster_from_bytes(&mut media, timebase, &output, &AtomicBool::new(false)).unwrap();
+        assert!(std::fs::metadata(&output).unwrap().len() > 1000, "a picture, not a placeholder");
+        if let Some(keep) = std::env::var_os("QNC_STREAM_POSTER_KEEP") {
+            std::fs::copy(&output, keep).unwrap();
+        }
     }
 
     #[test]

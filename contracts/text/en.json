@@ -456,6 +456,7 @@
     "import.import_interrupted": "The import was interrupted.",
     "import.writing_allowed_only_into_project_folder": "Writing is allowed only into the project folder.",
     "import.source_clip_available_this_computer": "The source of the clip is not available on this computer.",
+    "posters.stream_container_unknown": "The poster over LAN/Intranet is made from MXF and MP4/QuickTime media only.",
     "import.this_computer_local_picture_extractor": "This computer has no local picture extractor.",
     "import.optimised_copy_needs_original_this_computer": "The optimised copy needs the original on this computer (card or mounted disk).",
     "import.original_stored_picture_count_frame_rate": "The original has no stored picture count and frame rate.",

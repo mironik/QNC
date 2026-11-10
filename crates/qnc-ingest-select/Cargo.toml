@@ -31,6 +31,7 @@ qnc-source-bindings = { workspace = true }
 qnc-source-volumes = { workspace = true }
 qnc-source-reader = { workspace = true }
 qnc-transport-resolver = { workspace = true }
+qnc-media-stream = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
 uuid = { version = "1", features = ["v4"] }

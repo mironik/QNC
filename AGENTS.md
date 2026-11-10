@@ -8731,3 +8731,15 @@ Provjera 2026-11-10 (korisnik: "provjeri zastitu kao administrator"): test zasti
 High Mandatory Level, BUILTIN\Administrators) prolazi: datoteka projekta se ne moze obrisati, datoteka prerendera i exporta
 moze, mape ostaju. Zastita drzi i kad korisnik pokrene QNC kao administrator. Pad na GitHub runneru je svojstvo tog racunala
 (drugi racun i ovlasti), nije reproduciran lokalno i ostaje zabiljezen uz rucni CI.
+Izvedeno 2026-11-10 (korisnik: "napravi postere za LAN izvor"): klip ciji medij nije na ovom racunalu (LAN, intranet) dobiva
+poster kroz transport svog izvora, bez kopije cijele datoteke. `qnc-missing-posters`: `StreamMedia` (bajtovi medija kroz
+transport, citljivi i s mogucnoscu skoka), `streamed_poster`, `poster_from_bytes`, `first_picture_file` (`Start`): MXF daje
+pocetak datoteke (16 MB; OP1a drzi zaglavlje i prve slike na pocetku), MP4/QuickTime prvu kljucnu H.264 sliku kroz svoj indeks
+(i kad je indeks na kraju datoteke), sve u vlastitoj privremenoj mapi sustava koja se brise; poster s kartice na LAN-u cita se
+kroz transport i zapisuje u projekt. Drugi format je jasna greska (`posters.stream_container_unknown`). `qnc-mp4-sound`
+`read_index_from`, `first_key_picture` (citac s mogucnoscu skoka, ne samo datoteka); `qnc-poster-create`
+`create_poster_from_picture`; `qnc-ingest-select` `SourceConfig::media_stream` (lokalno ili LAN/intranet; uvoz ga koristi
+umjesto svoje kopije) i `stream_of`; Select i pozadinski radnik predaju ga kocki postera. Provjereno (kartice samo citane, mediji
+citani samo kao tok bajtova): FX6 MXF (Mironik 3609) i FX3A MP4 (C0012) daju ispravan poster. Testovi `qnc-missing-posters`,
+`qnc-mp4-sound`, `qnc-poster-create`, `qnc-ingest-select`, `qnc-ingest-import-worker`, `qnc-ingest-worker`, conformance. Na pravom
+LAN izvoru nije provjereno. HEVC slika u MP4 (proxy FX3A) preko LAN-a jos nema poster.

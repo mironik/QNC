@@ -67,14 +67,20 @@ impl Track {
 pub fn read_index(path: &Path) -> Result<Vec<Track>, String> {
     let mut file = File::open(path).map_err(|error| format!("mp4 open: {error}"))?;
     let size = file.metadata().map_err(|error| format!("mp4 size: {error}"))?.len();
+    read_index_from(&mut file, size)
+}
+
+/// The tracks from the index of a medium of `size` bytes read through any seekable reader
+/// (a file here, a medium on LAN/Intranet through its transport).
+pub fn read_index_from<R: Read + Seek + ?Sized>(file: &mut R, size: u64) -> Result<Vec<Track>, String> {
     let mut at = 0u64;
     while at + 8 <= size {
         let mut head = [0u8; 16];
-        read_at(&mut file, at, &mut head[..8.min((size - at) as usize)])?;
+        read_at(file, at, &mut head[..8.min((size - at) as usize)])?;
         let mut length = u64::from(u32::from_be_bytes(head[..4].try_into().unwrap()));
         let kind: [u8; 4] = head[4..8].try_into().unwrap();
         if length == 1 {
-            read_at(&mut file, at, &mut head)?;
+            read_at(file, at, &mut head)?;
             length = u64::from_be_bytes(head[8..16].try_into().unwrap());
         } else if length == 0 {
             length = size - at;
@@ -87,7 +93,7 @@ pub fn read_index(path: &Path) -> Result<Vec<Track>, String> {
                 return Err("mp4: index too large".into());
             }
             let mut moov = vec![0u8; length as usize];
-            read_at(&mut file, at, &mut moov)?;
+            read_at(file, at, &mut moov)?;
             let (start, end) = box_body(&moov, 0).ok_or("mp4: index")?;
             return Ok(children(&moov, start, end).filter(|(kind, _, _)| kind == b"trak").filter_map(|(_, s, e)| track(&moov, s, e)).collect());
         }
@@ -153,6 +159,22 @@ pub fn read_sound_and_pictures(
     Ok(())
 }
 
+/// The first key picture of the first H.264 picture track as an Annex B stream a decoder
+/// takes on its own (user 2026-11-10: the poster of a clip on LAN/Intranet, whose index is at
+/// the end of the file). `Err` for a picture that is not H.264.
+pub fn first_key_picture<R: Read + Seek + ?Sized>(file: &mut R, tracks: &[Track]) -> Result<Vec<u8>, String> {
+    let video = tracks.iter().find(|track| track.is_picture()).ok_or("mp4: no picture track")?;
+    let (nal_length, parameter_sets) = video.avc.as_ref().ok_or("mp4: the picture is not H.264")?;
+    let number = video.key_at_or_after(0).ok_or("mp4: the picture track is empty")?;
+    let (place, length) = *video.samples.get(number as usize).ok_or("mp4: no such picture")?;
+    if length > MAX_SAMPLE {
+        return Err("mp4: a picture sample is past what a file holds".into());
+    }
+    let mut sample = vec![0u8; length as usize];
+    read_at(file, place, &mut sample)?;
+    avc_annexb(&sample, *nal_length, parameter_sets)
+}
+
 /// An AAC frame with its ADTS header, as a decoder of an AAC stream takes it.
 pub fn adts_frame(config: &[u8], frame: &[u8], out: &mut Vec<u8>) -> Result<(), String> {
     if config.len() < 2 {
@@ -205,7 +227,7 @@ pub fn avc_annexb(sample: &[u8], nal_length: u8, parameter_sets: &[Vec<u8>]) -> 
     Ok(out)
 }
 
-fn read_at(file: &mut File, at: u64, buffer: &mut [u8]) -> Result<(), String> {
+fn read_at<R: Read + Seek + ?Sized>(file: &mut R, at: u64, buffer: &mut [u8]) -> Result<(), String> {
     file.seek(SeekFrom::Start(at)).map_err(|error| format!("mp4 seek: {error}"))?;
     file.read_exact(buffer).map_err(|error| format!("mp4 read: {error}"))
 }

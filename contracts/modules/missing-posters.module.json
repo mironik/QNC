@@ -3,7 +3,7 @@
   "module_name": "Missing posters",
   "module_version": "0.1.0",
   "module_kind": "library",
-  "capabilities": ["media.poster.missing"],
+  "capabilities": ["media.poster.missing", "media.poster.stream"],
   "input_contract_version": "0.1.0",
   "output_contract_version": "0.1.0",
   "supported_os": ["windows", "linux", "macos"],
@@ -14,7 +14,7 @@
   "state_policy": "stateless",
   "database_write_policy": "public_db_write_transports_only",
   "runtime_crate": "qnc-missing-posters",
-  "input": "The active project (read from its database), where each medium is on this computer (given by the caller from its source bindings) and the caller's write lease.",
+  "input": "The active project (read from its database), where each medium is on this computer (given by the caller from its source bindings), the bytes of a medium on LAN/Intranet through its transport (given by the caller) and the caller's write lease.",
   "output": "A poster from the start of every clip that has none, in the project thumbnails folder (never in the source), recorded through the content write transport under the lease.",
-  "specification": "User 2026-10-09 (a clip without a card poster gets one right after Select) and 2026-10-18 (its own block, the one place that makes a poster from the start of a clip; made right after the records are final, not after every artifact)."
+  "specification": "User 2026-10-09 (a clip without a card poster gets one right after Select) and 2026-10-18 (its own block, the one place that makes a poster from the start of a clip; made right after the records are final, not after every artifact) and 2026-11-10 (a medium on LAN/Intranet: only the head of an MXF or the first key picture of an MP4 from its index is read, into a temp folder of its own)."
 }

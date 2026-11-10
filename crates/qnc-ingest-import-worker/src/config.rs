@@ -5,7 +5,7 @@
 use crate::{MediaOpener, MediaRead};
 use qnc_ingest_select::selection_config::{ProbeConfig, SourceConfig};
 use qnc_media_probe::{Binding, Executor, OwnerConfig, Request};
-use qnc_media_stream::{LocalSource, MediaStream, SourceReference};
+use qnc_media_stream::{MediaStream, SourceReference};
 use std::io::Read;
 
 struct Stream(MediaStream);
@@ -65,20 +65,7 @@ impl MediaOpener for ConfigMediaOpener {
             .iter()
             .find(|s| s.location.uri == reference.source_uri())
             .ok_or_else(|| qnc_ui_text::text("import.media_source_bound_configuration").to_string())?;
-        let stream = if let Some(root) = &source.location.file {
-            qnc_dir_browser::verify_local_volume_serial(root, &source.serial_number)
-                .map_err(|e| e)?;
-            let local = LocalSource::new(&source.location.uri, root).map_err(|e| e.to_string())?;
-            MediaStream::local(&local, media_uri).map_err(|e| e.to_string())?
-        } else {
-            let resolver = source.location.resolver().map_err(|e| e.to_string())?;
-            let token = source
-                .location
-                .token()
-                .map_err(|e| e.to_string())?
-                .ok_or_else(|| qnc_ui_text::text("import.source_credential_missing").to_string())?;
-            MediaStream::remote(&resolver, media_uri, &token).map_err(|e| e.to_string())?
-        };
+        let stream = source.media_stream(media_uri).map_err(|e| e.to_string())?;
         Ok(Box::new(Stream(stream)))
     }
 }

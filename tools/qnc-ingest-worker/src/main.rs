@@ -245,11 +245,12 @@ fn make_posters(
         let source = config.sources.iter().find(|source| source.location.uri == reference.source_uri())?;
         source.local_media_path(uri).ok().flatten()
     };
+    let stream_media = |uri: &str| qnc_ingest_select::selection_config::stream_of(&config.sources, uri);
     let project = match qnc_missing_posters::PosterProject::active(root) {
         Ok(project) => project,
         Err(error) => return eprintln!("posteri nisu napravljeni: {error}"),
     };
-    match qnc_missing_posters::make_missing_posters(&project, &local_media, Some(lease.write_lease()), cancel) {
+    match qnc_missing_posters::make_missing_posters(&project, &local_media, &stream_media, Some(lease.write_lease()), cancel) {
         Ok(0) => {}
         Ok(made) => eprintln!("posteri napravljeni: {made}"),
         Err(error) => eprintln!("posteri nisu napravljeni: {error}"),
