@@ -10,6 +10,7 @@ qnc-db-broker = { workspace = true }
 qnc-dev-diagnostics = { workspace = true }
 qnc-plugin-process = { workspace = true }
 qnc-program-view = { workspace = true }
+qnc-program-waveform = { workspace = true }
 qnc-script-db = { workspace = true }
 qnc-shot-content = { workspace = true }
 qnc-transcript-db = { workspace = true }

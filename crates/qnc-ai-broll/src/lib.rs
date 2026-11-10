@@ -113,7 +113,7 @@ impl AiBrollView {
     /// parts long enough for the slot come first, the most like its words first, numbered; the
     /// shorter ones after them, in the same order.
     pub fn cards<'a>(&'a self, clips: &'a [ClipRow]) -> Vec<TabCard<'a>> {
-        let mut cards: Vec<(bool, f32, TabCard<'a>)> = self
+        let mut cards: Vec<(f64, &'a [f32], TabCard<'a>)> = self
             .parts
             .iter()
             .filter_map(|part| {
@@ -125,10 +125,9 @@ impl AiBrollView {
                 let words = |key: &str| qnc_ui_text::host().ok().and_then(|texts| texts.get(key).ok()).unwrap_or(key).to_string();
                 let label = if !part.terms.is_empty() { part.terms.iter().take(2).map(|term| words(term)).collect::<Vec<_>>().join(", ") } else if kind.is_empty() { label.to_string() } else { format!("{label} · {kind}") };
                 let seconds = (part.to - part.from) as f64 * per_frame;
-                let (long, like) = self.suggestion.as_ref().map_or((true, 0.0), |suggestion| (seconds >= suggestion.seconds, qnc_broll_suggest::likeness(suggestion, &part.vector)));
                 Some((
-                    long,
-                    like,
+                    seconds,
+                    part.vector.as_slice(),
                     TabCard {
                         id: format!("{}|{}|{}", part.clip_id, part.from, part.to),
                         title: qnc_ui_text::fill(if part.spoken { "ai_broll.card_spoken" } else { "ai_broll.card" }, &[("label", &label), ("clip", &clip.name)]).into(),
@@ -140,13 +139,35 @@ impl AiBrollView {
                 ))
             })
             .collect();
-        if self.suggestion.is_some() {
-            cards.sort_by(|(a_long, a, _), (b_long, b, _)| b_long.cmp(a_long).then(b.total_cmp(a)));
-            for (n, (_, _, card)) in cards.iter_mut().enumerate().filter(|(_, (long, _, _))| *long) {
-                card.title = format!("{}. {}", n + 1, card.title);
+        let Some(suggestion) = &self.suggestion else { return cards.into_iter().map(|(_, _, card)| card).collect() };
+        match suggestion.slots.as_slice() {
+            // One sentence of the OFF: the parts long enough first, the most like its words first.
+            [slot] => {
+                cards.sort_by(|(a_seconds, a, _), (b_seconds, b, _)| {
+                    (*b_seconds >= slot.seconds).cmp(&(*a_seconds >= slot.seconds)).then(qnc_broll_suggest::likeness(slot, b).total_cmp(&qnc_broll_suggest::likeness(slot, a)))
+                });
+                let long = cards.iter().filter(|(seconds, _, _)| *seconds >= slot.seconds).count();
+                for (n, (_, _, card)) in cards.iter_mut().take(long).enumerate() {
+                    card.title = format!("{}. {}", n + 1, card.title);
+                }
+                cards.into_iter().map(|(_, _, card)| card).collect()
+            }
+            // The whole OFF: the series, a cover a slot in the story's order, then the rest.
+            slots => {
+                let parts: Vec<(f64, &[f32])> = cards.iter().map(|(seconds, vector, _)| (*seconds, *vector)).collect();
+                let picks = qnc_broll_suggest::series(suggestion, &parts);
+                let mut cards: Vec<Option<TabCard<'a>>> = cards.into_iter().map(|(_, _, card)| Some(card)).collect();
+                let mut shown = Vec::with_capacity(cards.len());
+                for (n, pick) in picks.iter().enumerate() {
+                    if let Some(mut card) = pick.and_then(|index| cards[index].take()) {
+                        card.title = format!("{}/{} · {}", n + 1, slots.len(), card.title);
+                        shown.push(card);
+                    }
+                }
+                shown.extend(cards.into_iter().flatten());
+                shown
             }
         }
-        cards.into_iter().map(|(_, _, card)| card).collect()
     }
 
     pub fn count(&self) -> usize {
@@ -544,11 +565,17 @@ mod tests {
         let mut view = AiBrollView { parts: vec![shot(0, 100, vec![1.0, 0.0]), shot(100, 300, vec![0.0, 1.0]), shot(300, 500, vec![0.8, 0.6])], ..AiBrollView::default() };
         let ids = |view: &AiBrollView| view.cards(std::slice::from_ref(&clip)).iter().map(|card| card.id.clone()).collect::<Vec<_>>();
         assert_eq!(ids(&view), ["a|0|100", "a|100|300", "a|300|500"]);
-        view.suggestion = Some(qnc_broll_suggest::Suggestion { slot_id: "s".into(), seconds: 3.0, text: "more".into(), vector: vec![1.0, 0.0] });
+        let slot = |id: &str, seconds, vector: Vec<f32>| qnc_broll_suggest::SlotSuggestion { slot_id: id.into(), seconds, text: "more".into(), vector };
+        view.suggestion = Some(qnc_broll_suggest::Suggestion { key: "s".into(), slots: vec![slot("s", 3.0, vec![1.0, 0.0])] });
         // 2 s is shorter than the slot: last; of the 4 s parts the one most like the words first.
         assert_eq!(ids(&view), ["a|300|500", "a|100|300", "a|0|100"]);
         let cards = view.cards(std::slice::from_ref(&clip));
         assert!(cards[0].title.starts_with("1. ") && cards[1].title.starts_with("2. ") && !cards[2].title.starts_with("3. "));
+        // The whole OFF: a cover a slot in order, none twice, then the rest.
+        view.suggestion = Some(qnc_broll_suggest::Suggestion { key: "off:x".into(), slots: vec![slot("s1", 3.0, vec![0.0, 1.0]), slot("s2", 3.0, vec![0.0, 1.0])] });
+        let cards = view.cards(std::slice::from_ref(&clip));
+        assert_eq!(cards.iter().map(|card| card.id.as_str()).collect::<Vec<_>>(), ["a|100|300", "a|300|500", "a|0|100"]);
+        assert!(cards[0].title.starts_with("1/2 · ") && cards[1].title.starts_with("2/2 · "));
     }
 
     #[test]

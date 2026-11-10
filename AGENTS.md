@@ -8918,3 +8918,12 @@ otvorenom, park, hotel, selo; vijesti knjiga, luka/vez, nogometni stadion, pozor
 Testovi `qnc-shot-vocabulary`, `qnc-ai-broll`, `qnc-shot-content-run`, `qnc-ui-text`, conformance. Uzivo nije provjereno.
 Otvoreno (odluka korisnika: AI podaci ne u `project.db`): vektori kadrova, oznake i analiza kadrova projekta (`clip_content`,
 `shot_label_vectors`, `clip_shots`) jos su u `project.db`; seliti ih u zasebnu `ai.db` uz nju.
+Izmjena 2026-11-10 (korisnik: "OFF ili recenica OFF-a neka budu upit"; "pretraga moze ostati, ali kao pomocni nacin; trebam za
+breaking news auto prijedloge"; "tako da predlozi seriju za pokrivanje"): upit je sama prica. `qnc-broll-suggest`: `Ask` ima
+slotove; izabrani slot (recenica OFF-a izmedu dva M markera) je jedan upit, a bez izabranog slota OFF pod Wrap playheadom je upit
+serije: svaki njegov prazni slot (dio slota unutar tog OFF-a) sa svojim rijecima. Svi tekstovi idu programu sadrzaja u jednom
+zahtjevu (po 32). `series`: svaki slot redom dobiva najslicniji dio dovoljno dug za njega koji jos nije dan ranijem slotu.
+Tab AI pokrivalice: za recenicu rangiranje kao prije ("1. ..."), za cijeli OFF najprije serija redom po slotovima ("1/4 · ..."),
+zatim ostali dijelovi. Sve se racuna samo, bez klika (za breaking news). Polje za pretrazivanje tekstom (pomocni nacin) nije
+izvedeno. Testovi `qnc-broll-suggest` (novi `a_series_gives_each_slot_its_best_part_long_enough_and_none_twice`),
+`qnc-ai-broll` (prosiren), conformance. Uzivo nije provjereno. Nije izvedeno: upis serije kao pokrivalica jednom potvrdom.

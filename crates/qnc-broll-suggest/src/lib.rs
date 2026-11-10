@@ -1,20 +1,21 @@
-//! B-roll suggested for the words of an OFF (user 2026-11-10: "the text gives the length, the
-//! shots long enough are ranked by how like the text they are"). The slot chosen in the story
-//! (between two M markers: a part of the OFF the reporter marked) gives the frames a cover needs
-//! and the words A1 says there: a clip's transcript, or the words heard in an OFF reading. Those
-//! words become a vector of the same shot-content program the pictures were looked at with (the
-//! model's text side reads Croatian, SigLIP 2 is multilingual), and the usable parts long enough
-//! are ranked by how like it they are. It reads the project database (transcripts, voice
-//! readings) off the form thread and writes nothing.
+//! B-roll suggested for the words of an OFF (user 2026-11-10: "the OFF, or a sentence of the OFF,
+//! is the query"; "for breaking news, suggestions by themselves"). The query is the story itself:
+//! the slot chosen (between two M markers: a sentence of the OFF) asks for one cover, else the OFF
+//! under the Wrap playhead asks for a series, one cover a slot of it. Each slot gives the frames
+//! its cover needs and the words A1 says there (a clip's transcript, or the words heard in an OFF
+//! reading); the words become vectors of the same shot-content program the pictures were looked
+//! at with (SigLIP 2 reads Croatian). The series gives each slot, in order, the usable part most
+//! like its words that is long enough and not given to an earlier slot. It reads the project
+//! database (transcripts, voice readings) off the form thread and writes nothing.
 
 use std::sync::mpsc;
 
 use qnc_db_broker::ProjectDbTarget;
-use qnc_program_view::SegmentsView;
+use qnc_program_view::{SegmentKind, SegmentsView};
 
 pub const MODULE_ID: &str = "qnc.module.broll-suggest";
 
-/// What A1 plays in the slot: a clip and its frames `[from, to)`.
+/// What A1 plays in a slot: a clip and its frames `[from, to)`.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Piece {
     pub clip_id: String,
@@ -22,47 +23,78 @@ pub struct Piece {
     pub to: u64,
 }
 
-/// The cover a slot asks for: its id, how long it is and what A1 plays there.
+/// One slot of an ask: its id, how long its cover is and what A1 plays there.
 #[derive(Debug, Clone, PartialEq)]
-pub struct Ask {
+pub struct SlotAsk {
     pub slot_id: String,
     pub seconds: f64,
-    /// The story's frames a second (an OFF reading's words are seconds of its clip).
-    pub fps: f64,
     pub pieces: Vec<Piece>,
 }
 
-/// A suggestion ready: the slot, its words and their vector.
+/// What the story asks for: one slot (a sentence of the OFF) or the slots of an OFF (a series).
 #[derive(Debug, Clone, PartialEq)]
-pub struct Suggestion {
+pub struct Ask {
+    /// The slot or the OFF segment asked about.
+    pub key: String,
+    /// The story's frames a second (an OFF reading's words are seconds of its clip).
+    pub fps: f64,
+    pub slots: Vec<SlotAsk>,
+}
+
+/// One slot's suggestion: its words and their vector.
+#[derive(Debug, Clone, PartialEq)]
+pub struct SlotSuggestion {
     pub slot_id: String,
     pub seconds: f64,
     pub text: String,
     pub vector: Vec<f32>,
 }
 
-/// The cover the chosen slot asks for (none chosen: none); its A1 pieces from the story's own
-/// placement of every segment (`wave_placements`), in its clips' frames.
+/// A suggestion ready: one slot, or the series of an OFF in the story's order.
+#[derive(Debug, Clone, PartialEq)]
+pub struct Suggestion {
+    pub key: String,
+    pub slots: Vec<SlotSuggestion>,
+}
+
+/// What the story asks for now: the chosen slot, else the empty slots of the OFF under the Wrap
+/// playhead (inside that OFF); their A1 pieces from the story's own placement of every segment
+/// (`wave_placements`), in its clips' frames.
 pub fn ask_of(view: &SegmentsView) -> Option<Ask> {
-    let slot = view.selected_slot()?;
     let (num, den) = view.timebase?;
-    if num == 0 || den == 0 || slot.end_frame <= slot.start_frame {
+    if num == 0 || den == 0 {
         return None;
     }
-    let seconds = (slot.end_frame - slot.start_frame) as f64 * f64::from(den) / f64::from(num);
-    let pieces = view
-        .wave_placements()
-        .0
-        .into_iter()
-        .filter(|placement| !placement.off && placement.program_start < slot.end_frame && slot.start_frame < placement.program_end)
+    let seconds = |frames: u64| frames as f64 * f64::from(den) / f64::from(num);
+    let placements = view.wave_placements().0;
+    let slot_ask = |slot_id: &str, from: u64, to: u64| SlotAsk { slot_id: slot_id.to_string(), seconds: seconds(to - from), pieces: pieces_in(&placements, from, to) };
+    if let Some(slot) = view.selected_slot().filter(|slot| slot.end_frame > slot.start_frame) {
+        return Some(Ask { key: slot.slot_id.clone(), fps: f64::from(num) / f64::from(den), slots: vec![slot_ask(&slot.slot_id, slot.start_frame, slot.end_frame)] });
+    }
+    let playhead = view.playhead?;
+    let off = view.rows.iter().find(|row| row.kind == SegmentKind::Off && !row.lead && row.start_frame <= playhead && playhead < row.end_frame)?;
+    let slots: Vec<SlotAsk> = view
+        .slots
+        .iter()
+        .filter(|slot| !slot.has_cover && slot.start_frame < off.end_frame && off.start_frame < slot.end_frame)
+        .map(|slot| (slot, slot.start_frame.max(off.start_frame), slot.end_frame.min(off.end_frame)))
+        .filter(|(_, from, to)| to > from)
+        .map(|(slot, from, to)| slot_ask(&slot.slot_id, from, to))
+        .collect();
+    (!slots.is_empty()).then(|| Ask { key: format!("off:{}", off.segment_id), fps: f64::from(num) / f64::from(den), slots })
+}
+
+/// The A1 pieces of program frames `[from, to)`, in their clips' frames.
+fn pieces_in(placements: &[qnc_program_waveform::Placement], from: u64, to: u64) -> Vec<Piece> {
+    placements
+        .iter()
+        .filter(|placement| !placement.off && placement.program_start < to && from < placement.program_end)
         .map(|placement| {
-            // The program frames of the slot in the piece, as frames of its clip.
             let (program, source) = (placement.program_end - placement.program_start, placement.source_out.saturating_sub(placement.source_in));
             let at = |frame: u64| placement.source_in + (frame - placement.program_start) * source / program.max(1);
-            Piece { clip_id: placement.clip_id.clone(), from: at(slot.start_frame.max(placement.program_start)), to: at(slot.end_frame.min(placement.program_end)) }
+            Piece { clip_id: placement.clip_id.clone(), from: at(from.max(placement.program_start)), to: at(to.min(placement.program_end)) }
         })
-        .collect();
-    Some(Ask { slot_id: slot.slot_id.clone(), seconds, fps: f64::from(num) / f64::from(den), pieces })
+        .collect()
 }
 
 /// The words said in `pieces`, in order: a clip's transcript words whose middle is in its piece,
@@ -88,12 +120,36 @@ pub fn words_of(pieces: &[Piece], transcripts: &dyn Fn(&str) -> Vec<qnc_transcri
     said.iter().map(|word| word.trim()).filter(|word| !word.is_empty()).collect::<Vec<_>>().join(" ")
 }
 
-/// How like a part's vector is to the suggestion's text (cosine of unit vectors).
-pub fn likeness(suggestion: &Suggestion, vector: &[f32]) -> f32 {
-    if vector.len() != suggestion.vector.len() {
+/// How like a part's vector is to a slot's words (cosine of unit vectors).
+pub fn likeness(slot: &SlotSuggestion, vector: &[f32]) -> f32 {
+    if vector.len() != slot.vector.len() {
         return f32::NEG_INFINITY;
     }
-    vector.iter().zip(&suggestion.vector).map(|(a, b)| a * b).sum()
+    vector.iter().zip(&slot.vector).map(|(a, b)| a * b).sum()
+}
+
+/// The series: for each slot in order, the part (index into `parts`: its seconds and vector)
+/// most like its words that is long enough and not given to an earlier slot; `None` for a slot
+/// no part is long enough for.
+pub fn series(suggestion: &Suggestion, parts: &[(f64, &[f32])]) -> Vec<Option<usize>> {
+    let mut given = vec![false; parts.len()];
+    suggestion
+        .slots
+        .iter()
+        .map(|slot| {
+            let best = parts
+                .iter()
+                .enumerate()
+                .filter(|(index, (seconds, _))| !given[*index] && *seconds >= slot.seconds)
+                .map(|(index, (_, vector))| (index, likeness(slot, vector)))
+                .max_by(|a, b| a.1.total_cmp(&b.1))
+                .map(|(index, _)| index);
+            if let Some(index) = best {
+                given[index] = true;
+            }
+            best
+        })
+        .collect()
 }
 
 struct Job {
@@ -101,8 +157,8 @@ struct Job {
     ask: Ask,
 }
 
-/// The suggestion for the slot chosen, made off the form thread by one worker that keeps the
-/// shot-content program started (its model loads once).
+/// The suggestion of what the story asks for, made off the form thread by one worker that keeps
+/// the shot-content program started (its model loads once).
 #[derive(Default)]
 pub struct Suggest {
     asked: Option<Ask>,
@@ -119,16 +175,18 @@ impl std::fmt::Debug for Suggest {
 }
 
 impl Suggest {
-    /// Follows the chosen slot: a new ask is worked out, none withdraws the suggestion. Returns
-    /// whether the suggestion shown changed.
+    /// Follows what the story asks for: a new ask is worked out, none withdraws the suggestion.
+    /// Returns whether the suggestion shown changed.
     pub fn follow(&mut self, ask: Option<Ask>, target: Option<&ProjectDbTarget>) -> bool {
         let mut changed = false;
         if let Some(answers) = &self.answers {
             while let Ok(answer) = answers.try_recv() {
                 self.working = false;
                 match answer {
-                    Ok(suggestion) if self.asked.as_ref().is_some_and(|ask| ask.slot_id == suggestion.slot_id) => {
-                        log(&format!("broll-suggest slot={} seconds={:.1} text={:?}", suggestion.slot_id, suggestion.seconds, suggestion.text));
+                    Ok(suggestion) if self.asked.as_ref().is_some_and(|ask| ask.key == suggestion.key) => {
+                        for slot in &suggestion.slots {
+                            log(&format!("broll-suggest ask={} slot={} seconds={:.1} text={:?}", suggestion.key, slot.slot_id, slot.seconds, slot.text));
+                        }
                         self.shown = Some(suggestion);
                         changed = true;
                     }
@@ -154,7 +212,7 @@ impl Suggest {
         changed
     }
 
-    /// The suggestion of the slot chosen, once worked out.
+    /// The suggestion of what the story asks for, once worked out.
     pub fn shown(&self) -> Option<&Suggestion> {
         self.shown.as_ref()
     }
@@ -170,7 +228,7 @@ impl Suggest {
         let spawned = std::thread::Builder::new().name("qnc-broll-suggest".into()).spawn(move || {
             let mut client: Option<(std::path::PathBuf, qnc_shot_content::ContentClient)> = None;
             while let Ok(mut job) = take.recv() {
-                // Only the slot chosen last counts.
+                // Only what was asked last counts.
                 while let Ok(newer) = take.try_recv() {
                     job = newer;
                 }
@@ -185,7 +243,7 @@ impl Suggest {
     }
 }
 
-/// The words of a job's slot and their vector.
+/// The words of an ask's slots and their vectors (a slot without words is left out).
 fn work(job: &Job, client: &mut Option<(std::path::PathBuf, qnc_shot_content::ContentClient)>) -> Result<Suggestion, String> {
     let voices = qnc_script_db::read_voices(&job.target).unwrap_or_default();
     let heard = |clip: &str| {
@@ -195,19 +253,34 @@ fn work(job: &Job, client: &mut Option<(std::path::PathBuf, qnc_shot_content::Co
             .find(|(voice, take)| qnc_voice_take::clip_id(&qnc_script_db::take_name(&voice.name, take.take)) == clip)
             .map(|(_, take)| take.heard.clone().unwrap_or_default())
     };
-    let transcripts = |clip: &str| qnc_transcript_db::read_clip(&job.target, clip).unwrap_or_default();
-    let text = words_of(&job.ask.pieces, &transcripts, &heard, job.ask.fps);
-    if text.is_empty() {
-        return Err(format!("slot {} has no words on A1", job.ask.slot_id));
+    // Each clip's transcripts read once for every slot.
+    let mut read = std::collections::HashMap::new();
+    for piece in job.ask.slots.iter().flat_map(|slot| &slot.pieces) {
+        read.entry(piece.clip_id.clone()).or_insert_with(|| qnc_transcript_db::read_clip(&job.target, &piece.clip_id).unwrap_or_default());
+    }
+    let transcripts = |clip: &str| read.get(clip).cloned().unwrap_or_default();
+    let said: Vec<(&SlotAsk, String)> = job
+        .ask
+        .slots
+        .iter()
+        .map(|slot| (slot, words_of(&slot.pieces, &transcripts, &heard, job.ask.fps)))
+        .filter(|(_, text)| !text.is_empty())
+        .collect();
+    if said.is_empty() {
+        return Err(format!("{} has no words on A1", job.ask.key));
     }
     let engine = qnc_ai_catalog::installed_shot_content()?;
     if client.as_ref().is_none_or(|(model, _)| *model != engine.model) {
         *client = Some((engine.model.clone(), qnc_shot_content::ContentClient::new(&qnc_plugin_process::beside_application(&engine.program)?)));
     }
     let (_, content) = client.as_ref().ok_or("no shot-content program")?;
-    let texts = content.texts(&qnc_shot_content::TextsRequest { model: engine.model.clone(), texts: vec![text.clone()] })?;
-    let vector = texts.vectors.into_iter().next().ok_or("no vector of the text")?;
-    Ok(Suggestion { slot_id: job.ask.slot_id.clone(), seconds: job.ask.seconds, text, vector })
+    let mut vectors = Vec::new();
+    for texts in said.chunks(qnc_shot_content::MOST_AT_ONCE) {
+        let request = qnc_shot_content::TextsRequest { model: engine.model.clone(), texts: texts.iter().map(|(_, text)| text.clone()).collect() };
+        vectors.extend(content.texts(&request)?.vectors);
+    }
+    let slots = said.into_iter().zip(vectors).map(|((slot, text), vector)| SlotSuggestion { slot_id: slot.slot_id.clone(), seconds: slot.seconds, text, vector }).collect();
+    Ok(Suggestion { key: job.ask.key.clone(), slots })
 }
 
 fn log(line: &str) {
@@ -239,9 +312,12 @@ mod tests {
     }
 
     #[test]
-    fn a_part_like_the_text_is_liked_more() {
-        let suggestion = Suggestion { slot_id: "s".into(), seconds: 3.0, text: "luka".into(), vector: vec![1.0, 0.0] };
-        assert!(likeness(&suggestion, &[0.9, 0.436]) > likeness(&suggestion, &[0.1, 0.995]));
-        assert_eq!(likeness(&suggestion, &[1.0]), f32::NEG_INFINITY, "a vector of another model");
+    fn a_series_gives_each_slot_its_best_part_long_enough_and_none_twice() {
+        let slot = |id: &str, seconds, vector: Vec<f32>| SlotSuggestion { slot_id: id.into(), seconds, text: String::new(), vector };
+        let suggestion = Suggestion { key: "off:x".into(), slots: vec![slot("s1", 3.0, vec![1.0, 0.0]), slot("s2", 3.0, vec![1.0, 0.0]), slot("s3", 9.0, vec![0.0, 1.0])] };
+        let (sea, sea2, short_book) = ([1.0, 0.0], [0.8, 0.6], [0.0, 1.0]);
+        let parts: Vec<(f64, &[f32])> = vec![(4.0, &sea), (5.0, &sea2), (2.0, &short_book)];
+        // s1 takes the sea, s2 the next like it, s3 has none long enough.
+        assert_eq!(series(&suggestion, &parts), [Some(0), Some(1), None]);
     }
 }

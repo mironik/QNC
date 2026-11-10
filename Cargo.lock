@@ -3816,6 +3816,7 @@ dependencies = [
  "qnc-dev-diagnostics",
  "qnc-plugin-process",
  "qnc-program-view",
+ "qnc-program-waveform",
  "qnc-script-db",
  "qnc-shot-content",
  "qnc-transcript-db",
