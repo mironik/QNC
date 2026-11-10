@@ -40,7 +40,7 @@ impl Encoder {
             Self::NvidiaNvenc => "h264_nvenc",
             Self::AmdAmf => "h264_amf",
             Self::AppleVideoToolbox => "h264_videotoolbox",
-            Self::Software => "libx264",
+            Self::Software => "libopenh264",
         }
     }
 
@@ -63,7 +63,8 @@ impl Encoder {
             Self::NvidiaNvenc => vec!["-pix_fmt", "yuv420p", "-c:v", "h264_nvenc", "-preset", "p4"],
             Self::AmdAmf => vec!["-pix_fmt", "yuv420p", "-c:v", "h264_amf", "-quality", "speed"],
             Self::AppleVideoToolbox => vec!["-pix_fmt", "yuv420p", "-c:v", "h264_videotoolbox", "-allow_sw", "0"],
-            Self::Software => vec!["-pix_fmt", "yuv420p", "-c:v", "libx264", "-preset", "veryfast"],
+            // OpenH264: BSD licence, in the LGPL FFmpeg QNC ships (libx264 is GPL and is not).
+            Self::Software => vec!["-pix_fmt", "yuv420p", "-c:v", "libopenh264", "-coder", "cabac", "-rc_mode", "bitrate"],
         };
         args.extend(["-profile:v", "high"]);
         args.extend(rate);

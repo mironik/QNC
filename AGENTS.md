@@ -8668,3 +8668,12 @@ bajt po bajt, kljucne slike, otkazivanje); libav prema LGPL naredbi na Mironik 3
 skokova, prva slika 162-236 ms prema 259-317 ms naredbom; brzina dekodiranja Gyan prema LGPL (8 s originala, 5 puta):
 medijan 2,66 s prema 2,71 s (sum). Testovi `qnc-decoder-catalog` (10), conformance, `qnc-versions`. Uzivo kroz aplikaciju
 nije provjereno. Za beta paket: `ffmpeg.exe`, `ffprobe.exe` i DLL-ovi idu uz aplikaciju, uz licencu LGPL.
+Izmjena 2026-11-10 (korisnik: "sto kad se promijeni racunalo i ne bude imao intelov procesor"; "provjeri OpenH264"):
+racunalo bez hardverskog H.264 kodera (QSV, NVENC, AMF, VideoToolbox) imalo je za prerender, Express, H.264 export i
+optimiziranu kopiju zadnji izbor libx264, kojeg LGPL FFmpeg nema. LGPL build uz aplikaciju ima `libopenh264` (Cisco,
+BSD). Softverski koder je sada OpenH264 (`qnc-program-render` `encoder.rs`: High, CABAC, `rc_mode bitrate`, bez B
+slika; `qnc-media-optimize`, ugovor modula); i on prolazi probno kodiranje kao hardverski koderi (prije se smatralo da
+radi bez probe). Izmjereno (Mironik 3608, 20 s originala 1080p50 s kartice): OpenH264 20,7 s (oko stvarnog vremena,
+dodatne niti ne ubrzavaju), Quick Sync 9,6 s; PSNR 46,4 dB prema 48,9 dB; po sekundi 28,7-35,0 Mbit/s uz 35 (Quick
+Sync 30,5-38,3). AMD racunalo dobiva AMF, NVIDIA NVENC, kao i prije. Testovi `qnc-program-render`,
+`qnc-media-optimize`. Uzivo kroz aplikaciju nije provjereno (ovo racunalo uvijek bira Quick Sync).

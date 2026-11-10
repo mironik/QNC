@@ -1,6 +1,6 @@
 //! The H.264 encoder of a prerender on this computer: a hardware encoder when one works
 //! here (one short test encode, once per process), else the processor. Measured on the
-//! camera original (2026-10-12, Intel Iris Xe): libx264 veryfast 33 pictures/s with the
+//! camera original (2026-10-12, Intel Iris Xe): a processor encoder 33 pictures/s with the
 //! decoding, Quick Sync 86 (the decoding is then the limit) and the processor stays free
 //! for the player. Every unit of a process uses the one encoder found, so the units of a
 //! story are put together without encoding again.
@@ -58,7 +58,11 @@ impl H264 {
             Self::NvidiaNvenc => ("yuv420p", cbr(&["-c:v", "h264_nvenc", "-preset", "p5", "-rc", "cbr", "-b:v", "RATE", "-maxrate", "RATE", "-bufsize", "BUFFER", "-rc_init_occupancy", "START", "-profile:v", "high", "-bf", "0"])),
             Self::AmdAmf => ("yuv420p", cbr(&["-c:v", "h264_amf", "-quality", "quality", "-rc", "cbr", "-b:v", "RATE", "-maxrate", "RATE", "-bufsize", "BUFFER", "-rc_init_occupancy", "START", "-profile:v", "high", "-bf", "0"])),
             Self::AppleVideoToolbox => ("yuv420p", cbr(&["-c:v", "h264_videotoolbox", "-b:v", "RATE", "-maxrate", "RATE", "-constant_bit_rate", "1", "-profile:v", "high", "-allow_sw", "0", "-bf", "0"])),
-            Self::Software => ("yuv420p", cbr(&["-c:v", "libx264", "-preset", "superfast", "-b:v", "RATE", "-minrate", "RATE", "-maxrate", "RATE", "-bufsize", "BUFFER", "-rc_init_occupancy", "START", "-x264-params", "nal-hrd=cbr", "-profile:v", "high", "-flags", "+cgop", "-sc_threshold", "0", "-bf", "0"])),
+            // OpenH264 (BSD licence, in the LGPL FFmpeg QNC ships; libx264 is GPL and is not):
+            // bitrate mode keeps to the rate from below, it has no B pictures. Measured
+            // 2026-11-10 on the camera original 1080p50: about real time, 31-35 Mbit/s per
+            // second at 35, PSNR 46 dB (Quick Sync 49 dB, twice as fast).
+            Self::Software => ("yuv420p", cbr(&["-c:v", "libopenh264", "-profile:v", "high", "-coder", "cabac", "-rc_mode", "bitrate", "-b:v", "RATE", "-maxrate", "RATE", "-allow_skip_frames", "0", "-bf", "0"])),
         }
     }
 
@@ -69,7 +73,7 @@ impl H264 {
             Self::order()
                 .iter()
                 .copied()
-                .find(|encoder| *encoder == Self::Software || works(ffmpeg, *encoder))
+                .find(|encoder| works(ffmpeg, *encoder))
                 .unwrap_or(Self::Software)
         })
     }
