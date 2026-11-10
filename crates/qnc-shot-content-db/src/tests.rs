@@ -41,6 +41,18 @@ fn kept_content_is_read_back_by_clip_and_by_model_and_a_new_one_replaces_it() {
 }
 
 #[test]
+fn the_label_vectors_of_a_model_are_kept_and_replaced() {
+    let (_dir, target) = project();
+    assert_eq!(read_labels(&target, "m").unwrap(), None);
+    let set = |prompt: &str| LabelSet { model: "m".into(), scale: 110.0, bias: -16.0, labels: vec![LabelVector { code: "sea".into(), prompt: prompt.into(), vector: vec![1.0, 0.0] }] };
+    save_labels(&target, set("a photo of the sea"), None).unwrap();
+    save_labels(&target, set("a photo of a harbour"), None).unwrap();
+    assert_eq!(read_labels(&target, "m").unwrap(), Some(set("a photo of a harbour")));
+    assert_eq!(read_labels(&target, "other").unwrap(), None);
+    assert!(save_labels(&target, LabelSet { labels: Vec::new(), ..set("x") }, None).is_err(), "an empty list is refused");
+}
+
+#[test]
 fn a_part_outside_itself_a_vector_of_another_width_or_an_error_beside_parts_is_refused() {
     let (_dir, target) = project();
     let outside = PartContent { frames: vec![500], ..part(0, 100, vec![1.0]) };

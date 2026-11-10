@@ -51,6 +51,14 @@ pub struct ShotContentEngine {
     pub pictures: u8,
 }
 
+impl ShotContentEngine {
+    /// The model's name the kept vectors carry: the last folder of its path (vectors of
+    /// different models are not compared).
+    pub fn model_name(&self) -> String {
+        self.model.file_name().map_or_else(|| self.model.display().to_string(), |name| name.to_string_lossy().into_owned())
+    }
+}
+
 /// The shot content engine of this host's catalog; its model must be there.
 pub fn installed_shot_content() -> Result<ShotContentEngine, String> {
     shot_content(&installed_path()?)

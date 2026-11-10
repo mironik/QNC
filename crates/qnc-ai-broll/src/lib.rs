@@ -1,0 +1,236 @@
+//! The AI B-roll of a project (user 2026-11-10: "a tab of its own for the AI B-roll", sorted by
+//! what the pictures show, in Story, S-Story and MA Video). Every usable part of every clip whose
+//! content the background worker looked at, grouped by the label its pictures fit best (in the
+//! order of the newsroom's list of labels), the longest first within a label; a click opens the
+//! part's clip with its IN/OUT on the source timeline. It reads the content and the label vectors
+//! the worker kept (outside the UI thread, again now and then) and the list of labels; it loads
+//! no model and writes nothing.
+
+use std::sync::mpsc;
+use std::time::{Duration, Instant};
+
+use qnc_clip_row::{ClipRow, TabCard};
+use qnc_db_broker::ProjectDbTarget;
+use qnc_source_preview::SourcePreview;
+
+pub const MODULE_ID: &str = "qnc.module.ai-broll";
+
+/// A click on a part's card opens its clip with its IN/OUT (target: `clip|from|to`).
+pub const OPEN: &str = "ai_broll_open";
+
+const READ_EVERY: Duration = Duration::from_secs(3);
+
+/// One usable part as the tab shows it.
+#[derive(Debug, Clone, PartialEq)]
+pub struct AiPart {
+    pub clip_id: String,
+    /// Clip frames `[from, to)`.
+    pub from: u64,
+    pub to: u64,
+    /// The label it fits best, its dictionary key and its share among all labels.
+    pub label: String,
+    pub text: String,
+    pub share: f32,
+}
+
+/// What the tab shows.
+#[derive(Debug, Clone, Default, PartialEq)]
+pub struct AiBrollView {
+    /// In the order shown.
+    pub parts: Vec<AiPart>,
+    pub message: String,
+}
+
+impl AiBrollView {
+    /// The parts of the clips of the pool as cards: "Label · clip", the part's duration, the
+    /// clip's poster. A part of a clip the pool has not is left out.
+    pub fn cards<'a>(&self, clips: &'a [ClipRow]) -> Vec<TabCard<'a>> {
+        self.parts
+            .iter()
+            .filter_map(|part| {
+                let clip = clips.iter().find(|clip| clip.clip_id == part.clip_id)?;
+                let label = qnc_ui_text::host().ok().and_then(|texts| texts.get(&part.text).ok()).unwrap_or(&part.label);
+                let per_frame = if clip.duration_frames > 0 { clip.duration_seconds / clip.duration_frames as f64 } else { 0.0 };
+                Some(TabCard {
+                    id: format!("{}|{}|{}", part.clip_id, part.from, part.to),
+                    title: qnc_ui_text::fill("ai_broll.card", &[("label", label), ("clip", &clip.name)]).into(),
+                    seconds: (part.to - part.from) as f64 * per_frame,
+                    clip: Some(clip),
+                    icon: qnc_clip_row::PoolIcon::None,
+                })
+            })
+            .collect()
+    }
+
+    pub fn count(&self) -> usize {
+        self.parts.len()
+    }
+}
+
+/// The parts in the tab's order from the kept content and label vectors and the list of labels:
+/// each part under the label it fits best (softmax of the model's logits), the labels in the
+/// order of the list, the longest part first within a label.
+pub fn sort_parts(content: &[qnc_shot_content_db::ClipContent], set: &qnc_shot_content_db::LabelSet, list: &qnc_shot_labels::Labels) -> Vec<AiPart> {
+    let texts = qnc_shot_content::Texts { vectors: set.labels.iter().map(|label| label.vector.clone()).collect(), scale: set.scale, bias: set.bias };
+    let order = |code: &str| list.labels.iter().position(|label| label.code == code).unwrap_or(usize::MAX);
+    let mut parts: Vec<(usize, AiPart)> = content
+        .iter()
+        .flat_map(|clip| clip.parts.iter().map(move |part| (clip, part)))
+        .filter_map(|(clip, part)| {
+            let logits = texts.logits(&part.vector);
+            let top = logits.iter().copied().fold(f32::NEG_INFINITY, f32::max);
+            let sum: f32 = logits.iter().map(|logit| (logit - top).exp()).sum();
+            let best = logits.iter().position(|logit| *logit == top)?;
+            let label = &set.labels[best].code;
+            Some((
+                order(label),
+                AiPart {
+                    clip_id: clip.clip_id.clone(),
+                    from: part.from,
+                    to: part.to,
+                    label: label.clone(),
+                    text: list.text_of(label).unwrap_or(label).to_string(),
+                    share: 1.0 / sum,
+                },
+            ))
+        })
+        .collect();
+    parts.sort_by(|(a, x), (b, y)| a.cmp(b).then((y.to - y.from).cmp(&(x.to - x.from))).then(x.clip_id.cmp(&y.clip_id)).then(x.from.cmp(&y.from)));
+    parts.into_iter().map(|(_, part)| part).collect()
+}
+
+type Read = Result<Vec<AiPart>, String>;
+
+/// The AI B-roll of the project on the preview.
+#[derive(Debug, Default)]
+pub struct AiBroll {
+    view: AiBrollView,
+    project: Option<String>,
+    reading: Option<mpsc::Receiver<Read>>,
+    read_at: Option<Instant>,
+    source_request: Option<(String, u64, u64)>,
+}
+
+impl AiBroll {
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    pub fn view(&self) -> &AiBrollView {
+        &self.view
+    }
+
+    pub fn busy(&self) -> bool {
+        self.reading.is_some()
+    }
+
+    /// Takes a finished read, reads again now and then. Returns whether the view changed.
+    pub fn poll(&mut self, preview: &SourcePreview) -> bool {
+        let before = self.view.clone();
+        let project = preview.project_target().cloned();
+        let key = project.as_ref().map(|target| target.uri().to_string());
+        if key != self.project {
+            *self = Self { project: key, ..Self::default() };
+        }
+        if let Some(reading) = &self.reading {
+            if let Ok(result) = reading.try_recv() {
+                match result {
+                    Ok(parts) => {
+                        self.view.parts = parts;
+                        self.view.message.clear();
+                    }
+                    Err(error) => self.view.message = error,
+                }
+                self.reading = None;
+            }
+        }
+        if let Some(project) = project.filter(|_| self.reading.is_none() && self.read_at.is_none_or(|at| at.elapsed() >= READ_EVERY)) {
+            self.read_at = Some(Instant::now());
+            let (send, read) = mpsc::channel();
+            if std::thread::Builder::new().name("qnc-ai-broll-read".into()).spawn(move || _ = send.send(read_parts(&project))).is_ok() {
+                self.reading = Some(read);
+            }
+        }
+        self.view != before
+    }
+
+    /// Its own actions; `None` for any other.
+    pub fn act(&mut self, action_id: &str, target: Option<&str>) -> Option<bool> {
+        if action_id != OPEN {
+            return None;
+        }
+        let mut fields = target?.rsplitn(3, '|');
+        let (to, from, clip) = (fields.next()?.parse::<u64>().ok()?, fields.next()?.parse::<u64>().ok()?, fields.next()?);
+        let known = self.view.parts.iter().any(|part| part.clip_id == clip && part.from == from && part.to == to);
+        if known {
+            self.source_request = Some((clip.to_string(), from, to));
+        }
+        Some(known)
+    }
+
+    /// A clip and IN/OUT a chosen part opens on the source timeline, once.
+    pub fn take_source_request(&mut self) -> Option<(String, u64, u64)> {
+        self.source_request.take()
+    }
+}
+
+/// The parts of the project behind `target` for the model of this host.
+fn read_parts(target: &ProjectDbTarget) -> Read {
+    let engine = qnc_ai_catalog::installed_shot_content()?;
+    let model = engine.model_name();
+    let list = qnc_shot_labels::Labels::read(&qnc_shot_labels::installed_path()?)?;
+    let Some(set) = qnc_shot_content_db::read_labels(target, &model)? else {
+        return Ok(Vec::new());
+    };
+    let content = qnc_shot_content_db::read_all(target, &model)?;
+    Ok(sort_parts(&content, &set, &list))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use qnc_shot_content_db::{ClipContent, LabelSet, LabelVector, PartContent};
+
+    fn list() -> qnc_shot_labels::Labels {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("labels.json");
+        std::fs::write(&path, r#"{"version":1,"least":0.1,"labels":[
+            {"code":"sea","text":"shot.label.sea","prompt":"a photo of the sea"},
+            {"code":"person","text":"shot.label.person","prompt":"a photo of a person"}]}"#)
+        .unwrap();
+        qnc_shot_labels::Labels::read(&path).unwrap()
+    }
+
+    fn part(from: u64, to: u64, vector: Vec<f32>) -> PartContent {
+        PartContent { from, to, frames: vec![from], vector }
+    }
+
+    #[test]
+    fn parts_are_grouped_by_the_label_they_fit_best_in_the_lists_order_the_longest_first() {
+        let set = LabelSet {
+            model: "m".into(),
+            scale: 10.0,
+            bias: 0.0,
+            labels: vec![LabelVector { code: "person".into(), prompt: "p".into(), vector: vec![0.0, 1.0] }, LabelVector { code: "sea".into(), prompt: "s".into(), vector: vec![1.0, 0.0] }],
+        };
+        let content = vec![
+            ClipContent { clip_id: "a".into(), model: "m".into(), parts: vec![part(0, 100, vec![0.0, 1.0]), part(200, 500, vec![1.0, 0.0])], error: String::new(), took_ms: 0 },
+            ClipContent { clip_id: "b".into(), model: "m".into(), parts: vec![part(0, 50, vec![0.9, 0.1])], error: String::new(), took_ms: 0 },
+        ];
+        let parts = sort_parts(&content, &set, &list());
+        let shown: Vec<(&str, u64, &str)> = parts.iter().map(|p| (p.clip_id.as_str(), p.from, p.label.as_str())).collect();
+        assert_eq!(shown, [("a", 200, "sea"), ("b", 0, "sea"), ("a", 0, "person")], "sea comes first in the list; the longer sea part first");
+        assert!(parts[0].share > 0.99);
+        assert_eq!(parts[0].text, "shot.label.sea");
+    }
+
+    #[test]
+    fn a_click_opens_only_a_part_the_tab_shows() {
+        let mut broll = AiBroll::new();
+        broll.view.parts = vec![AiPart { clip_id: "clip|x".into(), from: 10, to: 90, label: "sea".into(), text: "shot.label.sea".into(), share: 1.0 }];
+        assert_eq!(broll.act(OPEN, Some("clip|x|10|90")), Some(true));
+        assert_eq!(broll.take_source_request(), Some(("clip|x".to_string(), 10, 90)));
+        assert_eq!(broll.act(OPEN, Some("clip|x|10|91")), Some(false));
+        assert_eq!(broll.act("other", Some("clip|x|10|90")), None);
+    }
+}

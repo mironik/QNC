@@ -1,0 +1,21 @@
+{
+  "module_id": "qnc.module.ai-broll",
+  "module_name": "AI B-roll",
+  "module_version": "0.1.0",
+  "module_kind": "library",
+  "capabilities": ["pool.ai-broll.cards", "pool.ai-broll.open"],
+  "input_contract_version": "0.1.0",
+  "output_contract_version": "0.1.0",
+  "transport_protocol_version": "0.1.0",
+  "transport_scope": ["local", "lan", "intranet"],
+  "supported_os": ["windows", "linux", "macos"],
+  "supported_cpu": ["x86_64", "aarch64"],
+  "forbidden_calls": ["db.write", "media.decode", "media.probe.full", "source.write", "playback.clock"],
+  "forbidden_dependencies": ["qnc.module.media-probe"],
+  "state_policy": "session_local",
+  "database_write_policy": "no_db_writes",
+  "runtime_crate": "qnc-ai-broll",
+  "input": "The project on the preview: the content of its clips' usable parts and the label vectors the background worker kept (qnc-shot-content-db, read outside the UI thread every 3 s), the model of this host's AI catalog and the list of labels.",
+  "output": "Every usable part grouped under the label its pictures fit best (softmax of the model's logits), labels in the list's order, the longest part first, as cards of the pool's AI B-roll tab (label, clip, duration, the clip's poster); a click (ai_broll_open, target clip|from|to) opens the part's clip with its IN/OUT on the source timeline. It loads no model.",
+  "specification": "User 2026-11-10: a tab of its own for the AI B-roll, sorted by content, in Story, S-Story and MA Video (docs/101)."
+}

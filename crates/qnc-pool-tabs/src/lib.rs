@@ -16,6 +16,9 @@ pub const SUBSEGMENT: &str = "editorial_tab_subsegment";
 pub const VOICE: &str = "editorial_tab_voice";
 /// The versions of the S-Story (user 2026-10-31).
 pub const STORIES: &str = "editorial_tab_stories";
+/// Every usable part of every clip, grouped by what its pictures show (user 2026-11-10: Story,
+/// S-Story, MA Video).
+pub const AI_BROLL: &str = "editorial_tab_ai_broll";
 
 /// The catalog actions of the X on a chosen card (target: the card's id): a statement, the
 /// transcript of a clip, a composite statement (a block of the script).
@@ -38,6 +41,7 @@ pub struct Contents {
     pub subsegments: usize,
     pub voices: usize,
     pub stories: usize,
+    pub ai_broll: usize,
 }
 
 impl Contents {
@@ -52,6 +56,7 @@ impl Contents {
             LibraryTab::Subsegment => self.subsegments,
             LibraryTab::Voice => self.voices,
             LibraryTab::Stories => self.stories,
+            LibraryTab::AiBroll => self.ai_broll,
         };
         Some(count > 0)
     }
@@ -70,6 +75,7 @@ pub enum LibraryTab {
     Subsegment,
     Voice,
     Stories,
+    AiBroll,
 }
 
 impl LibraryTab {
@@ -83,6 +89,7 @@ impl LibraryTab {
             SUBSEGMENT => Some(Self::Subsegment),
             VOICE => Some(Self::Voice),
             STORIES => Some(Self::Stories),
+            AI_BROLL => Some(Self::AiBroll),
             _ => None,
         }
     }
@@ -110,7 +117,7 @@ mod tests {
 
     #[test]
     fn every_tab_comes_from_its_action_and_only_virtual_and_broll_list_shots() {
-        for (action, tab) in [(ALL, LibraryTab::All), (VIRTUAL, LibraryTab::Virtual), (BROLL, LibraryTab::Broll), (SEGMENT, LibraryTab::Segment), (TRANSCRIPT, LibraryTab::Transcript), (SUBSEGMENT, LibraryTab::Subsegment), (VOICE, LibraryTab::Voice), (STORIES, LibraryTab::Stories)] {
+        for (action, tab) in [(ALL, LibraryTab::All), (VIRTUAL, LibraryTab::Virtual), (BROLL, LibraryTab::Broll), (SEGMENT, LibraryTab::Segment), (TRANSCRIPT, LibraryTab::Transcript), (SUBSEGMENT, LibraryTab::Subsegment), (VOICE, LibraryTab::Voice), (STORIES, LibraryTab::Stories), (AI_BROLL, LibraryTab::AiBroll)] {
             assert_eq!(LibraryTab::from_action(action), Some(tab));
         }
         assert_eq!(LibraryTab::from_action("play_pause"), None);

@@ -50,6 +50,7 @@
     "subsegment_empty_message": "@story.pool.subsegment_empty",
     "voice_empty_message": "@story.pool.voice_empty",
     "stories_empty_message": "@story.pool.stories_empty",
+    "ai_broll_empty_message": "@story.pool.ai_broll_empty",
     "loading_message": "@story.pool.loading"
   },
   "pool_head": {
@@ -59,8 +60,12 @@
         "action_id": "editorial_tab_all"
       },
       {
-        "label": "@pool.tab.subclip",
+        "label": "@pool.tab.sot",
         "action_id": "editorial_tab_virtual"
+      },
+      {
+        "label": "@pool.tab.ai_broll",
+        "action_id": "editorial_tab_ai_broll"
       }
     ],
     "transport_width": 290.0
@@ -347,12 +352,16 @@
             "action_id": "editorial_tab_stories"
           },
           {
-            "label": "@pool.tab.subclip",
+            "label": "@pool.tab.sot",
             "action_id": "editorial_tab_virtual"
           },
           {
             "label": "@pool.tab.broll",
             "action_id": "editorial_tab_broll"
+          },
+          {
+            "label": "@pool.tab.ai_broll",
+            "action_id": "editorial_tab_ai_broll"
           },
           {
             "label": "@pool.tab.segment",
@@ -461,12 +470,16 @@
             "action_id": "editorial_tab_all"
           },
           {
-            "label": "@pool.tab.subclip",
+            "label": "@pool.tab.sot",
             "action_id": "editorial_tab_virtual"
           },
           {
             "label": "@pool.tab.broll",
             "action_id": "editorial_tab_broll"
+          },
+          {
+            "label": "@pool.tab.ai_broll",
+            "action_id": "editorial_tab_ai_broll"
           },
           {
             "label": "@pool.tab.segment",

@@ -99,7 +99,7 @@ fn pool(ui: &mut Ui, contracts: &EditorialContracts, theme: &Theme, view: &Edito
     };
     let clicked = match tab {
         // A SubSegment is a virtual clip of the script (user 2026-10-29): a click opens it in place of the source timeline.
-        LibraryTab::Subsegment | LibraryTab::Voice | LibraryTab::Stories => { let (cards, action) = view.focus.tab_cards(tab, &view.clips); card_action = Some(action); qnc_media_pool_panel::show_removable(ui, themed, &spec, &now, &cards.iter().collect::<Vec<_>>()) }
+        LibraryTab::Subsegment | LibraryTab::Voice | LibraryTab::Stories | LibraryTab::AiBroll => { let (cards, action) = view.focus.tab_cards(tab, &view.clips); card_action = Some(action); qnc_media_pool_panel::show_removable(ui, themed, &spec, &now, &cards.iter().collect::<Vec<_>>()) }
         _ if shot_tab => qnc_media_pool_panel::show_removable(ui, themed, &spec, &now, &view.shorts.iter().filter(|shot| shot.b_roll == (tab == LibraryTab::Broll)).collect::<Vec<_>>()),
         _ => qnc_media_pool_panel::show_removable(ui, themed, &spec, &now, &view.focus.transcript.pool_clips(tab == LibraryTab::Transcript, &view.clips)),
     };

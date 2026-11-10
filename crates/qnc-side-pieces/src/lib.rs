@@ -7,6 +7,7 @@
 
 use std::sync::Arc;
 
+use qnc_ai_broll::{AiBroll, AiBrollView};
 use qnc_clip_row::ClipRow;
 use qnc_clip_shots::{ClipShots, ShotsView};
 use qnc_script::{Script, ScriptView};
@@ -35,6 +36,8 @@ pub const SCRIPT_WRITER_PANEL: &str = "script_writer_panel";
 /// The bar in the media window of the story writer (user 2026-11-02): the marked IN-OUT goes into
 /// the story from where it is marked. It shows the script of the writer panel.
 pub const SCRIPT_CLIP_BAR: &str = "script_clip_bar";
+/// Not a panel: the form has the pool tab AI B-roll (user 2026-11-10), its piece is made.
+pub const AI_BROLL_TAB: &str = "ai_broll_tab";
 
 /// What the right panel pieces show; empty for a piece the form does not have.
 #[derive(Debug, Clone, Default, PartialEq)]
@@ -43,6 +46,7 @@ pub struct SideViews {
     pub shots: Arc<ShotsView>,
     pub script: Arc<ScriptView>,
     pub versions: Arc<VersionsView>,
+    pub ai_broll: Arc<AiBrollView>,
 }
 
 /// The pieces of the panels a form has.
@@ -55,6 +59,7 @@ pub struct SidePieces {
     shots: Option<ClipShots>,
     script: Option<Script>,
     versions: Option<SkeletonVersions>,
+    ai_broll: Option<AiBroll>,
     views: SideViews,
     /// The form's segment panel shows a version of the S-Story.
     draft_story: bool,
@@ -74,6 +79,7 @@ impl SidePieces {
             shots: has(VIDEO_AI_PANEL).then(ClipShots::default),
             script: (has(SCRIPT_PANEL) || has(SCRIPT_WRITER_PANEL)).then(Script::new),
             versions: has(DRAFT_SEGMENT_PANEL).then(SkeletonVersions::new),
+            ai_broll: has(AI_BROLL_TAB).then(AiBroll::new),
             views: SideViews::default(),
             draft_story: has(DRAFT_SEGMENT_PANEL),
             said: Default::default(),
@@ -139,6 +145,11 @@ impl SidePieces {
                 self.views.versions = Arc::new(versions.view().clone());
             }
         }
+        if let Some(ai_broll) = &mut self.ai_broll {
+            if ai_broll.poll(preview) {
+                self.views.ai_broll = Arc::new(ai_broll.view().clone());
+            }
+        }
         self.warn_of_refusals();
     }
 
@@ -189,6 +200,11 @@ impl SidePieces {
                 return Some(done);
             }
         }
+        if let Some(ai_broll) = &mut self.ai_broll {
+            if let Some(done) = ai_broll.act(action_id, target) {
+                return Some(done);
+            }
+        }
         if let Some(shots) = &mut self.shots {
             // A click on a shot puts the playhead on its start (user 2026-10-27).
             if action_id == qnc_clip_shots::CUE_SHOT {
@@ -217,12 +233,15 @@ impl SidePieces {
     pub fn take_source_request(&mut self) -> Option<(String, u64, u64)> {
         let transcript = self.transcript.as_mut().and_then(Transcript::take_source_request);
         let shots = || self.shots.as_mut().and_then(ClipShots::take_source_request);
-        transcript.or_else(shots).or_else(|| self.script.as_mut().and_then(Script::take_source_request))
+        transcript
+            .or_else(shots)
+            .or_else(|| self.script.as_mut().and_then(Script::take_source_request))
+            .or_else(|| self.ai_broll.as_mut().and_then(AiBroll::take_source_request))
     }
 
     /// Whether a read or write of a piece runs (the form repaints soon).
     pub fn busy(&self) -> bool {
-        self.transcripts.busy() || self.transcript.as_ref().is_some_and(Transcript::busy) || self.script.as_ref().is_some_and(Script::busy) || self.versions.as_ref().is_some_and(SkeletonVersions::busy)
+        self.transcripts.busy() || self.transcript.as_ref().is_some_and(Transcript::busy) || self.script.as_ref().is_some_and(Script::busy) || self.versions.as_ref().is_some_and(SkeletonVersions::busy) || self.ai_broll.as_ref().is_some_and(AiBroll::busy)
     }
 
     /// Whether a transcription of this process runs in the background.

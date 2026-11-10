@@ -4,7 +4,7 @@ use crate::*;
 use rusqlite::{params, Connection, OptionalExtension};
 
 /// The tables this module owns; it writes no other.
-const OWNED: [&str; 1] = ["clip_content"];
+const OWNED: [&str; 2] = ["clip_content", "shot_label_vectors"];
 
 /// The longest vector a part may have (a model's width).
 const MOST_DIMENSIONS: usize = 4096;
@@ -30,12 +30,19 @@ impl Store {
                     made_at_utc TEXT NOT NULL
                  );
                  CREATE VIEW IF NOT EXISTS public_clip_content AS
-                    SELECT clip_id, model, version, parts_json, error, took_ms, made_at_utc FROM clip_content;",
+                    SELECT clip_id, model, version, parts_json, error, took_ms, made_at_utc FROM clip_content;
+                 CREATE TABLE IF NOT EXISTS shot_label_vectors (
+                    model TEXT PRIMARY KEY,
+                    labels_json TEXT NOT NULL,
+                    made_at_utc TEXT NOT NULL
+                 );
+                 CREATE VIEW IF NOT EXISTS public_shot_label_vectors AS
+                    SELECT model, labels_json, made_at_utc FROM shot_label_vectors;",
             )
             .map_err(err)?;
         }
         let ready = conn
-            .query_row("SELECT EXISTS(SELECT 1 FROM sqlite_master WHERE name='public_clip_content')", [], |r| r.get(0))
+            .query_row("SELECT EXISTS(SELECT 1 FROM sqlite_master WHERE name='public_shot_label_vectors')", [], |r| r.get(0))
             .map_err(err)?;
         if access == Access::ReadOnly {
             conn.pragma_update(None, "query_only", true).map_err(err)?;
@@ -48,10 +55,46 @@ impl Store {
         match operation {
             Operation::ReadClip { .. } if !self.ready => Ok(Data::Clip(None)),
             Operation::ReadAll { .. } if !self.ready => Ok(Data::All(Vec::new())),
+            Operation::ReadLabels { .. } if !self.ready => Ok(Data::Labels(None)),
             Operation::ReadClip { clip_id } => self.read_clip(clip_id),
             Operation::ReadAll { model } => self.read_all(model),
             Operation::Save(content) => self.save(content),
+            Operation::SaveLabels(labels) => self.save_labels(labels),
+            Operation::ReadLabels { model } => self.read_labels(model),
         }
+    }
+
+    fn save_labels(&mut self, labels: &LabelSet) -> Result<Data> {
+        let width = labels.labels.first().map_or(0, |label| label.vector.len());
+        let valid = !labels.model.is_empty()
+            && labels.scale.is_finite()
+            && labels.bias.is_finite()
+            && !labels.labels.is_empty()
+            && labels.labels.iter().all(|label| {
+                !label.code.is_empty() && label.vector.len() == width && (1..=MOST_DIMENSIONS).contains(&width) && label.vector.iter().all(|v| v.is_finite())
+            });
+        if !valid {
+            return Err(qnc_ui_text::text("db.shot_content_invalid").into());
+        }
+        let json = serde_json::to_string(labels).map_err(err)?;
+        let tx = qnc_db_broker::begin_write(&mut self.conn).map_err(err)?;
+        tx.execute(
+            "INSERT INTO shot_label_vectors (model, labels_json, made_at_utc) VALUES (?1, ?2, strftime('%Y-%m-%dT%H:%M:%fZ','now'))
+             ON CONFLICT(model) DO UPDATE SET labels_json=excluded.labels_json, made_at_utc=excluded.made_at_utc",
+            params![labels.model, json],
+        )
+        .map_err(err)?;
+        tx.commit().map_err(err)?;
+        Ok(Data::Changed)
+    }
+
+    fn read_labels(&mut self, model: &str) -> Result<Data> {
+        let json: Option<String> = self
+            .conn
+            .query_row("SELECT labels_json FROM public_shot_label_vectors WHERE model = ?1", params![model], |r| r.get(0))
+            .optional()
+            .map_err(err)?;
+        json.map(|json| serde_json::from_str(&json).map_err(err)).transpose().map(Data::Labels)
     }
 
     fn save(&mut self, content: &ClipContent) -> Result<Data> {

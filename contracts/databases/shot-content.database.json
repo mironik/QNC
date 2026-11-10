@@ -6,10 +6,12 @@
   "schema_version": "0.1.0",
   "qnc_uri": "qnc://local/db/project_db",
   "tables": [
-    "clip_content"
+    "clip_content",
+    "shot_label_vectors"
   ],
   "public_read_views": [
-    "public_clip_content"
+    "public_clip_content",
+    "public_shot_label_vectors"
   ],
   "write_owner": "qnc.module.shot-content-db",
   "public_read_policy": "public_read_views",
@@ -17,6 +19,7 @@
     "clip": "A row is what the usable parts of one clip show (user 2026-11-10: sorting the B-roll by content): per part of its shot analysis the clip frames [from, to), the frames its 1-3 pictures were taken at and one vector of what they show (their mean, unit length); or only why the clip was not looked at.",
     "model": "A row names the model its vectors come from; vectors of different models are not compared, and a clip is looked at again for another model.",
     "labels": "No labels are kept: which labels a part gets is worked out from its vector when it is read (catalogs/ai/shot-labels.json), so a newsroom's own list needs no new look at the pictures.",
+    "label_vectors": "Beside the content a row a model keeps the vectors of the list of labels it was given and its score scale and bias, so a form sorts the B-roll by content without loading the model; made again when the list says something else (user 2026-11-10).",
     "replace": "A clip looked at again replaces its row.",
     "version": "A row carries the content version; a row of another version is looked at again."
   },

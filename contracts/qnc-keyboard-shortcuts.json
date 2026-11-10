@@ -604,6 +604,12 @@
     "editorial_tab_stories": {
       "label": "Pool: tab Stories"
     },
+    "editorial_tab_ai_broll": {
+      "label": "Pool: tab AI B-roll"
+    },
+    "ai_broll_open": {
+      "label": "Otvori dio AI pokrivalice"
+    },
     "skeleton_open_version": {
       "label": "Otvori verziju S-Storyja"
     },

@@ -444,6 +444,7 @@ pub struct EditorialMediaCard {
     pub subsegment_empty_message: String,
     pub voice_empty_message: String,
     pub stories_empty_message: String,
+    pub ai_broll_empty_message: String,
     pub loading_message: String,
 }
 
@@ -460,6 +461,7 @@ impl EditorialMediaCard {
             LibraryTab::Subsegment => &self.subsegment_empty_message,
             LibraryTab::Voice => &self.voice_empty_message,
             LibraryTab::Stories => &self.stories_empty_message,
+            LibraryTab::AiBroll => &self.ai_broll_empty_message,
             _ if !catalog.is_empty() => catalog,
             _ => &self.empty_message,
         }

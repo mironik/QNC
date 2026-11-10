@@ -8772,3 +8772,19 @@ Testovi `qnc-shot-content`, `qnc-shot-content-db`, `qnc-shot-content-run`, `qnc-
 Nije izvedeno (sljedeci koraci docs/101): razvrstavanje pokrivalica u poolu po oznakama, prijedlog pokrivalica prema tekstu OFF-a,
 oznake u panelu Video AI; analiza kadrova i sadrzaj za MP4 originale (sada samo MXF). Mironik 3608 na kartici D: zapinje pri
 citanju (greska uredaja), nije problem agenta.
+Izvedeno 2026-11-10 (korisnik: "kreni s razvrstavanjem pokrivalica u poolu; tab pokrivalice sadrzi upotrebljene kadrove, treba
+poseban tab za AI B-roll; tab SubClip u biti sadrzi izjave i treba ga preimenovati u Izjave"; "i u MA Video"): tab AI B-roll /
+AI pokrivalice u poolu Storyja (o), S-Storyja (k) i MA Videa (l, osnovni raspored): svaki upotrebljivi dio svakog klipa ciji je
+sadrzaj pozadinski proces pogledao, pod oznakom kojoj slike najbolje odgovaraju (softmax), oznake redom popisa
+`catalogs/ai/shot-labels.json`, najdulji dio prvi; kartica "Oznaka · klip", trajanje dijela, poster klipa; klik (`ai_broll_open`,
+cilj `klip|od|do`) otvara klip s IN/OUT dijela na source timelineu. Tab je siv dok nema dijelova. Nova kocka `crates/qnc-ai-broll`
+(+ ugovor modula; cita u pozadini svake 3 s, ne ucitava model, nista ne pise). `qnc-shot-content-db`: tablica `shot_label_vectors`
+/ `public_shot_label_vectors` (vektori oznaka i skala/pomak modela po modelu; `SaveLabels`, `ReadLabels`), pa forma razvrstava bez
+modela; `qnc-shot-content-run` ih upisuje kad se popis oznaka promijeni (i bez novih klipova). `qnc-ai-catalog`
+`ShotContentEngine::model_name`. `qnc-pool-tabs` `AI_BROLL`, `LibraryTab::AiBroll`, `Contents.ai_broll`; `qnc-side-pieces`
+(`AI_BROLL_TAB`, dio se radi kad raspored forme ima tab), `qnc-panel-focus` (`FocusView.ai_broll`, `tab_cards`),
+`qnc-editorial-blocks`, `qnc-editorial-application` (isti broj redaka), `qnc-editorial-layout` (`ai_broll_empty_message`). Tab
+`editorial_tab_virtual` u Storyju, S-Storyju i MA Videu zove se Izjave / SOT (`@pool.tab.sot`), kao u MA Audiju i AI Media Assistu;
+gumb "Dodaj SubClip" nije preimenovan. Katalog akcija `editorial_tab_ai_broll`, `ai_broll_open` (bez tipki). Testovi
+`qnc-ai-broll` (razvrstavanje, klik), `qnc-shot-content-db` (vektori oznaka), `qnc-pool-tabs`, `qnc-side-pieces`,
+`qnc-panel-focus` (zlatne tablice), conformance. Uzivo nije provjereno.

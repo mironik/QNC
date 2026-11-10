@@ -43,22 +43,41 @@ pub fn look_missing(reader: &SettingsReader, settings: &WorkSettings, local_medi
             return Ok(0);
         }
     };
-    let model = model_name(&engine.model);
+    let model = engine.model_name();
     let db = ProjectDbTarget::for_project(reader, settings)?;
     let looked: Vec<String> = qnc_shot_content_db::read_all(&db, &model)?.into_iter().map(|clip| clip.clip_id).collect();
     let mut remaining: Vec<String> = qnc_shot_db::read_analysed(&db)?.into_iter().filter(|clip| !looked.contains(clip)).collect();
-    if remaining.is_empty() {
+    // The label vectors the forms sort the B-roll by (no model in a form): made again only when
+    // the list of labels says something else than the kept ones.
+    let labels = qnc_shot_labels::installed_path().and_then(|path| qnc_shot_labels::Labels::read(&path)).ok();
+    let stored = qnc_shot_content_db::read_labels(&db, &model)?;
+    let stale = labels.as_ref().filter(|list| !stored.as_ref().is_some_and(|set| same_labels(set, list)));
+    if remaining.is_empty() && stale.is_none() {
         return Ok(0);
     }
     let program = qnc_plugin_process::beside_application(&engine.program)?;
     let client = qnc_shot_content::ContentClient::new(&program);
     let mut catalog = qnc_content_store::ContentTarget::for_project(reader, settings)?.open(qnc_content_store::Access::ReadOnly)?;
-    // The labels the log names for each part (what the B-roll is sorted by is worked out when
-    // it is read; this is only what the log says).
-    let labels = qnc_shot_labels::installed_path().and_then(|path| qnc_shot_labels::Labels::read(&path)).ok();
-    let label_texts = labels
-        .as_ref()
-        .and_then(|list| client.texts(&qnc_shot_content::TextsRequest { model: engine.model.clone(), texts: list.prompts() }).ok());
+    let label_texts = match stale {
+        Some(list) => {
+            let texts = client.texts(&qnc_shot_content::TextsRequest { model: engine.model.clone(), texts: list.prompts() })?;
+            let set = qnc_shot_content_db::LabelSet {
+                model: model.clone(),
+                scale: texts.scale,
+                bias: texts.bias,
+                labels: list
+                    .labels
+                    .iter()
+                    .zip(&texts.vectors)
+                    .map(|(label, vector)| qnc_shot_content_db::LabelVector { code: label.code.clone(), prompt: label.prompt.clone(), vector: vector.clone() })
+                    .collect(),
+            };
+            qnc_shot_content_db::save_labels(&db, set, lease.clone())?;
+            log(format!("shot-content labels model={model} kept={}", list.labels.len()));
+            Some(texts)
+        }
+        None => stored.map(|set| qnc_shot_content::Texts { vectors: set.labels.into_iter().map(|label| label.vector).collect(), scale: set.scale, bias: set.bias }),
+    };
     let mut kept = 0;
     while !remaining.is_empty() {
         if !wait_for_player(pace) {
@@ -106,10 +125,11 @@ pub fn look_missing(reader: &SettingsReader, settings: &WorkSettings, local_medi
     Ok(kept)
 }
 
-/// The model's name: the last folder of its path (vectors of different models are not compared).
-pub fn model_name(model: &Path) -> String {
-    model.file_name().map_or_else(|| model.display().to_string(), |name| name.to_string_lossy().into_owned())
+/// Whether the kept label vectors are of the same labels and prompts, in the same order.
+fn same_labels(set: &qnc_shot_content_db::LabelSet, list: &qnc_shot_labels::Labels) -> bool {
+    set.labels.len() == list.labels.len() && set.labels.iter().zip(&list.labels).all(|(kept, label)| kept.code == label.code && kept.prompt == label.prompt)
 }
+
 
 /// The clip frames a part is looked at: its sharpest picture first, then a fifth in from its
 /// start and from its end; `count` of them (1-3), each once.

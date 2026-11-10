@@ -48,6 +48,27 @@ pub struct ClipContent {
     pub took_ms: u64,
 }
 
+/// The vector of one label's prompt, by one model.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct LabelVector {
+    pub code: String,
+    pub prompt: String,
+    pub vector: Vec<f32>,
+}
+
+/// The vectors of a list of labels by one model and how the model scores a picture against a
+/// text (the sigmoid of `cosine * scale + bias`): kept so a form sorts the B-roll by content
+/// without loading the model (user 2026-11-10).
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct LabelSet {
+    pub model: String,
+    pub scale: f32,
+    pub bias: f32,
+    pub labels: Vec<LabelVector>,
+}
+
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(tag = "kind", content = "value", rename_all = "snake_case", deny_unknown_fields)]
 pub enum Operation {
@@ -57,11 +78,15 @@ pub enum Operation {
     ReadClip { clip_id: String },
     /// The content of every clip looked at by `model` (done or failed).
     ReadAll { model: String },
+    /// The label vectors of a model are kept (they replace its earlier ones).
+    SaveLabels(LabelSet),
+    /// The label vectors of a model.
+    ReadLabels { model: String },
 }
 
 impl Operation {
     pub fn is_write(&self) -> bool {
-        matches!(self, Self::Save(_))
+        matches!(self, Self::Save(_) | Self::SaveLabels(_))
     }
 }
 
@@ -70,6 +95,7 @@ impl Operation {
 pub enum Data {
     Clip(Option<ClipContent>),
     All(Vec<ClipContent>),
+    Labels(Option<LabelSet>),
     Changed,
 }
 
@@ -108,15 +134,32 @@ pub fn read_all(target: &ProjectDbTarget, model: &str) -> Result<Vec<ClipContent
     }
 }
 
+/// The label vectors of `model` in the project behind `target`, if kept.
+pub fn read_labels(target: &ProjectDbTarget, model: &str) -> Result<Option<LabelSet>> {
+    match read(target, Operation::ReadLabels { model: model.into() })? {
+        Data::Labels(labels) => Ok(labels),
+        _ => Err(qnc_ui_text::text("db.shot_content_reply").into()),
+    }
+}
+
 /// Keeps `content` in the project behind `target` through its serial writer, under `lease`
 /// when given (checked in the same transaction as the write).
 pub fn save(target: &ProjectDbTarget, content: ClipContent, lease: Option<WriteLease>) -> Result<()> {
+    write(target, Operation::Save(content), lease)
+}
+
+/// Keeps the label vectors of a model in the project behind `target`, under `lease` when given.
+pub fn save_labels(target: &ProjectDbTarget, labels: LabelSet, lease: Option<WriteLease>) -> Result<()> {
+    write(target, Operation::SaveLabels(labels), lease)
+}
+
+fn write(target: &ProjectDbTarget, operation: Operation, lease: Option<WriteLease>) -> Result<()> {
     let writer = qnc_db_broker::ProjectDbWriter::spawn(target.clone(), vec![ShotContentModule::factory()])?;
     let writer = match lease {
         Some(lease) => writer.leased(lease),
         None => writer,
     };
-    writer.call(MODULE_ID, encode(&Operation::Save(content))?).map(drop)
+    writer.call(MODULE_ID, encode(&operation)?).map(drop)
 }
 
 #[cfg(test)]

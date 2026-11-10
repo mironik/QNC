@@ -1,0 +1,18 @@
+[package]
+name = "qnc-ai-broll"
+version = "0.1.0"
+edition = "2021"
+description = "QNC public piece: the AI B-roll of the project on the preview, every usable part grouped by the label its pictures fit best, read outside the UI thread from the content and label vectors the worker kept, as cards of the pool's AI B-roll tab; it loads no model and writes nothing"
+
+[dependencies]
+qnc-ai-catalog = { workspace = true }
+qnc-clip-row = { workspace = true }
+qnc-db-broker = { workspace = true }
+qnc-shot-content = { workspace = true }
+qnc-shot-content-db = { workspace = true }
+qnc-shot-labels = { workspace = true }
+qnc-source-preview = { workspace = true }
+qnc-ui-text = { workspace = true }
+
+[dev-dependencies]
+tempfile = "3"

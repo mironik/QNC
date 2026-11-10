@@ -3602,6 +3602,21 @@ dependencies = [
 ]
 
 [[package]]
+name = "qnc-ai-broll"
+version = "0.1.0"
+dependencies = [
+ "qnc-ai-catalog",
+ "qnc-clip-row",
+ "qnc-db-broker",
+ "qnc-shot-content",
+ "qnc-shot-content-db",
+ "qnc-shot-labels",
+ "qnc-source-preview",
+ "qnc-ui-text",
+ "tempfile",
+]
+
+[[package]]
 name = "qnc-ai-catalog"
 version = "0.1.0"
 dependencies = [
@@ -5594,6 +5609,7 @@ name = "qnc-panel-focus"
 version = "0.1.0"
 dependencies = [
  "qnc-action-event",
+ "qnc-ai-broll",
  "qnc-clip-row",
  "qnc-clip-shots",
  "qnc-db-broker",
@@ -6754,6 +6770,7 @@ version = "0.1.0"
 name = "qnc-side-pieces"
 version = "0.1.0"
 dependencies = [
+ "qnc-ai-broll",
  "qnc-clip-row",
  "qnc-clip-shots",
  "qnc-db-broker",

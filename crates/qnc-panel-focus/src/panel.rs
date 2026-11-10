@@ -85,6 +85,8 @@ pub struct FocusView {
     pub script: std::sync::Arc<qnc_script::ScriptView>,
     /// The versions of the S-Story.
     pub versions: std::sync::Arc<qnc_skeleton_versions::VersionsView>,
+    /// The AI B-roll of the project.
+    pub ai_broll: std::sync::Arc<qnc_ai_broll::AiBrollView>,
 }
 
 impl FocusView {
@@ -93,6 +95,7 @@ impl FocusView {
     pub fn tab_cards<'a>(&self, tab: qnc_pool_tabs::LibraryTab, clips: &'a [qnc_clip_row::ClipRow]) -> (Vec<qnc_clip_row::TabCard<'a>>, &'static str) {
         match tab {
             qnc_pool_tabs::LibraryTab::Stories => (self.versions.cards(), qnc_skeleton_versions::OPEN),
+            qnc_pool_tabs::LibraryTab::AiBroll => (self.ai_broll.cards(clips), qnc_ai_broll::OPEN),
             tab => self.script.tab_cards(tab == qnc_pool_tabs::LibraryTab::Voice, clips),
         }
     }
