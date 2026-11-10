@@ -8890,3 +8890,17 @@ poredak je kao prije. Spoj: `qnc-side-pieces` `follow_slot`, `qnc-panel-focus` (
 conformance; pet hrvatskih recenica OFF-a protiv 29 kadrova kartice D: (samo citanje) svrstava knjige, stadion i pozornicu,
 policiju i kolica uz svoje recenice. Nije izvedeno: oznaka slota s tekstom iznad kartica (vidi se samo poredak i brojevi),
 prijedlog iz teksta scenarija prije slanja u pricu. Uzivo nije provjereno.
+Popravak i izmjena 2026-11-10 (korisnik: "uveo sam novu vrstu kartice (kopija kartice na disku), pogledaj log... provjeri kako je
+AI kategorizirao i prepoznao klipove: lose, skoro neupotrebljivo"): (1) Nova kartica je Sony PMW-300 XDCAM EX
+(`PRIVATE/SONY/BPAV/CLPR`, MPEG-2 4:2:0 1080 u MP4). Analiza kadrova odbila je svih 19 klipova ("nema MXF indeks"): citac MP4
+indeksa znao je samo H.264 i HEVC. `qnc-mp4-sound`: vizualni zapis `mp4v` s `esds` vrste objekta 0x60-0x65 je MPEG-2
+(`Track.mpeg2`, `picture_codec` = `mpeg2video`); `picture_at` daje elementarni tok slike (zaglavlje sekvence iz `esds` kad ga
+slika nema). Poruka `shots.no_index` vise ne kaze samo MXF. (2) Razvrstavanje je bilo lose jer popis oznaka nije imao nista za
+taj materijal (hotel, bazeni, vrtovi, fontana, obala), pa je pobjedivala bilo koja oznaka s ocjenom oko 0,000, a mutni kadrovi
+su dobivali "noc". Popis (`catalogs/ai/shot-labels.json`) dobio je hotel, bazen, vrt/park, fontanu, obalu, drvece,
+cvijece/biljke, mjesto i mutno (rjecnik `shot.label.*`). Izmjereno (`rank_pictures`, prva oznaka tocna, rucno zapisane tocne
+grupe): PMW-300 19 kadrova SigLIP 2 6/19 -> 18/19 (SigLIP 5 -> 16), kadrovi vijesti 29 -> 28/29 (bez pogorsanja). Probni program
+`look_card` na kopiji kartice (samo citanje): MP4 klipovi daju kadrove i dijelove (npr. 594_9500: 4 dijela, 1,3 s). Klipovi
+cija analiza nije uspjela analiziraju se ponovno u sljedecem radu pozadinskog procesa. Release `qnc-ingest-worker` izgraden.
+Testovi `qnc-mp4-sound`, `qnc-shot-analysis`, `qnc-shot-labels`, `qnc-ui-text`, `qnc-ai-broll`, conformance. Uzivo nije
+provjereno.

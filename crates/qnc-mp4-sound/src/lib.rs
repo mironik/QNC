@@ -43,6 +43,9 @@ pub struct Track {
     pub sample_ticks: u32,
     /// H.265: the length of the NAL size fields and the parameter sets (VPS, SPS, PPS).
     pub hevc: Option<(u8, Vec<Vec<u8>>)>,
+    /// MPEG-2 video in MP4 (`mp4v`, XDCAM EX): the decoder specific info of its `esds` (the
+    /// sequence header, when the file keeps it there; empty when every key picture carries it).
+    pub mpeg2: Option<Vec<u8>>,
     /// AAC: the AudioSpecificConfig of the track.
     pub aac_config: Option<Vec<u8>>,
 }
@@ -171,16 +174,17 @@ pub fn read_sound_and_pictures(
 pub fn first_key_picture<R: Read + Seek + ?Sized>(file: &mut R, tracks: &[Track]) -> Result<(Vec<u8>, &'static str), String> {
     let video = tracks.iter().find(|track| track.is_picture()).ok_or("mp4: no picture track")?;
     let number = video.key_at_or_after(0).ok_or("mp4: the picture track is empty")?;
-    let codec = video.picture_codec().ok_or("mp4: the picture is neither H.264 nor H.265")?;
+    let codec = video.picture_codec().ok_or("mp4: the picture is neither H.264, H.265 nor MPEG-2")?;
     Ok((picture_at(file, video, number)?, codec))
 }
 
 impl Track {
-    /// The picture codec as the decoder catalog names it (`h264`, `hevc`).
+    /// The picture codec as the decoder catalog names it (`h264`, `hevc`, `mpeg2video`).
     pub fn picture_codec(&self) -> Option<&'static str> {
-        match (&self.avc, &self.hevc) {
-            (Some(_), _) => Some("h264"),
-            (None, Some(_)) => Some("hevc"),
+        match (&self.avc, &self.hevc, &self.mpeg2) {
+            (Some(_), _, _) => Some("h264"),
+            (None, Some(_), _) => Some("hevc"),
+            (None, None, Some(_)) => Some("mpeg2video"),
             _ => None,
         }
     }
@@ -200,15 +204,23 @@ impl Track {
 }
 
 /// Picture sample `number` of an H.264/H.265 track as an Annex B stream a decoder takes on its
-/// own (user 2026-11-10: the shot analysis of MP4 originals through their index).
+/// own (user 2026-11-10: the shot analysis of MP4 originals through their index); of an MPEG-2
+/// track (XDCAM EX) as an elementary stream, its sequence header first.
 pub fn picture_at<R: Read + Seek + ?Sized>(file: &mut R, track: &Track, number: u64) -> Result<Vec<u8>, String> {
-    let (nal_length, parameter_sets) = track.avc.as_ref().or(track.hevc.as_ref()).ok_or("mp4: the picture is neither H.264 nor H.265")?;
     let (place, length) = *track.samples.get(number as usize).ok_or("mp4: no such picture")?;
     if length > MAX_SAMPLE {
         return Err("mp4: a picture sample is past what a file holds".into());
     }
     let mut sample = vec![0u8; length as usize];
     read_at(file, place, &mut sample)?;
+    if let (None, None, Some(header)) = (&track.avc, &track.hevc, &track.mpeg2) {
+        // A key picture that carries its own sequence header is a stream on its own.
+        if sample.starts_with(&[0, 0, 1, 0xb3]) || header.is_empty() {
+            return Ok(sample);
+        }
+        return Ok([header.as_slice(), &sample].concat());
+    }
+    let (nal_length, parameter_sets) = track.avc.as_ref().or(track.hevc.as_ref()).ok_or("mp4: the picture is neither H.264, H.265 nor MPEG-2")?;
     avc_annexb(&sample, *nal_length, parameter_sets)
 }
 
@@ -387,6 +399,12 @@ fn sample_entry(data: &[u8], at: usize, end: usize, track: &mut Track) {
             track.avc = avc_config(&data[avcc..avcc_end]);
         } else if let Some((hvcc, hvcc_end)) = child(data, body + 78, entry_end, &[b"hvcC"]) {
             track.hevc = hevc_config(&data[hvcc..hvcc_end]);
+        } else if let Some((esds, esds_end)) = child(data, body + 78, entry_end, &[b"esds"]) {
+            // MPEG-2 video (ISO/IEC 14496-1 object types 0x60-0x65), as XDCAM EX writes it.
+            let descriptors = data.get(esds + 4..esds_end).unwrap_or_default();
+            if object_type(descriptors).is_some_and(|object| (0x60..=0x65).contains(&object)) {
+                track.mpeg2 = Some(decoder_specific_info(descriptors).unwrap_or_default());
+            }
         }
     } else if track.is_sound() {
         // A sound sample entry has 28 bytes before its boxes; QuickTime versions 1 and 2
@@ -441,6 +459,22 @@ fn avc_config(avcc: &[u8]) -> Option<(u8, Vec<Vec<u8>>)> {
 
 /// The DecoderSpecificInfo (tag 5) inside an ES descriptor: the AudioSpecificConfig.
 fn decoder_specific_info(descriptors: &[u8]) -> Option<Vec<u8>> {
+    es_descriptors(descriptors).1
+}
+
+/// The object type of an `esds` (its decoder config's first byte).
+fn object_type(descriptors: &[u8]) -> Option<u8> {
+    es_descriptors(descriptors).0
+}
+
+/// The object type and the decoder specific info of an `esds`'s descriptors.
+fn es_descriptors(descriptors: &[u8]) -> (Option<u8>, Option<Vec<u8>>) {
+    let mut object = None;
+    let found = walk_descriptors(descriptors, &mut object);
+    (object, found)
+}
+
+fn walk_descriptors(descriptors: &[u8], object: &mut Option<u8>) -> Option<Vec<u8>> {
     let mut at = 0;
     while at < descriptors.len() {
         let tag = descriptors[at];
@@ -469,8 +503,11 @@ fn decoder_specific_info(descriptors: &[u8]) -> Option<Vec<u8>> {
                     at += 2;
                 }
             }
-            // Decoder config: 13 bytes, then its descriptors.
-            4 => at += 13,
+            // Decoder config: the object type and 12 more bytes, then its descriptors.
+            4 => {
+                *object = descriptors.get(at).copied();
+                at += 13;
+            }
             5 => return descriptors.get(at..at + length).map(<[u8]>::to_vec),
             _ => at += length,
         }

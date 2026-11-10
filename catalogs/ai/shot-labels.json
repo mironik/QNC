@@ -33,6 +33,15 @@
     { "code": "field", "text": "shot.label.field", "prompt": "a photo of a field or a farm" },
     { "code": "greenhouse", "text": "shot.label.greenhouse", "prompt": "a photo of a greenhouse" },
     { "code": "animals", "text": "shot.label.animals", "prompt": "a photo of animals" },
-    { "code": "night", "text": "shot.label.night", "prompt": "a photo taken at night" }
+    { "code": "night", "text": "shot.label.night", "prompt": "a photo taken at night" },
+    { "code": "hotel", "text": "shot.label.hotel", "prompt": "a photo of a hotel building" },
+    { "code": "pool", "text": "shot.label.pool", "prompt": "a photo of a swimming pool" },
+    { "code": "garden", "text": "shot.label.garden", "prompt": "a photo of a garden or a park with lawn and trees" },
+    { "code": "fountain", "text": "shot.label.fountain", "prompt": "a photo of a fountain" },
+    { "code": "coast", "text": "shot.label.coast", "prompt": "a photo of the coast and the sea seen from above" },
+    { "code": "trees", "text": "shot.label.trees", "prompt": "a photo of trees" },
+    { "code": "flowers", "text": "shot.label.flowers", "prompt": "a close-up photo of flowers or plants" },
+    { "code": "town", "text": "shot.label.town", "prompt": "a photo of a small town with houses" },
+    { "code": "blur", "text": "shot.label.blur", "prompt": "a blurry out of focus photo" }
   ]
 }
