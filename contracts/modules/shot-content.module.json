@@ -1,0 +1,21 @@
+{
+  "module_id": "qnc.module.shot-content",
+  "module_name": "Shot Content Contract",
+  "module_version": "0.1.0",
+  "module_kind": "library",
+  "capabilities": ["ai.shot-content.client", "ai.shot-content.serve"],
+  "input_contract_version": "0.1.0",
+  "output_contract_version": "0.1.0",
+  "transport_protocol_version": "0.1.0",
+  "transport_scope": ["local"],
+  "supported_os": ["windows", "linux", "macos"],
+  "supported_cpu": ["x86_64", "aarch64"],
+  "forbidden_calls": ["db.write", "media.probe.full", "source.write", "playback.clock"],
+  "forbidden_dependencies": ["qnc.module.media-probe"],
+  "state_policy": "stateless",
+  "database_write_policy": "no_db_writes",
+  "runtime_crate": "qnc-shot-content",
+  "input": "Pictures (JPEG files of the application) or texts and the model folder.",
+  "output": "Their unit vectors in one space and how a text scores a picture (contracts/plugins/shot-content.v1.json), both the application's side and the program's side.",
+  "specification": "User 2026-11-10: the shot-content agent, its own program so its model can be replaced without building QNC (docs/101)."
+}

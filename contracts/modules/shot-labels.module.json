@@ -1,0 +1,21 @@
+{
+  "module_id": "qnc.module.shot-labels",
+  "module_name": "Shot Labels",
+  "module_version": "0.1.0",
+  "module_kind": "library",
+  "capabilities": ["ai.shot-labels.list", "ai.shot-labels.best"],
+  "input_contract_version": "0.1.0",
+  "output_contract_version": "0.1.0",
+  "transport_protocol_version": "0.1.0",
+  "transport_scope": ["local"],
+  "supported_os": ["windows", "linux", "macos"],
+  "supported_cpu": ["x86_64", "aarch64"],
+  "forbidden_calls": ["db.write", "media.decode", "source.write"],
+  "forbidden_dependencies": ["qnc.module.media-probe"],
+  "state_policy": "stateless",
+  "database_write_policy": "no_db_writes",
+  "runtime_crate": "qnc-shot-labels",
+  "input": "The list of labels (catalogs/ai/shot-labels.json: code, dictionary key, English prompt, least share) and a part's logits against the prompts.",
+  "output": "The labels a part gets: each label's share among all (softmax), those reaching least, best first.",
+  "specification": "User 2026-11-10: the labels are data a newsroom changes, not code (docs/101)."
+}

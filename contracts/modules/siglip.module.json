@@ -1,0 +1,21 @@
+{
+  "module_id": "qnc.module.siglip",
+  "module_name": "SigLIP Model",
+  "module_version": "0.1.0",
+  "module_kind": "library",
+  "capabilities": ["ai.vision-text.embed"],
+  "input_contract_version": "0.1.0",
+  "output_contract_version": "0.1.0",
+  "transport_protocol_version": "0.1.0",
+  "transport_scope": ["local"],
+  "supported_os": ["windows", "linux", "macos"],
+  "supported_cpu": ["x86_64", "aarch64"],
+  "forbidden_calls": ["db.write", "media.decode", "source.write", "network"],
+  "forbidden_dependencies": ["qnc.module.media-probe"],
+  "state_policy": "session_local",
+  "database_write_policy": "no_db_writes",
+  "runtime_crate": "qnc-siglip",
+  "input": "A SigLIP model folder (model.safetensors, tokenizer.json; google/siglip-base-patch16-224, Apache 2.0) and RGB pictures or texts.",
+  "output": "Unit vectors of what the pictures show and of the texts, in one space, and the model's scale and bias of a picture-text score; pure Rust (candle) on the processor, offline.",
+  "specification": "User 2026-11-10: the shot-content agent's model (docs/101)."
+}

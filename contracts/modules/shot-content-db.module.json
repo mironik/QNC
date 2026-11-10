@@ -1,0 +1,21 @@
+{
+  "module_id": "qnc.module.shot-content-db",
+  "module_name": "Shot Content Table",
+  "module_version": "0.1.0",
+  "module_kind": "library",
+  "capabilities": ["db.shot-content.read", "db.shot-content.write"],
+  "input_contract_version": "0.1.0",
+  "output_contract_version": "0.1.0",
+  "transport_protocol_version": "0.1.0",
+  "transport_scope": ["local", "lan", "intranet"],
+  "supported_os": ["windows", "linux", "macos"],
+  "supported_cpu": ["x86_64", "aarch64"],
+  "forbidden_calls": ["media.decode", "media.probe.full", "file.write", "playback.clock"],
+  "forbidden_dependencies": ["qnc.module.media-probe", "qnc.module.scanner"],
+  "state_policy": "session_local",
+  "database_write_policy": "public_db_owner_write_adapter_only",
+  "runtime_crate": "qnc-shot-content-db",
+  "input": "What the usable parts of a clip show (one vector a part, its frames, the model), or a clip id or a model to read.",
+  "output": "The table clip_content and the view public_clip_content of the project database through its one intermediary (qnc-db-broker); a frame outside its part, vectors of different widths or an error beside parts are refused.",
+  "specification": "User 2026-11-10: sorting the B-roll by content (docs/101, AGENTS.md)."
+}

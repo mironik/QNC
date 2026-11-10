@@ -4,6 +4,11 @@
     "program": "rife-ncnn-vulkan",
     "model": "../../data/models/rife-v4.6"
   },
+  "shot_content": {
+    "program": "qnc-shot-content-siglip",
+    "model": "../../data/models/siglip-base-patch16-224",
+    "pictures": 2
+  },
   "letters": {
     "program": "qnc-align-wav2vec2",
     "model": "../../data/models/wav2vec2-parlaspeech-hr"

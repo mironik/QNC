@@ -273,11 +273,17 @@ members = [
     "crates/qnc-keyframe-jump",
     "crates/qnc-trim-play",
     "crates/qnc-wav2vec2",
+    "crates/qnc-siglip",
+    "crates/qnc-shot-labels",
+    "crates/qnc-shot-content-run",
+    "crates/qnc-shot-content-db",
+    "crates/qnc-shot-content",
     "crates/qnc-ctc-align",
     "crates/qnc-letter-align",
     "crates/qnc-letter-db",
     "crates/qnc-letter-times",
     "tools/qnc-align-wav2vec2",
+    "tools/qnc-shot-content-siglip",
     "crates/qnc-match-frame",
     "crates/qnc-segments-keys",
     "crates/qnc-sync-session",
@@ -590,6 +596,11 @@ qnc-playhead-moves = { path = "crates/qnc-playhead-moves" }
 qnc-keyframe-jump = { path = "crates/qnc-keyframe-jump" }
 qnc-trim-play = { path = "crates/qnc-trim-play" }
 qnc-wav2vec2 = { path = "crates/qnc-wav2vec2" }
+qnc-siglip = { path = "crates/qnc-siglip" }
+qnc-shot-labels = { path = "crates/qnc-shot-labels" }
+qnc-shot-content-run = { path = "crates/qnc-shot-content-run" }
+qnc-shot-content-db = { path = "crates/qnc-shot-content-db" }
+qnc-shot-content = { path = "crates/qnc-shot-content" }
 qnc-ctc-align = { path = "crates/qnc-ctc-align" }
 qnc-letter-align = { path = "crates/qnc-letter-align" }
 qnc-letter-db = { path = "crates/qnc-letter-db" }

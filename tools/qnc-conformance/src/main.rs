@@ -1925,6 +1925,7 @@ fn is_public_db_owner_path(relative: &str) -> bool {
         "crates/qnc-script-db/",
         "crates/qnc-skeleton-db/",
         "crates/qnc-shot-db/",
+        "crates/qnc-shot-content-db/",
         "crates/qnc-project-store/",
         "crates/qnc-project-close/",
         "crates/qnc-camera-patterns/",

@@ -8750,3 +8750,25 @@ samo kao tok bajtova) daje ispravan poster. Nalaz uz napomenu korisnika ("i loka
 danas napravio 17 postera OFF-ova i medjuslika u mapi projekta (`products/thumbnails`); kartice taba Glas ih ne koriste
 (kartica OFF-a nije klip kataloga), pa su pokazivale "...", sada mikrofon. Greske "Izvor klipa nije dostupan" u logu su od prije
 popravka postera iz mape projekta.
+Izvedeno 2026-11-10 (korisnik: "kreni s agentom qnc-shot-content"; "za prepoznavanje sadrzaja klipa dovoljna je jedna ili dvije,
+maksimalno tri slicice, ovisno o postavkama ili snazi racunala"; plan `docs/101`, korak 1; odobrio preuzimanje modela i postavku
+racunala): agent sadrzaja kadra. Model Google SigLIP base (`google/siglip-base-patch16-224`, Apache 2.0, 813 MB) preuzet u
+`data/models/siglip-base-patch16-224` (izvan gita). Nove kocke (s ugovorima modula): `qnc-siglip` (SigLIP u cistom Rustu,
+candle-transformers; vektor slike i teksta u istom prostoru), `qnc-shot-content` (ugovor dodatka
+`contracts/plugins/shot-content.v1.json`, `qnc.shot-content` 1, obje strane: `pictures`, `texts`), program
+`tools/qnc-shot-content-siglip` (model ucitan jednom, ispod normalnog prioriteta), `qnc-shot-content-db` (modul tablica
+posrednika, `clip_content` / `public_clip_content`, ugovor baze `shot-content.database.json`; cuva vektor po upotrebljivom dijelu
+i model, ne oznake; conformance: na popisu javnih DB vlasnika), `qnc-shot-labels` (popis oznaka je podatak
+`catalogs/ai/shot-labels.json`: sifra, kljuc rjecnika, engleski upit, prag; udio oznake medju svima (softmax), jer su vlastite
+sigmoidne vrijednosti SigLIP-a niske), `qnc-shot-content-run` (za klipove s upotrebljivim dijelovima analize kadrova: 1-3 intra
+slike po dijelu (najostrija, pa petina od pocetka i od kraja), citane kroz MXF indeks originala, dekodirane na 224x224 kroz katalog
+dekodera, vektor dijela je srednja vrijednost; pod najmom radnika, ceka dok player svira, klip u previewu prvi). Broj slika po
+dijelu je postavka racunala: AI katalog `shot_content.pictures` (zadano 2). Pozadinski radnik ga pokrece odmah iza analize kadrova
+(`tools/qnc-ingest-worker` `make_shots`), uz projektnu postavku `ai.enabled`; oznake po dijelu idu u player log
+(`shot-content clip= part= labels=`). Izmjereno (kartica D: samo citana, `examples/look_card.rs`): agent spreman s 24 oznake 3-5 s
+(jednom po radu), jedna slika oko 0,45 s na procesoru, klip s 7 dijelova 14 slika za 5,9 s; Mironik 3625 (izjava u kameru)
+"govori u kameru" 0,97-1,00, Mironik 3615 (dvoje s knjigom u luci) govori u kameru 0,67, more i luka 0,20, provjereno slikama.
+Testovi `qnc-shot-content`, `qnc-shot-content-db`, `qnc-shot-content-run`, `qnc-shot-labels`, `qnc-ai-catalog`, conformance.
+Nije izvedeno (sljedeci koraci docs/101): razvrstavanje pokrivalica u poolu po oznakama, prijedlog pokrivalica prema tekstu OFF-a,
+oznake u panelu Video AI; analiza kadrova i sadrzaj za MP4 originale (sada samo MXF). Mironik 3608 na kartici D: zapinje pri
+citanju (greska uredaja), nije problem agenta.

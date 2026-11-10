@@ -25,6 +25,50 @@ struct File {
     /// The in-between pictures of a smooth cut (user 2026-11-08); a host without it has none.
     #[serde(default)]
     smooth: Option<LettersJob>,
+    /// What the pictures of a clip show (user 2026-11-10: sorting the B-roll by content); a host
+    /// without it has none.
+    #[serde(default)]
+    shot_content: Option<ContentJob>,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct ContentJob {
+    program: String,
+    model: String,
+    /// Pictures looked at per usable part of a clip: 1, 2 or 3, after the strength of this host.
+    pictures: u8,
+}
+
+/// The engine that sees what the pictures of a clip show, on this host.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ShotContentEngine {
+    /// The program's name beside the application.
+    pub program: String,
+    /// The model's folder.
+    pub model: PathBuf,
+    /// Pictures per usable part (1-3).
+    pub pictures: u8,
+}
+
+/// The shot content engine of this host's catalog; its model must be there.
+pub fn installed_shot_content() -> Result<ShotContentEngine, String> {
+    shot_content(&installed_path()?)
+}
+
+/// The shot content engine of the catalog at `path`.
+pub fn shot_content(path: &Path) -> Result<ShotContentEngine, String> {
+    let text = std::fs::read_to_string(path).map_err(|e| format!("{}: {e}", path.display()))?;
+    let file: File = serde_json::from_str(&text).map_err(|e| format!("{}: {e}", path.display()))?;
+    let job = file.shot_content.ok_or("the AI catalog of this host has no shot content engine")?;
+    if !(1..=3).contains(&job.pictures) {
+        return Err("shot content: pictures per part is 1, 2 or 3".into());
+    }
+    let model = path.parent().ok_or("the AI catalog has no folder")?.join(&job.model);
+    if !model.exists() {
+        return Err(format!("shot content: the model {} is not on this host", model.display()));
+    }
+    Ok(ShotContentEngine { program: job.program, model, pictures: job.pictures })
 }
 
 /// The engine that makes the in-between pictures of a smooth cut on this host.

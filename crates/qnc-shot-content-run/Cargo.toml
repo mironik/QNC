@@ -1,0 +1,25 @@
+[package]
+name = "qnc-shot-content-run"
+version = "0.1.0"
+edition = "2021"
+description = "QNC public block: what the usable parts of the clips of a project show, 1-3 intra pictures per part given to the shot-content agent and kept in the project database; run by the background worker"
+
+[dependencies]
+qnc-ui-text = { workspace = true }
+qnc-dev-diagnostics = { workspace = true }
+qnc-ai-catalog = { workspace = true }
+qnc-content-store = { workspace = true }
+qnc-db-broker = { workspace = true }
+qnc-decoder-catalog = { workspace = true }
+qnc-filmstrip = { workspace = true }
+qnc-mxf-index = { workspace = true }
+qnc-plugin-process = { workspace = true }
+qnc-shot-analysis = { workspace = true }
+qnc-shot-content = { workspace = true }
+qnc-shot-content-db = { workspace = true }
+qnc-shot-db = { workspace = true }
+qnc-shot-labels = { workspace = true }
+qnc-work-settings = { workspace = true }
+
+[dev-dependencies]
+qnc-ai-catalog = { workspace = true }
