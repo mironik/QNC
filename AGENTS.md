@@ -8726,3 +8726,8 @@ rucno (`workflow_dispatch`); ponovno se ukljucuje pred beta paket. FFmpeg build 
 `C:\Users\miron\tools\qnc-ffmpeg-archive\ffmpeg-n8.1.3-17-gc389840894-20261011-win64-lgpl-shared.zip` (cijela mapa
 `FFMPEG_DIR`: programi, DLL-ovi, razvojne datoteke, licenca), uz `SHA256SUMS.txt` i `README.txt`. Provjera zastite projekta
 pokrenute kao administrator ostaje otvorena.
+Provjera 2026-11-10 (korisnik: "provjeri zastitu kao administrator"): test zastite projekta
+(`the_files_of_the_prerender_cache_may_be_deleted_the_rest_stays_protected`) pokrenut s administratorskim pravima (UAC,
+High Mandatory Level, BUILTIN\Administrators) prolazi: datoteka projekta se ne moze obrisati, datoteka prerendera i exporta
+moze, mape ostaju. Zastita drzi i kad korisnik pokrene QNC kao administrator. Pad na GitHub runneru je svojstvo tog racunala
+(drugi racun i ovlasti), nije reproduciran lokalno i ostaje zabiljezen uz rucni CI.
