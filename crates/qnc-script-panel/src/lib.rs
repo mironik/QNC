@@ -100,6 +100,11 @@ fn paint_script(ui: &mut egui::Ui, view: &ScriptView, transcript: &TranscriptVie
                 asked = Some(ActionEvent::key(ADD_CLIP).with_target(kind.id.clone()).at(PANEL));
             }
         }
+        // The shown clip as a recording of the OFFs made elsewhere (user 2026-11-10).
+        let free = view.recording.is_none() && !view.session_busy;
+        if qnc_ui_kit::chrome_button(ui, qnc_ui_text::text("script.off_recording"), view.marks && free, false, style).on_hover_text(qnc_ui_text::text("script.off_recording_hint")).clicked() {
+            asked = Some(ActionEvent::key(qnc_script::OFF_RECORDING).at(PANEL));
+        }
     });
     // The length of the script against the target of the story sheet (red when over).
     let total = view.total_seconds();

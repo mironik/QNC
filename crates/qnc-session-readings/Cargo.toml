@@ -16,3 +16,5 @@ qnc-ui-text = { workspace = true }
 qnc-voice-catalog = { path = "../qnc-voice-catalog" }
 qnc-voice-record = { workspace = true }
 qnc-voice-take = { workspace = true }
+qnc-sound-range = { workspace = true }
+qnc-source-timecode = { workspace = true }

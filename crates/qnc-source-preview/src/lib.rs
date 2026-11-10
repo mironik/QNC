@@ -522,8 +522,8 @@ impl SourcePreview {
 
     /// `clip_id` prepared anew even when it is open (its file changed: a voice record that got
     /// one more take).
-    pub fn open_again(&mut self, clip_id: &str) -> bool {
-        self.prepare_clip(clip_id, 0)
+    pub fn open_again(&mut self, clip_id: &str, first_frame: u64) -> bool {
+        self.prepare_clip(clip_id, first_frame)
     }
 
     /// The channels of the shown clip heard on output 1 (A1) and 2 (A2) (user rule

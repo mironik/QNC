@@ -8691,3 +8691,21 @@ unutar projekta), ostalo kao prije kroz pozivatelja; vrijedi za Select i pozadin
 kartice kao i prije. Medij na LAN/Intranet izvoru i dalje nema poster (`local_media_path` daje samo lokalnu datoteku;
 poster bi trebao citanje kroz transport). Test `a_medium_of_the_project_itself_is_found_in_the_project_folder`,
 conformance. Uzivo nije provjereno.
+Izvedeno 2026-11-10 (korisnik: "offovi mogu biti i na kartici, LAN-u ili intranetu, od tamo se mogu preuzeti"; "oni nemaju
+space izmedu citanja"; "da, kreni tim redom"): snimka OFF-ova napravljena drugdje (kamera, diktafon, LAN, intranet) ulazi
+kao obicni klip kroz Ingest. U MA Audiju (red "U scenarij iz klipa") i u traci prozora medija MA Scripta gumb "Snimka
+OFF-ova" (`script_off_recording`, bez tipke): IN-OUT prikazanog klipa (bez oznaka cijeli klip) presluša se na kanalu
+govora projekta hrvatskim modelom u pozadini, a citanja se nalaze iz teksta (`qnc-session-readings` `found.rs` `find`:
+slijeva nadesno, citanje pocinje rijecju koja je jedna od prve tri rijeci OFF-a i najbolje cita taj OFF (najmanje 40 %),
+nikad preko mjesta gdje isti OFF opet pocinje, pa je prekinuto i ponovljeno citanje dva citanja; govor koji ne cita
+nijedan OFF se broji). Citanje je raspon izvornog klipa, ne nova datoteka: `qnc-script-db` `VoiceTake.source`
+(`TakeSource`: klip, slike, stopa, kanal; stupac `source_json`), `wav_uri` je medij klipa, rijeci su sekunde od pocetka
+raspona; 0,5 s oko rijeci, nikad u susjedno citanje (`reading_ranges`); TC je TC klipa na tom mjestu. Jedno pravilo gdje
+se citanje pusta: `qnc-script-draft` `reading_place` (vlastito citanje svoj klip na stopi projekta, nadeno raspon klipa na
+svojoj stopi i kanalu; IN/OUT po pravilu 90 %); koriste ga klik na T1..Tn (pusta se od IN-a citanja, i za vlastita
+citanja; `qnc-source-preview` `open_again` prima sliku), Nacrt XML i Send to S-Story (A1 na kanalu citanja). Upis citanja
+u katalog je jedan (`qnc-voice-take` `reading_record`; za nadeno citanje nista); export nacrta vise ne upisuje stari zapis
+s vise kanala nego svako citanje. Nadeno citanje je prisutno kad je njegov klip. Nije izvedeno: rucno "IN/OUT kao citanje
+OFF-a n"; citanje klipa s LAN/Intranet izvora (prijepis cita samo lokalni medij; preuzeti klip u projekt radi). Testovi
+`qnc-session-readings` (5), `qnc-script-db`, `qnc-script-draft`, `qnc-script`, `qnc-panel-focus`, conformance. Uzivo
+nije provjereno.

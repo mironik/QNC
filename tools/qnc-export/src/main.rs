@@ -144,14 +144,15 @@ fn draft_program(
     let blocks = qnc_script_db::read(target)?;
     let voices = qnc_script_db::read_voices(target)?;
     let profile = qnc_script_db::read_profile(target)?.ok_or_else(|| qnc_ui_text::text("script.draft_empty").to_string())?;
+    // Every reading is its own clip (user 2026-11-09); one found in a recording made elsewhere is
+    // that clip's range, in the catalog already.
     for voice in &voices {
-        let takes: Vec<f64> = voice.takes.iter().map(|take| take.seconds).collect();
-        if takes.is_empty() {
-            continue;
+        for take in &voice.takes {
+            if let Some(made) = qnc_voice_take::reading_record(settings, &voice.name, take) {
+                let (name, record) = made?;
+                qnc_voice_catalog::publish_record(reader, settings, &name, record)?;
+            }
         }
-        let first_tc = voice.takes.first().map(|take| take.tc.clone()).unwrap_or_default();
-        let record = qnc_voice_take::describe_record(settings, &voice.name, &voice.clip_uri, &takes, &first_tc)?;
-        qnc_voice_catalog::publish_record(reader, settings, &voice.name, record)?;
     }
     let rates = qnc_script_draft::DraftRates {
         words_per_second: settings.reading_words_per_second().map_err(|e| e.message)?,

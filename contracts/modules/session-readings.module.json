@@ -28,7 +28,7 @@
   "state_policy": "session_local",
   "database_write_policy": "public_db_owner_write_adapter_only",
   "runtime_crate": "qnc-session-readings",
-  "input": "The voice records of the script and whether the player is idle.",
-  "output": "The words heard in every take, with their seconds in the take, kept with the take through qnc-script-db.",
+  "input": "A recording of the whole story with its presses, or a clip of the project recorded elsewhere (user 2026-11-10: no presses between its readings), and the OFFs of the script.",
+  "output": "Every reading found, as the next reading of the OFF it reads, through qnc-script-db: a reading of a recording made in QNC its own WAV and clip, one found in a clip of the project a range of that clip (no file of its own); the words heard with it.",
   "specification": "AGENTS.md 2026-11-08 (user: wav2vec2 transcribes the OFF, and that checks that it was read correctly). Background, one take at a time, only while the player is idle and nothing records; the project's transcription setting and language are obeyed."
 }

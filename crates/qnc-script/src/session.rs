@@ -12,6 +12,8 @@ use crate::Script;
 pub const SESSION: &str = "script_session";
 /// A press while it records: a new reading starts here.
 pub const SESSION_MARK: &str = "script_session_mark";
+/// The shown clip is a recording of the OFFs made elsewhere: its readings are found from the text.
+pub const OFF_RECORDING: &str = "script_off_recording";
 
 pub(crate) enum SessionAnswer {
     Started(Session),
@@ -79,16 +81,46 @@ impl Script {
         true
     }
 
-    /// Hears the recording and puts each of its readings on the OFF it reads, off the form thread.
-    fn sort_session(&mut self, preview: &SourcePreview, done: &RecordedSession) {
-        let Some(locator) = preview.still_locator() else { return };
-        let offs: Vec<qnc_session_readings::Off> = self
-            .view
+    /// The OFFs of the script a reading may read: the recorded kinds with text.
+    fn offs(&self) -> Vec<qnc_session_readings::Off> {
+        self.view
             .blocks
             .iter()
             .filter(|row| row.recorded && !row.block.text.trim().is_empty())
             .map(|row| qnc_session_readings::Off { block_id: row.block.id, mark: row.mark.clone(), text: row.block.text.clone() })
-            .collect();
+            .collect()
+    }
+
+    /// The shown clip is a recording of the OFFs made elsewhere (user 2026-11-10: a camera, a
+    /// recorder, LAN or intranet; no presses between its readings): its IN-OUT (the whole clip
+    /// without marks) is heard and its readings are found from the text, off the form thread.
+    pub(crate) fn sort_off_recording(&mut self, preview: &SourcePreview, timeline: &qnc_timeline_model::TimelineProjection) -> bool {
+        if self.session_busy.is_some() || self.session.is_some() || self.take.is_some() {
+            return true;
+        }
+        let marked = preview.view().clip_id.clone().zip(timeline.visible_source_marks()).filter(|(_, (from, to))| to > from);
+        let (Some((clip_id, (from, to))), Some(locator)) = (marked, preview.still_locator()) else {
+            self.view.message = qnc_notice::raised(qnc_ui_text::text("script.off_recording_clip").into());
+            return true;
+        };
+        let offs = self.offs();
+        if offs.is_empty() {
+            self.view.message = qnc_notice::raised(qnc_ui_text::text("script.off_recording_no_offs").into());
+            return true;
+        }
+        log(&format!("script-session off-recording clip={clip_id} frames={from}..{to} offs={}", offs.len()));
+        self.view.message = qnc_ui_text::text("script.session_sorting").into();
+        self.spawn_session(move || {
+            let sorted = qnc_session_readings::sort_clip(&locator, &clip_id, from, to, &offs);
+            SessionAnswer::Sorted(sorted)
+        });
+        true
+    }
+
+    /// Hears the recording and puts each of its readings on the OFF it reads, off the form thread.
+    fn sort_session(&mut self, preview: &SourcePreview, done: &RecordedSession) {
+        let Some(locator) = preview.still_locator() else { return };
+        let offs = self.offs();
         self.view.message = qnc_ui_text::text("script.session_sorting").into();
         let done = done.clone();
         self.spawn_session(move || {

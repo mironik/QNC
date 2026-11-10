@@ -105,16 +105,16 @@ pub fn draft_pieces(blocks: &[Block], voices: &[Voice], profile: &ScriptProfile,
             }
             Role::Spoken => match voices.iter().find(|voice| voice.block_id == block.id).and_then(|voice| Some((voice, voice.chosen_take()?))) {
                 Some((voice, take)) => {
-                    let (from_frame, to_frame) = take_sound_range(&block.text, take, rates.fps).unwrap_or((0, frames(take.seconds).max(1)));
+                    let place = reading_place(&block.text, voice, take, rates.fps, rates.clip_id);
                     pieces.push(PieceInput {
                         smooth: None,
-                        clip_id: (rates.clip_id)(&qnc_script_db::take_name(&voice.name, take.take)),
-                        from_frame,
-                        to_frame,
+                        clip_id: place.clip_id,
+                        from_frame: place.from,
+                        to_frame: place.to,
                         gap_before: pause,
                         crossfade: false,
-                        // Every reading is its own mono clip (user 2026-11-09).
-                        a1: Some((Some(0), 0, false)),
+                        // A reading is heard on its voice's channel only.
+                        a1: Some((Some(place.channel), 0, false)),
                         sound_lead: 0,
                         sound_tail: 0,
                         picture_lead: 0,
@@ -164,6 +164,33 @@ pub fn mark_seconds(block: &Block, check: Option<(&qnc_read_check::ReadCheck, &[
 const SOUND_MARKS_PERCENT: u32 = 90;
 /// Sound kept before the first word and after the last, seconds: breath of the word, not silence.
 const SOUND_MARGIN: f64 = 0.1;
+
+/// Where a reading plays from: its clip, frames `[from, to)` there, the camera channel of its
+/// voice, and its own rate and first frame in that clip (the marks of its text are laid from it).
+#[derive(Debug, Clone, PartialEq)]
+pub struct ReadingPlace {
+    pub clip_id: String,
+    pub from: u64,
+    pub to: u64,
+    pub channel: u16,
+    pub fps: f64,
+    pub start: u64,
+}
+
+/// The one rule of where a reading is: one recorded in QNC is its own mono clip at the
+/// project's rate; one found in a recording made elsewhere (user 2026-11-10) is its range of that
+/// clip, heard on its channel. Either opens with IN and OUT where its sound is when it is read
+/// well (`take_sound_range`), else whole.
+pub fn reading_place(text: &str, voice: &Voice, take: &qnc_script_db::VoiceTake, project_fps: f64, clip_id: &dyn Fn(&str) -> String) -> ReadingPlace {
+    let (clip, start) = take.clip_and_start(|| clip_id(&qnc_script_db::take_name(&voice.name, take.take)));
+    let (fps, channel) = match &take.source {
+        Some(source) => (f64::from(source.fps_num) / f64::from(source.fps_den.max(1)), source.channel),
+        None => (project_fps, 0),
+    };
+    let whole = ((take.seconds * fps).round().max(1.0)) as u64;
+    let (from, to) = take_sound_range(text, take, fps).unwrap_or((0, whole));
+    ReadingPlace { clip_id: clip, from: start + from, to: start + to, channel, fps, start }
+}
 
 /// IN and OUT of the reading `take` of `text`, frames `[in, out)` of its clip, from where its first
 /// word starts and its last ends; none until it is heard or when it is under 90 %.
@@ -220,16 +247,16 @@ pub fn skeleton(blocks: &[Block], voices: &[Voice], profile: &ScriptProfile, rat
             }
             Role::Spoken => {
                 if let Some((voice, take)) = voices.iter().find(|voice| voice.block_id == block.id).and_then(|voice| Some((voice, voice.chosen_take()?))) {
-                    let whole = ((take.seconds * rates.fps).round().max(1.0)) as u64;
-                    let (from_frame, to_frame) = take_sound_range(&block.text, take, rates.fps).unwrap_or((0, whole));
+                    let place = reading_place(&block.text, voice, take, rates.fps, rates.clip_id);
+                    let whole = ((take.seconds * place.fps).round().max(1.0)) as u64;
                     parts.push(SkeletonPart {
                         kind: "offovi",
-                        clip_id: (rates.clip_id)(&qnc_script_db::take_name(&voice.name, take.take)),
-                        from_frame,
-                        to_frame,
-                        a1: Some((Some(0), 0, false)),
+                        clip_id: place.clip_id,
+                        from_frame: place.from,
+                        to_frame: place.to,
+                        a1: Some((Some(place.channel), 0, false)),
                         origin: format!("script:{}:0", block.id),
-                        marks: mark_frames(block, take, rates.fps, whole),
+                        marks: mark_frames(block, take, place.fps, whole).into_iter().map(|frame| place.start + frame).collect(),
                         parts: Vec::new(),
                     });
                 }

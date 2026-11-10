@@ -113,7 +113,7 @@ fn only_a_block_of_a_recorded_kind_takes_a_recording() {
 }
 
 fn take(number: u16, seconds: f64, tc: &str, text: &str) -> VoiceTake {
-    VoiceTake { take: number, wav_uri: format!("qnc://local/source/project-p1/file/products/voice/P_OFF1_T{number}.wav"), seconds, tc: tc.into(), text: text.into(), heard: None }
+    VoiceTake { take: number, wav_uri: format!("qnc://local/source/project-p1/file/products/voice/P_OFF1_T{number}.wav"), seconds, tc: tc.into(), text: text.into(), heard: None, source: None }
 }
 
 #[test]
@@ -168,6 +168,27 @@ fn every_take_of_an_off_is_one_more_channel_of_one_record_and_the_last_is_used()
     assert_eq!(block.voice_seconds, 4.5, "the length is the chosen take's");
     remove(&target, off_block).unwrap();
     assert!(read_voices(&target).unwrap().is_empty(), "a removed block takes its record");
+}
+
+#[test]
+fn a_reading_found_in_another_recording_is_a_range_of_that_clip_with_its_words() {
+    let (_dir, target) = written();
+    let off_block = add(&target, None, off("Prvi off.")).unwrap();
+    let media = "qnc://local/source/card/file/Clip/A001.MXF".to_string();
+    let mut found = take(1, 3.0, "10:00:02:00", "Prvi off.");
+    found.wav_uri = media.clone();
+    found.heard = Some(vec![HeardWord { text: "prvi".into(), start: 0.5, end: 0.9 }, HeardWord { text: "off".into(), start: 1.0, end: 1.4 }]);
+    found.source = Some(TakeSource { clip_id: "clip-a001".into(), from_frame: 100, to_frame: 250, fps_num: 50, fps_den: 1, channel: 1 });
+    let mut empty = found.clone();
+    empty.source.as_mut().unwrap().to_frame = 100;
+    assert!(add_voice_take(&target, off_block, "P_OFF1".into(), media.clone(), empty).is_err(), "a range has frames");
+    add_voice_take(&target, off_block, "P_OFF1".into(), media.clone(), found.clone()).unwrap();
+    add_voice_take(&target, off_block, "P_OFF1".into(), "qnc://local/source/project-p1/file/products/voice/P_OFF1_T2.mxf".into(), take(2, 2.0, "18:00:00:00", "Prvi off.")).unwrap();
+    set_voice_chosen(&target, off_block, 1).unwrap();
+    let voice = read_voice(&target, off_block).unwrap().unwrap();
+    assert_eq!(voice.chosen_take().unwrap(), &found, "its range, channel and words are kept");
+    let block = read(&target).unwrap().into_iter().find(|b| b.id == off_block).unwrap();
+    assert_eq!((block.voice_uri.as_str(), block.voice_seconds), (media.as_str(), 3.0), "it plays from that clip's media");
 }
 
 #[test]

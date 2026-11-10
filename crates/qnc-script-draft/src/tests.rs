@@ -16,7 +16,7 @@ fn sot(id: i64, clip: &str, from: u64, to: u64) -> Block {
 
 #[test]
 fn a_draft_is_the_script_in_reading_order_with_its_recorded_takes_and_pauses_for_the_rest() {
-    let take = |take: u16, seconds: f64| VoiceTake { take, wav_uri: String::new(), seconds, tc: String::new(), text: String::new(), heard: None };
+    let take = |take: u16, seconds: f64| VoiceTake { take, wav_uri: String::new(), seconds, tc: String::new(), text: String::new(), heard: None, source: None };
     let voices = [Voice { block_id: 2, name: "P_OFF1".into(), clip_uri: String::new(), chosen: 2, takes: vec![take(1, 4.0), take(2, 3.0)] }];
     let blocks = [
         block(1, "intro", "Najava se ne broji u prilog."),
@@ -42,7 +42,7 @@ fn a_script_with_nothing_for_the_draft_says_so() {
 
 #[test]
 fn the_skeleton_is_the_script_as_story_segments_without_the_offs_not_recorded() {
-    let take = |take: u16, seconds: f64| VoiceTake { take, wav_uri: String::new(), seconds, tc: String::new(), text: String::new(), heard: None };
+    let take = |take: u16, seconds: f64| VoiceTake { take, wav_uri: String::new(), seconds, tc: String::new(), text: String::new(), heard: None, source: None };
     let voices = [Voice { block_id: 2, name: "P_OFF1".into(), clip_uri: String::new(), chosen: 2, takes: vec![take(1, 4.0), take(2, 3.0)] }];
     let blocks = [
         block(1, "intro", "Najava se ne broji u prilog."),
@@ -62,7 +62,7 @@ fn the_skeleton_is_the_script_as_story_segments_without_the_offs_not_recorded() 
 #[test]
 fn a_good_reading_has_its_in_and_out_where_its_sound_is_a_bad_one_has_none() {
     let heard = |text: &str, start: f64, end: f64| qnc_script_db::HeardWord { text: text.into(), start, end };
-    let take = |words| VoiceTake { take: 1, wav_uri: String::new(), seconds: 6.0, tc: String::new(), text: String::new(), heard: Some(words) };
+    let take = |words| VoiceTake { take: 1, wav_uri: String::new(), seconds: 6.0, tc: String::new(), text: String::new(), heard: Some(words), source: None };
     let good = take(vec![heard("prva", 1.0, 1.4), heard("druga", 1.5, 2.0), heard("treca", 2.1, 3.0)]);
     assert_eq!(take_sound_range("prva druga treca", &good, 50.0), Some((45, 155)));
     let bad = take(vec![heard("prva", 1.0, 1.4)]);
@@ -72,7 +72,7 @@ fn a_good_reading_has_its_in_and_out_where_its_sound_is_a_bad_one_has_none() {
 #[test]
 fn a_marker_in_the_text_of_an_off_is_the_frame_its_word_was_heard_at() {
     let heard = |text: &str, start: f64| qnc_script_db::HeardWord { text: text.into(), start, end: start + 0.2 };
-    let take = VoiceTake { take: 1, wav_uri: String::new(), seconds: 4.0, tc: String::new(), text: String::new(), heard: Some(vec![heard("prva", 0.2), heard("druga", 1.5), heard("treca", 3.0)]) };
+    let take = VoiceTake { take: 1, wav_uri: String::new(), seconds: 4.0, tc: String::new(), text: String::new(), heard: Some(vec![heard("prva", 0.2), heard("druga", 1.5), heard("treca", 3.0)]), source: None };
     let voices = [Voice { block_id: 2, name: "P".into(), clip_uri: String::new(), chosen: 1, takes: vec![take] }];
     let mut off = block(2, "off", "prva druga treca");
     off.marks = vec![1, 2];
@@ -80,4 +80,16 @@ fn a_marker_in_the_text_of_an_off_is_the_frame_its_word_was_heard_at() {
     let rates = DraftRates { words_per_second: 2.5, fps: 50.0, clip_id: &clip_id };
     let parts = skeleton(&[off], &voices, &general_tv(), &rates).unwrap();
     assert_eq!(parts[0].marks, [75, 150]);
+}
+
+#[test]
+fn a_reading_found_in_another_recording_plays_from_its_range_of_that_clip_on_its_channel() {
+    let heard = |text: &str, start: f64, end: f64| qnc_script_db::HeardWord { text: text.into(), start, end };
+    let mut take = VoiceTake { take: 1, wav_uri: "qnc://card/A001.MXF".into(), seconds: 6.0, tc: String::new(), text: String::new(), heard: Some(vec![heard("prva", 1.0, 1.4), heard("druga", 1.5, 2.0), heard("treca", 2.1, 3.0)]), source: None };
+    let voice = Voice { block_id: 2, name: "P_OFF1".into(), clip_uri: String::new(), chosen: 1, takes: Vec::new() };
+    let own = reading_place("prva druga treca", &voice, &take, 50.0, &|name: &str| format!("voice-{name}"));
+    assert_eq!((own.clip_id.as_str(), own.from, own.to, own.channel), ("voice-P_OFF1_T1", 45, 155, 0), "its own clip at the project's rate");
+    take.source = Some(qnc_script_db::TakeSource { clip_id: "clip-a001".into(), from_frame: 1000, to_frame: 1150, fps_num: 25, fps_den: 1, channel: 2 });
+    let found = reading_place("prva druga treca", &voice, &take, 50.0, &|name: &str| format!("voice-{name}"));
+    assert_eq!((found.clip_id.as_str(), found.from, found.to, found.channel, found.start), ("clip-a001", 1022, 1078, 2, 1000), "that clip's range, at its own rate");
 }

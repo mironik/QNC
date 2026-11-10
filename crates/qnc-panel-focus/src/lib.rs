@@ -175,21 +175,22 @@ impl PanelFocus {
         let button = (self.panel == Panel::SourceButtons).then(|| self.walk.chosen_in(qnc_focus_walk::SOURCE_BUTTONS).map(str::to_string)).flatten();
         qnc_dev_diagnostics::timed_block("poll-side", || self.side.poll(preview, timeline, clips));
         // A take of a voice record clicked: its clip on the source timeline, A1 on its channel,
-        // played from its start.
-        if let Some((clip_id, channel, fresh)) = self.side.take_voice_request() {
+        // played from its start (a reading found in a recording made elsewhere: from its start
+        // in that clip).
+        if let Some((clip_id, channel, fresh, start)) = self.side.take_voice_request() {
             self.source.want_a1(&clip_id, channel);
             // A record that got a take since it was opened has one more channel: prepared anew.
             // A take of the clip already open plays from its start once the cue landed (log
             // 2026-11-08: a Play sent behind the cue was refused as not ready).
             if fresh {
-                preview.open_again(&clip_id);
+                preview.open_again(&clip_id, start);
                 preview.toggle_play();
-            } else if preview.open(&clip_id) {
+            } else if preview.open_at(&clip_id, start) {
                 preview.toggle_play();
             } else if preview.view().playing {
-                preview.cue(0);
+                preview.cue(start);
             } else {
-                preview.play_from(0);
+                preview.play_from(start);
             }
         }
         let side = self.side.views().clone();

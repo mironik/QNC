@@ -33,6 +33,7 @@ pub(crate) fn ensure_schema(conn: &Connection) -> Result<()> {
             text TEXT NOT NULL,
             recorded_at_utc TEXT NOT NULL,
             heard_json TEXT,
+            source_json TEXT,
             PRIMARY KEY (block_id, take));
         CREATE VIEW IF NOT EXISTS public_script_voice AS
             SELECT block_id, name, clip_uri, chosen, updated_at_utc FROM script_voice;",
@@ -42,12 +43,15 @@ pub(crate) fn ensure_schema(conn: &Connection) -> Result<()> {
     if !has_column_of(conn, "script_voice_takes", "heard_json")? {
         conn.execute_batch("ALTER TABLE script_voice_takes ADD COLUMN heard_json TEXT").map_err(err)?;
     }
-    if view_exists(conn, "public_script_voice_takes")? && !has_column_of(conn, "public_script_voice_takes", "heard_json")? {
+    if !has_column_of(conn, "script_voice_takes", "source_json")? {
+        conn.execute_batch("ALTER TABLE script_voice_takes ADD COLUMN source_json TEXT").map_err(err)?;
+    }
+    if view_exists(conn, "public_script_voice_takes")? && !has_column_of(conn, "public_script_voice_takes", "source_json")? {
         conn.execute_batch("DROP VIEW public_script_voice_takes").map_err(err)?;
     }
     conn.execute_batch(
         "CREATE VIEW IF NOT EXISTS public_script_voice_takes AS
-            SELECT block_id, take, wav_uri, seconds, tc, text, recorded_at_utc, heard_json FROM script_voice_takes;",
+            SELECT block_id, take, wav_uri, seconds, tc, text, recorded_at_utc, heard_json, source_json FROM script_voice_takes;",
     )
     .map_err(err)
 }
@@ -80,13 +84,15 @@ impl Store {
         };
         // A view made before the words heard reads without them until the owner brings it up.
         let heard = if has_column_of(conn, "public_script_voice_takes", "heard_json")? { "heard_json" } else { "NULL" };
-        let mut statement = conn.prepare(&format!("SELECT block_id, take, wav_uri, seconds, tc, text, {heard} FROM public_script_voice_takes ORDER BY block_id, take")).map_err(err)?;
+        let source = if has_column_of(conn, "public_script_voice_takes", "source_json")? { "source_json" } else { "NULL" };
+        let mut statement = conn.prepare(&format!("SELECT block_id, take, wav_uri, seconds, tc, text, {heard}, {source} FROM public_script_voice_takes ORDER BY block_id, take")).map_err(err)?;
         let rows = statement
-            .query_map([], |r| Ok((r.get::<_, i64>(0)?, VoiceTake { take: r.get::<_, i64>(1)?.clamp(1, u16::MAX as i64) as u16, wav_uri: r.get(2)?, seconds: r.get(3)?, tc: r.get(4)?, text: r.get(5)?, heard: None }, r.get::<_, Option<String>>(6)?)))
+            .query_map([], |r| Ok((r.get::<_, i64>(0)?, VoiceTake { take: r.get::<_, i64>(1)?.clamp(1, u16::MAX as i64) as u16, wav_uri: r.get(2)?, seconds: r.get(3)?, tc: r.get(4)?, text: r.get(5)?, heard: None, source: None }, r.get::<_, Option<String>>(6)?, r.get::<_, Option<String>>(7)?)))
             .map_err(err)?;
         for row in rows {
-            let (block, mut take, heard) = row.map_err(err)?;
+            let (block, mut take, heard, source) = row.map_err(err)?;
             take.heard = heard.map(|heard| serde_json::from_str(&heard).map_err(err)).transpose()?;
+            take.source = source.map(|source| serde_json::from_str(&source).map_err(err)).transpose()?;
             if let Some(voice) = voices.iter_mut().find(|voice| voice.block_id == block) {
                 voice.takes.push(take);
             }
@@ -117,9 +123,16 @@ impl Store {
         if kept.as_ref().is_some_and(|(kept_name, _)| kept_name != name) {
             return Err(qnc_ui_text::text("db.script_voice_renamed").into());
         }
+        // The words heard and where a found reading is go in with the take (a reading found in
+        // another recording is heard already; the background need not hear it again).
+        let heard = take.heard.as_ref().map(serde_json::to_string).transpose().map_err(err)?;
+        let source = take.source.as_ref().map(serde_json::to_string).transpose().map_err(err)?;
+        if take.source.as_ref().is_some_and(|source| source.clip_id.trim().is_empty() || source.to_frame <= source.from_frame || source.fps_num == 0 || source.fps_den == 0) {
+            return Err(qnc_ui_text::text("db.script_voice_invalid").into());
+        }
         tx.execute(
-            "INSERT INTO script_voice_takes (block_id, take, wav_uri, seconds, tc, text, recorded_at_utc) VALUES (?1, ?2, ?3, ?4, ?5, ?6, strftime('%Y-%m-%dT%H:%M:%fZ','now'))",
-            params![id, take.take, take.wav_uri, take.seconds, take.tc, take.text],
+            "INSERT INTO script_voice_takes (block_id, take, wav_uri, seconds, tc, text, recorded_at_utc, heard_json, source_json) VALUES (?1, ?2, ?3, ?4, ?5, ?6, strftime('%Y-%m-%dT%H:%M:%fZ','now'), ?7, ?8)",
+            params![id, take.take, take.wav_uri, take.seconds, take.tc, take.text, heard, source],
         )
         .map_err(err)?;
         tx.execute(
@@ -161,12 +174,13 @@ impl Store {
     /// Take `take` of block `id` becomes the one used; the block keeps its length.
     pub(crate) fn set_voice_chosen(&mut self, id: i64, take: u16) -> Result<Data> {
         let tx = qnc_db_broker::begin_write(self.connection_mut()).map_err(err)?;
-        let (seconds, wav_uri, tc): (f64, String, String) = tx
-            .query_row("SELECT seconds, wav_uri, tc FROM script_voice_takes WHERE block_id = ?1 AND take = ?2", params![id, take], |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?)))
+        let (seconds, wav_uri, tc, source): (f64, String, String, Option<String>) = tx
+            .query_row("SELECT seconds, wav_uri, tc, source_json FROM script_voice_takes WHERE block_id = ?1 AND take = ?2", params![id, take], |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?, r.get(3)?)))
             .optional()
             .map_err(err)?
             .ok_or_else(|| qnc_ui_text::fill("db.script_voice_no_take", &[("take", &take.to_string())]))?;
-        let clip_uri = take_clip_uri(&wav_uri);
+        // A reading found in another recording plays from that clip's media.
+        let clip_uri = if source.is_some() { wav_uri } else { take_clip_uri(&wav_uri) };
         tx.execute("UPDATE script_voice SET chosen = ?2, clip_uri = ?3, updated_at_utc = strftime('%Y-%m-%dT%H:%M:%fZ','now') WHERE block_id = ?1", params![id, take, clip_uri]).map_err(err)?;
         tx.execute("UPDATE script_blocks SET voice_seconds = ?2, voice_uri = ?3, voice_tc = ?4, updated_at_utc = strftime('%Y-%m-%dT%H:%M:%fZ','now') WHERE block_id = ?1", params![id, seconds, clip_uri, tc]).map_err(err)?;
         tx.commit().map_err(err)?;

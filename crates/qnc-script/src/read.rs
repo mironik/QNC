@@ -53,7 +53,11 @@ pub(crate) fn read_script(target: &ProjectDbTarget, locator: Option<&StillLocato
     let voices = qnc_script_db::read_voices(target)?
         .into_iter()
         .map(|voice| {
-            let present = there(&voice.clip_uri) && voice.chosen_take().is_some_and(|take| there(&take.wav_uri));
+            // A reading found in a recording made elsewhere is there when its clip is.
+            let present = match voice.chosen_take().and_then(|take| take.source.as_ref()) {
+                Some(source) => locator.is_some_and(|locator| locator.locate(&source.clip_id).is_ok()),
+                None => there(&voice.clip_uri) && voice.chosen_take().is_some_and(|take| there(&take.wav_uri)),
+            };
             (voice, present)
         })
         .collect();

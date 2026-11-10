@@ -219,6 +219,37 @@ pub struct VoiceTake {
     /// background has heard it, empty when nothing was said.
     #[serde(default)]
     pub heard: Option<Vec<HeardWord>>,
+    /// A reading found in a recording made elsewhere (user 2026-11-10: a camera, a recorder,
+    /// LAN or intranet; no presses between readings): a range of that clip of the project,
+    /// not a file of its own. Its `wav_uri` is then the clip's media, its words are seconds
+    /// from `from_frame`. `None`: a reading recorded in QNC, its own WAV and clip.
+    #[serde(default)]
+    pub source: Option<TakeSource>,
+}
+
+/// Where a reading found in another recording is: clip, frames `[from_frame, to_frame)` of it
+/// at its rate, and the camera channel it was heard on.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct TakeSource {
+    pub clip_id: String,
+    pub from_frame: u64,
+    pub to_frame: u64,
+    pub fps_num: u32,
+    pub fps_den: u32,
+    /// The camera channel (0 is the first) the reading was heard on.
+    pub channel: u16,
+}
+
+impl VoiceTake {
+    /// The clip a reading plays from and its frames there: its own clip (`clip_id_of` the
+    /// take's name) from 0, or the range of the recording it was found in.
+    pub fn clip_and_start(&self, own_clip: impl FnOnce() -> String) -> (String, u64) {
+        match &self.source {
+            Some(source) => (source.clip_id.clone(), source.from_frame),
+            None => (own_clip(), 0),
+        }
+    }
 }
 
 /// The name of the files of reading `take` of record `name`: its WAV and its mono clip.

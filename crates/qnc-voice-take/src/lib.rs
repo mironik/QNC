@@ -132,6 +132,17 @@ pub fn record_name(project: &str, mark: &str) -> String {
 /// The catalog record of a voice record's clip as it stands (its takes' lengths, its first
 /// take's timecode), from the project's settings as saved: what `finish` wrote, nothing probed.
 /// A record made before the catalog knew voice clips is described the same way.
+/// The catalog record of reading `take` of record `name`: its own mono clip, under the name of
+/// the reading. `None` for a reading found in a recording made elsewhere (user 2026-11-10): that
+/// clip is in the catalog already and nothing of it is written again.
+pub fn reading_record(settings: &qnc_work_settings::WorkSettings, name: &str, take: &qnc_script_db::VoiceTake) -> Option<Result<(String, qnc_media_metadata::ClipMetadata)>> {
+    if take.source.is_some() {
+        return None;
+    }
+    let reading = qnc_script_db::take_name(name, take.take);
+    Some(describe_record(settings, &reading, &qnc_script_db::take_clip_uri(&take.wav_uri), &[take.seconds], &take.tc).map(|record| (reading, record)))
+}
+
 pub fn describe_record(settings: &qnc_work_settings::WorkSettings, name: &str, clip_uri: &str, takes: &[f64], first_tc: &str) -> Result<qnc_media_metadata::ClipMetadata> {
     let (width, height, fps) = settings.video_picture().map_err(|e| e.message)?;
     let fields = settings.video_fields().map_err(|e| e.message)?;

@@ -6306,6 +6306,8 @@ dependencies = [
  "qnc-db-broker",
  "qnc-read-check",
  "qnc-script-db",
+ "qnc-sound-range",
+ "qnc-source-timecode",
  "qnc-still-locator",
  "qnc-take-heard",
  "qnc-transcribe-jobs",

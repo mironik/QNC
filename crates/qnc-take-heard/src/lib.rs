@@ -161,7 +161,7 @@ mod tests {
     use qnc_script_db::VoiceTake;
 
     fn take(number: u16, heard: Option<Vec<HeardWord>>) -> VoiceTake {
-        VoiceTake { take: number, wav_uri: format!("T{number}.wav"), seconds: 2.0, tc: String::new(), text: String::new(), heard }
+        VoiceTake { take: number, wav_uri: format!("T{number}.wav"), seconds: 2.0, tc: String::new(), text: String::new(), heard, source: None }
     }
 
     #[test]
