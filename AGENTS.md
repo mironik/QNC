@@ -8822,3 +8822,11 @@ pokrivalice: poster kadra na kartici (`qnc-clip-row` `TabCard.poster`; posteri s
 citane): 3615 dva mirna dijela Ljudi 0,97 i pokretni dio izmedju njih Dokument 0,97; C0012 (FX3A, bez upotrebljivog dijela) kadar
 Staklenik 1,00; C0014 Automobil 0,94 (prije bez oznake auta "sport"). Testovi `qnc-shot-content-run` (`units`), `qnc-shot-db`,
 `qnc-ai-broll`, conformance. Nije izvedeno: ucenje iz ispravaka (sljedece).
+Izvedeno 2026-11-10 (korisnik: "prvo AI razvrstavanje radi na osnovu postera sa kartice, drugo dodatno s postera koji se
+generiraju na osnovu analize mirnoce ili drugog oblika kretnje"): AI razvrstavanje u dva koraka. Pozadinski radnik prije analize
+kadrova pokrece `qnc-shot-content-run` `look_posters`: svaki uvezeni klip s posterom (poster s kartice ili njegova kopija u
+projektu, nista se ne dekodira) bez ikakvog sadrzaja dobiva jedan kadar preko cijelog klipa (vrsta `poster`), vektor iz tog
+postera; agent cita samo kopije u privremenoj mapi (kartica samo citana), po 32 odjednom, ceka dok player svira. Tab AI pokrivalice
+ga odmah razvrstava (bez vrste kadra u naslovu). Kad je klip analiziran, prolaz kadrova (`look_missing`) zamijeni taj zapis
+kadrovima analize s njihovim posterima; klip cija analiza nema nijedan kadar zadrzava razvrstavanje s postera. Test
+`a_clip_seen_only_through_its_poster_is_looked_at_again_by_its_shots`, conformance, release build radnika. Uzivo nije provjereno.

@@ -8,6 +8,7 @@ description = "QNC public block: what the usable parts of the clips of a project
 qnc-ui-text = { workspace = true }
 qnc-dev-diagnostics = { workspace = true }
 qnc-ai-catalog = { workspace = true }
+qnc-content-read = { workspace = true }
 qnc-content-store = { workspace = true }
 qnc-db-broker = { workspace = true }
 qnc-decoder-catalog = { workspace = true }

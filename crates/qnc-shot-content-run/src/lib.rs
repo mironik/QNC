@@ -46,7 +46,8 @@ pub fn look_missing(reader: &SettingsReader, settings: &WorkSettings, local_medi
     };
     let model = engine.model_name();
     let db = ProjectDbTarget::for_project(reader, settings)?;
-    let looked: Vec<String> = qnc_shot_content_db::read_all(&db, &model)?.into_iter().map(|clip| clip.clip_id).collect();
+    // A clip looked at only through its poster is looked at again once its shots are analysed.
+    let looked: Vec<String> = qnc_shot_content_db::read_all(&db, &model)?.into_iter().filter(|clip| !poster_only(clip)).map(|clip| clip.clip_id).collect();
     let mut remaining: Vec<String> = qnc_shot_db::read_analysed(&db)?.into_iter().filter(|clip| !looked.contains(clip)).collect();
     // The label vectors the forms sort the B-roll by (no model in a form): made again only when
     // the list of labels says something else than the kept ones.
@@ -101,6 +102,10 @@ pub fn look_missing(reader: &SettingsReader, settings: &WorkSettings, local_medi
         let Some(shots) = qnc_shot_db::read_clip(&db, &clip_id)? else { continue };
         let units = units(&shots);
         if units.is_empty() {
+            // A clip the poster sorted keeps that look when its analysis has no shot to look at.
+            if qnc_shot_content_db::read_clip(&db, &clip_id)?.is_some_and(|clip| poster_only(&clip)) {
+                continue;
+            }
             // Nothing to look at (or the analysis failed): kept as looked at, with why.
             let why = if shots.error.is_empty() { qnc_ui_text::text("shots.content_no_parts").to_string() } else { shots.error.clone() };
             qnc_shot_content_db::save(&db, ClipContent { clip_id, model: model.clone(), parts: Vec::new(), error: why, took_ms: 0 }, lease.clone())?;
@@ -158,6 +163,75 @@ pub fn look_missing(reader: &SettingsReader, settings: &WorkSettings, local_medi
         kept += 1;
     }
     Ok(kept)
+}
+
+/// The first, quickest look (user 2026-11-10: "the first AI sorting works from the card's
+/// poster, the second from the posters made by the analysis"): every imported clip with a poster
+/// and nothing looked at yet gets one shot spanning the whole clip, its vector from that poster
+/// (the card's, or its copy in the project; nothing is decoded). The shots of the analysis replace
+/// it later. Returns how many it kept.
+pub fn look_posters(reader: &SettingsReader, settings: &WorkSettings, local_media: &LocalMedia<'_>, lease: Option<WriteLease>, pace: &Pace<'_>) -> Result<usize, String> {
+    if !settings.ai_enabled() {
+        return Ok(0);
+    }
+    let Ok(engine) = qnc_ai_catalog::installed_shot_content() else { return Ok(0) };
+    let model = engine.model_name();
+    let db = ProjectDbTarget::for_project(reader, settings)?;
+    let looked: Vec<String> = qnc_shot_content_db::read_all(&db, &model)?.into_iter().map(|clip| clip.clip_id).collect();
+    let project_dir = reader.local_workspace_dir(settings).map_err(|e| e.to_string())?;
+    let root = format!("{}/", settings.output_root_uri.trim_end_matches('/'));
+    let local = |uri: &str| match (uri.strip_prefix(&root), &project_dir) {
+        (Some(relative), Some(dir)) if !relative.contains("..") => Some(dir.join(relative)).filter(|file| file.is_file()),
+        _ => local_media(uri),
+    };
+    let wanted: Vec<(String, u64, String, PathBuf)> = qnc_content_read::ContentReader::for_project(reader, settings)?
+        .summaries()?
+        .into_iter()
+        .filter(|clip| clip.imported && !looked.contains(&clip.clip_id))
+        .filter_map(|clip| {
+            let uri = clip.thumbnail_uri?;
+            let file = local(&uri)?;
+            Some((clip.clip_id, clip.duration_frames.max(1), uri, file))
+        })
+        .collect();
+    if wanted.is_empty() {
+        return Ok(0);
+    }
+    let client = qnc_shot_content::ContentClient::new(&qnc_plugin_process::beside_application(&engine.program)?);
+    // The agent reads only copies in a folder of its own (the card stays only read).
+    let temp = scratch_dir("posters");
+    let mut kept = 0;
+    for batch in wanted.chunks(qnc_shot_content::MOST_AT_ONCE) {
+        if !wait_for_player(pace) || pace.cancel.load(Ordering::Relaxed) {
+            break;
+        }
+        let _ = fs::remove_dir_all(&temp);
+        fs::create_dir_all(&temp).map_err(|e| e.to_string())?;
+        let mut pictures = Vec::new();
+        for (n, (_, _, _, file)) in batch.iter().enumerate() {
+            let copy = temp.join(format!("{n:03}.jpg"));
+            fs::copy(file, &copy).map_err(|e| e.to_string())?;
+            pictures.push(copy);
+        }
+        let vectors = client.pictures(&qnc_shot_content::PicturesRequest { model: engine.model.clone(), pictures });
+        let _ = fs::remove_dir_all(&temp);
+        let vectors = vectors?;
+        for ((clip_id, frames, uri, _), vector) in batch.iter().zip(vectors) {
+            let shot = PartContent { from: 0, to: *frames, kind: POSTER.into(), frames: vec![0], vector, poster: uri.clone(), fine: false };
+            qnc_shot_content_db::save(&db, ClipContent { clip_id: clip_id.clone(), model: model.clone(), parts: vec![shot], error: String::new(), took_ms: 0 }, lease.clone())?;
+            kept += 1;
+        }
+    }
+    log(format!("shot-content posters model={model} kept={kept}"));
+    Ok(kept)
+}
+
+/// The kind of the one shot of a clip looked at only through its poster.
+pub const POSTER: &str = "poster";
+
+/// Whether a clip's content is only its poster's (the shots of the analysis still to come).
+fn poster_only(clip: &ClipContent) -> bool {
+    clip.parts.len() == 1 && clip.parts[0].kind == POSTER
 }
 
 /// Whether a shot kind is a usable part of the analysis (steady, pan).
@@ -356,6 +430,15 @@ mod tests {
 
     fn part(from: u64, to: u64, key: u64) -> PartRecord {
         PartRecord { from, to, camera: "steady".into(), key_frame: key }
+    }
+
+    #[test]
+    fn a_clip_seen_only_through_its_poster_is_looked_at_again_by_its_shots() {
+        let shot = |kind: &str| PartContent { from: 0, to: 50, kind: kind.into(), frames: vec![0], vector: vec![1.0], poster: String::new(), fine: false };
+        let clip = |parts| ClipContent { clip_id: "c".into(), model: "m".into(), parts, error: String::new(), took_ms: 0 };
+        assert!(poster_only(&clip(vec![shot(POSTER)])));
+        assert!(!poster_only(&clip(vec![shot("steady")])));
+        assert!(!poster_only(&clip(Vec::new())));
     }
 
     #[test]

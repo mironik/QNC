@@ -6683,6 +6683,7 @@ name = "qnc-shot-content-run"
 version = "0.1.0"
 dependencies = [
  "qnc-ai-catalog",
+ "qnc-content-read",
  "qnc-content-store",
  "qnc-db-broker",
  "qnc-decoder-catalog",

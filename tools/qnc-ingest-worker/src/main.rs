@@ -375,6 +375,11 @@ fn make_shots(
         let player_plays = || level() == qnc_playback_activity::PlaybackLevel::Playing || transcribing();
         let wanted = || qnc_playback_activity::read(&target, qnc_playback_activity::PLAYBACK_CLIP);
         let pace = qnc_shot_analysis::Pace { player_plays: &player_plays, wanted: &wanted, cancel };
+        // First the quickest sorting, from each clip's poster (user 2026-11-10), before any
+        // picture of a shot is read.
+        if let Err(error) = qnc_shot_content_run::look_posters(active.settings_reader(), &snapshot.settings, &local_media, Some(lease.write_lease()), &pace) {
+            qnc_dev_diagnostics::log_line(qnc_dev_diagnostics::DiagnosticsStream::Player, format!("shot-content posters failed error={error}"));
+        }
         let analysed = qnc_shot_analysis::analyse_missing(&project, &local_media, Some(lease.write_lease()), &pace);
         // What the usable parts show (user 2026-11-10: sorting the B-roll by content), right
         // after their analysis, with the same pace.
