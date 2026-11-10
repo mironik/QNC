@@ -22,6 +22,7 @@ pub struct Siglip {
     bias: f32,
     pad: u32,
     max_len: usize,
+    lowercase: bool,
     device: Device,
 }
 
@@ -29,7 +30,17 @@ impl Siglip {
     /// The model of `folder`.
     pub fn load(folder: &Path) -> Result<Self, String> {
         let device = Device::Cpu;
-        let config = siglip::Config::base_patch16_224();
+        let tokenizer = tokenizers::Tokenizer::from_file(folder.join("tokenizer.json")).map_err(err)?;
+        // SigLIP and SigLIP 2 base share the picture model; SigLIP 2's text model has the larger
+        // vocabulary of its `config.json`, pads with `<pad>` and reads lower-case text.
+        let mut config = siglip::Config::base_patch16_224();
+        let file: serde_json::Value = serde_json::from_slice(&std::fs::read(folder.join("config.json")).map_err(err)?).map_err(err)?;
+        let vocab = file.pointer("/text_config/vocab_size").and_then(serde_json::Value::as_u64).map_or(config.text_config.vocab_size, |v| v as usize);
+        let second = vocab != config.text_config.vocab_size;
+        if second {
+            config.text_config.vocab_size = vocab;
+            config.text_config.pad_token_id = tokenizer.token_to_id("<pad>").ok_or_else(|| "the tokenizer has no <pad>".to_string())?;
+        }
         let weights = folder.join("model.safetensors");
         // SAFETY: the weights file is only read and not changed while the model is loaded.
         let vb = unsafe { VarBuilder::from_mmaped_safetensors(&[&weights], DType::F32, &device) }.map_err(err)?;
@@ -37,7 +48,6 @@ impl Siglip {
         let scalar = |name: &str| -> Result<f32, String> { vb.get(&[1], name).and_then(|t| t.to_vec1::<f32>()).map(|v| v[0]).map_err(err) };
         let scale = scalar("logit_scale")?.exp();
         let bias = scalar("logit_bias")?;
-        let tokenizer = tokenizers::Tokenizer::from_file(folder.join("tokenizer.json")).map_err(err)?;
         Ok(Self {
             model,
             tokenizer,
@@ -45,6 +55,7 @@ impl Siglip {
             bias,
             pad: config.text_config.pad_token_id,
             max_len: config.text_config.max_position_embeddings,
+            lowercase: second,
             device,
         })
     }
@@ -74,7 +85,8 @@ impl Siglip {
         }
         let mut ids = Vec::with_capacity(texts.len() * self.max_len);
         for text in texts {
-            let encoding = self.tokenizer.encode(text.as_str(), true).map_err(err)?;
+            let text = if self.lowercase { text.to_lowercase() } else { text.clone() };
+            let encoding = self.tokenizer.encode(text, true).map_err(err)?;
             let mut row: Vec<u32> = encoding.get_ids().iter().copied().take(self.max_len).collect();
             row.resize(self.max_len, self.pad);
             ids.extend(row);

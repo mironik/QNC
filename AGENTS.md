@@ -8830,3 +8830,11 @@ postera; agent cita samo kopije u privremenoj mapi (kartica samo citana), po 32 
 ga odmah razvrstava (bez vrste kadra u naslovu). Kad je klip analiziran, prolaz kadrova (`look_missing`) zamijeni taj zapis
 kadrovima analize s njihovim posterima; klip cija analiza nema nijedan kadar zadrzava razvrstavanje s postera. Test
 `a_clip_seen_only_through_its_poster_is_looked_at_again_by_its_shots`, conformance, release build radnika. Uzivo nije provjereno.
+Usporedba 2026-11-10 (korisnik: "da probaj Base"; SigLIP 2 umjesto SigLIP za sadrzaj kadra): preuzet
+google/siglip2-base-patch16-224 (Apache 2.0, 1,5 GB, `data/models/siglip2-base-patch16-224`, izvan gita). `qnc-siglip` cita oba
+modela iste velicine: SigLIP 2 prepoznaje po vokabularu iz `config.json` (256000), puni s `<pad>` i cita tekst oznaka malim
+slovima; SigLIP ostaje bit po bit isti (provjereno: 3615, 3622 iste vrijednosti kao prije). Probni program `look_card` prima
+mapu modela kao cetvrti argument. Izmjereno na 8 klipova kartice D: (samo citanje), 2 slike po dijelu: brzina ista (slike
+1,0-10,5 s po klipu kod oba), ucitavanje 6-13 s prema 4-6 s. Razvrstavanje nije bolje: grupe su iste (Ljudi, Dokument, Osoba),
+SigLIP 2 je manje siguran (Ljudi 0,66-0,88 prema 0,97-0,98), a oznaka izjave (`statement_least` podesen za SigLIP) daje 4 od 10
+izjava 3625 umjesto 9 od 10. Katalog racunala ostaje na SigLIP base; prelazak bi trazio novo podesavanje pragova bez dobitka.
