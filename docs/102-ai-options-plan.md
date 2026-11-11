@@ -112,8 +112,11 @@ mu trebaju, ali da sacuva ovisnosti: kad odabere automatske prijedloge pokrivali
 kadrova".
 
 - AI template je imenovani skup ukljucenih mogucnosti (sifre iz `features.json`), po istom obrascu kao
-  projektni templatei: sistemski AI templatei su zakljucani baseline (seed), korisnicki se spremaju u Project
-  registry (`system = 0`) i smiju se brisati.
+  projektni templatei: sistemski AI templatei su zakljucani (`catalogs/ai/templates.json`), korisnicki se
+  spremaju na racunalu (`data/ai-templates`, kao obrasci priloga) i smiju se brisati.
+- Odluke korisnika 2026-11-11: AI template je odvojen od projektnog, projekt ih udruzuje kad je AI izabran;
+  opisi kadrova i ispravci na LAN-u su zajednicki svima (baza za treniranje); Project otkljucan za korak 1.
+  Zadano (bez odgovora, prijedlog): novi projekt "Bez AI-ja", jedan "Gdje radi AI" za cijeli projekt.
 - Predlozeni sistemski: "Bez AI-ja" (zadano), "Prijepis" (transcription, letter_times, read_check), "Video AI"
   (shot_analysis, shot_content, shot_caption), "News puni" (sve), "Bez prijedloga pokrivalica" (sve osim
   broll_suggest i translate).

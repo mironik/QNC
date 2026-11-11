@@ -1,0 +1,10 @@
+{
+  "note": "The AI templates QNC brings (docs/102, user 2026-11-11): locked, never deleted. A newsroom keeps its own in data/ai-templates. A project chooses its AI template apart from its technical template.",
+  "templates": [
+    { "id": "none", "name": "ai.template.none", "features": [] },
+    { "id": "transcription", "name": "ai.template.transcription", "features": ["transcription", "letter_times", "read_check"] },
+    { "id": "video_ai", "name": "ai.template.video_ai", "features": ["shot_analysis", "shot_content", "shot_caption"] },
+    { "id": "news_no_broll", "name": "ai.template.news_no_broll", "features": ["transcription", "letter_times", "read_check", "shot_analysis", "shot_content", "shot_caption", "smooth_cut"] },
+    { "id": "news_full", "name": "ai.template.news_full", "features": ["transcription", "letter_times", "read_check", "shot_analysis", "shot_content", "shot_caption", "broll_suggest", "translate", "smooth_cut"] }
+  ]
+}

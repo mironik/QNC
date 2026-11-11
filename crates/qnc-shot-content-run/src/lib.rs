@@ -34,7 +34,7 @@ const PICTURE: [u32; 2] = [384, 216];
 /// this host; returns how many it kept. Nothing is done when the project has AI off or this host
 /// has no shot content engine.
 pub fn look_missing(reader: &SettingsReader, settings: &WorkSettings, local_media: &LocalMedia<'_>, lease: Option<WriteLease>, pace: &Pace<'_>) -> Result<usize, String> {
-    if !settings.ai_enabled() {
+    if !settings.ai_feature(qnc_ai_features::SHOT_CONTENT).unwrap_or(false) {
         return Ok(0);
     }
     let engine = match qnc_ai_catalog::installed_shot_content() {
@@ -182,7 +182,7 @@ pub fn look_missing(reader: &SettingsReader, settings: &WorkSettings, local_medi
 /// (the card's, or its copy in the project; nothing is decoded). The shots of the analysis replace
 /// it later. Returns how many it kept.
 pub fn look_posters(reader: &SettingsReader, settings: &WorkSettings, local_media: &LocalMedia<'_>, lease: Option<WriteLease>, pace: &Pace<'_>) -> Result<usize, String> {
-    if !settings.ai_enabled() {
+    if !settings.ai_feature(qnc_ai_features::SHOT_CONTENT).unwrap_or(false) {
         return Ok(0);
     }
     let Ok(engine) = qnc_ai_catalog::installed_shot_content() else { return Ok(0) };

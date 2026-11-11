@@ -5,6 +5,7 @@ edition = "2021"
 description = "QNC public block: a sentence of what each looked-at shot of a project shows, from its poster, by the shot-caption agent, kept on this computer; run by the background worker"
 
 [dependencies]
+qnc-ai-features = { workspace = true }
 qnc-ai-catalog = { workspace = true }
 qnc-db-broker = { workspace = true }
 qnc-dev-diagnostics = { workspace = true }

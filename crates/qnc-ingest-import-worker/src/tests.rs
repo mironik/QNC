@@ -79,7 +79,7 @@ fn qnc_work_settings_fixture(media: &str, playback: &str) -> qnc_work_settings::
         "playback": {"input": playback},
         "video": {"fps": 25.0},
         "audio": {"sample_rate": 48000, "channels": 2},
-        "ai": {"enabled": false},
+        "ai": {"features": []},
         "keyboard_shortcuts": {"active_preset": "qnc"}
     }))
     .unwrap()

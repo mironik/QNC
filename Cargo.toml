@@ -279,6 +279,8 @@ members = [
     "tools/qnc-translate-opus",
     "crates/qnc-ai-broll",
     "crates/qnc-shot-labels",
+    "crates/qnc-ai-features",
+    "crates/qnc-ai-features-view",
     "crates/qnc-shot-examples",
     "crates/qnc-broll-suggest",
     "crates/qnc-shot-vocabulary",
@@ -613,6 +615,8 @@ qnc-translate = { path = "crates/qnc-translate" }
 qnc-text-translate = { path = "crates/qnc-text-translate" }
 qnc-ai-broll = { path = "crates/qnc-ai-broll" }
 qnc-shot-labels = { path = "crates/qnc-shot-labels" }
+qnc-ai-features = { path = "crates/qnc-ai-features" }
+qnc-ai-features-view = { path = "crates/qnc-ai-features-view" }
 qnc-shot-examples = { path = "crates/qnc-shot-examples" }
 qnc-broll-suggest = { path = "crates/qnc-broll-suggest" }
 qnc-shot-vocabulary = { path = "crates/qnc-shot-vocabulary" }

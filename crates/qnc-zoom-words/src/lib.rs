@@ -244,7 +244,7 @@ impl ZoomWords {
     }
 
     fn transcribe(&mut self, locator: &StillLocator, need: &Need) {
-        if self.job.is_some() || self.failed.contains(&need.clip_id) || !locator.settings().transcription_enabled().unwrap_or(false) {
+        if self.job.is_some() || self.failed.contains(&need.clip_id) || !locator.settings().ai_feature(qnc_ai_features::TRANSCRIPTION).unwrap_or(false) {
             return;
         }
         let (send, done) = mpsc::channel();

@@ -317,7 +317,7 @@ fn transcription_is_off_in_croatian_on_the_first_channel_until_the_project_says_
     let root = fixture();
     let reader = SettingsReader::local(root.path().join("data/qnc-projects.db"));
     let mut settings = reader.read().unwrap();
-    assert!(!settings.transcription_enabled().unwrap());
+    assert!(!settings.ai_feature("transcription").unwrap(), "no AI until the project turns it on");
     assert_eq!(settings.speech_language().unwrap(), "hr");
     assert_eq!(settings.transcribe_channel().unwrap(), 0, "CH1 is the first channel");
     settings.ai["language"] = json!("auto");
@@ -327,8 +327,10 @@ fn transcription_is_off_in_croatian_on_the_first_channel_until_the_project_says_
     // Missing or impossible values are refused, never defaulted.
     settings.ai["language"] = json!("Hrvatski");
     assert!(settings.speech_language().is_err());
-    settings.ai.as_object_mut().unwrap().remove("transcription");
-    assert!(settings.transcription_enabled().is_err());
+    settings.ai["features"] = json!(["transcription"]);
+    assert!(settings.ai_feature("transcription").unwrap());
+    settings.ai.as_object_mut().unwrap().remove("features");
+    assert!(settings.ai_feature("transcription").is_err());
     settings.audio["transcribe_channel"] = json!("CH0");
     assert!(settings.transcribe_channel().is_err());
 }

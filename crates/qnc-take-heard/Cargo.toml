@@ -5,6 +5,7 @@ edition = "2021"
 description = "QNC public piece: the words heard in the takes of a script's voice records, transcribed in the background while the player is idle and kept with the take in the project database"
 
 [dependencies]
+qnc-ai-features = { workspace = true }
 qnc-db-broker = { workspace = true }
 qnc-dev-diagnostics = { workspace = true }
 qnc-script-db = { workspace = true }

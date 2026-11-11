@@ -126,7 +126,7 @@ fn claim(locator: &StillLocator, take: &Wanted) -> (String, i64, u16) {
 /// language of the engine.
 pub fn barred(locator: &StillLocator) -> Option<String> {
     let settings = locator.settings();
-    match settings.transcription_enabled() {
+    match settings.ai_feature(qnc_ai_features::READ_CHECK) {
         Ok(true) => {}
         Ok(false) => return Some(qnc_ui_text::text("script.read_check_off").into()),
         Err(error) => return Some(error.to_string()),

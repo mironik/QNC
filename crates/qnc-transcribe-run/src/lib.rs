@@ -74,7 +74,7 @@ pub fn transcribe(locator: &StillLocator, ask: &Ask, quality: Quality, pace: Pac
         return Err(qnc_ui_text::text("transcribe.empty_range").into());
     }
     let settings = locator.settings();
-    if !settings.transcription_enabled().map_err(|e| e.to_string())? {
+    if !settings.ai_feature(qnc_ai_features::TRANSCRIPTION).map_err(|e| e.to_string())? {
         return Err(qnc_ui_text::text("transcribe.off_in_project").into());
     }
     let engine = qnc_ai_catalog::installed_transcriber_for(quality)?;

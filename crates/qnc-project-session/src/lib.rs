@@ -34,6 +34,8 @@ pub struct ProjectSession {
     pub selected_template_id: String,
     pub templates: Vec<ProjectTemplateRow>,
     pub draft_settings: Value,
+    /// The AI template and features of the draft (piece `qnc-ai-features`, docs/102).
+    pub ai: qnc_ai_features::Choice,
     pub template_draft_name: String,
     pub template_draft_description: String,
     pub export_preset_draft_name: String,
@@ -131,6 +133,7 @@ impl ProjectSession {
     /// action ids of the keyboard catalog (an intent outside it is refused).
     pub fn new(component: ProjectComponent, ready_text: String, known_actions: BTreeSet<String>) -> Self {
         // Shown once the registry answers (piece `qnc-project-jobs`).
+        let ai = qnc_ai_features::Choice::load(&component.root);
         let mut session = Self {
             component,
             project_name: String::new(),
@@ -146,6 +149,7 @@ impl ProjectSession {
             selected_template_id: String::new(),
             templates: Vec::new(),
             draft_settings: Value::Object(Default::default()),
+            ai,
             template_draft_name: String::new(),
             template_draft_description: String::new(),
             export_preset_draft_name: String::new(),

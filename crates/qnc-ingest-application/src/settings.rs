@@ -87,7 +87,7 @@ impl IngestApplication {
             self.view.browser.chosen = Default::default();
         }
         self.show_project_status();
-        let ai = self.project.plan().is_some_and(|plan| plan.settings.ai_enabled());
+        let ai = self.project.plan().is_some_and(|plan| plan.settings.ai_feature(qnc_ai_features::SHOT_ANALYSIS).unwrap_or(false));
         (self.view.ai_mining, self.view.archive_original_available, self.view.archive_original) = (ai, false, false);
         let catalog_was_loaded = loaded.clips.is_some();
         if let Some(clips) = loaded.clips {

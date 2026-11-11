@@ -1818,14 +1818,20 @@ fn complete_project_settings(settings: &mut Value) -> Result<(), String> {
         // the level of XAVC Long 35 and XDCAM HD 35).
         export.entry("video_bitrate_mbps".to_string()).or_insert_with(|| json!(DEFAULT_VIDEO_BITRATE_MBPS));
     }
-    // Transcription of speech (user 2026-10-26: off until the project turns it on; the language
-    // of speech is the project's, Croatian unless it says other).
+    // The AI of a project (docs/102, user 2026-11-11): its AI template and the AI features it
+    // turned on; a project that says neither has no AI. The switches of before (enabled,
+    // coverage_suggestions, transcription) are taken out, not turned into features. The
+    // language of speech is the project's, Croatian unless it says other (user 2026-10-26).
     let ai = root
         .entry("ai")
         .or_insert_with(|| json!({}))
         .as_object_mut()
         .ok_or(qnc_ui_text::text("project.store.ai_object"))?;
-    ai.entry("transcription".to_string()).or_insert_with(|| json!(false));
+    for old in ["enabled", "coverage_suggestions", "transcription"] {
+        ai.remove(old);
+    }
+    ai.entry("template".to_string()).or_insert_with(|| json!("none"));
+    ai.entry("features".to_string()).or_insert_with(|| json!([]));
     ai.entry("language".to_string()).or_insert_with(|| json!(DEFAULT_SPEECH_LANGUAGE));
     Ok(())
 }
@@ -3044,7 +3050,7 @@ mod tests {
         assert_eq!(read()["export"]["start_timecode"], json!("10:00:00:00"));
         assert_eq!(read()["export"]["video_bitrate_mbps"], json!(35));
         assert_eq!(read()["ai"]["language"], json!("hr"), "Croatian from its template");
-        assert_eq!(read()["ai"]["transcription"], json!(false));
+        assert_eq!(read()["ai"]["features"], json!([]), "no AI until the project turns it on");
         let mut older = read();
         older["audio"].as_object_mut().unwrap().remove("crossfade_frames");
         older["audio"].as_object_mut().unwrap().remove("reading_words_per_second");
@@ -3054,7 +3060,8 @@ mod tests {
         older["export"].as_object_mut().unwrap().remove("start_timecode");
         older["export"].as_object_mut().unwrap().remove("video_bitrate_mbps");
         older["ai"].as_object_mut().unwrap().remove("language");
-        older["ai"].as_object_mut().unwrap().remove("transcription");
+        older["ai"].as_object_mut().unwrap().remove("features");
+        older["ai"]["enabled"] = json!(true);
         Connection::open(project_dir.join("project.db"))
             .unwrap()
             .execute("UPDATE project_settings SET settings_json = ?2 WHERE project_id = ?1", params![row.project_id, older.to_string()])
@@ -3069,7 +3076,8 @@ mod tests {
         assert_eq!(completed["export"]["start_timecode"], json!("10:00:00:00"));
         assert_eq!(completed["export"]["video_bitrate_mbps"], json!(35));
         assert_eq!(completed["ai"]["language"], json!("hr"));
-        assert_eq!(completed["ai"]["transcription"], json!(false));
+        assert_eq!(completed["ai"]["features"], json!([]));
+        assert!(completed["ai"].get("enabled").is_none(), "a switch of before is taken out");
         assert_eq!(completed["audio"]["channels"], older["audio"]["channels"]);
         cleanup_temp_root(&root);
     }

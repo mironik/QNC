@@ -5,6 +5,7 @@ edition = "2021"
 description = "QNC public piece: the words A1 says around the cut of the trim zoom, from the transcripts kept in the project database, a part no transcript covers transcribed once with five seconds on each side, off the form thread; it paints nothing and knows no form"
 
 [dependencies]
+qnc-ai-features = { workspace = true }
 qnc-clip-transcripts = { workspace = true }
 qnc-db-broker = { workspace = true }
 qnc-dev-diagnostics = { workspace = true }

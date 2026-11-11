@@ -66,7 +66,7 @@ fn fixture() -> tempfile::TempDir {
             },
             "input":{"mode":"auto"}, "playback":{"input":"proxy_if_available"},
             "video":{"fps":50}, "audio":{"sample_rate":48000, "channels":2},
-            "ai":{"enabled":id=="p2"}, "keyboard_shortcuts":{"active_preset":"default"}
+            "ai":{"features": if id == "p2" { serde_json::json!(["shot_analysis"]) } else { serde_json::json!([]) }}, "keyboard_shortcuts":{"active_preset":"default"}
         });
         workspace
             .execute(

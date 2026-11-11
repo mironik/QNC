@@ -9050,3 +9050,26 @@ pokrivalice" ga upisuje u scenarij jednim korakom (`script_accept_broll`), "Odba
 `a_plan_covers_an_off_with_the_shots_wanted_first_then_by_its_words_none_twice`), `qnc-script` (novi
 `every_off_of_the_story_is_asked_for_b_roll_a_slot_between_its_marks_with_its_note`), conformance. Uzivo nije provjereno.
 Nije izvedeno: Send to S-Story jos ne prenosi prihvacene pokrivalice u pricu; prikaz kadrova bez postera.
+Otkljucano i izvedeno 2026-11-11 (korisnik: AI kao opcije projekta, docs/102; "templatei za AI... u templateu korisnik
+moze odabrati postavke koje mu trebaju, ali da sacuva ovisnosti"; odluke: AI template odvojen od projektnog, projekt ih
+udruzuje kad je AI izabran; opisi i ispravci na LAN-u zajednicki; "DA" na otkljucavanje Projecta za korak 1): korak 1.
+Popis AI mogucnosti je podatak `catalogs/ai/features.json` (transcription, letter_times, read_check, shot_analysis,
+shot_content, shot_caption, broll_suggest, translate, smooth_cut; svaka imenuje sto treba), sistemski AI templatei
+`catalogs/ai/templates.json` (Bez AI-ja, Prijepis, Video AI, Vijesti bez prijedloga pokrivalica, Vijesti sve),
+korisnicki na racunalu (`data/ai-templates`). Nova kocka `crates/qnc-ai-features` (+ ugovor): jedno pravilo
+ovisnosti (ukljucivanje ukljuci sto mogucnost treba, potrebna se ne moze iskljuciti dok je nesto treba, izbor koji to
+krsi je greska), AI templatei (spremi, obrisi; pripremljeni se ne brisu), zapis u postavkama projekta `ai.template` i
+`ai.features`. Nova kocka `crates/qnc-ai-features-view` (+ ugovor): odjeljak AI (izbor AI templatea, "(izmijenjen)"
+kad se sklopke razlikuju, sklopka po mogucnosti, potrebna siva s "treba je: ...", Spremi kao AI template, Obrisi
+vlastiti). Project (otkljucan samo za ovo): AI odjeljak Advanced postavki crta ga kocka (forma isti broj redaka),
+stare sklopke `ai.enabled`, `ai.coverage_suggestions`, `ai.transcription` uklonjene iz ugovora rasporeda i seeda (svi
+sistemski templatei: template none, features []), `qnc-project-store` ih pri otvaranju projekta uklanja i dopunjuje
+`template`/`features` (bez pretvaranja: projekt dobiva Bez AI-ja), `qnc-project-jobs` odbija kreiranje projekta ciji
+AI izbor krsi ovisnosti. `qnc-work-settings`: `ai_feature(code)` strogo (umjesto `ai_enabled`,
+`transcription_enabled`; `ai.enabled` vise ne trazi validacija); pokretaci pitaju svoju mogucnost: analiza kadrova i
+AI u Ingestu shot_analysis, pregled sadrzaja shot_content, opis shot_caption, prijepis (red, panel, zoom rijeci)
+transcription, provjera citanja read_check. Nije izvedeno (korak 2-3): vremena slova, prijedlog i prijevod, Smooth jos
+ne pitaju svoju mogucnost; forme jos pokazuju AI tabove bez obzira na mogucnosti; AI se bira samo za novi projekt (Project
+ne mijenja postavke otvorenog projekta). Tri testa `qnc-ingest-application` catalog_tests padaju i bez ove izmjene
+(postojeci kvar). Testovi `qnc-ai-features` (3), `qnc-work-settings`, `qnc-project-store`, `qnc-project-jobs` i
+dotaknutih kocki, conformance. Uzivo nije provjereno. Project je ponovno zamrznut.

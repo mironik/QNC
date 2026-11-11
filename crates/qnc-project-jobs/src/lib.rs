@@ -83,11 +83,14 @@ pub fn run(store: &mut Result<ProjectStore, String>, request: Request) -> Answer
         Request::Create { name, template_id, settings, selection, sheet } => {
             // The sheet goes into the database the new project has; a project whose sheet
             // could not be kept is still there, and says so.
-            let created = store.create_project(&name, &template_id, Some(&settings), &selection).and_then(|project| {
+            // The AI it turns on keeps the rule of the features (docs/102): what a feature needs is on.
+            let chosen = qnc_ai_features::chosen_of(&settings);
+            let checked = if chosen.is_empty() { Ok(()) } else { qnc_ai_features::Features::load(store.root()).and_then(|features| features.check(&chosen)) };
+            let created = checked.and_then(|()| store.create_project(&name, &template_id, Some(&settings), &selection).and_then(|project| {
                 save_sheet(store, &project.project_id, sheet)
                     .map_err(|error| qnc_ui_text::fill("project.msg.sheet_not_kept", &[("error", &error)]))?;
                 Ok((project, projects(store)?))
-            });
+            }));
             let navigation = created.as_ref().ok().map(|(project, _)| (project.project_id.clone(), store.navigation_sequence(&project.project_id)));
             (Reply::Created(created), navigation)
         }

@@ -1,0 +1,12 @@
+[package]
+name = "qnc-ai-features-view"
+version = "0.1.0"
+edition = "2021"
+description = "QNC public UI piece: the AI section of a settings draft (an AI template, one switch per AI feature, what is needed kept on and said, keep and delete an own AI template); the rule is qnc-ai-features"
+
+[dependencies]
+qnc-ai-features = { workspace = true }
+qnc-ui-kit = { workspace = true }
+qnc-ui-text = { workspace = true }
+eframe = { workspace = true }
+serde_json = { workspace = true }

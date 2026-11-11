@@ -24,6 +24,7 @@ qnc-settings-path = { workspace = true }
 qnc-settings-form = { workspace = true }
 qnc-language-choice = { workspace = true }
 qnc-settings-switches = { workspace = true }
+qnc-ai-features-view = { workspace = true }
 qnc-newsroom-sheet = { workspace = true }
 qnc-ui-kit = { workspace = true }
 serde = { workspace = true }

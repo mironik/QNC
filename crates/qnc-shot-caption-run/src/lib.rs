@@ -35,7 +35,7 @@ struct Wanted {
 /// Captions every looked-at shot of the project that has none of this host's model; returns how
 /// many it kept. Nothing is done when the project has AI off or this host has no shot captioner.
 pub fn caption_missing(root: &Path, reader: &SettingsReader, settings: &WorkSettings, local_media: &LocalMedia<'_>, pace: &Pace<'_>) -> Result<usize, String> {
-    if !settings.ai_enabled() {
+    if !settings.ai_feature(qnc_ai_features::SHOT_CAPTION).unwrap_or(false) {
         return Ok(0);
     }
     let captioner = match qnc_ai_catalog::installed_shot_captioner() {

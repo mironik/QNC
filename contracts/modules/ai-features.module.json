@@ -1,0 +1,21 @@
+{
+  "module_id": "qnc.module.ai-features",
+  "module_name": "AI Features",
+  "module_version": "0.1.0",
+  "module_kind": "library",
+  "capabilities": ["ai.features.list", "ai.features.dependencies", "ai.templates.list", "ai.templates.keep"],
+  "input_contract_version": "0.1.0",
+  "output_contract_version": "0.1.0",
+  "transport_protocol_version": "0.1.0",
+  "transport_scope": ["local"],
+  "supported_os": ["windows", "linux", "macos"],
+  "supported_cpu": ["x86_64", "aarch64"],
+  "forbidden_calls": ["db.write", "media.decode", "source.write", "media.probe"],
+  "forbidden_dependencies": ["qnc.module.media-probe"],
+  "state_policy": "stateless",
+  "database_write_policy": "no_db_writes",
+  "runtime_crate": "qnc-ai-features",
+  "input": "The AI features (catalogs/ai/features.json: code, name, needs), the prepared AI templates (catalogs/ai/templates.json), the own AI templates of this computer (data/ai-templates) and a settings draft.",
+  "output": "The AI template and features of the draft (ai.template, ai.features), what a feature needs and what needs it, own AI templates kept or deleted.",
+  "specification": "docs/102, user 2026-11-11: QNC works without AI; a project turns on the features it wants, through an AI template apart from its technical template. Turning a feature on turns on what it needs; a feature a chosen one needs cannot be turned off; a choice that breaks this is an error, never mended."
+}

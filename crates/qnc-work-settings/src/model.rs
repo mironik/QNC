@@ -227,13 +227,17 @@ impl WorkSettings {
             .ok_or_else(|| ReadError::new("audio_reading_words_per_second", "The database holds no valid audio.reading_words_per_second."))
     }
 
-    /// Whether the speech of this project is transcribed (`ai.transcription`, user 2026-10-26);
-    /// a project without it is completed when Project opens it, a missing value is an error.
-    pub fn transcription_enabled(&self) -> Result<bool, ReadError> {
-        self.ai
-            .get("transcription")
-            .and_then(Value::as_bool)
-            .ok_or_else(|| ReadError::new("ai_transcription", "The database holds no valid ai.transcription."))
+    /// Whether AI feature `code` is on in this project (`ai.features`, docs/102: the project
+    /// turns on what it wants, QNC works without any). A project without the list is completed
+    /// when Project opens it; until then asking is an error, never a guess.
+    pub fn ai_feature(&self, code: &str) -> Result<bool, ReadError> {
+        let features = self
+            .ai
+            .get("features")
+            .and_then(Value::as_array)
+            .filter(|codes| codes.iter().all(Value::is_string))
+            .ok_or_else(|| ReadError::new("ai_features", "The database holds no valid ai.features."))?;
+        Ok(features.iter().any(|feature| feature.as_str() == Some(code)))
     }
 
     /// The language of speech of this project (`ai.language`, user 2026-10-26: a project
@@ -437,8 +441,7 @@ impl WorkSettings {
         required_text(&self.input, "mode")?;
         required_text(&self.playback, "input")?;
         required_text(&self.keyboard_shortcuts, "active_preset")?;
-        if self.ai.get("enabled").and_then(Value::as_bool).is_none()
-            || !self.video.is_object()
+        if !self.video.is_object()
             || !self.audio.is_object()
             || self
                 .video
@@ -463,10 +466,6 @@ impl WorkSettings {
     /// catalog's own preset.
     pub fn keyboard_preset(&self) -> Option<&str> {
         self.keyboard_shortcuts.get("active_preset").and_then(Value::as_str)
-    }
-
-    pub fn ai_enabled(&self) -> bool {
-        self.ai.get("enabled").and_then(Value::as_bool) == Some(true)
     }
 
     pub fn product_uri(&self, area: ProductArea) -> String {

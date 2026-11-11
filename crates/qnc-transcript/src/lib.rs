@@ -355,7 +355,7 @@ impl Transcript {
             return true;
         };
         // Off in the project: said at once, nothing queued to fail (user 2026-10-26).
-        if !preview.still_locator().is_some_and(|locator| locator.settings().transcription_enabled().unwrap_or(false)) {
+        if !preview.still_locator().is_some_and(|locator| locator.settings().ai_feature(qnc_ai_features::TRANSCRIPTION).unwrap_or(false)) {
             self.view.message = qnc_ui_text::text("transcribe.off_in_project").into();
             return true;
         }
@@ -387,7 +387,7 @@ impl Transcript {
             return true;
         };
         let settings = preview.still_locator().map(|locator| locator.settings().clone());
-        if !settings.as_ref().is_some_and(|settings| settings.transcription_enabled().unwrap_or(false)) {
+        if !settings.as_ref().is_some_and(|settings| settings.ai_feature(qnc_ai_features::TRANSCRIPTION).unwrap_or(false)) {
             self.view.message = qnc_ui_text::text("transcribe.off_in_project").into();
             return true;
         }

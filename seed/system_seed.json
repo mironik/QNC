@@ -120,9 +120,8 @@
           "atmosphere_channel": "CH2"
         },
         "ai": {
-          "enabled": false,
-          "coverage_suggestions": false,
-          "transcription": false,
+          "template": "none",
+          "features": [],
           "language": "hr"
         },
         "artifacts": {
@@ -210,9 +209,8 @@
           "atmosphere_channel": "CH2"
         },
         "ai": {
-          "enabled": false,
-          "coverage_suggestions": true,
-          "transcription": false,
+          "template": "none",
+          "features": [],
           "language": "hr"
         },
         "artifacts": {
@@ -300,9 +298,8 @@
           "atmosphere_channel": "CH2"
         },
         "ai": {
-          "enabled": false,
-          "coverage_suggestions": true,
-          "transcription": false,
+          "template": "none",
+          "features": [],
           "language": "hr"
         },
         "artifacts": {
@@ -390,9 +387,8 @@
           "atmosphere_channel": "CH2"
         },
         "ai": {
-          "enabled": false,
-          "coverage_suggestions": true,
-          "transcription": false,
+          "template": "none",
+          "features": [],
           "language": "hr"
         },
         "artifacts": {

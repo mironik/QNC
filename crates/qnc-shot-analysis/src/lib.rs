@@ -71,7 +71,7 @@ pub struct Pace<'a> {
 /// Nothing is done when the project has shot analysis off.
 pub fn analyse_missing(project: &ShotProject, local_media: &LocalMedia<'_>, lease: Option<WriteLease>, pace: &Pace<'_>) -> Result<usize, String> {
     let (reader, settings) = (&project.reader, &project.settings);
-    if !settings.ai_enabled() {
+    if !settings.ai_feature(qnc_ai_features::SHOT_ANALYSIS).unwrap_or(false) {
         return Ok(0);
     }
     let shots_db = ProjectDbTarget::for_project(reader, settings)?;

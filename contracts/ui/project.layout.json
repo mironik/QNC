@@ -63,27 +63,6 @@
   },
   "ai_switches": [
     {
-      "path": "ai.enabled",
-      "on": true,
-      "off": false,
-      "default_on": false,
-      "label": "@project.ai_shot_analysis_and_subclips"
-    },
-    {
-      "path": "ai.coverage_suggestions",
-      "on": true,
-      "off": false,
-      "default_on": true,
-      "label": "@project.coverage_suggestions"
-    },
-    {
-      "path": "ai.transcription",
-      "on": true,
-      "off": false,
-      "default_on": false,
-      "label": "@project.transcription_media_tab"
-    },
-    {
       "path": "artifacts.filmstrip",
       "on": "auto",
       "off": "off",

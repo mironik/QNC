@@ -242,7 +242,7 @@ fn settings(context: &str, mode: &str) -> WorkSettings {
         playback: serde_json::json!({"input":mode}),
         video: serde_json::json!({"fps":50}),
         audio: serde_json::json!({"sample_rate":44100,"channels":2}),
-        ai: serde_json::json!({"enabled":false}),
+        ai: serde_json::json!({"features": []}),
         keyboard_shortcuts: serde_json::json!({"active_preset":"qnc"}),
         artifacts: serde_json::json!({"filmstrip":"auto","wave":"auto"}),
         export: serde_json::Value::Null,

@@ -287,8 +287,8 @@ impl Blocks<'_> {
     fn ai_settings(&mut self, ui: &mut egui::Ui, content_w: f32, settings: &SettingsPanelMetrics) {
         widgets::section(ui, content_w, "AI", settings, &self.contracts.theme, |ui| {
             ui.spacing_mut().item_spacing.y = 8.0;
-            let switches = &self.contracts.project.ai_switches;
-            if qnc_settings_switches::show(ui, &mut self.session.draft_settings, switches) {
+            let (switches, session) = (&self.contracts.project.ai_switches, &mut self.session);
+            if qnc_ai_features_view::show(ui, &mut session.ai, &mut session.draft_settings) | qnc_settings_switches::show(ui, &mut session.draft_settings, switches) {
                 self.session.status = self.contracts.project.texts.settings_changed.clone();
             }
         });

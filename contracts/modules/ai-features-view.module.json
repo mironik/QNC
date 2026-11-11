@@ -1,0 +1,21 @@
+{
+  "module_id": "qnc.module.ai-features-view",
+  "module_name": "AI Features View",
+  "module_version": "0.1.0",
+  "module_kind": "ui_widget",
+  "capabilities": ["ui.ai.features.section"],
+  "input_contract_version": "0.1.0",
+  "output_contract_version": "0.1.0",
+  "transport_protocol_version": "0.1.0",
+  "transport_scope": ["local"],
+  "supported_os": ["windows", "linux", "macos"],
+  "supported_cpu": ["x86_64", "aarch64"],
+  "forbidden_calls": ["db.write", "media.decode", "source.write", "media.probe"],
+  "forbidden_dependencies": ["qnc.module.media-probe"],
+  "state_policy": "stateless",
+  "database_write_policy": "no_db_writes",
+  "runtime_crate": "qnc-ai-features-view",
+  "input": "The AI choice (qnc-ai-features) and a settings draft.",
+  "output": "The AI section painted: the AI template, one switch per feature (a needed one on and greyed, with what needs it), keep and delete an own AI template; the draft changed through qnc-ai-features.",
+  "specification": "docs/102, user 2026-11-11."
+}

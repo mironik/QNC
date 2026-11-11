@@ -219,7 +219,7 @@ mod tests {
                     "channels": 2,
                     "sample_rate": 48000
                 },
-                "ai": {"enabled": false},
+                "ai": {"features": []},
                 "keyboard_shortcuts": {"active_preset": "default"}
             }"#
         .to_string()
