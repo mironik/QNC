@@ -70,6 +70,9 @@ fn paint_script(ui: &mut egui::Ui, view: &ScriptView, transcript: &TranscriptVie
     ui.horizontal(|ui| {
         ui.label(RichText::new(qnc_ui_text::text("script.title")).color(theme.text).strong());
         ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+            if let Some(event) = broll_buttons(ui, view, style) {
+                asked = Some(event);
+            }
             if qnc_ui_kit::chrome_button(ui, qnc_ui_text::text("script.send_story"), out, false, style).on_hover_text(qnc_ui_text::text("script.send_story_hint")).clicked() {
                 asked = Some(ActionEvent::key(SEND_STORY).at(PANEL));
             }
@@ -363,6 +366,7 @@ pub fn paint_block(ui: &mut egui::Ui, place: &'static str, row: &qnc_script::Blo
         if let Some(event) = paint_fields(ui, row, view, theme) {
             asked = Some(event);
         }
+        paint_covers(ui, row, view, theme);
     });
     // The mark and the text choose the block (the whole frame would take the clicks of its
     // buttons and fields).
@@ -434,10 +438,56 @@ fn paint_editor(ui: &mut egui::Ui, view: &ScriptView, theme: &qnc_desktop_theme:
         Some(kind) => qnc_ui_text::fill("script.editor_editing", &[("kind", &kind.short)]),
         None => qnc_ui_text::text("script.editor").to_string(),
     };
-    let editor = Editor { id: "qnc_script_editor", title: &title, text: &view.editor, info: &info, hint: qnc_ui_text::text("script.editor_hint"), buttons: &buttons };
+    let editor = Editor { id: "qnc_script_editor", title: &title, text: &view.editor, info: &info, hint: qnc_ui_text::text("script.editor_hint"), buttons: &buttons, second: None };
     match qnc_text_source_editor::show(ui, &editor, theme)? {
+        Answer::Second(_) => None,
         Answer::Text(text) => Some(ActionEvent::key(EDITOR_TEXT).with_target(text).at(PANEL)),
         Answer::Button(action, Some(kind)) => Some(ActionEvent::key(action).with_target(kind).at(PANEL)),
         Answer::Button(action, None) => Some(ActionEvent::key(action).at(PANEL)),
     }
+}
+
+/// The B-roll of an OFF (user 2026-11-11): the shots the reporter wants, then the covers
+/// suggested (not yet in the script) or accepted, each at its second of the OFF with its clip,
+/// how long it covers and the term it was found for.
+fn paint_covers(ui: &mut egui::Ui, row: &qnc_script::BlockRow, view: &ScriptView, theme: &qnc_desktop_theme::Theme) {
+    if row.role != Some(Role::Spoken) {
+        return;
+    }
+    let muted = |text: String| RichText::new(text).color(theme.text_muted).size(theme.font_ui);
+    if !row.block.broll_note.is_empty() {
+        ui.add(egui::Label::new(muted(qnc_ui_text::fill("script.broll_wanted", &[("note", &row.block.broll_note)]))).wrap());
+    }
+    let proposed = view.proposal.as_ref().and_then(|proposal| proposal.iter().find(|(id, _)| *id == row.block.id)).map(|(_, covers)| covers);
+    let (covers, title, colour) = match proposed {
+        Some(covers) => (covers, "script.broll_proposed", theme.focus),
+        None => (&row.block.covers, "script.broll_covers", theme.text_muted),
+    };
+    if covers.is_empty() {
+        return;
+    }
+    ui.label(RichText::new(qnc_ui_text::text(title)).color(colour).size(theme.font_ui));
+    for cover in covers {
+        let asked = if cover.asked.is_empty() { String::new() } else { format!("  [{}]", cover.asked) };
+        ui.add(egui::Label::new(RichText::new(format!("{}  {}  {}{asked}", seconds_label(cover.at_seconds), cover.clip_name, seconds_label(cover.seconds))).color(colour).size(theme.font_ui)).truncate());
+    }
+}
+
+/// The B-roll buttons of the script's bar, right to left (user 2026-11-11): Suggest B-roll, and
+/// while a suggestion is shown Accept (all OFFs in one step) and Drop.
+pub fn broll_buttons(ui: &mut egui::Ui, view: &ScriptView, style: qnc_ui_kit::ChromeButtonStyle) -> Option<ActionEvent> {
+    let mut asked = None;
+    if view.proposal.is_some() {
+        if qnc_ui_kit::chrome_button(ui, qnc_ui_text::text("script.broll_drop"), true, false, style).clicked() {
+            asked = Some(ActionEvent::key(qnc_script::DROP_BROLL).at(PANEL));
+        }
+        if qnc_ui_kit::chrome_button(ui, qnc_ui_text::text("script.broll_accept"), true, true, style).on_hover_text(qnc_ui_text::text("script.broll_accept_hint")).clicked() {
+            asked = Some(ActionEvent::key(qnc_script::ACCEPT_BROLL).at(PANEL));
+        }
+    }
+    let can = !view.blocks.is_empty() && !view.suggesting;
+    if qnc_ui_kit::chrome_button(ui, qnc_ui_text::text("script.broll_suggest"), can, view.suggesting, style).on_hover_text(qnc_ui_text::text("script.broll_suggest_hint")).clicked() {
+        asked = Some(ActionEvent::key(qnc_script::SUGGEST_BROLL).at(PANEL));
+    }
+    asked
 }

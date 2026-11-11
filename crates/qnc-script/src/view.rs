@@ -189,6 +189,8 @@ pub struct ScriptView {
     pub selected: Option<i64>,
     /// The editor's text.
     pub editor: String,
+    /// The shots the reporter wants under the editor's OFF (its B-roll note, saved with it).
+    pub editor_note: String,
     /// The text block the editor's text was taken from (Replace puts it back there).
     pub editing: Option<i64>,
     /// Seconds the editor's text takes to read.
@@ -227,6 +229,10 @@ pub struct ScriptView {
     pub exporting: bool,
     /// Why the takes are not being checked against their text, if they are not.
     pub read_note: Option<String>,
+    /// The B-roll suggested for the OFFs, not yet in the script (by block; user 2026-11-11).
+    pub proposal: Option<Vec<(i64, Vec<qnc_script_db::Cover>)>>,
+    /// A suggestion is being made.
+    pub suggesting: bool,
     /// The M marker in a text taken with a right click: its block and word.
     pub taken_mark: Option<(i64, u32)>,
     /// The SubSegment open in place of the source timeline.
@@ -237,37 +243,37 @@ pub struct ScriptView {
 }
 
 impl ScriptView {
-    /// What the script asks the B-roll for (user 2026-11-11: "a mark or a sentence in the text
-    /// editor gives the query", as the story's slots do): the text being written in the editor,
-    /// one slot of its reading time; else the chosen block a reporter reads (an OFF), a slot
-    /// between every two M markers of its text, each its words and the seconds it lasts (by the
-    /// recording heard, or the reading time). A key naming the text and its lengths, and the
-    /// slots as (words, seconds); `None` while nothing is written or chosen.
-    pub fn broll_query(&self) -> Option<(String, Vec<(String, f64)>)> {
-        if self.editor.split_whitespace().count() >= 3 && self.editor_seconds > 0.0 {
-            let text = self.editor.trim().to_string();
-            return Some((format!("script-editor:{text}"), vec![(text, self.editor_seconds)]));
-        }
-        let row = self.blocks.iter().find(|row| Some(row.block.id) == self.selected && row.role == Some(Role::Spoken) && row.seconds > 0.0)?;
-        let words: Vec<&str> = row.block.text.split_whitespace().collect();
-        if words.is_empty() {
-            return None;
-        }
-        // The words between the marks (a mark stands before the word it counts).
-        let mut cuts: Vec<usize> = row.block.marks.iter().map(|mark| *mark as usize).filter(|mark| (1..words.len()).contains(mark)).collect();
-        cuts.sort_unstable();
-        cuts.dedup();
-        let bounds: Vec<usize> = std::iter::once(0).chain(cuts).chain(std::iter::once(words.len())).collect();
-        let texts: Vec<String> = bounds.windows(2).map(|pair| words[pair[0]..pair[1]].join(" ")).collect();
-        // The lengths of the shots the marks make; without them (or not one a shot) the reading
-        // time shared by the words.
-        let lengths: Vec<f64> = if row.mark_lengths.len() == texts.len() {
-            row.mark_lengths.clone()
-        } else {
-            bounds.windows(2).map(|pair| row.seconds * (pair[1] - pair[0]) as f64 / words.len() as f64).collect()
-        };
-        let key = format!("script:{}:{}:{:?}", row.block.id, row.block.text, lengths.iter().map(|seconds| (seconds * 10.0).round() as i64).collect::<Vec<_>>());
-        Some((key, texts.into_iter().zip(lengths).collect()))
+    /// The OFFs of the story to cover with B-roll (user 2026-11-11: "when the reporter has
+    /// written an OFF or the whole story, a button starts the suggestion"): every block a
+    /// reporter reads in the length of the story, with words, in reading order. Each as its id,
+    /// its seconds (by the recording, or the reading time), its slots (the words between every
+    /// two M markers of its text and the seconds each lasts; the whole text without markers) and
+    /// its B-roll note as the reporter wrote it.
+    pub fn broll_offs(&self) -> Vec<(i64, f64, Vec<(String, f64)>, String)> {
+        self.blocks
+            .iter()
+            .filter(|row| row.role == Some(Role::Spoken) && row.in_story && row.seconds > 0.0)
+            .filter_map(|row| {
+                let words: Vec<&str> = row.block.text.split_whitespace().collect();
+                if words.is_empty() {
+                    return None;
+                }
+                // The words between the marks (a mark stands before the word it counts).
+                let mut cuts: Vec<usize> = row.block.marks.iter().map(|mark| *mark as usize).filter(|mark| (1..words.len()).contains(mark)).collect();
+                cuts.sort_unstable();
+                cuts.dedup();
+                let bounds: Vec<usize> = std::iter::once(0).chain(cuts).chain(std::iter::once(words.len())).collect();
+                let texts: Vec<String> = bounds.windows(2).map(|pair| words[pair[0]..pair[1]].join(" ")).collect();
+                // The lengths of the shots the marks make; without them (or not one a shot) the
+                // reading time shared by the words.
+                let lengths: Vec<f64> = if row.mark_lengths.len() == texts.len() {
+                    row.mark_lengths.clone()
+                } else {
+                    bounds.windows(2).map(|pair| row.seconds * (pair[1] - pair[0]) as f64 / words.len() as f64).collect()
+                };
+                Some((row.block.id, row.seconds, texts.into_iter().zip(lengths).collect(), row.block.broll_note.clone()))
+            })
+            .collect()
     }
 
     /// The SubSegments of the script as cards of the pool, in reading order; `clips` gives each
@@ -352,7 +358,11 @@ impl ScriptView {
         if let Some(draft) = self.field_drafts.get(&(id, code.to_string())) {
             return draft.clone();
         }
-        self.blocks.iter().find(|row| row.block.id == id).and_then(|row| row.block.fields.get(code).cloned()).unwrap_or_default()
+        let row = self.blocks.iter().find(|row| row.block.id == id);
+        if code == crate::BROLL_NOTE {
+            return row.map(|row| row.block.broll_note.clone()).unwrap_or_default();
+        }
+        row.and_then(|row| row.block.fields.get(code).cloned()).unwrap_or_default()
     }
 
     /// The fields of a block as lines of the pasted script (`Caption: name: Ivan Horvat`).

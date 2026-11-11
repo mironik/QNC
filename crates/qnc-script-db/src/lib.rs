@@ -78,12 +78,41 @@ pub struct Block {
     /// its place in the text, so it stays when another take is used.
     #[serde(default)]
     pub marks: Vec<u32>,
+    /// What the reporter wants to cover a text block with (user 2026-11-11: "terms or a phrase
+    /// in the column for the B-roll"): written as typed; the suggestion covers the text with them
+    /// first.
+    #[serde(default)]
+    pub broll_note: String,
+    /// The B-roll accepted for a text block (user 2026-11-11: "write the series with one
+    /// confirmation"), in the order it covers the text.
+    #[serde(default)]
+    pub covers: Vec<Cover>,
 }
+
+/// A shot covering a text block: its clip, clip frames `[from, to)`, the second of the text it
+/// starts at and how long it covers; `asked` the reporter's term it was found for (empty: found
+/// for the words of the text).
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct Cover {
+    pub clip_id: String,
+    #[serde(default)]
+    pub clip_name: String,
+    pub from_frame: u64,
+    pub to_frame: u64,
+    pub at_seconds: f64,
+    pub seconds: f64,
+    #[serde(default)]
+    pub asked: String,
+}
+
+/// The longest B-roll note of a block.
+pub const NOTE_MOST: usize = 500;
 
 impl Block {
     /// A text block of kind `kind`.
     pub fn written(kind: impl Into<String>, text: impl Into<String>) -> Self {
-        Self { id: 0, kind: kind.into(), text: text.into(), clip_id: String::new(), clip_name: String::new(), from_frame: 0, to_frame: 0, start_tc: String::new(), end_tc: String::new(), length: String::new(), seconds: 0.0, voice_uri: String::new(), voice_seconds: 0.0, voice_tc: String::new(), fields: BTreeMap::new(), pieces: Vec::new(), marks: Vec::new() }
+        Self { id: 0, kind: kind.into(), text: text.into(), clip_id: String::new(), clip_name: String::new(), from_frame: 0, to_frame: 0, start_tc: String::new(), end_tc: String::new(), length: String::new(), seconds: 0.0, voice_uri: String::new(), voice_seconds: 0.0, voice_tc: String::new(), fields: BTreeMap::new(), pieces: Vec::new(), marks: Vec::new(), broll_note: String::new(), covers: Vec::new() }
     }
 
     /// A clip block of kind `kind` made of `pieces` (at least one): its clip, IN and timecodes
@@ -305,6 +334,11 @@ pub enum Operation {
     SetTakeHeard { id: i64, take: u16, heard: Vec<HeardWord> },
     /// The M markers in the text of block `id` become `marks`.
     SetMarks { id: i64, marks: Vec<u32> },
+    /// The B-roll note of text block `id` becomes `note`.
+    SetBrollNote { id: i64, note: String },
+    /// The B-roll of every text block named becomes its covers, in one step (a block not named
+    /// keeps its own).
+    SetCovers { covers: Vec<(i64, Vec<Cover>)> },
     /// The blocks in reading order.
     Read,
     /// The profile the project's script is written with (none yet: the script was never
@@ -501,6 +535,16 @@ pub fn set_take_heard(target: &ProjectDbTarget, id: i64, take: u16, heard: Vec<H
 /// The M markers in the text of block `id` become `marks`.
 pub fn set_marks(target: &ProjectDbTarget, id: i64, marks: Vec<u32>) -> Result<()> {
     write(target, Operation::SetMarks { id, marks }).map(drop)
+}
+
+/// The B-roll note of text block `id` becomes `note`.
+pub fn set_broll_note(target: &ProjectDbTarget, id: i64, note: String) -> Result<()> {
+    write(target, Operation::SetBrollNote { id, note }).map(drop)
+}
+
+/// The covers of the text blocks named, all in one step of undo.
+pub fn set_covers(target: &ProjectDbTarget, covers: Vec<(i64, Vec<Cover>)>) -> Result<()> {
+    write(target, Operation::SetCovers { covers }).map(drop)
 }
 
 /// The fields of block `id` become `fields`.

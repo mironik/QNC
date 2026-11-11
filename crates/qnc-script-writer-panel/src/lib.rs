@@ -11,7 +11,7 @@
 
 use eframe::egui::{self, Align, Id, Layout, Rect, RichText, Sense, Ui, UiBuilder, Vec2};
 use qnc_action_event::ActionEvent;
-use qnc_script::{seconds_label, KindSpec, Role, ScriptView, ADD_CLIP, CLEAR_EDITOR, DRAFT, EDITOR_TEXT, EXPORT, OPEN_EXPORT, PANEL, SAVE_TEXT, SEND_STORY};
+use qnc_script::{seconds_label, KindSpec, Role, ScriptView, ADD_CLIP, CLEAR_EDITOR, DRAFT, EDITOR_NOTE, EDITOR_TEXT, EXPORT, OPEN_EXPORT, PANEL, SAVE_TEXT, SEND_STORY};
 use qnc_text_source_editor::{Answer, Editor, EditorButton};
 
 pub const MODULE_ID: &str = "qnc.module.script-writer-panel";
@@ -167,6 +167,10 @@ fn paint_header(ui: &mut Ui, view: &ScriptView, theme: &qnc_desktop_theme::Theme
             if qnc_ui_kit::chrome_button(ui, label, !view.session_busy && view.recording.is_none(), recording, red).on_hover_text(qnc_ui_text::text("script.session_hint")).clicked() {
                 asked = Some(ActionEvent::key(qnc_script::SESSION).at(PANEL));
             }
+            // The B-roll of the OFFs (user 2026-11-11): suggested by a button, accepted at once.
+            if let Some(event) = qnc_script_panel::broll_buttons(ui, view, style) {
+                asked = Some(event);
+            }
             // The document group: what leaves the script (user 2026-11-01).
             if qnc_ui_kit::chrome_button(ui, qnc_ui_text::text("script.send_story"), out, false, style).on_hover_text(qnc_ui_text::text("script.send_story_hint")).clicked() {
                 asked = Some(ActionEvent::key(SEND_STORY).at(PANEL));
@@ -241,9 +245,13 @@ fn editor(ui: &mut Ui, kind: &KindSpec, view: &ScriptView, theme: &qnc_desktop_t
         EditorButton { label: qnc_ui_text::text("common.cancel"), action_id: CLEAR_EDITOR, target: "", enabled: true, group: 0 },
     ];
     let info = qnc_ui_text::fill("script.editor_info", &[("words", &view.editor.split_whitespace().count().to_string()), ("length", &seconds_label(view.editor_seconds))]);
-    let editor = Editor { id: EDITOR_ID, title: &title, text: &view.editor, info: &info, hint: qnc_ui_text::text("script.editor_hint"), buttons: &buttons };
+    // Under an OFF the shots the reporter wants (user 2026-11-11): the suggestion covers it with
+    // them first.
+    let second = (kind.role == Role::Spoken).then(|| qnc_text_source_editor::Second { label: qnc_ui_text::text("writer.broll_note"), text: &view.editor_note, hint: qnc_ui_text::text("writer.broll_note_hint") });
+    let editor = Editor { id: EDITOR_ID, title: &title, text: &view.editor, info: &info, hint: qnc_ui_text::text("script.editor_hint"), buttons: &buttons, second };
     match qnc_text_source_editor::show(ui, &editor, theme)? {
         Answer::Text(text) => Some((ActionEvent::key(EDITOR_TEXT).with_target(text).at(PANEL), false)),
+        Answer::Second(text) => Some((ActionEvent::key(EDITOR_NOTE).with_target(text).at(PANEL), false)),
         Answer::Button(action, target) => {
             let event = ActionEvent::key(&action).at(PANEL);
             Some((match target { Some(kind) => event.with_target(kind), None => event }, true))

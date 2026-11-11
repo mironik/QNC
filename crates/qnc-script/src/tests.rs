@@ -157,24 +157,22 @@ fn the_edited_text_of_a_statement_is_the_scripts_until_enter_or_esc() {
 }
 
 #[test]
-fn the_text_written_or_the_chosen_off_asks_for_b_roll_a_slot_between_its_marks() {
+fn every_off_of_the_story_is_asked_for_b_roll_a_slot_between_its_marks_with_its_note() {
     let profile = general_tv();
     // Ten words at 2.5 a second: 4 seconds; marks before the 4th and the 8th word.
-    let mut off = Block::written("off", "Ribari su jutros isplovili iz luke, brodovi su se vratili.");
-    off.id = 3;
-    off.marks = vec![3, 7];
-    let blocks = [Block { id: 2, ..Block::written("intro", "Dobar dan.") }, off, Block { id: 4, ..sot("Rekao je.") }];
-    let mut view = ScriptView { blocks: rows(&blocks, Some(&profile), 2.5), profile: Some(profile), ..ScriptView::default() };
-    assert!(view.broll_query().is_none(), "nothing chosen, nothing written");
-    view.selected = Some(2);
-    assert!(view.broll_query().is_none(), "the anchor's text has no B-roll");
-    view.selected = Some(3);
-    let (_, slots) = view.broll_query().unwrap();
-    let texts: Vec<&str> = slots.iter().map(|(text, _)| text.as_str()).collect();
-    assert_eq!(texts, ["Ribari su jutros", "isplovili iz luke, brodovi", "su se vratili."]);
-    let seconds: f64 = slots.iter().map(|(_, seconds)| seconds).sum();
-    assert!((seconds - 4.0).abs() < 0.01, "the shots share the OFF's length: {slots:?}");
-    view.editor = "Policija je s psom pretražila parkiralište.".into();
-    view.editor_seconds = 2.4;
-    assert_eq!(view.broll_query().unwrap().1, [("Policija je s psom pretražila parkiralište.".to_string(), 2.4)], "the text being written asks first");
+    let mut first = Block::written("off", "Ribari su jutros isplovili iz luke, brodovi su se vratili.");
+    first.id = 3;
+    first.marks = vec![3, 7];
+    first.broll_note = "luka, brodovi".into();
+    let second = Block { id: 5, ..Block::written("off", "Navečer su se vratili.") };
+    let blocks = [Block { id: 2, ..Block::written("intro", "Dobar dan.") }, first, Block { id: 4, ..sot("Rekao je.") }, second];
+    let view = ScriptView { blocks: rows(&blocks, Some(&profile), 2.5), profile: Some(profile), ..ScriptView::default() };
+    let offs = view.broll_offs();
+    assert_eq!(offs.iter().map(|(id, ..)| *id).collect::<Vec<_>>(), [3, 5], "the anchor's text and a statement have no B-roll");
+    let (_, seconds, slots, note) = &offs[0];
+    assert_eq!(slots.iter().map(|(text, _)| text.as_str()).collect::<Vec<_>>(), ["Ribari su jutros", "isplovili iz luke, brodovi", "su se vratili."]);
+    let shared: f64 = slots.iter().map(|(_, seconds)| seconds).sum();
+    assert!((shared - seconds).abs() < 0.01 && (seconds - 4.0).abs() < 0.01, "the shots share the OFF's length: {slots:?}");
+    assert_eq!(note, "luka, brodovi");
+    assert_eq!(offs[1].2.len(), 1, "an OFF without marks is one slot");
 }

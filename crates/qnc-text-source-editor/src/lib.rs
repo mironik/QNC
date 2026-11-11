@@ -36,6 +36,9 @@ pub struct Editor<'a> {
     /// Shown greyed in an empty editor.
     pub hint: &'a str,
     pub buttons: &'a [EditorButton<'a>],
+    /// A second, smaller field under the text (user 2026-11-11: under the OFF, the shots the
+    /// reporter wants); `None`: the text alone.
+    pub second: Option<Second<'a>>,
 }
 
 fn focus_id(id: &str) -> egui::Id {
@@ -49,11 +52,23 @@ pub fn focus(ctx: &egui::Context, id: &str) {
     ctx.data_mut(|data| data.insert_temp(focus_id(id), true));
 }
 
+/// The second field: its name above it, its text and what it shows greyed when empty.
+pub struct Second<'a> {
+    pub label: &'a str,
+    pub text: &'a str,
+    pub hint: &'a str,
+}
+
+/// The height of the second field, its name included.
+const SECOND_HEIGHT: f32 = 84.0;
+
 /// What the editor gave back.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Answer {
     /// Typing changed the text; the whole new text.
     Text(String),
+    /// Typing changed the second field; its whole new text.
+    Second(String),
     /// A button was pressed; its action and what it names.
     Button(String, Option<String>),
 }
@@ -79,7 +94,8 @@ pub fn show(ui: &mut egui::Ui, editor: &Editor<'_>, theme: &qnc_desktop_theme::T
         });
     });
     let info_height = ui.text_style_height(&egui::TextStyle::Body) + 6.0;
-    let height = (ui.available_height() - info_height).max(48.0);
+    let second_height = if editor.second.is_some() { SECOND_HEIGHT } else { 0.0 };
+    let height = (ui.available_height() - info_height - second_height).max(48.0);
     let mut text = editor.text.to_string();
     egui::ScrollArea::vertical().id_salt((editor.id, "scroll")).max_height(height).auto_shrink([false, false]).show(ui, |ui| {
         let edit = qnc_ui_kit::text_area(&mut text)
@@ -98,5 +114,20 @@ pub fn show(ui: &mut egui::Ui, editor: &Editor<'_>, theme: &qnc_desktop_theme::T
         }
     });
     ui.label(RichText::new(editor.info).color(theme.text_muted).size(theme.font_ui));
+    if let Some(second) = &editor.second {
+        ui.label(RichText::new(second.label).color(theme.text_muted).size(theme.font_ui));
+        let mut text = second.text.to_string();
+        let edit = qnc_ui_kit::text_area(&mut text)
+            .id_salt((editor.id, "second"))
+            .hint_text(second.hint)
+            .font(egui::FontId::proportional(theme.font_ui))
+            .desired_width(f32::INFINITY)
+            .desired_rows(2)
+            .frame(true);
+        let height = (SECOND_HEIGHT - info_height).max(36.0);
+        if ui.add_sized([ui.available_width(), height], edit).changed() && answer.is_none() {
+            answer = Some(Answer::Second(text));
+        }
+    }
     answer
 }

@@ -211,6 +211,122 @@ pub fn series(suggestion: &Suggestion, parts: &[Candidate<'_>]) -> Vec<Option<us
         .collect()
 }
 
+/// One OFF of a script to cover (user 2026-11-11: "a button starts the suggestion; terms or a
+/// phrase the reporter wrote are taken into account, and the script adds what is needed to cover
+/// the OFF"): its block, how long it lasts, its slots (between the M markers of its text: the
+/// words and seconds of each; one without markers) and the shots the reporter wants, as written.
+#[derive(Debug, Clone, PartialEq)]
+pub struct PlanBlock {
+    pub block_id: i64,
+    pub seconds: f64,
+    pub slots: Vec<(String, f64)>,
+    pub wanted: Vec<String>,
+}
+
+/// A shot planned over an OFF: the part (index into the candidates), the second of the OFF it
+/// starts at, how long it covers and the reporter's term it was found for (empty: the words).
+#[derive(Debug, Clone, PartialEq)]
+pub struct Planned {
+    pub part: usize,
+    pub at_seconds: f64,
+    pub seconds: f64,
+    pub asked: String,
+}
+
+/// The shortest shot laid over an OFF without markers (a shot less than this is a flash).
+pub const SHORTEST_COVER: f64 = 2.0;
+
+/// The terms of a reporter's note: parted at commas, semicolons and new lines.
+pub fn wanted_of(note: &str) -> Vec<String> {
+    note.split([',', ';', '\n']).map(str::trim).filter(|term| !term.is_empty()).map(str::to_string).collect()
+}
+
+fn slot_key(block: i64, slot: usize) -> String {
+    format!("b{block}s{slot}")
+}
+
+fn wanted_key(block: i64, term: usize) -> String {
+    format!("b{block}w{term}")
+}
+
+/// The ask of a plan: every slot's words and every wanted term, made vectors with the words of
+/// the project's language translated as for a slot of the story; `key` names this run.
+pub fn plan_ask(key: String, blocks: &[PlanBlock]) -> Option<Ask> {
+    let mut slots = Vec::new();
+    for block in blocks {
+        for (n, (text, seconds)) in block.slots.iter().enumerate() {
+            slots.push(SlotAsk { slot_id: slot_key(block.block_id, n), seconds: *seconds, pieces: Vec::new(), text: text.clone() });
+        }
+        for (n, term) in block.wanted.iter().enumerate() {
+            slots.push(SlotAsk { slot_id: wanted_key(block.block_id, n), seconds: 0.0, pieces: Vec::new(), text: term.clone() });
+        }
+    }
+    (!slots.is_empty()).then(|| Ask { key, fps: 0.0, slots })
+}
+
+/// The cover of every OFF, in the script's order, no part given twice in the whole story:
+/// - an OFF with M markers: each slot, in order, gets the part best for the reporter's term of
+///   the same place (the first term the first slot) or else for its own words, long enough for
+///   the slot;
+/// - an OFF without them is covered from its start: first a part for each term in order, then
+///   parts best for its words until it is covered; each part covers what it lasts, at most what
+///   is left, and is at least `SHORTEST_COVER` (or what is left) long.
+/// A slot or term without a fitting part is left out.
+pub fn plan(suggestion: &Suggestion, blocks: &[PlanBlock], parts: &[Candidate<'_>]) -> Vec<(i64, Vec<Planned>)> {
+    let mut given = vec![false; parts.len()];
+    let asked = |id: &str| suggestion.slots.iter().find(|slot| slot.slot_id == id);
+    // The best part not yet given at least `least` seconds long for the words of `slot`.
+    let best = |slot: &SlotSuggestion, least: f64, given: &mut Vec<bool>| {
+        let scores = scores(suggestion, slot, parts);
+        let found = (0..parts.len())
+            .filter(|n| !given[*n] && parts[*n].seconds >= least && scores[*n].is_finite())
+            .max_by(|a, b| scores[*a].total_cmp(&scores[*b]))?;
+        given[found] = true;
+        Some(found)
+    };
+    blocks
+        .iter()
+        .map(|block| {
+            let mut laid = Vec::new();
+            if block.slots.len() > 1 {
+                let mut at = 0.0;
+                for (n, (_, seconds)) in block.slots.iter().enumerate() {
+                    let term = block.wanted.get(n).and_then(|_| asked(&wanted_key(block.block_id, n)));
+                    let query = term.or_else(|| asked(&slot_key(block.block_id, n)));
+                    if let Some(part) = query.and_then(|query| best(query, *seconds, &mut given)) {
+                        let asked = if term.is_some() { block.wanted[n].clone() } else { String::new() };
+                        laid.push(Planned { part, at_seconds: at, seconds: *seconds, asked });
+                    }
+                    at += seconds;
+                }
+            } else {
+                let mut at = 0.0;
+                let lay = |part: usize, asked: String, at: &mut f64, laid: &mut Vec<Planned>| {
+                    let seconds = parts[part].seconds.min(block.seconds - *at);
+                    laid.push(Planned { part, at_seconds: *at, seconds, asked });
+                    *at += seconds;
+                };
+                for (n, term) in block.wanted.iter().enumerate() {
+                    let left = block.seconds - at;
+                    if left <= 0.0 {
+                        break;
+                    }
+                    if let Some(part) = asked(&wanted_key(block.block_id, n)).and_then(|query| best(query, SHORTEST_COVER.min(left), &mut given)) {
+                        lay(part, term.clone(), &mut at, &mut laid);
+                    }
+                }
+                if let Some(words) = asked(&slot_key(block.block_id, 0)) {
+                    while block.seconds - at > 0.1 {
+                        let Some(part) = best(words, SHORTEST_COVER.min(block.seconds - at), &mut given) else { break };
+                        lay(part, String::new(), &mut at, &mut laid);
+                    }
+                }
+            }
+            (block.block_id, laid)
+        })
+        .collect()
+}
+
 struct Job {
     target: ProjectDbTarget,
     ask: Ask,
@@ -491,5 +607,35 @@ mod tests {
         let slots: Vec<(&str, &str, f64)> = ask.slots.iter().map(|slot| (slot.slot_id.as_str(), slot.text.as_str(), slot.seconds)).collect();
         assert_eq!(slots, [("script:7#0", "Ribari su isplovili iz luke.", 2.4), ("script:7#3", "Navečer.", 0.8)], "a slot without words or length asks nothing");
         assert!(ask_of_text("script:7".into(), vec![("".into(), 2.0)]).is_none());
+    }
+
+    #[test]
+    fn a_plan_covers_an_off_with_the_shots_wanted_first_then_by_its_words_none_twice() {
+        let slot = |id: &str, vector: Vec<f32>| SlotSuggestion { slot_id: id.into(), seconds: 0.0, text: String::new(), vector };
+        // Words of the first OFF are of the sea; the reporter wants a book first. The second OFF
+        // has two marked slots: the first wants a book, the second has only its words (sea).
+        let suggestion = Suggestion {
+            key: "plan:1".into(),
+            slots: vec![slot("b1s0", vec![1.0, 0.0]), slot("b1w0", vec![0.0, 1.0]), slot("b2s0", vec![1.0, 0.0]), slot("b2s1", vec![1.0, 0.0]), slot("b2w0", vec![0.0, 1.0])],
+            captions: Default::default(),
+        };
+        const SEA: [f32; 2] = [1.0, 0.0];
+        const SEA2: [f32; 2] = [0.9, 0.436];
+        const BOOK: [f32; 2] = [0.0, 1.0];
+        const BOOK2: [f32; 2] = [0.2, 0.98];
+        let part = |seconds, vector: &'static [f32]| Candidate { seconds, vector, caption: None };
+        let parts = [part(3.0, &SEA), part(10.0, &SEA2), part(2.5, &BOOK), part(4.0, &BOOK2)];
+        let blocks = [
+            PlanBlock { block_id: 1, seconds: 6.0, slots: vec![("more".into(), 6.0)], wanted: vec!["knjiga".into()] },
+            PlanBlock { block_id: 2, seconds: 5.0, slots: vec![("a".into(), 3.5), ("b".into(), 1.5)], wanted: vec!["knjiga".into()] },
+        ];
+        let planned = plan(&suggestion, &blocks, &parts);
+        let laid = |n: usize| planned[n].1.iter().map(|p| (p.part, p.at_seconds, p.seconds, p.asked.as_str())).collect::<Vec<_>>();
+        // OFF 1: the book (2.5 s) first, then the sea for the 3.5 s left.
+        assert_eq!(laid(0), [(2, 0.0, 2.5, "knjiga"), (0, 2.5, 3.0, ""), (1, 5.5, 0.5, "")]);
+        // OFF 2: the first slot wants a book: the one left long enough (4 s); the second slot
+        // has no sea left (both given) and nothing else long enough: left out.
+        assert_eq!(laid(1), [(3, 0.0, 3.5, "knjiga")]);
+        assert_eq!(wanted_of("luka, brodovi;\nribari , "), ["luka", "brodovi", "ribari"]);
     }
 }

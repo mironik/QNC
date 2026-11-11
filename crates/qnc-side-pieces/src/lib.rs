@@ -63,6 +63,10 @@ pub struct SidePieces {
     views: SideViews,
     /// The form's segment panel shows a version of the S-Story.
     draft_story: bool,
+    /// The B-roll the script asked for, being worked out: its ask, OFFs and when it was asked;
+    /// and how many were asked (each its own key).
+    plan: Option<(qnc_ai_broll::Ask, Vec<qnc_ai_broll::PlanBlock>, std::time::Instant)>,
+    plans: u64,
     /// The messages of the script and the transcript at the last look.
     said: [String; 2],
 }
@@ -83,6 +87,8 @@ impl SidePieces {
             views: SideViews::default(),
             draft_story: has(DRAFT_SEGMENT_PANEL),
             said: Default::default(),
+            plan: None,
+            plans: 0,
         }
     }
 
@@ -150,7 +156,47 @@ impl SidePieces {
                 self.views.ai_broll = Arc::new(ai_broll.view().clone());
             }
         }
+        self.plan_broll(clips);
         self.warn_of_refusals();
+    }
+
+    /// The B-roll the script asked for (user 2026-11-11: "a button starts the suggestion"):
+    /// every OFF of the story with the shots the reporter wants, asked through the AI B-roll's
+    /// suggestion (its words and terms made vectors as a slot's, translated); once its vectors
+    /// came, the plan over the shots of the pool is the script's proposal.
+    fn plan_broll(&mut self, clips: &[ClipRow]) {
+        let Some(script) = &mut self.script else { return };
+        if script.take_broll_ask() {
+            let blocks: Vec<qnc_ai_broll::PlanBlock> = script
+                .view()
+                .broll_offs()
+                .into_iter()
+                .map(|(block_id, seconds, slots, note)| qnc_ai_broll::PlanBlock { block_id, seconds, slots, wanted: qnc_ai_broll::wanted_of(&note) })
+                .collect();
+            self.plans += 1;
+            match (blocks.is_empty(), &self.ai_broll) {
+                (true, _) => script.propose(None, "script.broll_no_offs"),
+                (_, None) => script.propose(None, "script.broll_no_ai"),
+                _ => match qnc_ai_broll::plan_ask(format!("plan:{}", self.plans), &blocks) {
+                    Some(ask) => self.plan = Some((ask, blocks, std::time::Instant::now())),
+                    None => script.propose(None, "script.broll_no_offs"),
+                },
+            }
+            self.views.script = Arc::new(script.view().clone());
+        }
+        let (Some((ask, blocks, since)), Some(ai_broll)) = (&self.plan, &self.ai_broll) else { return };
+        let ready = ai_broll.view().suggestion.as_ref().filter(|suggestion| suggestion.key == ask.key);
+        if let Some(suggestion) = ready {
+            let covers = ai_broll.view().plan_covers(clips, suggestion, blocks);
+            script.propose(Some(covers), "script.broll_none");
+        } else if since.elapsed() > std::time::Duration::from_secs(2) && !ai_broll.busy() {
+            // The worker answered nothing for it (no words, no program): said, not waited on.
+            script.propose(None, "script.broll_failed");
+        } else {
+            return;
+        }
+        self.plan = None;
+        self.views.script = Arc::new(script.view().clone());
     }
 
     /// A message newly saying that a command could not be done is raised as a warning.
@@ -245,17 +291,19 @@ impl SidePieces {
     /// 2026-11-10); the ask is made only where the form has that tab.
     pub fn follow_slot(&mut self, ask: impl FnOnce() -> Option<qnc_ai_broll::Ask>, preview: &SourcePreview) {
         if let Some(ai_broll) = &mut self.ai_broll {
-            // The text of the script asks first where the form has one (user 2026-11-11: the
-            // text editor gives the query), else the story's chosen slot.
-            let written = self.script.as_ref().and_then(|script| script.view().broll_query()).and_then(|(key, slots)| qnc_ai_broll::ask_of_text(key, slots));
-            if ai_broll.follow_slot(written.or_else(ask), preview) {
+            // The B-roll the script asked for, while it is worked out; else the story's slot.
+            let asked = match &self.plan {
+                Some((ask, ..)) => Some(ask.clone()),
+                None => ask(),
+            };
+            if ai_broll.follow_slot(asked, preview) {
                 self.views.ai_broll = Arc::new(ai_broll.view().clone());
             }
         }
     }
 
     pub fn busy(&self) -> bool {
-        self.transcripts.busy() || self.transcript.as_ref().is_some_and(Transcript::busy) || self.script.as_ref().is_some_and(Script::busy) || self.versions.as_ref().is_some_and(SkeletonVersions::busy) || self.ai_broll.as_ref().is_some_and(AiBroll::busy)
+        self.transcripts.busy() || self.transcript.as_ref().is_some_and(Transcript::busy) || self.script.as_ref().is_some_and(Script::busy) || self.versions.as_ref().is_some_and(SkeletonVersions::busy) || self.ai_broll.as_ref().is_some_and(AiBroll::busy) || self.plan.is_some()
     }
 
     /// Whether a transcription of this process runs in the background.

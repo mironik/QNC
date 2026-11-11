@@ -70,6 +70,7 @@
     "script.mark_hint": "Desni klik između dvije riječi: M marker tamo. Na markeru: uzima ga (Delete ga briše, Esc ga pušta).",
     "script.mark_lengths": "Kadrovi: {lengths}",
     "db.script_mark_invalid": "M marker stoji između dvije riječi teksta.",
+    "db.script_broll_invalid": "Pokrivalice pripadaju tekstu koji čita novinar: napomena do 500 znakova, pokrivalice s klipom, slikama i trajanjem.",
     "voice.take_unreadable": "{file}: to nije snimka napravljena ovdje",
     "script.making_clip": "Izrađujem klip offa...",
     "script.record": "Snimi",

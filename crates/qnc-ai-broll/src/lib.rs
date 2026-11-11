@@ -59,7 +59,7 @@ pub use qnc_pool_tabs::REGROUP_AI_BROLL as REGROUP;
 pub const GROUP: &str = "ai_broll_group";
 pub const REGROUP_CANCEL: &str = "ai_broll_regroup_cancel";
 pub use qnc_shot_examples::{Taught, NOT_BROLL};
-pub use qnc_broll_suggest::{ask_of, ask_of_text, Ask};
+pub use qnc_broll_suggest::{ask_of, plan_ask, wanted_of, Ask, PlanBlock};
 
 /// What the tab shows.
 #[derive(Debug, Clone, Default, PartialEq)]
@@ -86,6 +86,37 @@ fn kind_text(kind: &str) -> &'static str {
 }
 
 impl AiBrollView {
+    /// The B-roll of the OFFs of a script (user 2026-11-11): the plan of `blocks` with the
+    /// vectors of `suggestion` over the parts of the clips of the pool (`qnc_broll_suggest::plan`),
+    /// each planned part as a cover of its clip from the part's start for as long as it covers.
+    pub fn plan_covers(&self, clips: &[ClipRow], suggestion: &qnc_broll_suggest::Suggestion, blocks: &[qnc_broll_suggest::PlanBlock]) -> Vec<(i64, Vec<qnc_script_db::Cover>)> {
+        let usable: Vec<(&AiPart, &ClipRow, f64)> = self
+            .parts
+            .iter()
+            .filter_map(|part| {
+                let clip = clips.iter().find(|clip| clip.clip_id == part.clip_id)?;
+                let fps = (clip.duration_frames > 0 && clip.duration_seconds > 0.0).then(|| clip.duration_frames as f64 / clip.duration_seconds)?;
+                Some((part, clip, fps))
+            })
+            .collect();
+        let candidates: Vec<qnc_broll_suggest::Candidate<'_>> =
+            usable.iter().map(|(part, _, fps)| qnc_broll_suggest::Candidate { seconds: (part.to - part.from) as f64 / fps, vector: &part.vector, caption: part.caption.as_deref() }).collect();
+        qnc_broll_suggest::plan(suggestion, blocks, &candidates)
+            .into_iter()
+            .map(|(block, planned)| {
+                let covers = planned
+                    .into_iter()
+                    .map(|planned| {
+                        let (part, clip, fps) = usable[planned.part];
+                        let frames = ((planned.seconds * fps).round() as u64).clamp(1, part.to - part.from);
+                        qnc_script_db::Cover { clip_id: part.clip_id.clone(), clip_name: clip.name.clone(), from_frame: part.from, to_frame: part.from + frames, at_seconds: planned.at_seconds, seconds: planned.seconds, asked: planned.asked }
+                    })
+                    .collect();
+                (block, covers)
+            })
+            .collect()
+    }
+
     /// The parts of the clips of the pool as cards: "Label · clip", the part's duration, the
     /// clip's poster. A part of a clip the pool has not is left out.
     /// With a suggestion for the chosen slot (user 2026-11-10: B-roll for the words of an OFF) the

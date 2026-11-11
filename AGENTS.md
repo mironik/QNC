@@ -9026,3 +9026,27 @@ tabu AI pokrivalice. Testovi `qnc-script` (novi `the_text_written_or_the_chosen_
 `qnc-broll-suggest` (novi `the_text_of_a_script_asks_with_its_own_words_and_lengths`), `qnc-ai-broll`, `qnc-side-pieces`,
 `qnc-panel-focus`, conformance. Uzivo nije provjereno. Nije izvedeno: prijedlog za jednu oznacenu recenicu teksta (sada
 cijeli izabrani OFF kao serija), upis predlozene serije.
+Izmjena 2026-11-11 (korisnik: "ne bi to radio na taj nacin.. kada novinar napise off ili cijeli prilog dodao bi dugme koje bi
+pokrenulo skriptu za kreiranje prijedloga... ukoliko korisnik prilikom pisanja offova u kolonu za prijedlog pokrivalica
+upise neki pojam ili frazu, taj dio se uzima u obzir, a skripta dodaje ako treba jos nesto da bi se pokrio off"; "obrazac
+za pisanje off se sastoji od dva edit polja, gornje za pisanje off, i donje u kojem pise koje kadrove zeli"; "da, dodaj upis
+serije jednom potvrdom"): zamjenjuje automatski upit iz teksta scenarija od istog dana (`broll_query`, `ask_of_text` u
+`follow_slot` uklonjeni). (1) Obrazac za pisanje u MA Scriptu ispod teksta OFF-a ima drugo polje "Kadrovi koje zelim
+(pokrivalice)" (`qnc-text-source-editor` `Second`, `Answer::Second`; samo za vrstu koju cita novinar); Spremi sprema tekst i
+kadrove (`EDITOR_NOTE`, `ScriptView.editor_note`; izbor bloka ih ucitava). Blok scenarija ima `broll_note` (kako je
+upisano) i `covers` (prihvacene pokrivalice: klip, slike, sekunda OFF-a, trajanje, trazeni pojam); `qnc-script-db` stupci
+`broll_note`, `covers_json` (starijoj tablici se dodaju), operacije `SetBrollNote` i `SetCovers` (svi OFF-ovi u jednom
+koraku Undo; jedan odbijen ne upisuje nijedan; samo vrsta koju cita novinar). (2) Dugme "Predlozi pokrivalice" (MA Script i
+MA Audio, `script_suggest_broll`) radi za sve OFF-ove price (`ScriptView::broll_offs`: slotovi izmedu M markera teksta s
+rijecima i duljinom iz snimke ili vremena citanja). `qnc-broll-suggest` `PlanBlock`, `plan_ask`, `plan`, `wanted_of`
+(pojmovi odvojeni zarezom, tockom-zarezom ili novim retkom): OFF s markerima - svaki slot redom dobiva kadar za pojam istog
+mjesta, inace za svoje rijeci, dovoljno dug; OFF bez markera - od pocetka najprije kadar za svaki pojam redom (najmanje 2 s
+ili koliko je ostalo, pokriva koliko traje), zatim kadrovi po rijecima dok OFF nije pokriven; nijedan kadar dvaput u prici.
+Isti put kao prijedlog serije (prijevod, slika i opis kadra). `qnc-ai-broll` `plan_covers` (kadar od svog pocetka),
+`qnc-side-pieces` `plan_broll` (upit kroz radnika prijedloga, odgovor je prijedlog scenarija). (3) Prijedlog se vidi ispod
+svakog OFF-a ("Predlozene pokrivalice": sekunda, klip, trajanje, [pojam]), uz pojmove koje je novinar upisao; "Prihvati
+pokrivalice" ga upisuje u scenarij jednim korakom (`script_accept_broll`), "Odbaci" (`script_drop_broll`). Katalog akcija
+(bez tipki), rjecnik. Testovi `qnc-script-db` (novi), `qnc-broll-suggest` (novi
+`a_plan_covers_an_off_with_the_shots_wanted_first_then_by_its_words_none_twice`), `qnc-script` (novi
+`every_off_of_the_story_is_asked_for_b_roll_a_slot_between_its_marks_with_its_note`), conformance. Uzivo nije provjereno.
+Nije izvedeno: Send to S-Story jos ne prenosi prihvacene pokrivalice u pricu; prikaz kadrova bez postera.

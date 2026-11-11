@@ -18,6 +18,7 @@ qnc-image-assets = { workspace = true }
 qnc-work-settings = { workspace = true }
 qnc-shot-examples = { workspace = true }
 qnc-shot-captions = { workspace = true }
+qnc-script-db = { workspace = true }
 qnc-notice = { workspace = true }
 qnc-pool-tabs = { workspace = true }
 qnc-dev-diagnostics = { workspace = true }

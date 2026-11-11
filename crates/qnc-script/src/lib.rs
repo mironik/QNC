@@ -51,6 +51,9 @@ pub const MODULE_ID: &str = "qnc.module.script";
 pub const PANEL: &str = "script";
 /// The editor's text changed (target: the whole text).
 pub const EDITOR_TEXT: &str = "script_editor_text";
+/// The shots the reporter wants under the OFF in the editor changed (target: the whole text;
+/// user 2026-11-11).
+pub const EDITOR_NOTE: &str = "script_editor_note";
 /// The editor's text goes into the script as a block of a text kind after the chosen block
 /// (target: the kind's code).
 pub const ADD_TEXT: &str = "script_add_text";
@@ -95,6 +98,9 @@ pub const VOICE_TAKE: &str = "script_voice_take";
 pub const FIELD_TEXT: &str = "script_field_text";
 /// The drafts of a block's fields go into the script (target: the block id).
 pub const FIELD_COMMIT: &str = "script_field_commit";
+/// The field code of the B-roll note of an OFF in `FIELD_TEXT` and `FIELD_COMMIT` (user
+/// 2026-11-11: terms or a phrase the B-roll suggestion covers the OFF with first).
+pub const BROLL_NOTE: &str = "@broll";
 /// A field is set and goes into the script at once (a choice; target as `FIELD_TEXT`).
 pub const FIELD_SET: &str = "script_field_set";
 /// The script is written out to the project's export folder: clean text, the two-column A/V script
@@ -106,6 +112,14 @@ pub const DRAFT: &str = "script_draft";
 /// The skeleton of the script is added at the end of the story (user 2026-10-31): recorded
 /// OFFs as Offs, statements as Tons; OFFs not recorded yet are left out.
 pub const SEND_STORY: &str = "script_send_story";
+/// B-roll is suggested for every OFF of the story (user 2026-11-11: "a button starts the
+/// suggestion"): with the shots the reporter wants first, then by the words.
+pub const SUGGEST_BROLL: &str = "script_suggest_broll";
+/// The B-roll suggested goes into the script, all OFFs in one step of undo (user 2026-11-11:
+/// "write the series with one confirmation").
+pub const ACCEPT_BROLL: &str = "script_accept_broll";
+/// The B-roll suggested is dropped.
+pub const DROP_BROLL: &str = "script_drop_broll";
 /// The exported A/V script is shown in the file browser of this OS.
 pub const OPEN_EXPORT: &str = "script_open_export";
 
@@ -134,6 +148,8 @@ enum TakeAnswer {
 }
 
 pub struct Script {
+    /// The reporter asked for B-roll; taken by the side pieces that hold the suggestion.
+    broll_asked: bool,
     view: ScriptView,
     blocks: Vec<Block>,
     project: Option<String>,
@@ -196,7 +212,7 @@ pub struct Script {
 
 impl Default for Script {
     fn default() -> Self {
-        Self { view: ScriptView::default(), blocks: Vec::new(), project: None, reading: None, read_at: None, writing: None, queued: std::collections::VecDeque::new(), source_request: None, names: HashMap::new(), words_per_second: Ok(0.0), take: None, taking: None, session: None, session_busy: None, exporting: None, draft: Default::default(), edit: Default::default(), letters: HashMap::new(), letter_times: qnc_letter_times::LetterTimes::new(), smooth_joins: qnc_smooth_joins::SmoothJoins::new(), take_heard: qnc_take_heard::TakeHeard::new(), read_checks: HashMap::new(), word_cut: qnc_edit_words::WordPair::new(), word_pick: None, voices: Vec::new(), voice_request: None, voice_after_write: None, marks_after_write: None, heard_takes: HashMap::new(), message_after_write: None, clear_after_write: false }
+        Self { broll_asked: false, view: ScriptView::default(), blocks: Vec::new(), project: None, reading: None, read_at: None, writing: None, queued: std::collections::VecDeque::new(), source_request: None, names: HashMap::new(), words_per_second: Ok(0.0), take: None, taking: None, session: None, session_busy: None, exporting: None, draft: Default::default(), edit: Default::default(), letters: HashMap::new(), letter_times: qnc_letter_times::LetterTimes::new(), smooth_joins: qnc_smooth_joins::SmoothJoins::new(), take_heard: qnc_take_heard::TakeHeard::new(), read_checks: HashMap::new(), word_cut: qnc_edit_words::WordPair::new(), word_pick: None, voices: Vec::new(), voice_request: None, voice_after_write: None, marks_after_write: None, heard_takes: HashMap::new(), message_after_write: None, clear_after_write: false }
     }
 }
 
@@ -213,6 +229,21 @@ impl Script {
 
     pub fn view(&self) -> &ScriptView {
         &self.view
+    }
+
+    /// The reporter's ask for B-roll for the OFFs, once (the side pieces work it out with the
+    /// shots of the project).
+    pub fn take_broll_ask(&mut self) -> bool {
+        std::mem::take(&mut self.broll_asked)
+    }
+
+    /// The B-roll suggested for the OFFs (by block), shown until accepted or dropped; `None`:
+    /// none could be made (`why`: the dictionary key of what says why).
+    pub fn propose(&mut self, proposal: Option<Vec<(i64, Vec<qnc_script_db::Cover>)>>, why: &'static str) {
+        self.view.suggesting = false;
+        let shots: usize = proposal.iter().flatten().map(|(_, covers)| covers.len()).sum();
+        self.view.message = if shots > 0 { qnc_ui_text::fill("script.broll_suggested", &[("count", &shots.to_string())]) } else { qnc_ui_text::text(why).to_string() };
+        self.view.proposal = proposal.filter(|_| shots > 0);
     }
 
     /// Whether a read or a write of this process runs (the form repaints soon).
@@ -314,8 +345,13 @@ impl Script {
                 self.refresh_editor();
                 true
             }
+            EDITOR_NOTE => {
+                self.view.editor_note = target.unwrap_or_default().to_string();
+                true
+            }
             CLEAR_EDITOR => {
                 self.view.editor.clear();
+                self.view.editor_note.clear();
                 self.view.editing = None;
                 self.refresh_editor();
                 true
@@ -334,7 +370,10 @@ impl Script {
                     None if self.opens_the_script(&kind) => qnc_script_db::Place::First,
                     None => qnc_script_db::Place::Last,
                 };
-                self.write(preview, move |target| qnc_script_db::add_at(target, place, Block::written(kind.id, text)).map(Some))
+                // An OFF goes in with the shots the reporter wants under it.
+                let broll_note = if kind.role == Role::Spoken { self.view.editor_note.trim().to_string() } else { String::new() };
+                self.view.editor_note.clear();
+                self.write(preview, move |target| qnc_script_db::add_at(target, place, Block { broll_note, ..Block::written(kind.id, text) }).map(Some))
             }
             SAVE_TEXT => match self.view.editing {
                 Some(block) => {
@@ -344,7 +383,18 @@ impl Script {
                         return Some(true);
                     }
                     self.clear_after_write = true;
-                    self.write(preview, move |target| qnc_script_db::set_text(target, block, text).map(|_| None))
+                    // The shots wanted under an OFF are saved with its text, when they changed.
+                    let stored = self.blocks.iter().find(|b| b.id == block);
+                    let spoken = stored.and_then(|b| self.kind(&b.kind)).is_some_and(|kind| kind.role == Role::Spoken);
+                    let note = self.view.editor_note.trim().to_string();
+                    let note = (spoken && stored.is_some_and(|b| b.broll_note != note)).then_some(note);
+                    self.write(preview, move |target| {
+                        qnc_script_db::set_text(target, block, text)?;
+                        if let Some(note) = note {
+                            qnc_script_db::set_broll_note(target, block, note)?;
+                        }
+                        Ok(None)
+                    })
                 }
                 None => return self.act(ADD_TEXT, target, (preview, timeline, timecode, transcript)),
             },
@@ -388,6 +438,7 @@ impl Script {
                 self.view.selected = Some(id);
                 if let Some(row) = self.view.blocks.iter().find(|row| row.block.id == id).filter(|row| !row.is_clip()) {
                     self.view.editor = row.block.text.clone();
+                    self.view.editor_note = row.block.broll_note.clone();
                     self.view.editing = Some(id);
                     self.refresh_editor();
                 }
@@ -458,6 +509,21 @@ impl Script {
                 true
             }
             SEND_STORY => self.send_story(preview),
+            SUGGEST_BROLL => {
+                self.broll_asked = true;
+                self.view.suggesting = true;
+                self.view.message = qnc_ui_text::text("script.broll_suggesting").into();
+                true
+            }
+            ACCEPT_BROLL => {
+                let Some(proposal) = self.view.proposal.take() else { return Some(false) };
+                self.view.message = qnc_ui_text::text("script.broll_accepted").into();
+                self.write(preview, move |target| qnc_script_db::set_covers(target, proposal).map(|_| None))
+            }
+            DROP_BROLL => {
+                self.view.proposal = None;
+                true
+            }
             OPEN_EXPORT => {
                 if let Some(file) = &self.view.exported {
                     if let Err(error) = qnc_status_line::open(file) {
@@ -671,9 +737,12 @@ impl Script {
     /// The drafts of block `block`'s fields go into the script (nothing is written when they
     /// change nothing). The block shows them at once; the script read after the write is the truth.
     fn commit_fields(&mut self, preview: &SourcePreview, block: i64) -> bool {
-        let drafts: Vec<(String, String)> = self.view.field_drafts.iter().filter(|((id, _), _)| *id == block).map(|((_, code), value)| (code.clone(), value.clone())).collect();
+        let mut drafts: Vec<(String, String)> = self.view.field_drafts.iter().filter(|((id, _), _)| *id == block).map(|((_, code), value)| (code.clone(), value.clone())).collect();
         self.view.field_drafts.retain(|(id, _), _| *id != block);
+        // The B-roll note of an OFF is kept as typed, apart from its kind's fields.
+        let note = drafts.iter().position(|(code, _)| code == BROLL_NOTE).map(|at| drafts.remove(at).1);
         let Some(stored) = self.blocks.iter_mut().find(|b| b.id == block) else { return false };
+        let note = note.map(|note| note.trim().to_string()).filter(|note| *note != stored.broll_note);
         let mut fields = stored.fields.clone();
         for (code, value) in drafts {
             if value.trim().is_empty() {
@@ -682,11 +751,25 @@ impl Script {
                 fields.insert(code, value.trim().to_string());
             }
         }
-        if fields == stored.fields {
+        let fields = (fields != stored.fields).then_some(fields);
+        if fields.is_none() && note.is_none() {
             return true;
         }
-        stored.fields = fields.clone();
-        self.write(preview, move |target| qnc_script_db::set_fields(target, block, fields).map(|_| None))
+        if let Some(fields) = &fields {
+            stored.fields = fields.clone();
+        }
+        if let Some(note) = &note {
+            stored.broll_note = note.clone();
+        }
+        self.write(preview, move |target| {
+            if let Some(note) = note {
+                qnc_script_db::set_broll_note(target, block, note)?;
+            }
+            if let Some(fields) = fields {
+                qnc_script_db::set_fields(target, block, fields)?;
+            }
+            Ok(None)
+        })
     }
 
     /// Seconds of `frames` of `clip_id` (0 when its rate is not known).
@@ -1004,6 +1087,7 @@ impl Script {
                             // A saved text leaves the editor empty (MA Script).
                             if std::mem::take(&mut self.clear_after_write) {
                                 self.view.editor.clear();
+                                self.view.editor_note.clear();
                                 self.view.editing = None;
                             }
                             if let Some(id) = added {

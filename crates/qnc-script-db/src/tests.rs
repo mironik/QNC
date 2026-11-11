@@ -508,3 +508,20 @@ fn an_undo_step_kept_before_a_column_was_added_puts_the_blocks_back() {
     assert!(undo(&target).unwrap());
     assert_eq!(texts(&target), ["staro"]);
 }
+
+#[test]
+fn an_off_keeps_its_b_roll_note_and_its_accepted_covers_in_one_undo_step() {
+    let (_dir, target) = written();
+    let id = add(&target, None, off("Ribari su isplovili iz luke.")).unwrap();
+    let statement = add(&target, Some(id), sot("c")).unwrap();
+    set_broll_note(&target, id, "luka, brodovi".into()).unwrap();
+    assert!(set_broll_note(&target, statement, "luka".into()).is_err(), "a statement has no B-roll note");
+    let cover = |at: f64| Cover { clip_id: "c".into(), clip_name: "Mironik 2002".into(), from_frame: 10, to_frame: 110, at_seconds: at, seconds: 2.0, asked: "luka".into() };
+    set_covers(&target, vec![(id, vec![cover(0.0), cover(2.0)])]).unwrap();
+    assert!(set_covers(&target, vec![(id, vec![cover(0.0)]), (statement, vec![cover(0.0)])]).is_err(), "one refused, none written");
+    let block = |target: &ProjectDbTarget| read(target).unwrap().into_iter().find(|block| block.id == id).unwrap();
+    assert_eq!((block(&target).broll_note.as_str(), block(&target).covers.len()), ("luka, brodovi", 2));
+    undo(&target).unwrap();
+    assert!(block(&target).covers.is_empty(), "undo takes the covers back");
+    assert_eq!(block(&target).broll_note, "luka, brodovi");
+}

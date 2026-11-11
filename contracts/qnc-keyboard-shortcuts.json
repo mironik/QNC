@@ -136,6 +136,9 @@
     "script_editor_text": {
       "label": "Tekst editora scenarija"
     },
+    "script_editor_note": {
+      "label": "Kadrovi koje novinar zeli ispod OFF-a u editoru"
+    },
     "script_add_text": {
       "label": "Dodaj tekst iz editora kao blok izabrane vrste profila"
     },
@@ -198,6 +201,15 @@
     },
     "script_send_story": {
       "label": "Posalji kostur price u S-Story (na kraj)"
+    },
+    "script_suggest_broll": {
+      "label": "Predlozi pokrivalice za OFF-ove (najprije zeljeni kadrovi, zatim po rijecima)"
+    },
+    "script_accept_broll": {
+      "label": "Prihvati predlozene pokrivalice (svi OFF-ovi, jedan korak)"
+    },
+    "script_drop_broll": {
+      "label": "Odbaci predlozene pokrivalice"
     },
     "story_send_draft": {
       "label": "Posalji pricu S-Storyja u Story (na kraj)"
