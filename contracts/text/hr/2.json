@@ -237,6 +237,8 @@
     "ai.keep_name_hint": "Naziv AI templatea",
     "ai.delete_template": "Obriši",
     "ai.needed_lock": "treba je: {names}",
+    "ai.engine_here": "na ovom računalu: {engine}",
+    "ai.engine_missing": "nije instalirano: {why}",
     "ai.unknown_feature": "Nepoznata AI mogućnost '{code}'.",
     "ai.need_missing": "AI mogućnost '{code}' treba '{need}', koja nije uključena.",
     "ai.template_twice": "AI template '{id}' postoji dvaput; zadržan je prvi.",

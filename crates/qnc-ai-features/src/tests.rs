@@ -77,3 +77,14 @@ fn an_action_of_a_feature_the_project_has_off_is_grey() {
     let twice = r#"{"features": [{"code": "a", "name": "n", "needs": [], "actions": ["x"]}, {"code": "b", "name": "n", "needs": [], "actions": ["x"]}]}"#;
     assert!(Features::parse(twice).is_err());
 }
+
+#[test]
+fn a_feature_names_known_engines_and_the_choice_says_where_they_run() {
+    let features = Features::load(&root()).expect("features");
+    assert!(features.get(SHOT_ANALYSIS).is_some_and(|feature| feature.engines.is_empty()), "analysis uses no AI model");
+    let choice = Choice::load(&root());
+    let content = features.get(SHOT_CONTENT).expect("shot content");
+    assert_eq!(choice.engines_of(content).len(), 1, "on this computer or not installed, never unsaid");
+    let unknown = r#"{"features": [{"code": "a", "name": "n", "needs": [], "engines": ["whisper"]}]}"#;
+    assert!(Features::parse(unknown).is_err());
+}

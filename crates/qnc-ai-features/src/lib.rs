@@ -40,6 +40,10 @@ pub struct Feature {
     /// Text code of its name.
     pub name: String,
     pub needs: Vec<String>,
+    /// The engines it uses on this computer (`qnc-ai-engines` keys); none when it uses no AI
+    /// model (docs/102 step 4).
+    #[serde(default)]
+    pub engines: Vec<String>,
     /// The catalog actions of the forms that start it: grey in every form while the project has it
     /// off (docs/102 step 3).
     #[serde(default)]
@@ -79,6 +83,9 @@ impl Features {
             }
             if features.all_needs(&feature.code).contains(&feature.code) {
                 return Err(format!("feature '{}' needs itself", feature.code));
+            }
+            if let Some(engine) = feature.engines.iter().find(|engine| !qnc_ai_engines::KEYS.contains(&engine.as_str())) {
+                return Err(format!("feature '{}' names engine '{engine}', which is not known", feature.code));
             }
             if let Some(action) = feature.actions.iter().find(|action| features.list[..index].iter().any(|earlier| earlier.actions.contains(action))) {
                 return Err(format!("action '{action}' starts two features"));
@@ -293,6 +300,9 @@ pub struct Choice {
     /// The name typed for "Keep as AI template".
     pub name: String,
     pub message: String,
+    /// Where the engines of the features run on this computer, by their key, read when the
+    /// choice is loaded (docs/102 step 4): its program and model, or why it is not installed.
+    pub engines: Vec<(String, Result<String, String>)>,
 }
 
 impl Choice {
@@ -302,7 +312,11 @@ impl Choice {
             Ok(features) => templates(root, features),
             Err(_) => (Vec::new(), Vec::new()),
         };
-        Self { root: root.to_path_buf(), features, templates, errors, name: String::new(), message: String::new() }
+        let mut keys: Vec<String> = features.iter().flat_map(|features| features.list.iter().flat_map(|feature| feature.engines.iter().cloned())).collect();
+        keys.sort_unstable();
+        keys.dedup();
+        let engines = keys.into_iter().map(|key| { let state = qnc_ai_engines::state(&key); (key, state) }).collect();
+        Self { root: root.to_path_buf(), features, templates, errors, name: String::new(), message: String::new(), engines }
     }
 
     /// Takes template `id` into the settings.
@@ -397,5 +411,13 @@ impl Gate {
 
     pub fn allows(&self, action: &str) -> bool {
         !self.off.iter().any(|off| off == action)
+    }
+}
+
+impl Choice {
+    /// What the engines of `feature` say on this computer: none when it uses no AI model, else
+    /// for each engine its program and model, or why it is not installed.
+    pub fn engines_of(&self, feature: &Feature) -> Vec<&Result<String, String>> {
+        feature.engines.iter().filter_map(|key| self.engines.iter().find(|(engine, _)| engine == key).map(|(_, state)| state)).collect()
     }
 }

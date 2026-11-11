@@ -1,0 +1,9 @@
+[package]
+name = "qnc-ai-engines"
+version = "0.1.0"
+edition = "2021"
+description = "QNC public block: whether the engine of an AI job runs on this computer (its program beside the application, its model in the AI catalog of this host) or is not installed, and why (docs/102 step 4)"
+
+[dependencies]
+qnc-ai-catalog = { workspace = true }
+qnc-plugin-process = { workspace = true }

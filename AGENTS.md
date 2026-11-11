@@ -9094,3 +9094,11 @@ mogucnosti koju projekt nema je siva: tabovi i gumbi kroz `EditorialView::action
 (`qnc-right-panel` `Shown.ai`; otvara se prvi dopusteni tab), Predlozi pokrivalice, Snimka OFF-ova i Smooth u panelima
 scenarija. Odluku o AI gumbima donosi kocka fokusa (`FocusView::decides`, `enabled`), pa aplikacija nije narasla (C10 495).
 Layout nije mijenjan. Test `an_action_of_a_feature_the_project_has_off_is_grey`. Uzivo nije provjereno.
+Izvedeno 2026-11-11 (korisnik: "da, kreni s korakom 4"; docs/102 korak 4): Project Advanced uz svaku AI sklopku pokazuje gdje
+njezin motor radi: "na ovom računalu: program, model" ili crveno "nije instalirano: razlog". Nova javna kocka
+`crates/qnc-ai-engines` (+ ugovor `contracts/modules/ai-engines.module.json`): motor po kljucu (`transcribe.fast`,
+`transcribe.best`, `letters`, `shot_content`, `shot_caption`, `translate`, `smooth`) iz AI kataloga racunala i program uz
+aplikaciju; nista ne pokrece. Popis mogucnosti (`catalogs/ai/features.json`) uz svaku navodi `engines` (analiza kadrova nema
+AI model); nepoznat kljuc je greska popisa. `qnc-ai-features` `Choice.engines` (cita se jednom kad se izbor ucita),
+`engines_of`; crta `qnc-ai-features-view`. "Na serveru" dolazi s AI serverom (korak 6). Testovi `qnc-ai-engines`,
+`qnc-ai-features`, conformance. Uzivo nije provjereno.

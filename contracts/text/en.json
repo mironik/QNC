@@ -559,6 +559,8 @@
     "ai.keep_name_hint": "Name of the AI template",
     "ai.delete_template": "Delete",
     "ai.needed_lock": "needed by: {names}",
+    "ai.engine_here": "on this computer: {engine}",
+    "ai.engine_missing": "not installed: {why}",
     "ai.unknown_feature": "Unknown AI feature '{code}'.",
     "ai.need_missing": "AI feature '{code}' needs '{need}', which is not on.",
     "ai.template_twice": "AI template '{id}' is there twice; the first one is kept.",

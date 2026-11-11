@@ -6,6 +6,7 @@ description = "QNC public UI piece: the AI section of a settings draft (an AI te
 
 [dependencies]
 qnc-ai-features = { workspace = true }
+qnc-desktop-theme = { workspace = true }
 qnc-ui-kit = { workspace = true }
 qnc-ui-text = { workspace = true }
 eframe = { workspace = true }

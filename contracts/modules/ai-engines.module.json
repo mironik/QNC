@@ -1,0 +1,21 @@
+{
+  "module_id": "qnc.module.ai-engines",
+  "module_name": "AI Engines",
+  "module_version": "0.1.0",
+  "module_kind": "library",
+  "capabilities": ["ai.engines.state"],
+  "input_contract_version": "0.1.0",
+  "output_contract_version": "0.1.0",
+  "transport_protocol_version": "0.1.0",
+  "transport_scope": ["local"],
+  "supported_os": ["windows", "linux", "macos"],
+  "supported_cpu": ["x86_64", "aarch64"],
+  "forbidden_calls": ["db.write", "media.decode", "source.write", "media.probe"],
+  "forbidden_dependencies": ["qnc.module.media-probe"],
+  "state_policy": "stateless",
+  "database_write_policy": "no_db_writes",
+  "runtime_crate": "qnc-ai-engines",
+  "input": "The key of an AI engine (transcribe.fast, transcribe.best, letters, shot_content, shot_caption, translate, smooth), the AI catalog of this host and the programs beside the application.",
+  "output": "Where the engine runs (its program and model on this computer) or why it is not installed.",
+  "specification": "docs/102 step 4, user 2026-11-11: next to every AI switch the project's settings say whether its engine runs on this computer or is not installed. It starts nothing and changes nothing."
+}

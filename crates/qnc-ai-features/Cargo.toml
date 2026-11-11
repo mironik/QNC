@@ -8,6 +8,7 @@ description = "QNC public block: the AI features a project turns on or off, thei
 serde = { workspace = true }
 serde_json = { workspace = true }
 qnc-ui-text = { workspace = true }
+qnc-ai-engines = { workspace = true }
 qnc-dev-diagnostics = { workspace = true }
 
 [dev-dependencies]
