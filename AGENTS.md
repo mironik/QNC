@@ -9139,3 +9139,16 @@ ne prenose (bez migracije): AI ih napravi ponovno u `ai.db`, stare tablice ostaj
 `shot-content` (pravilo `file`). Test `the_analysis_is_kept_in_the_ai_file_beside_the_project_not_in_it`. Nije izvedeno (7b):
 zajednicki opisi kadrova i ispravci grupa na AI serveru (odluka 3: zajednicki svima); danas su u bazama ovog racunala
 (`qnc-shot-captions`, `qnc-shot-examples`).
+Izvedeno 2026-11-11 (korisnik: "da, kreni s korakom 8"; docs/102 korak 8): AI paket odvojen od QNC-a. Novi podatak
+`catalogs/ai/pack.json`: uz svaki AI program datoteke koje trebaju pored njega (ONNX Runtime, sherpa-onnx, vcomp140) i licenca
+svakog programa, biblioteke i modela (status `known` ili `check`). Novi alat `tools/qnc-ai-pack`: `list` (sto AI katalog ovog
+racunala bira, s velicinama i licencama, i neiskoristeni modeli; nista ne brise), `make OUT` (programi, datoteke uz njih,
+samo modeli koje katalog bira, katalog, `pack.json`, `LICENSES/AI-LICENCES.txt` i README/LICENSE modela, `ai-pack.json` s
+velicinom i SHA-256 svake datoteke; model ciju licencu autori ne navode ostaje van, osim uz `--include-unchecked`),
+`install PACK APP_DIR QNC_ROOT` (najprije provjeri svaku datoteku, pokvaren paket ne instalira nista; programi u APP_DIR koji
+mora biti unutar QNC korijena, katalog i modeli u korijen). Provjereno: paket ovog racunala 44 datoteke, 3,6 GB, 11 s
+(wav2vec2 ParlaSpeech van: licenca nije navedena, pa prijepis Best i vremena slova nisu u paketu); instalacija na izolirani
+korijen 22 s; promijenjena datoteka paketa: nista instalirano; instalirani program prevodi s instaliranim modelom. Neiskoristeni
+modeli ovog racunala: ggml-large-v3-turbo (1,5 GB) i q5_0 (0,5 GB), moondream-q4 (1,4 GB), siglip-base-patch16-224 (0,8 GB);
+nisu obrisani (odluka korisnika). Nije izvedeno: instalacijski paket QNC-a (nema ga jos), licenca wav2vec2 ParlaSpeech (pitati
+CLASSLA).

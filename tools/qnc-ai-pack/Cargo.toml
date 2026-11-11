@@ -1,0 +1,12 @@
+[package]
+name = "qnc-ai-pack"
+version = "0.1.0"
+edition = "2021"
+description = "QNC tool (docs/102 step 8): the AI pack apart from QNC: what the AI catalog of this computer uses with its licences, the pack of its programs and models (models of an unstated licence kept out) and its installation checked file by file"
+
+[dependencies]
+qnc-ai-catalog = { workspace = true }
+qnc-dev-diagnostics = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+sha2 = "0.10"

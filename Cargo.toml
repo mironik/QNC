@@ -297,6 +297,7 @@ members = [
     "crates/qnc-letter-align",
     "crates/qnc-letter-db",
     "crates/qnc-letter-times",
+    "tools/qnc-ai-pack",
     "tools/qnc-ai-server",
     "tools/qnc-align-wav2vec2",
     "tools/qnc-shot-content-siglip",

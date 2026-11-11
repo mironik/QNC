@@ -3743,6 +3743,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "qnc-ai-pack"
+version = "0.1.0"
+dependencies = [
+ "qnc-ai-catalog",
+ "qnc-dev-diagnostics",
+ "serde",
+ "serde_json",
+ "sha2",
+]
+
+[[package]]
 name = "qnc-ai-place"
 version = "0.1.0"
 dependencies = [

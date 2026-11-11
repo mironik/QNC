@@ -1,0 +1,33 @@
+{
+  "note": "The AI pack (docs/102 step 8): QNC installs without AI; this pack carries the AI programs, the files they need beside them and the models the AI catalog uses, with their licences. status: known (the licence is stated by its authors) or check (not stated: kept out of a pack until checked). The AI catalog (catalog.json) says which programs and models are used; this file says what goes with them and under which licence.",
+  "programs": [
+    { "program": "qnc-transcribe-parakeet", "beside": ["sherpa-onnx-c-api.dll", "onnxruntime.dll", "onnxruntime_providers_shared.dll"], "licence": "QNC", "status": "known" },
+    { "program": "qnc-transcribe-wav2vec2", "beside": [], "licence": "QNC", "status": "known" },
+    { "program": "qnc-transcribe-whisper", "beside": [], "licence": "QNC (whisper.cpp MIT)", "status": "known" },
+    { "program": "qnc-align-wav2vec2", "beside": [], "licence": "QNC", "status": "known" },
+    { "program": "qnc-shot-content-siglip", "beside": [], "licence": "QNC", "status": "known" },
+    { "program": "qnc-shot-caption-florence", "beside": ["onnxruntime.dll", "onnxruntime_providers_shared.dll"], "licence": "QNC (ONNX Runtime MIT)", "status": "known" },
+    { "program": "qnc-translate-opus", "beside": [], "licence": "QNC", "status": "known" },
+    { "program": "rife-ncnn-vulkan", "beside": ["vcomp140.dll"], "licence": "MIT (nihui/rife-ncnn-vulkan); vcomp140.dll: Microsoft Visual C++ redistributable", "status": "known" },
+    { "program": "qnc-ai-server", "beside": [], "licence": "QNC", "status": "known" }
+  ],
+  "libraries": [
+    { "file": "sherpa-onnx-c-api.dll", "licence": "Apache-2.0 (k2-fsa/sherpa-onnx)" },
+    { "file": "onnxruntime.dll", "licence": "MIT (Microsoft ONNX Runtime)" },
+    { "file": "onnxruntime_providers_shared.dll", "licence": "MIT (Microsoft ONNX Runtime)" },
+    { "file": "vcomp140.dll", "licence": "Microsoft Visual C++ redistributable" }
+  ],
+  "models": [
+    { "model": "siglip2-base-patch16-224", "licence": "Apache-2.0", "source": "https://huggingface.co/google/siglip2-base-patch16-224", "attribution": "Google", "status": "known" },
+    { "model": "siglip-base-patch16-224", "licence": "Apache-2.0", "source": "https://huggingface.co/google/siglip-base-patch16-224", "attribution": "Google", "status": "known" },
+    { "model": "florence-2-base-ft", "licence": "MIT", "source": "https://huggingface.co/microsoft/Florence-2-base-ft", "attribution": "Microsoft", "status": "known" },
+    { "model": "opus-mt-tc-big-sh-en", "licence": "CC-BY-4.0", "source": "https://huggingface.co/Helsinki-NLP/opus-mt-tc-big-sh-en", "attribution": "Helsinki-NLP, OPUS-MT (Tiedemann and Thottingal); the authors are to be named", "status": "known" },
+    { "model": "parakeet-tdt-0.6b-v3-int8", "licence": "CC-BY-4.0", "source": "https://huggingface.co/nvidia/parakeet-tdt-0.6b-v3 (int8 by k2-fsa/sherpa-onnx)", "attribution": "NVIDIA; the authors are to be named", "status": "known" },
+    { "model": "wav2vec2-parlaspeech-hr", "licence": "not stated on the model page", "source": "https://huggingface.co/classla/wav2vec2-xls-r-parlaspeech-hr", "attribution": "CLASSLA", "status": "check" },
+    { "model": "ggml-large-v3-turbo.bin", "licence": "MIT", "source": "https://huggingface.co/ggerganov/whisper.cpp (OpenAI Whisper)", "attribution": "OpenAI", "status": "known" },
+    { "model": "ggml-large-v3-turbo-q5_0.bin", "licence": "MIT", "source": "https://huggingface.co/ggerganov/whisper.cpp (OpenAI Whisper)", "attribution": "OpenAI", "status": "known" },
+    { "model": "ggml-silero-v5.1.2.bin", "licence": "MIT", "source": "https://github.com/snakers4/silero-vad", "attribution": "Silero Team", "status": "known" },
+    { "model": "rife-v4.6", "licence": "MIT", "source": "https://github.com/hzwer/ECCV2022-RIFE (ncnn by nihui)", "attribution": "hzwer, nihui", "status": "known" },
+    { "model": "moondream-q4", "licence": "Apache-2.0", "source": "https://huggingface.co/vikhyatk/moondream2", "attribution": "vikhyatk", "status": "known" }
+  ]
+}
