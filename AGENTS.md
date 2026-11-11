@@ -9152,3 +9152,6 @@ korijen 22 s; promijenjena datoteka paketa: nista instalirano; instalirani progr
 modeli ovog racunala: ggml-large-v3-turbo (1,5 GB) i q5_0 (0,5 GB), moondream-q4 (1,4 GB), siglip-base-patch16-224 (0,8 GB);
 nisu obrisani (odluka korisnika). Nije izvedeno: instalacijski paket QNC-a (nema ga jos), licenca wav2vec2 ParlaSpeech (pitati
 CLASSLA).
+Obrisano 2026-11-11 (korisnik: "da, obriši neiskorištene modele"): iz `data/models` (izvan gita) ggml-large-v3-turbo.bin,
+ggml-large-v3-turbo-q5_0.bin, moondream-q4 i siglip-base-patch16-224 (4,3 GB). Ostao je ggml-silero-v5.1.2.bin (0,9 MB, VAD
+Whispera). Whisper motori u AI katalogu racunala sada nemaju model; katalog ih ne bira, a izabrani bi dao kontroliranu gresku.
