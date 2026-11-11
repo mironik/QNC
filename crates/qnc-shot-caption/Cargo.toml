@@ -8,3 +8,4 @@ description = "QNC public block: the shot-caption plug-in contract (qnc.shot-cap
 qnc-plugin-process = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
+qnc-ai-catalog = { workspace = true }

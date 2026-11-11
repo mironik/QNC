@@ -1,8 +1,9 @@
-//! The shot-content plug-in program (contract `qnc.shot-content` 1): a SigLIP model in pure
-//! Rust, loaded once and kept for the next job, below the player and the desktop. It reads the
-//! pictures and the model it is given and writes nothing.
+//! The shot-content plug-in program (contract `qnc.shot-content` 2): a SigLIP model in pure
+//! Rust, loaded once and kept for the next job, below the player and the desktop. It is given the
+//! pictures themselves and the model's name, finds the model in the AI catalog of the computer it
+//! runs on, and writes nothing.
 
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 
 use qnc_shot_content::{PicturesRequest, Texts, TextsRequest};
 use qnc_siglip::Siglip;
@@ -13,7 +14,9 @@ struct Engine {
 }
 
 impl Engine {
-    fn model(&mut self, folder: &Path) -> Result<&Siglip, String> {
+    fn model(&mut self, name: &str) -> Result<&Siglip, String> {
+        let folder = qnc_ai_catalog::installed_model(name)?;
+        let folder = folder.as_path();
         if self.model.as_ref().map(|(loaded, _)| loaded.as_path()) != Some(folder) {
             self.model = Some((folder.to_path_buf(), Siglip::load(folder)?));
         }
@@ -26,7 +29,8 @@ impl qnc_shot_content::Engine for Engine {
         let pictures = request
             .pictures
             .iter()
-            .map(|path| image::open(path).map(|image| image.into_rgb8()).map_err(|e| format!("{}: {e}", path.display())))
+            .enumerate()
+            .map(|(n, picture)| image::load_from_memory(&picture.0).map(|image| image.into_rgb8()).map_err(|e| format!("picture {n}: {e}")))
             .collect::<Result<Vec<_>, _>>()?;
         self.model(&request.model)?.pictures(&pictures)
     }

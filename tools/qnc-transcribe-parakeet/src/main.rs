@@ -1,4 +1,4 @@
-//! Speech to text as a plug-in program (contract `qnc.transcribe` 1) with NVIDIA Parakeet TDT
+//! Speech to text as a plug-in program (contract `qnc.transcribe` 2) with NVIDIA Parakeet TDT
 //! through sherpa-onnx, on the processor (user 2026-10-26: the trim zoom transcribes on the
 //! processor and never takes the graphics card from the player). It is not autoregressive:
 //! a few seconds of speech take a fraction of a second on two cores and it invents nothing

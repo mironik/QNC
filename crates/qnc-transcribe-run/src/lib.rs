@@ -27,7 +27,7 @@ use std::{
 pub use qnc_ai_catalog::Quality;
 use qnc_playback_activity::PlaybackLevel;
 use qnc_still_locator::StillLocator;
-use qnc_transcribe_jobs::{Backend, Transcribe, Transcriber};
+use qnc_transcribe_jobs::{TranscribeRequest, Transcriber};
 pub use qnc_transcript_db::{ClipTranscript, Line, Word};
 
 pub const MODULE_ID: &str = "qnc.module.transcribe-run";
@@ -524,26 +524,13 @@ impl Job<'_> {
     }
 }
 
-/// `samples` (16 kHz) through `engine`, written for it into an empty temporary folder.
+/// `samples` (16 kHz) through `engine`: the sound itself goes to its program, which finds the
+/// engine's model where it runs (contract version 2).
 fn run_engine(engine: &qnc_ai_catalog::Transcriber, language: &str, samples: &[f32], cancel: &AtomicBool, on_segment: &mut dyn FnMut(&qnc_transcribe_jobs::Segment)) -> Result<qnc_transcribe_jobs::Transcript, String> {
-    let folder = std::env::temp_dir().join(format!("qnc-transcribe-{}-{}", std::process::id(), unique()));
-    std::fs::create_dir_all(&folder).map_err(|e| e.to_string())?;
-    let wav = folder.join("sound.wav");
     // The engine hears the sound at the level of speech (user 2026-11-03).
     let heard = qnc_transcribe_jobs::at_speech_level(samples, qnc_transcribe_jobs::WHISPER_RATE as usize);
-    let result = qnc_transcribe_jobs::write_wav(&wav, &heard).and_then(|()| {
-        let job = Transcribe {
-            model: engine.model.clone(),
-            vad_model: engine.vad_model.clone(),
-            backend: if engine.backend == "vulkan" { Backend::Vulkan } else { Backend::Cpu },
-            wav,
-            language: language.to_string(),
-            threads: engine.threads,
-        };
-        transcriber(&engine.program)?.transcribe(&job, cancel, on_segment)
-    });
-    let _ = std::fs::remove_dir_all(&folder);
-    result
+    let job = TranscribeRequest::new(&engine.id, &heard, language)?;
+    transcriber(&engine.program)?.transcribe(&job, cancel, on_segment)
 }
 
 /// What the Best engine of this computer hears in `samples` (16 kHz) that are not of a clip: a
@@ -579,8 +566,4 @@ fn log(line: &str) {
     if qnc_dev_diagnostics::player_diagnostics_enabled() {
         qnc_dev_diagnostics::log_line(qnc_dev_diagnostics::DiagnosticsStream::Player, line.to_string());
     }
-}
-
-fn unique() -> u128 {
-    std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).map(|d| d.as_nanos()).unwrap_or_default()
 }

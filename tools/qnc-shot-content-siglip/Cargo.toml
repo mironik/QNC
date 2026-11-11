@@ -2,9 +2,10 @@
 name = "qnc-shot-content-siglip"
 version = "0.1.0"
 edition = "2021"
-description = "QNC shot-content plug-in: what pictures show with a SigLIP model in pure Rust (contract qnc.shot-content 1), as its own program"
+description = "QNC shot-content plug-in: what pictures show with a SigLIP model in pure Rust (contract qnc.shot-content 2), as its own program"
 
 [dependencies]
+qnc-ai-catalog = { workspace = true }
 qnc-dev-diagnostics = { workspace = true }
 qnc-shot-content = { workspace = true }
 qnc-siglip = { workspace = true }

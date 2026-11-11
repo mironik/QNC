@@ -7,3 +7,4 @@ description = "QNC public block: a plug-in as its own program speaking a version
 [dependencies]
 serde = { workspace = true }
 serde_json = { workspace = true }
+base64 = "0.22"

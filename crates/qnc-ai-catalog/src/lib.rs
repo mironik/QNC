@@ -273,12 +273,26 @@ pub fn transcriber_for(path: &Path, quality: Quality) -> Result<Transcriber, Str
         Quality::Best => file.transcribe.selected.clone(),
         Quality::Fast => file.transcribe.fast.clone().ok_or("the AI catalog of this host has no fast transcription engine")?,
     };
+    engine_in(&file, folder, &selected)
+}
+
+/// The transcription engine `id` of this host's catalog, whatever is selected (plug-in contracts
+/// version 2, docs/102 step 5: the application names the engine, the program finds its model,
+/// backend and threads on the computer it runs on).
+pub fn installed_engine(id: &str) -> Result<Transcriber, String> {
+    let path = installed_path()?;
+    let text = std::fs::read_to_string(&path).map_err(|e| format!("{}: {e}", path.display()))?;
+    let file: File = serde_json::from_str(&text).map_err(|e| format!("{}: {e}", path.display()))?;
+    engine_in(&file, path.parent().ok_or("the AI catalog has no folder")?, id)
+}
+
+fn engine_in(file: &File, folder: &Path, selected: &str) -> Result<Transcriber, String> {
     let engine = file
         .transcribe
         .engines
         .iter()
         .find(|engine| engine.id == selected)
-        .ok_or_else(|| format!("the selected transcription engine {selected} is not in the AI catalog"))?;
+        .ok_or_else(|| format!("the transcription engine {selected} is not in the AI catalog of this host"))?;
     if !BACKENDS.contains(&engine.backend.as_str()) {
         return Err(format!("transcription engine {}: unknown backend {}", engine.id, engine.backend));
     }
@@ -351,4 +365,42 @@ pub fn translator(path: &Path) -> Result<Translator, String> {
         return Err("translator: it translates from no language".into());
     }
     Ok(Translator { program: job.program, model, from: job.from })
+}
+
+/// The name a model is asked by in a plug-in request (contracts version 2): its file or folder
+/// name, the same on every computer that has it.
+pub fn model_name(path: &Path) -> String {
+    path.file_name().map_or_else(|| path.display().to_string(), |name| name.to_string_lossy().into_owned())
+}
+
+/// The model named `name` (`model_name`) that a job of this host's catalog uses; it must be on
+/// this host (plug-in contracts version 2: the program finds the model it is asked by name).
+pub fn installed_model(name: &str) -> Result<PathBuf, String> {
+    let path = installed_path()?;
+    let text = std::fs::read_to_string(&path).map_err(|e| format!("{}: {e}", path.display()))?;
+    let catalog: serde_json::Value = serde_json::from_str(&text).map_err(|e| format!("{}: {e}", path.display()))?;
+    let folder = path.parent().ok_or("the AI catalog has no folder")?;
+    let mut models = Vec::new();
+    collect_models(&catalog, &mut models);
+    models
+        .into_iter()
+        .map(|relative| folder.join(relative))
+        .find(|model| model_name(model) == name)
+        .filter(|model| model.exists())
+        .ok_or_else(|| format!("the model {name} is not in the AI catalog of this host or not on it"))
+}
+
+fn collect_models(value: &serde_json::Value, into: &mut Vec<String>) {
+    match value {
+        serde_json::Value::Object(map) => {
+            for (key, value) in map {
+                match value {
+                    serde_json::Value::String(model) if key == "model" || key == "vad_model" => into.push(model.clone()),
+                    other => collect_models(other, into),
+                }
+            }
+        }
+        serde_json::Value::Array(items) => items.iter().for_each(|item| collect_models(item, into)),
+        _ => {}
+    }
 }

@@ -26,7 +26,7 @@ fn main() -> Result<(), String> {
     let client = qnc_shot_content::ContentClient::new(&qnc_plugin_process::beside_application(&engine.program)?);
     let labels = qnc_shot_labels::Labels::read(&qnc_shot_labels::installed_path()?)?;
     let started = Instant::now();
-    let texts = client.texts(&qnc_shot_content::TextsRequest { model: engine.model.clone(), texts: labels.prompts() })?;
+    let texts = client.texts(&qnc_shot_content::TextsRequest::new(&engine.model, labels.prompts()))?;
     println!("agent ready and {} labels: {} ms", labels.labels.len(), started.elapsed().as_millis());
     let started = Instant::now();
     let shots = qnc_shot_db::ClipShots { clip_id: "look-card".into(), media_uri: String::new(), pictures: found.pictures, shots: found.shots.clone(), parts: found.parts.clone(), error: String::new(), took_ms: 0 };

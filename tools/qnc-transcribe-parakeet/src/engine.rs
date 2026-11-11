@@ -32,7 +32,7 @@ impl Engine for Parakeet {
             self.kept = Some((job.model.clone(), job.threads, Recognizer::open(&job.model, job.threads)?));
         }
         let recognizer = &self.kept.as_ref().expect("kept above").2;
-        let samples = qnc_transcribe_jobs::read_wav(&job.wav)?;
+        let samples = &job.samples;
         let rate = WHISPER_RATE as usize;
         let mut language = String::new();
         for window in qnc_transcribe_jobs::quiet_pieces(&samples, rate, WINDOW_SECONDS) {

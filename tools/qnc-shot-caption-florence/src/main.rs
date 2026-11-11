@@ -1,8 +1,9 @@
-//! The shot-caption plug-in program (contract `qnc.shot-caption` 1): Florence-2 through the ONNX
+//! The shot-caption plug-in program (contract `qnc.shot-caption` 2): Florence-2 through the ONNX
 //! Runtime library beside this program, loaded once and kept for the next job, below the player
-//! and the desktop. It reads the pictures and the model it is given and writes nothing.
+//! and the desktop. It is given the pictures themselves and the model's name, finds
+//! the model in the AI catalog of the computer it runs on, and writes nothing.
 
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 
 use qnc_florence2::Florence;
 use qnc_shot_caption::CaptionsRequest;
@@ -16,7 +17,9 @@ struct Engine {
 }
 
 impl Engine {
-    fn model(&mut self, folder: &Path) -> Result<&mut Florence, String> {
+    fn model(&mut self, name: &str) -> Result<&mut Florence, String> {
+        let folder = qnc_ai_catalog::installed_model(name)?;
+        let folder = folder.as_path();
         if self.model.as_ref().map(|(loaded, _)| loaded.as_path()) != Some(folder) {
             self.model = Some((folder.to_path_buf(), Florence::load(folder, &runtime()?, THREADS)?));
         }
@@ -36,7 +39,8 @@ impl qnc_shot_caption::Engine for Engine {
         let pictures = request
             .pictures
             .iter()
-            .map(|path| image::open(path).map(|image| image.into_rgb8()).map_err(|e| format!("{}: {e}", path.display())))
+            .enumerate()
+            .map(|(n, picture)| image::load_from_memory(&picture.0).map(|image| image.into_rgb8()).map_err(|e| format!("picture {n}: {e}")))
             .collect::<Result<Vec<_>, _>>()?;
         let model = self.model(&request.model)?;
         pictures.iter().map(|picture| model.caption(picture)).collect()

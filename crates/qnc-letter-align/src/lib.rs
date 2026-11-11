@@ -1,9 +1,12 @@
-//! The letter-align plug-in contract (`contracts/plugins/letter-align.v1.json`, user
+//! The letter-align plug-in contract (`contracts/plugins/letter-align.v2.json`, user
 //! 2026-11-05: cutting by letters in the script): the application asks the times of the letters
 //! of a known text in a 16 kHz WAV, the program answers them. Both sides are here, so the
 //! program can be replaced without building QNC.
+//!
+//! Version 2 (docs/102 step 5): a request carries the speech itself (WAV bytes) and names the
+//! model; the program finds the model in the AI catalog of the computer it runs on.
 
-use std::path::{Path, PathBuf};
+use std::path::Path;
 use std::time::Duration;
 
 use serde::{Deserialize, Serialize};
@@ -12,7 +15,7 @@ pub const MODULE_ID: &str = "qnc.module.letter-align";
 pub const VERSION: &str = env!("CARGO_PKG_VERSION");
 
 pub const CONTRACT: &str = "qnc.letter-align";
-pub const CONTRACT_VERSION: u32 = 1;
+pub const CONTRACT_VERSION: u32 = 2;
 const ALIGN: &str = "align";
 
 /// One letter and the seconds it is said in (none for a sign the model has not).
@@ -33,8 +36,10 @@ pub struct WordLetters {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct AlignRequest {
-    pub model: PathBuf,
-    pub wav: PathBuf,
+    /// The model's name (`qnc_ai_catalog::model_name`).
+    pub model: String,
+    /// The speech: a 16 kHz mono 16-bit WAV.
+    pub wav: qnc_plugin_process::Bytes,
     pub words: Vec<String>,
 }
 

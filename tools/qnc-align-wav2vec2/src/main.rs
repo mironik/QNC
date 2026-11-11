@@ -1,5 +1,6 @@
-//! The letter-align plug-in program (contract `qnc.letter-align` 1): a wav2vec2 CTC model in
-//! pure Rust, loaded once and kept for the next job, below the player and the desktop.
+//! The letter-align plug-in program (contract `qnc.letter-align` 2): a wav2vec2 CTC model in
+//! pure Rust, loaded once and kept for the next job, below the player and the desktop. It is given the
+//! speech itself and the model's name, and finds the model in the AI catalog of the computer it runs on.
 
 fn main() {
     qnc_dev_diagnostics::log_panics("qnc-align-wav2vec2");
@@ -10,8 +11,8 @@ fn main() {
     }
     let mut engine = qnc_align_wav2vec2::Engine::default();
     let served = qnc_letter_align::serve("qnc.letter-align.wav2vec2", env!("CARGO_PKG_VERSION"), "wav2vec2 ctc (candle)", |request| {
-        let samples = qnc_transcribe_jobs::read_wav(&request.wav)?;
-        engine.align(&request.model, &samples, &request.words)
+        let samples = qnc_transcribe_jobs::read_wav_bytes(&request.wav.0)?;
+        engine.align(&qnc_ai_catalog::installed_model(&request.model)?, &samples, &request.words)
     });
     if let Err(error) = served {
         eprintln!("{error}");

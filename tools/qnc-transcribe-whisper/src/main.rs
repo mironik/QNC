@@ -1,4 +1,4 @@
-//! Speech to text as a plug-in program (contract `qnc.transcribe` 1) with whisper.cpp: the
+//! Speech to text as a plug-in program (contract `qnc.transcribe` 2) with whisper.cpp: the
 //! model is loaded once and kept for the next job; words get their times from the engine's
 //! alignment of the decoder's attention to the sound (DTW). Built with the feature `vulkan`
 //! it runs on the graphics card (Intel, AMD, NVIDIA) and the processor; with `whisper` only on

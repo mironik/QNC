@@ -1,9 +1,12 @@
-//! The text-translate plug-in contract (`contracts/plugins/text-translate.v1.json`, user
+//! The text-translate plug-in contract (`contracts/plugins/text-translate.v2.json`, user
 //! 2026-11-11: "the OFF into English", so that SigLIP 2 finds the pictures and the captions of
 //! its words): the application gives texts, the program answers each in English. Both sides are
 //! here, so the program and its model can be replaced without building QNC.
+//!
+//! Version 2 (docs/102 step 5): a request names the model; the program finds it in the AI catalog
+//! of the computer it runs on.
 
-use std::path::{Path, PathBuf};
+use std::path::Path;
 use std::time::Duration;
 
 use serde::{Deserialize, Serialize};
@@ -12,7 +15,7 @@ pub const MODULE_ID: &str = "qnc.module.text-translate";
 pub const VERSION: &str = env!("CARGO_PKG_VERSION");
 
 pub const CONTRACT: &str = "qnc.text-translate";
-pub const CONTRACT_VERSION: u32 = 1;
+pub const CONTRACT_VERSION: u32 = 2;
 const TRANSLATE: &str = "translate";
 
 /// The most texts one request carries (a sentence takes half a second).
@@ -24,8 +27,15 @@ pub const LONGEST: usize = 4000;
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct TranslateRequest {
-    pub model: PathBuf,
+    /// The model's name (`qnc_ai_catalog::model_name`).
+    pub model: String,
     pub texts: Vec<String>,
+}
+
+impl TranslateRequest {
+    pub fn new(model: &Path, texts: Vec<String>) -> Self {
+        Self { model: qnc_ai_catalog::model_name(model), texts }
+    }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

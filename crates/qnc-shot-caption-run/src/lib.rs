@@ -4,14 +4,13 @@
 //!
 //! Every shot the shot-content agent looked at has a poster (the card's poster for a clip seen
 //! only through it, otherwise the shot's own poster in the project's thumbnails). The posters of
-//! the shots without a caption of this host's model are copied into an empty temporary folder,
-//! given to the shot-caption agent (`qnc-shot-caption`, its own program) a few at a time, and the
+//! the shots without a caption of this host's model are read and given as bytes to the
+//! shot-caption agent (`qnc-shot-caption`, its own program) a few at a time, and the
 //! captions kept in the captions database of this computer (`qnc-shot-captions`), not in the
 //! project: the AI agents are an add-on. Nothing is decoded; the card is only read. While the
 //! player plays it waits; the clip a preview has open goes first.
 
 use std::{
-    fs,
     path::{Path, PathBuf},
     sync::atomic::Ordering,
     time::Instant,
@@ -76,8 +75,6 @@ pub fn caption_missing(root: &Path, reader: &SettingsReader, settings: &WorkSett
         return Ok(0);
     }
     let client = qnc_shot_caption::CaptionClient::new(&qnc_plugin_process::beside_application(&captioner.program)?);
-    // The agent reads only copies in a folder of its own (the card stays only read).
-    let temp = std::env::temp_dir().join("qnc-shot-caption").join(std::process::id().to_string());
     let mut kept = 0;
     while !wanted.is_empty() {
         if !wait_for_player(pace) {
@@ -99,18 +96,10 @@ pub fn caption_missing(root: &Path, reader: &SettingsReader, settings: &WorkSett
             }
             taken
         };
-        let _ = fs::remove_dir_all(&temp);
-        fs::create_dir_all(&temp).map_err(|e| e.to_string())?;
-        let mut pictures = Vec::new();
-        for (n, shot) in batch.iter().enumerate() {
-            let copy = temp.join(format!("{n:02}.jpg"));
-            fs::copy(&shot.poster, &copy).map_err(|e| e.to_string())?;
-            pictures.push(copy);
-        }
+        // The posters go to the captioner as bytes (contract version 2): it reads no file.
+        let files: Vec<PathBuf> = batch.iter().map(|shot| shot.poster.clone()).collect();
         let started = Instant::now();
-        let captions = client.captions(&qnc_shot_caption::CaptionsRequest { model: captioner.model.clone(), pictures });
-        let _ = fs::remove_dir_all(&temp);
-        let captions = captions?;
+        let captions = client.captions(&qnc_shot_caption::CaptionsRequest::of_files(&captioner.model, &files)?)?;
         let ms = started.elapsed().as_millis();
         for (shot, caption) in batch.iter().zip(captions) {
             log(format!("shot-caption clip={} shot={}-{} caption={caption}", shot.clip_id, shot.from, shot.to));

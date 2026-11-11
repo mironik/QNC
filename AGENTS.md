@@ -9102,3 +9102,16 @@ aplikaciju; nista ne pokrece. Popis mogucnosti (`catalogs/ai/features.json`) uz 
 AI model); nepoznat kljuc je greska popisa. `qnc-ai-features` `Choice.engines` (cita se jednom kad se izbor ucita),
 `engines_of`; crta `qnc-ai-features-view`. "Na serveru" dolazi s AI serverom (korak 6). Testovi `qnc-ai-engines`,
 `qnc-ai-features`, conformance. Uzivo nije provjereno.
+Izvedeno 2026-11-11 (korisnik: "da, kreni s korakom 5"; docs/102 korak 5): ugovori AI dodataka verzija 2. Zahtjev nosi sadrzaj
+umjesto putanja: slike kao JPEG bajtove, zvuk kao WAV bajtove (16 kHz mono 16-bit), u JSON retku kao base64
+(`qnc-plugin-process` `Bytes`). Model se imenuje imenom (ime datoteke ili mape, `qnc_ai_catalog::model_name`), a prijepis
+sifrom motora iz AI kataloga; program model, VAD model, backend i niti nalazi u AI katalogu racunala na kojem radi
+(`qnc_ai_catalog::installed_model`, `installed_engine`), pa moze raditi i na drugom racunalu (korak 6). Program vise ne cita
+nijednu datoteku aplikacije: nestale su privremene mape za JPEG i WAV (posteri kadrova, vremena slova, prijepis). Ugovori
+`contracts/plugins/{transcribe,letter-align,text-translate,shot-caption,shot-content}.v2.json` (v1 zamijenjen, nema dvije
+verzije). Kocke `qnc-shot-content`, `qnc-shot-caption`, `qnc-letter-align`, `qnc-text-translate`, `qnc-transcribe-jobs`
+(`TranscribeRequest`, `Transcribe::of`, `wav_bytes`, `read_wav_bytes`; provjeru backenda radi program), pozivatelji
+(`qnc-shot-content-run`, `qnc-shot-caption-run`, `qnc-broll-suggest`, `qnc-letter-times`, `qnc-transcribe-run`) i programi
+(SigLIP, Florence-2, OPUS-MT, wav2vec2 slova, Parakeet, wav2vec2 prijepis). Whisper je izmijenjen, ali se njegov build s
+Vulkanom ne gradi (od 28. 10.), pa do nove gradnje govori v1 i odbija se; katalog ga ne bira. Dodaci formata kamera i poslova
+dekodera ostaju v1 (nisu AI, rade uz medij).

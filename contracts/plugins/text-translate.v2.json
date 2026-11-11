@@ -1,0 +1,18 @@
+{
+  "contract": "qnc.text-translate",
+  "version": 2,
+  "purpose": "A text in English (user 2026-11-11: the words of an OFF, so that SigLIP 2 finds the pictures and the captions of the shots), as a plug-in program. Version 2 (docs/102 step 5): the request names the model; the program finds it in the AI catalog of the computer it runs on. Nothing falls back to another engine.",
+  "transport": "The JSON lines of qnc.module.plugin-process: the application's hello, the plug-in's ready, then one request at a time.",
+  "handshake": {
+    "application": { "contract": "qnc.text-translate", "version": 2 },
+    "plugin": { "contract": "qnc.text-translate", "version": 2, "plugin_id": "a stable id", "plugin_version": "its version", "about": "{ engine }" }
+  },
+  "operations": {
+    "translate": {
+      "body": "{ model, texts: [text] }: model is a model's name (its file or folder name)",
+      "ok": "{ texts: [text] }: each text in English, in the order given"
+    }
+  },
+  "rules": "At most 16 texts a request, each at most 4000 bytes. The plug-in reads only the models of its own computer's AI catalog and writes nothing; a model it has not is an error.",
+  "acceptance": "crates/qnc-text-translate/examples/translate_with_program.rs (texts of a file through the program, only read)."
+}

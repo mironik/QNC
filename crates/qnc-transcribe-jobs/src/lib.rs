@@ -1,13 +1,14 @@
-//! Speech to text as a plug-in program (contract `qnc.transcribe` 1; user 2026-10-26: the best
+//! Speech to text as a plug-in program (contract `qnc.transcribe` 2; user 2026-10-26: the best
 //! offline transcription, a block that can be replaced without building QNC). The application
-//! writes the sound to transcribe as a 16 kHz mono WAV into an empty temporary folder and asks
-//! the program the AI catalog names; the program answers the segments in parts, each with its
+//! gives the sound itself (a 16 kHz mono WAV) and names the engine of its AI catalog; the program
+//! finds that engine's model, voice activity model, backend and threads in the AI catalog of the
+//! computer it runs on (version 2, docs/102 step 5: it may run on another computer); the program answers the segments in parts, each with its
 //! words and their times. The program writes nothing and decides nothing about the media; a
 //! program that cannot run the backend the catalog chose answers an error, nothing falls back.
 
 mod audio;
 
-pub use audio::{at_speech_level, clip_floor_dbfs, loud_spans, noise_dbfs, quiet_pieces, read_wav, to_whisper_rate, write_wav, FLOOR_CEILING_DBFS, WHISPER_RATE};
+pub use audio::{at_speech_level, clip_floor_dbfs, loud_spans, noise_dbfs, quiet_pieces, read_wav, read_wav_bytes, to_whisper_rate, wav_bytes, write_wav, FLOOR_CEILING_DBFS, WHISPER_RATE};
 use qnc_plugin_process::{Plugin, PluginSpec, Ready};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
@@ -19,7 +20,7 @@ use std::{
 
 pub const MODULE_ID: &str = "qnc.module.transcribe-jobs";
 pub const CONTRACT: &str = "qnc.transcribe";
-pub const CONTRACT_VERSION: u32 = 1;
+pub const CONTRACT_VERSION: u32 = 2;
 /// How long the program may stay silent within a job: loading the model and one window of
 /// sound on a processor can take this long.
 pub const TIMEOUT: Duration = Duration::from_secs(600);
@@ -34,19 +35,45 @@ pub enum Backend {
     Cpu,
 }
 
-/// Transcribe `wav` (16 kHz mono 16-bit PCM) with `model`.
+/// What the application asks: transcribe `wav` (16 kHz mono 16-bit PCM) with the engine `engine`
+/// of the AI catalog (its id).
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
+pub struct TranscribeRequest {
+    pub engine: String,
+    pub wav: qnc_plugin_process::Bytes,
+    /// A language code (`hr`, `en`...) or `auto`.
+    pub language: String,
+}
+
+impl TranscribeRequest {
+    /// `samples` (16 kHz mono) for the engine `engine`.
+    pub fn new(engine: &str, samples: &[f32], language: &str) -> Result<Self, String> {
+        Ok(Self { engine: engine.to_string(), wav: qnc_plugin_process::Bytes(wav_bytes(samples)?), language: language.to_string() })
+    }
+}
+
+/// The job a program runs: the request with the engine found on the computer it runs on.
+#[derive(Debug, Clone, PartialEq)]
 pub struct Transcribe {
     pub model: PathBuf,
     /// The voice activity model: only speech is transcribed (no text invented on silence).
-    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub vad_model: Option<PathBuf>,
     pub backend: Backend,
-    pub wav: PathBuf,
+    /// The sound, 16 kHz mono.
+    pub samples: Vec<f32>,
     /// A language code (`hr`, `en`...) or `auto`.
     pub language: String,
     pub threads: u32,
+}
+
+impl Transcribe {
+    /// The job of `request` on this computer: its engine from the AI catalog here.
+    pub fn of(request: &TranscribeRequest) -> Result<Self, String> {
+        let engine = qnc_ai_catalog::installed_engine(&request.engine)?;
+        let backend = if engine.backend == "vulkan" { Backend::Vulkan } else { Backend::Cpu };
+        Ok(Self { model: engine.model, vad_model: engine.vad_model, backend, samples: read_wav_bytes(&request.wav.0)?, language: request.language.clone(), threads: engine.threads })
+    }
 }
 
 /// One word and where it is in the sound (seconds from the start of the WAV).
@@ -109,7 +136,10 @@ pub fn serve(engine: &mut dyn Engine, plugin_id: &str, plugin_version: &str, abo
     };
     qnc_plugin_process::serve_parts(ready, |op, body, cancel, send| match op {
         "transcribe" => {
-            let job: Transcribe = parse(body)?;
+            let job = Transcribe::of(&parse(body)?)?;
+            if !engine.backends().contains(&job.backend) {
+                return Err(format!("this program does not run the {:?} backend the AI catalog here chose", job.backend));
+            }
             let language = engine.transcribe(&job, cancel, &mut |segment| send(to_value(segment)?))?;
             to_value(Done { language })
         }
@@ -140,28 +170,16 @@ impl Transcriber {
         Self { plugin: Mutex::new(Plugin::new(spec)) }
     }
 
-    /// Transcribes `job`, handing each segment to `on_segment` as it comes.
+    /// Transcribes `job`, handing each segment to `on_segment` as it comes. Whether the program
+    /// runs the engine's backend is its own answer (the engine is of the computer it runs on).
     pub fn transcribe(
         &self,
-        job: &Transcribe,
+        job: &TranscribeRequest,
         cancel: &AtomicBool,
         on_segment: &mut dyn FnMut(&Segment),
     ) -> Result<Transcript, String> {
         let plugin = self.plugin.lock().unwrap_or_else(|e| e.into_inner());
         let ready = plugin.ready()?;
-        let backends: Vec<Backend> = ready
-            .about
-            .get("backends")
-            .cloned()
-            .map(parse)
-            .transpose()?
-            .unwrap_or_default();
-        if !backends.contains(&job.backend) {
-            return Err(format!(
-                "the transcription program {} does not run the {:?} backend the catalog chose",
-                ready.plugin_id, job.backend
-            ));
-        }
         let mut segments = Vec::new();
         let done: Done = parse(plugin.call_parts("transcribe", to_value(job)?, cancel, &mut |part| {
             let segment: Segment = parse(part)?;

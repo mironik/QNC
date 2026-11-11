@@ -1,6 +1,6 @@
 //! whisper.cpp behind the transcription contract.
 
-use qnc_transcribe_jobs::{read_wav, Backend, Engine, Segment, Transcribe, Word, WHISPER_RATE};
+use qnc_transcribe_jobs::{Backend, Engine, Segment, Transcribe, Word, WHISPER_RATE};
 use std::{
     path::PathBuf,
     sync::atomic::{AtomicBool, Ordering},
@@ -36,7 +36,7 @@ impl Engine for Whisper {
         if !self.backends().contains(&job.backend) {
             return Err(format!("this build does not run the {:?} backend", job.backend));
         }
-        let samples = read_wav(&job.wav)?;
+        let samples = &job.samples;
         let context = self.context(job)?;
         let mut state = context.create_state().map_err(|e| format!("whisper state: {e}"))?;
         let mut language = job.language.clone();

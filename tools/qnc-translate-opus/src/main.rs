@@ -1,8 +1,9 @@
-//! The text-translate plug-in program (contract `qnc.text-translate` 1): a Marian model of
+//! The text-translate plug-in program (contract `qnc.text-translate` 2): a Marian model of
 //! OPUS-MT in pure Rust (candle), loaded once and kept for the next job, below the player and the
-//! desktop. It reads the model it is given and writes nothing.
+//! desktop. It finds the model it is asked by name in the AI catalog of the
+//! computer it runs on, and writes nothing.
 
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 
 use qnc_text_translate::TranslateRequest;
 use qnc_translate::Translator;
@@ -13,7 +14,9 @@ struct Engine {
 }
 
 impl Engine {
-    fn model(&mut self, folder: &Path) -> Result<&mut Translator, String> {
+    fn model(&mut self, name: &str) -> Result<&mut Translator, String> {
+        let folder = qnc_ai_catalog::installed_model(name)?;
+        let folder = folder.as_path();
         if self.model.as_ref().map(|(loaded, _)| loaded.as_path()) != Some(folder) {
             self.model = Some((folder.to_path_buf(), Translator::load(folder)?));
         }

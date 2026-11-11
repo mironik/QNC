@@ -1,0 +1,19 @@
+{
+  "contract": "qnc.transcribe",
+  "version": 2,
+  "purpose": "Speech to text for QNC as a plug-in program (user 2026-10-26: the best offline transcription, a block that can be replaced without building QNC). Version 2 (docs/102 step 5): the request carries the sound itself and names the engine; the program finds that engine's model, voice activity model, backend and threads in the AI catalog of the computer it runs on, so it may run on another computer. Nothing falls back to another engine.",
+  "transport": "The JSON lines of qnc.module.plugin-process: the application's hello, the plug-in's ready, then one request at a time. A job answers its segments in parts (lines with \"part\") before its answer. A request { \"id\": 0, \"op\": \"cancel\", \"body\": <id> } stops the running job; a plug-in that does not end it in 2 s is stopped.",
+  "handshake": {
+    "application": { "contract": "qnc.transcribe", "version": 2 },
+    "plugin": { "contract": "qnc.transcribe", "version": 2, "plugin_id": "a stable id", "plugin_version": "its version", "about": "{ engine, backends: [..] }" }
+  },
+  "operations": {
+    "transcribe": {
+      "body": "{ engine, wav, language }: engine is an engine id of the AI catalog; wav is a 16 kHz mono 16-bit PCM WAV as base64",
+      "part": "{ start, end, text, words: [{ start, end, text, p }] }: one segment, times in seconds from the start of wav",
+      "ok": "{ language }: the language the text is in"
+    }
+  },
+  "rules": "The plug-in reads no file of the application and writes nothing; it reads only the models of its own computer's AI catalog. An engine its catalog has not, a model not on its computer or a backend it cannot run is an error, never another engine. language is a code (hr, en...) or auto. Word times are the engine's alignment of each word to the sound.",
+  "acceptance": "crates/qnc-transcribe-jobs/examples/transcribe_media.rs and transcribe_wav.rs: a medium or a WAV that is only read, the engine named, the time it takes and the words with their times."
+}

@@ -1,7 +1,10 @@
-//! The shot-caption plug-in contract (`contracts/plugins/shot-caption.v1.json`, user 2026-11-10:
+//! The shot-caption plug-in contract (`contracts/plugins/shot-caption.v2.json`, user 2026-11-10:
 //! Florence-2 as the second AI engine): the application gives pictures, the program answers a
 //! sentence of what each shows. Both sides are here, so the program and its model can be
 //! replaced without building QNC.
+//!
+//! Version 2 (docs/102 step 5): a request carries the pictures themselves (JPEG bytes) and names
+//! the model; the program finds the model in the AI catalog of the computer it runs on.
 
 use std::path::{Path, PathBuf};
 use std::time::Duration;
@@ -12,7 +15,7 @@ pub const MODULE_ID: &str = "qnc.module.shot-caption";
 pub const VERSION: &str = env!("CARGO_PKG_VERSION");
 
 pub const CONTRACT: &str = "qnc.shot-caption";
-pub const CONTRACT_VERSION: u32 = 1;
+pub const CONTRACT_VERSION: u32 = 2;
 const CAPTIONS: &str = "captions";
 
 /// The most pictures one request carries (a caption takes seconds).
@@ -21,9 +24,18 @@ pub const MOST_AT_ONCE: usize = 8;
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct CaptionsRequest {
-    pub model: PathBuf,
-    /// JPEG files in an empty temporary folder of the application.
-    pub pictures: Vec<PathBuf>,
+    /// The model's name (`qnc_ai_catalog::model_name`).
+    pub model: String,
+    /// JPEG pictures.
+    pub pictures: Vec<qnc_plugin_process::Bytes>,
+}
+
+impl CaptionsRequest {
+    /// The request of JPEG `files` of the application for `model` (a path of its catalog).
+    pub fn of_files(model: &Path, files: &[PathBuf]) -> Result<Self, String> {
+        let pictures = files.iter().map(|file| std::fs::read(file).map(qnc_plugin_process::Bytes).map_err(|error| format!("{}: {error}", file.display()))).collect::<Result<_, _>>()?;
+        Ok(Self { model: qnc_ai_catalog::model_name(model), pictures })
+    }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

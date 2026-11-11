@@ -1,4 +1,4 @@
-//! Speech to text as a plug-in program (contract `qnc.transcribe` 1) with the Croatian wav2vec2
+//! Speech to text as a plug-in program (contract `qnc.transcribe` 2) with the Croatian wav2vec2
 //! CTC model (ParlaSpeech-HR) in pure Rust, on the processor, below the player and the desktop
 //! (user 2026-11-07: "a second pass of a chosen part with wav2vec2", Parakeet heard "jedna
 //! tisuća devetsto šezdeset devet" where the speaker said "tisuću devetsto šezdeset devete").
@@ -32,7 +32,7 @@ impl Engine for Wav2Vec2Engine {
             self.kept = Some((job.model.clone(), qnc_wav2vec2::Wav2Vec2::load(&job.model)?));
         }
         let model = &self.kept.as_ref().expect("kept above").1;
-        let samples = qnc_transcribe_jobs::read_wav(&job.wav)?;
+        let samples = &job.samples;
         let rate = WHISPER_RATE as usize;
         for window in qnc_transcribe_jobs::quiet_pieces(&samples, rate, WINDOW_SECONDS) {
             if cancel.load(Ordering::Relaxed) {

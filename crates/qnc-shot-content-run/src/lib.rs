@@ -66,7 +66,7 @@ pub fn look_missing(reader: &SettingsReader, settings: &WorkSettings, local_medi
     let mut catalog = qnc_content_store::ContentTarget::for_project(reader, settings)?.open(qnc_content_store::Access::ReadOnly)?;
     let label_texts = match stale {
         Some(list) => {
-            let texts = client.texts(&qnc_shot_content::TextsRequest { model: engine.model.clone(), texts: list.prompts() })?;
+            let texts = client.texts(&qnc_shot_content::TextsRequest::new(&engine.model, list.prompts()))?;
             let set = qnc_shot_content_db::LabelSet {
                 model: model.clone(),
                 scale: texts.scale,
@@ -210,24 +210,15 @@ pub fn look_posters(reader: &SettingsReader, settings: &WorkSettings, local_medi
         return Ok(0);
     }
     let client = qnc_shot_content::ContentClient::new(&qnc_plugin_process::beside_application(&engine.program)?);
-    // The agent reads only copies in a folder of its own (the card stays only read).
-    let temp = scratch_dir("posters");
+    // The posters go to the agent as bytes (contract version 2): the card stays only read and
+    // the agent reads no file of the application.
     let mut kept = 0;
     for batch in wanted.chunks(qnc_shot_content::MOST_AT_ONCE) {
         if !wait_for_player(pace) || pace.cancel.load(Ordering::Relaxed) {
             break;
         }
-        let _ = fs::remove_dir_all(&temp);
-        fs::create_dir_all(&temp).map_err(|e| e.to_string())?;
-        let mut pictures = Vec::new();
-        for (n, (_, _, _, file)) in batch.iter().enumerate() {
-            let copy = temp.join(format!("{n:03}.jpg"));
-            fs::copy(file, &copy).map_err(|e| e.to_string())?;
-            pictures.push(copy);
-        }
-        let vectors = client.pictures(&qnc_shot_content::PicturesRequest { model: engine.model.clone(), pictures });
-        let _ = fs::remove_dir_all(&temp);
-        let vectors = vectors?;
+        let files: Vec<PathBuf> = batch.iter().map(|(_, _, _, file)| file.clone()).collect();
+        let vectors = client.pictures(&qnc_shot_content::PicturesRequest::of_files(&engine.model, &files)?)?;
         for ((clip_id, frames, uri, _), vector) in batch.iter().zip(vectors) {
             let shot = PartContent { from: 0, to: *frames, kind: POSTER.into(), frames: vec![0], vector, poster: uri.clone(), fine: false };
             qnc_shot_content_db::save(&db, ClipContent { clip_id: clip_id.clone(), model: model.clone(), parts: vec![shot], error: String::new(), took_ms: 0 }, lease.clone())?;
@@ -351,7 +342,7 @@ fn keep_vocabulary(engine: &qnc_ai_catalog::ShotContentEngine, model: &str) -> R
     let client = qnc_shot_content::ContentClient::new(&qnc_plugin_process::beside_application(&engine.program)?);
     let (mut vectors, mut scoring) = (Vec::new(), (0.0, 0.0));
     for prompts in list.prompts().chunks(qnc_shot_content::MOST_AT_ONCE) {
-        let texts = client.texts(&qnc_shot_content::TextsRequest { model: engine.model.clone(), texts: prompts.to_vec() })?;
+        let texts = client.texts(&qnc_shot_content::TextsRequest::new(&engine.model, prompts.to_vec()))?;
         scoring = (texts.scale, texts.bias);
         vectors.extend(texts.vectors);
     }
@@ -440,7 +431,7 @@ pub fn look_file(clip_id: &str, codec: &str, path: &Path, parts: &[PartRecord], 
                     }
                 }
             }
-            vectors.extend(client.pictures(&qnc_shot_content::PicturesRequest { model: model.to_path_buf(), pictures: decoded })?);
+            vectors.extend(client.pictures(&qnc_shot_content::PicturesRequest::of_files(model, &decoded)?)?);
         }
         Ok(vectors)
     })();

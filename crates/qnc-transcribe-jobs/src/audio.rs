@@ -216,6 +216,14 @@ fn blackman(x: f64) -> f64 {
 
 /// Writes 16 kHz mono samples as a 16-bit PCM WAV file.
 pub fn write_wav(path: &Path, samples: &[f32]) -> Result<(), String> {
+    let bytes = wav_bytes(samples)?;
+    let mut file = File::create(path).map_err(|e| format!("{}: {e}", path.display()))?;
+    file.write_all(&bytes).map_err(|e| format!("{}: {e}", path.display()))
+}
+
+/// `samples` (16 kHz mono) as the bytes of the WAV the contract takes (plug-in contracts version
+/// 2: the sound itself goes in the request, no file).
+pub fn wav_bytes(samples: &[f32]) -> Result<Vec<u8>, String> {
     let data_bytes = u32::try_from(samples.len() * 2).map_err(|_| "sound too long for one WAV file")?;
     let mut bytes = Vec::with_capacity(44 + data_bytes as usize);
     bytes.extend_from_slice(b"RIFF");
@@ -234,8 +242,7 @@ pub fn write_wav(path: &Path, samples: &[f32]) -> Result<(), String> {
         let value = (sample.clamp(-1.0, 1.0) * 32767.0).round() as i16;
         bytes.extend_from_slice(&value.to_le_bytes());
     }
-    let mut file = File::create(path).map_err(|e| format!("{}: {e}", path.display()))?;
-    file.write_all(&bytes).map_err(|e| format!("{}: {e}", path.display()))
+    Ok(bytes)
 }
 
 /// Reads a WAV file the contract takes; any other format is an error.
@@ -244,6 +251,11 @@ pub fn read_wav(path: &Path) -> Result<Vec<f32>, String> {
     File::open(path)
         .and_then(|mut file| file.read_to_end(&mut bytes))
         .map_err(|e| format!("{}: {e}", path.display()))?;
+    read_wav_bytes(&bytes)
+}
+
+/// The samples of the WAV `bytes` the contract takes; any other format is an error.
+pub fn read_wav_bytes(bytes: &[u8]) -> Result<Vec<f32>, String> {
     if bytes.len() < 12 || &bytes[0..4] != b"RIFF" || &bytes[8..12] != b"WAVE" {
         return Err("not a WAV file".into());
     }

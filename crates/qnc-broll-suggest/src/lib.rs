@@ -489,7 +489,7 @@ fn work(job: &Job, client: &mut Option<(std::path::PathBuf, qnc_shot_content::Co
     };
     let mut vectors = Vec::new();
     for texts in asked.chunks(qnc_shot_content::MOST_AT_ONCE) {
-        let request = qnc_shot_content::TextsRequest { model: engine.model.clone(), texts: texts.to_vec() };
+        let request = qnc_shot_content::TextsRequest::new(&engine.model, texts.to_vec());
         vectors.extend(content.texts(&request)?.vectors);
     }
     let slots = said.into_iter().zip(vectors).map(|((slot, text), vector)| SlotSuggestion { slot_id: slot.slot_id.clone(), seconds: slot.seconds, text, vector }).collect();
@@ -500,7 +500,7 @@ fn work(job: &Job, client: &mut Option<(std::path::PathBuf, qnc_shot_content::Co
     }
     let missing: Vec<String> = job.captions.iter().filter(|caption| !made.1.contains_key(*caption)).cloned().collect();
     for texts in missing.chunks(qnc_shot_content::MOST_AT_ONCE) {
-        match content.texts(&qnc_shot_content::TextsRequest { model: engine.model.clone(), texts: texts.to_vec() }) {
+        match content.texts(&qnc_shot_content::TextsRequest::new(&engine.model, texts.to_vec())) {
             Ok(answer) => made.1.extend(texts.iter().cloned().zip(answer.vectors)),
             Err(error) => {
                 log(&format!("broll-suggest captions failed error={error}"));
@@ -530,7 +530,7 @@ fn english(texts: &[String], language: Option<&str>, translator: &mut Option<Tra
     // A text asked again (the same OFF, new captions) is not translated again.
     let missing: Vec<String> = texts.iter().filter(|text| !given.contains_key(*text)).cloned().collect();
     if !missing.is_empty() {
-        let english = client.translate(&qnc_text_translate::TranslateRequest { model: engine.model.clone(), texts: missing.clone() })?;
+        let english = client.translate(&qnc_text_translate::TranslateRequest::new(&engine.model, missing.clone()))?;
         for (said, english) in missing.into_iter().zip(english) {
             log(&format!("broll-suggest translated {said:?} -> {english:?}"));
             given.insert(said, english);

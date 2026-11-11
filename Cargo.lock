@@ -3752,6 +3752,7 @@ dependencies = [
 name = "qnc-align-wav2vec2"
 version = "0.1.0"
 dependencies = [
+ "qnc-ai-catalog",
  "qnc-ctc-align",
  "qnc-dev-diagnostics",
  "qnc-letter-align",
@@ -5981,6 +5982,7 @@ dependencies = [
 name = "qnc-plugin-process"
 version = "0.1.0"
 dependencies = [
+ "base64 0.22.1",
  "serde",
  "serde_json",
 ]
@@ -6823,6 +6825,7 @@ dependencies = [
 name = "qnc-shot-caption"
 version = "0.1.0"
 dependencies = [
+ "qnc-ai-catalog",
  "qnc-plugin-process",
  "serde",
  "serde_json",
@@ -6833,6 +6836,7 @@ name = "qnc-shot-caption-florence"
 version = "0.1.0"
 dependencies = [
  "image",
+ "qnc-ai-catalog",
  "qnc-dev-diagnostics",
  "qnc-florence2",
  "qnc-shot-caption",
@@ -6868,6 +6872,7 @@ dependencies = [
 name = "qnc-shot-content"
 version = "0.1.0"
 dependencies = [
+ "qnc-ai-catalog",
  "qnc-plugin-process",
  "serde",
  "serde_json",
@@ -6915,6 +6920,7 @@ name = "qnc-shot-content-siglip"
 version = "0.1.0"
 dependencies = [
  "image",
+ "qnc-ai-catalog",
  "qnc-dev-diagnostics",
  "qnc-shot-content",
  "qnc-siglip",
@@ -7480,6 +7486,7 @@ dependencies = [
 name = "qnc-text-translate"
 version = "0.1.0"
 dependencies = [
+ "qnc-ai-catalog",
  "qnc-plugin-process",
  "serde",
  "serde_json",
@@ -7711,6 +7718,7 @@ dependencies = [
 name = "qnc-translate-opus"
 version = "0.1.0"
 dependencies = [
+ "qnc-ai-catalog",
  "qnc-dev-diagnostics",
  "qnc-text-translate",
  "qnc-translate",

@@ -1,0 +1,18 @@
+{
+  "contract": "qnc.shot-caption",
+  "version": 2,
+  "purpose": "A sentence of what a picture shows, written by a model (user 2026-11-10: Florence-2 as the second AI engine beside SigLIP: it names what it sees without a vocabulary), as a plug-in program. Version 2 (docs/102 step 5): the request carries the pictures themselves and names the model; the program finds the model in the AI catalog of the computer it runs on. Nothing falls back to another engine.",
+  "transport": "The JSON lines of qnc.module.plugin-process: the application's hello, the plug-in's ready, then one request at a time.",
+  "handshake": {
+    "application": { "contract": "qnc.shot-caption", "version": 2 },
+    "plugin": { "contract": "qnc.shot-caption", "version": 2, "plugin_id": "a stable id", "plugin_version": "its version", "about": "{ engine }" }
+  },
+  "operations": {
+    "captions": {
+      "body": "{ model, pictures: [jpeg] }: model is a model's name (its file or folder name); each picture is a JPEG as base64",
+      "ok": "{ captions: [text] }: one English sentence or a few a picture, in the order given"
+    }
+  },
+  "rules": "At most 8 pictures a request. The plug-in reads no file of the application and writes nothing. A picture it cannot read, or a model not in its computer's AI catalog, is an error, never a guess.",
+  "acceptance": "crates/qnc-shot-caption-run/examples/caption_files.rs (the captions of pictures given, only read)."
+}

@@ -1,0 +1,22 @@
+{
+  "contract": "qnc.shot-content",
+  "version": 2,
+  "purpose": "What pictures show, as vectors in one space with texts (user 2026-11-10: sorting the B-roll by content, offline), as a plug-in program. Version 2 (docs/102 step 5): the request carries the pictures themselves and names the model; the program finds the model in the AI catalog of the computer it runs on. Nothing falls back to another engine.",
+  "transport": "The JSON lines of qnc.module.plugin-process: the application's hello, the plug-in's ready, then one request at a time.",
+  "handshake": {
+    "application": { "contract": "qnc.shot-content", "version": 2 },
+    "plugin": { "contract": "qnc.shot-content", "version": 2, "plugin_id": "a stable id", "plugin_version": "its version", "about": "{ engine }" }
+  },
+  "operations": {
+    "pictures": {
+      "body": "{ model, pictures: [jpeg] }: model is a model's name (its file or folder name); each picture is a JPEG as base64",
+      "ok": "{ vectors: [[number]] }: one unit vector a picture, in the order given"
+    },
+    "texts": {
+      "body": "{ model, texts: [text] }",
+      "ok": "{ vectors: [[number]], scale, bias }: one unit vector a text; a text describes a picture by the sigmoid of cosine * scale + bias"
+    }
+  },
+  "rules": "At most 32 pictures or texts a request. The plug-in reads no file of the application and writes nothing. A picture it cannot read, or a model not in its computer's AI catalog, is an error, never a guess.",
+  "acceptance": "crates/qnc-siglip/examples/look.rs (what one picture shows) and crates/qnc-shot-content-run/examples/look_card.rs (the shot analysis and the content of one original, only read)."
+}

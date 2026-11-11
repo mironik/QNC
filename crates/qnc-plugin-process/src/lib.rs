@@ -21,6 +21,9 @@ use std::{
     time::{Duration, Instant},
 };
 
+mod bytes;
+pub use bytes::Bytes;
+
 pub const MODULE_ID: &str = "qnc.module.plugin-process";
 
 /// The longest answer line a plug-in may give.

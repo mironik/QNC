@@ -31,7 +31,7 @@
   "state_policy": "session_local",
   "database_write_policy": "no_db_writes",
   "runtime_crate": "qnc-letter-align",
-  "input": "A 16 kHz WAV, the model and the words said in it (contracts/plugins/letter-align.v1.json).",
+  "input": "A 16 kHz WAV, the model and the words said in it (contracts/plugins/letter-align.v2.json).",
   "output": "The seconds of every letter of every word.",
   "specification": "AGENTS.md 2026-11-05 (user: cutting by letters in the script, pure Rust). The application's side and the program's side of the plug-in contract qnc.letter-align 1."
 }

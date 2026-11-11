@@ -42,18 +42,15 @@ fn a_wav_written_reads_back_and_another_format_is_refused() {
 
 #[test]
 fn a_job_and_a_segment_keep_the_contract_shape() {
-    let job = Transcribe {
-        model: "m.bin".into(),
-        vad_model: None,
-        backend: Backend::Vulkan,
-        wav: "a.wav".into(),
-        language: "hr".into(),
-        threads: 4,
-    };
+    let samples = tone(WHISPER_RATE, 440.0, 0.1);
+    let job = TranscribeRequest::new("parakeet.tdt-0.6b-v3.cpu", &samples, "hr").unwrap();
     let value = serde_json::to_value(&job).unwrap();
-    assert_eq!(value["backend"], "vulkan");
-    assert!(value.get("vad_model").is_none());
-    assert_eq!(serde_json::from_value::<Transcribe>(value).unwrap(), job);
+    assert_eq!(value["engine"], "parakeet.tdt-0.6b-v3.cpu");
+    assert!(value["wav"].is_string(), "the sound itself, as base64");
+    assert!(value.get("model").is_none() && value.get("backend").is_none(), "the program finds them where it runs");
+    let back: TranscribeRequest = serde_json::from_value(value).unwrap();
+    assert_eq!(back, job);
+    assert_eq!(read_wav_bytes(&back.wav.0).unwrap().len(), samples.len());
     let segment: Segment = serde_json::from_str(
         r#"{"start":0.5,"end":1.25,"text":"Dobar dan","words":[{"start":0.5,"end":0.8,"text":"Dobar","p":0.9}]}"#,
     )

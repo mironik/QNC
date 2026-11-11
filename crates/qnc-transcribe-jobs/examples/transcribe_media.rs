@@ -1,10 +1,10 @@
 //! Acceptance of the transcription contract on a medium that is only read: its sound through the
 //! decoder catalog's executable, the engine the AI catalog selects, the time each step takes and
-//! the words with their times. Writes only a WAV into an empty temporary folder it removes.
+//! the words with their times. Writes a WAV only when QNC_KEEP_WAV names where.
 //! Usage: transcribe_media MEDIA CONTAINER STREAM RATE LANGUAGE [SECONDS]
 //! (e.g. `card/Clip/A.MXF mxf 1 48000 hr 120`: the second stream, the first 120 s)
 
-use qnc_transcribe_jobs::{to_whisper_rate, write_wav, Backend, Transcribe, Transcriber};
+use qnc_transcribe_jobs::{to_whisper_rate, write_wav, TranscribeRequest, Transcriber};
 use std::{path::PathBuf, sync::atomic::AtomicBool, time::Instant};
 
 fn main() -> Result<(), String> {
@@ -38,24 +38,13 @@ fn main() -> Result<(), String> {
     let duration = sound.len() as f64 / f64::from(rate);
     let read = started.elapsed();
     let sound = to_whisper_rate(&sound, rate)?;
-    let folder = std::env::temp_dir().join(format!("qnc-transcribe-{}", std::process::id()));
-    std::fs::create_dir_all(&folder).map_err(|e| e.to_string())?;
-    let wav = folder.join("sound.wav");
-    write_wav(&wav, &sound)?;
     if let Some(keep) = std::env::var_os("QNC_KEEP_WAV") {
-        std::fs::copy(&wav, keep).map_err(|e| e.to_string())?;
+        write_wav(&PathBuf::from(keep), &sound)?;
     }
     println!("sound {duration:.1} s read in {:.1} s, 16 kHz in {:.1} s", read.as_secs_f64(), started.elapsed().as_secs_f64());
 
     let transcriber = Transcriber::beside_application(&engine.program)?;
-    let job = Transcribe {
-        model: engine.model,
-        vad_model: engine.vad_model,
-        backend: if engine.backend == "vulkan" { Backend::Vulkan } else { Backend::Cpu },
-        wav,
-        language: args[4].clone(),
-        threads: engine.threads,
-    };
+    let job = TranscribeRequest::new(&engine.id, &sound, &args[4])?;
     let began = Instant::now();
     let mut first = None;
     let transcript = transcriber.transcribe(&job, &never, &mut |segment| {
@@ -64,7 +53,6 @@ fn main() -> Result<(), String> {
         let words: Vec<String> = segment.words.iter().map(|w| format!("{}@{:.2}-{:.2}", w.text, w.start, w.end)).collect();
         println!("            {}", words.join(" "));
     });
-    let _ = std::fs::remove_dir_all(&folder);
     let transcript = transcript?;
     let took = began.elapsed().as_secs_f64();
     println!(

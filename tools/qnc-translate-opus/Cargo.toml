@@ -2,9 +2,10 @@
 name = "qnc-translate-opus"
 version = "0.1.0"
 edition = "2021"
-description = "QNC text-translate plug-in: texts into English with a Marian model of OPUS-MT in pure Rust (contract qnc.text-translate 1), as its own program"
+description = "QNC text-translate plug-in: texts into English with a Marian model of OPUS-MT in pure Rust (contract qnc.text-translate 2), as its own program"
 
 [dependencies]
+qnc-ai-catalog = { workspace = true }
 qnc-dev-diagnostics = { workspace = true }
 qnc-text-translate = { workspace = true }
 qnc-translate = { workspace = true }

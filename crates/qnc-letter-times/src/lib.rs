@@ -148,14 +148,10 @@ fn lay(locator: &StillLocator, aligner: &qnc_letter_align::Aligner, clip_id: &st
     let (first, last) = (words.first().ok_or("no words")?.from, words.iter().map(|word| word.to).max().unwrap_or(0));
     let sound = qnc_sound_range::read(&place, channel, first.saturating_sub(margin), last + margin, &mut |_| true)?;
     let samples = qnc_transcribe_jobs::to_whisper_rate(&sound.samples, sound.rate)?;
-    let folder = std::env::temp_dir().join(format!("qnc-letters-{}-{}", std::process::id(), unique()));
-    std::fs::create_dir_all(&folder).map_err(|e| e.to_string())?;
-    let wav = folder.join("speech.wav");
-    let model = qnc_ai_catalog::installed_letter_aligner()?.model;
-    let laid = qnc_transcribe_jobs::write_wav(&wav, &samples).and_then(|()| {
-        aligner.align(&qnc_letter_align::AlignRequest { model, wav: wav.clone(), words: words.iter().map(|word| word.text.clone()).collect() })
-    });
-    let _ = std::fs::remove_dir_all(&folder);
+    // The speech itself goes to the aligner (contract version 2): no file is written.
+    let model = qnc_ai_catalog::model_name(&qnc_ai_catalog::installed_letter_aligner()?.model);
+    let wav = qnc_plugin_process::Bytes(qnc_transcribe_jobs::wav_bytes(&samples)?);
+    let laid = aligner.align(&qnc_letter_align::AlignRequest { model, wav, words: words.iter().map(|word| word.text.clone()).collect() });
     // Seconds of the speech as clip frames, fractions kept: the speech starts at `from_seconds`.
     let frame = |seconds: f64| ((sound.from_seconds + seconds - place.frame_zero_seconds) * fps).max(0.0);
     let kept: Vec<WordLetters> = words
@@ -169,10 +165,6 @@ fn lay(locator: &StillLocator, aligner: &qnc_letter_align::Aligner, clip_id: &st
         .collect();
     let target = qnc_db_broker::ProjectDbTarget::for_project(locator.reader(), locator.settings()).map_err(|error| error)?;
     qnc_letter_db::save(&target, clip_id, "wav2vec2-parlaspeech-hr", kept)
-}
-
-fn unique() -> u128 {
-    std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).map(|d| d.as_nanos()).unwrap_or_default()
 }
 
 fn log(line: &str) {
