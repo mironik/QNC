@@ -9177,3 +9177,8 @@ pise samo baze svog racunala. AI katalog ima posao `store`; `pack.json` i AI pak
 izolirana korijena (server i "drugo racunalo"): opis i ispravak spremljeni kroz server i procitani natrag, baze su nastale na
 serveru, klijent nema nijednu. Nije izvedeno: postojeci opisi i ispravci ovog racunala ne prenose se na server (bez migracije);
 drugi stroj na LAN-u nije proban.
+Odluka 2026-11-11 (korisnik: AI wizard kao zaseban proizvod, opcija B; "wave2vec2 bez obzira na licencu koristi, ako je bude
+trebalo uzeti rijesit cu; alat koristi Hrvatski sabor, mislim da je javan"): QNC-AI (`C:\Users\miron\Projects\QNC-AI`) je
+zaseban repo koji koristi kocke QNC-a kao git ovisnost zakljucanu na oznaku; nista se ne kopira, sto wizardu fali, a pripada
+kocki, radi se u QNC-u. Plan: `QNC-AI/docs/01-wizard-plan.md`. wav2vec2 ParlaSpeech ulazi u AI paket odlukom korisnika
+(izvesti u W0.1: `pack.json` status `user`).
