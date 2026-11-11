@@ -41,6 +41,22 @@ pub enum Taught {
     Corrected,
     /// It looks like a corrected shot.
     LikeCorrected,
+    /// A caption a model wrote of this very shot names its group (user 2026-11-11: Florence-2 as
+    /// the corrector of SigLIP).
+    Described,
+    /// It looks like a shot whose caption names its group.
+    LikeDescribed,
+}
+
+/// The group a shot gets from the user's corrections and from the groups captions give
+/// (`described`, examples made from the captions of this project's shots): a correction comes
+/// before a caption (user 2026-11-11: "lower than your correction"), so the user's own and
+/// like-corrected groups first, then the caption's of this shot, then of a described shot it
+/// looks like.
+pub fn group_with<'a>(corrected: &'a [Example], described: &'a [Example], key: &str, vector: &[f32]) -> Option<(&'a str, Taught)> {
+    group_of(corrected, key, vector).or_else(|| {
+        group_of(described, key, vector).map(|(label, taught)| (label, if taught == Taught::Corrected { Taught::Described } else { Taught::LikeDescribed }))
+    })
 }
 
 /// What a shot is: its project (its public URI), clip and frames.
@@ -171,5 +187,16 @@ mod tests {
         assert_eq!(group_of(&examples, "x", &[0.99, 0.141]), Some(("sea", Taught::LikeCorrected)));
         assert_eq!(group_of(&examples, "x", &[0.0, 1.0]), None, "like no example enough");
         assert_eq!(group_of(&examples, "x", &[1.0, 0.0, 0.0]), None, "another width is another model");
+    }
+
+    #[test]
+    fn a_correction_comes_before_a_caption_and_a_caption_teaches_the_shots_like_it() {
+        let corrected = [example("a", "sea", vec![1.0, 0.0])];
+        let described = [example("a", "people", vec![1.0, 0.0]), example("b", "pool", vec![0.0, 1.0])];
+        assert_eq!(group_with(&corrected, &described, "a", &[1.0, 0.0]), Some(("sea", Taught::Corrected)), "the user's own wins over the caption");
+        assert_eq!(group_with(&corrected, &described, "x", &[0.99, 0.141]), Some(("sea", Taught::LikeCorrected)), "like a correction before a caption");
+        assert_eq!(group_with(&corrected, &described, "b", &[0.0, 1.0]), Some(("pool", Taught::Described)));
+        assert_eq!(group_with(&corrected, &described, "y", &[0.141, 0.99]), Some(("pool", Taught::LikeDescribed)));
+        assert_eq!(group_with(&corrected, &described, "z", &[0.7, -0.7]), None);
     }
 }

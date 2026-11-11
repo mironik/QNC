@@ -8968,3 +8968,18 @@ Primjer `qnc-shot-caption-run/examples/caption_files.rs`. Izbor motora u projekt
 sljedeci korak: Florence kao korektor i trener SigLIP-a (opis -> grupa -> primjer u bazi primjera racunala, nizi prioritet od
 korisnikova ispravka) i opis kadra u prijedlogu serije za OFF. Testovi `qnc-florence2`, `qnc-shot-captions`, `qnc-ai-catalog`,
 conformance, release build. Uzivo nije provjereno.
+Izvedeno 2026-11-11 (korisnik: "da, kreni s korektorom i trenerom"; Florence-2 kao korektor i trener SigLIP-a): opis kadra
+koji je napisao Florence-2 daje grupu AI pokrivalica. Popis oznaka (`catalogs/ai/shot-labels.json`) ima `caption_rules`
+(podatak, ne kod): redom, prvo pravilo cija rijec ili fraza (cijele rijeci, engleski) stoji u prvoj recenici opisa daje
+oznaku; specificne oznake prije opcih (mikrofon, dokument, zivotinje, kamera, ekran, mutno, bazen, fontana, ..., ljudi,
+skupina, ruke, obala, vrt, cvijece, mjesto, auto, zgrada, drvece, osoba). Pravilo koje daje oznaku izjave ne daje grupu
+(izjavu odlucuju slika i A1). `qnc-shot-labels` `CaptionRule`, `group_of_caption`; pravilo s oznakom koje popis nema je
+greska popisa. `qnc-shot-examples` `group_with`: korisnikov ispravak kadra, pa kadar slican ispravljenom, pa grupa iz
+opisa tog kadra (`Taught::Described`), pa kadar slican opisanom (`LikeDescribed`, kosinus 0,85). `qnc-ai-broll`
+(`described_examples`): primjeri iz opisa racunaju se pri citanju taba iz baze opisa racunala i pravila, nikad se ne
+spremaju, pa izmijenjeno pravilo vrijedi odmah; bez programa opisa na racunalu nema ih. Primjer
+`qnc-shot-labels/examples/caption_groups.rs` (samo citanje). Provjereno: 48 opisa s kartica (vijesti i PMW-300) daju
+razumnu grupu, osim "a cloth" (bez grupe, ostaje SigLIP) i mikrofona (izjava). Testovi `qnc-shot-labels` (novi
+`a_captions_first_sentence_gives_the_group_of_the_first_rule_it_says`), `qnc-shot-examples` (novi
+`a_correction_comes_before_a_caption_and_a_caption_teaches_the_shots_like_it`), `qnc-ai-broll`, conformance. Nije
+izvedeno: opis kadra u prijedlogu serije za OFF. Uzivo nije provjereno.

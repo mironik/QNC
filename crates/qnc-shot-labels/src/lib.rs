@@ -41,6 +41,20 @@ pub struct Labels {
     #[serde(default = "statement_least")]
     pub statement_least: f32,
     pub labels: Vec<Label>,
+    /// How a caption a model wrote of a shot gives its group (user 2026-11-11: Florence-2 as the
+    /// corrector and trainer of SigLIP): in order, the first rule one of whose words the
+    /// caption's first sentence (what the shot is of) says gives its label; the specific labels
+    /// first, the general ones last.
+    #[serde(default)]
+    pub caption_rules: Vec<CaptionRule>,
+}
+
+/// One rule of a caption: the label and the English words (whole words or phrases) that give it.
+#[derive(Debug, Clone, PartialEq, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct CaptionRule {
+    pub label: String,
+    pub words: Vec<String>,
 }
 
 fn statement_least() -> f32 {
@@ -56,7 +70,8 @@ impl Labels {
         let mut codes: Vec<&str> = labels.labels.iter().map(|label| label.code.as_str()).collect();
         codes.sort_unstable();
         let twice = codes.windows(2).any(|pair| pair[0] == pair[1]);
-        if labels.labels.is_empty() || twice || labels.labels.iter().any(|l| l.code.is_empty() || l.prompt.trim().is_empty()) || !(0.0..1.0).contains(&labels.least) {
+        let rule_bad = labels.caption_rules.iter().any(|rule| labels.text_of(&rule.label).is_none() || rule.words.is_empty() || rule.words.iter().any(|word| words_of(word).is_empty()));
+        if labels.labels.is_empty() || twice || rule_bad || labels.labels.iter().any(|l| l.code.is_empty() || l.prompt.trim().is_empty()) || !(0.0..1.0).contains(&labels.least) {
             return Err(format!("{}: not a usable list of labels", path.display()));
         }
         Ok(labels)
@@ -107,6 +122,22 @@ impl Labels {
     pub fn text_of(&self, code: &str) -> Option<&str> {
         self.labels.iter().find(|label| label.code == code).map(|label| label.text.as_str())
     }
+
+    /// The group a caption of a shot gives: the label of the first caption rule a word of which
+    /// its first sentence says; `None` when no rule does, or when that rule's label is a
+    /// statement (a statement is decided by the pictures and A1, never by a caption).
+    pub fn group_of_caption(&self, caption: &str) -> Option<&str> {
+        let first = caption.split(['.', '!', '?']).next().unwrap_or_default();
+        let said = format!(" {} ", words_of(first).join(" "));
+        let rule = self.caption_rules.iter().find(|rule| rule.words.iter().any(|word| said.contains(&format!(" {} ", words_of(word).join(" ")))))?;
+        let label = self.labels.iter().find(|label| label.code == rule.label)?;
+        (!label.statement).then_some(label.code.as_str())
+    }
+}
+
+/// The lower-case words of a text (letters and digits; "person's" is "person s").
+fn words_of(text: &str) -> Vec<String> {
+    text.split(|c: char| !c.is_alphanumeric()).filter(|word| !word.is_empty()).map(str::to_lowercase).collect()
 }
 
 /// The list beside the application.
@@ -160,6 +191,28 @@ mod tests {
         assert_eq!(shares.iter().map(|(code, _)| code.as_str()).collect::<Vec<_>>(), ["people", "sea"]);
         assert!(labels.is_statement(&[-2.0, 1.0, 0.0]), "sigmoid(-2) = 0.12 reaches 0.05");
         assert!(!labels.is_statement(&[-6.0, 1.0, 0.0]), "sigmoid(-6) = 0.002 does not");
+    }
+
+    #[test]
+    fn a_captions_first_sentence_gives_the_group_of_the_first_rule_it_says() {
+        let path = Path::new(env!("CARGO_MANIFEST_DIR")).join("../..").join(LIST);
+        let labels = Labels::read(&path).unwrap();
+        // Captions Florence-2 wrote of shots of the cards (2026-11-10).
+        for (caption, group) in [
+            ("a person holding a book. On the book we can also see a picture of a person.", Some("document")),
+            ("a man wearing a jacket and goggles. In the background, we can also see some boats on the water.", Some("person")),
+            ("a man and a woman standing on the floor. In the background we can also see a wall.", Some("people")),
+            ("a person holding a dog with a belt. On the left side of the image we have a car.", Some("animals")),
+            ("buildings, trees, swimming pool, hills and sky with clouds.", Some("pool")),
+            ("a building, trees, plants, grass, vehicles and sky with clouds.", Some("garden")),
+            ("buildings, trees and hills.", Some("town")),
+            ("the blurred picture.", Some("blur")),
+            ("a person wearing goggles and holding a mic.", None),
+            ("a cloth.", None),
+        ] {
+            assert_eq!(labels.group_of_caption(caption), group, "{caption}");
+        }
+        assert!(list(r#"{"version":1,"least":0.1,"labels":[{"code":"a","text":"t","prompt":"p"}],"caption_rules":[{"label":"b","words":["x"]}]}"#).is_err(), "a rule of a label the list has not");
     }
 
     #[test]

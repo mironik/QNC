@@ -3684,6 +3684,7 @@ dependencies = [
  "qnc-image-assets",
  "qnc-notice",
  "qnc-pool-tabs",
+ "qnc-shot-captions",
  "qnc-shot-content",
  "qnc-shot-content-db",
  "qnc-shot-examples",

@@ -159,7 +159,7 @@ pub fn sort_parts(
     set: &qnc_shot_content_db::LabelSet,
     list: &qnc_shot_labels::Labels,
     speech: &dyn Fn(&str, u64, u64) -> Option<f32>,
-    (project, examples): (&str, &[qnc_shot_examples::Example]),
+    (project, examples, described): (&str, &[qnc_shot_examples::Example], &[qnc_shot_examples::Example]),
 ) -> Vec<AiPart> {
     // The kept vectors in the order of the list (a label the kept set has not is never best).
     let vectors: Vec<Vec<f32>> = list
@@ -187,7 +187,7 @@ pub fn sort_parts(
             // the agent learns from what the newsroom corrects): this shot's own, else the
             // group of a corrected shot it looks like; a shot that is no B-roll is left out.
             let key = qnc_shot_examples::key(project, &clip.clip_id, part.from, part.to);
-            let taught = match qnc_shot_examples::group_of(examples, &key, &part.vector) {
+            let taught = match qnc_shot_examples::group_with(examples, described, &key, &part.vector) {
                 Some((NOT_BROLL, _)) => return None,
                 Some((code, taught)) if list.text_of(code).is_some() => {
                     (label, share) = (code.to_string(), 1.0);
@@ -415,6 +415,25 @@ fn read_parts(target: &ProjectDbTarget, settings: Option<(qnc_work_settings::Set
     Ok((parts, posters, model))
 }
 
+/// Examples of the groups the captions give the looked-at shots of the project: a shot whose
+/// caption a rule of the list names gets that group with its vector (`model`: of the vectors).
+/// None while this host has no captioner.
+fn described_examples(root: &std::path::Path, project: &str, model: &str, content: &[qnc_shot_content_db::ClipContent], list: &qnc_shot_labels::Labels) -> Vec<qnc_shot_examples::Example> {
+    let Ok(captioner) = qnc_ai_catalog::installed_shot_captioner() else { return Vec::new() };
+    let captioner = captioner.model_name();
+    let mut described = Vec::new();
+    for clip in content.iter().filter(|clip| !clip.parts.is_empty()) {
+        let Ok(captions) = qnc_shot_captions::read_clip(root, &captioner, project, &clip.clip_id) else { continue };
+        for part in &clip.parts {
+            let caption = captions.iter().find(|caption| caption.from == part.from && caption.to == part.to);
+            if let Some(group) = caption.and_then(|caption| list.group_of_caption(&caption.text)) {
+                described.push(qnc_shot_examples::Example { model: model.into(), key: qnc_shot_examples::key(project, &clip.clip_id, part.from, part.to), label: group.into(), vector: part.vector.clone() });
+            }
+        }
+    }
+    described
+}
+
 /// The parts of the project behind `target` for the model of this host, in the tab's order.
 /// With the model of their vectors.
 fn read_sorted(target: &ProjectDbTarget) -> Result<(Vec<AiPart>, String), String> {
@@ -434,7 +453,11 @@ fn read_sorted(target: &ProjectDbTarget) -> Result<(Vec<AiPart>, String), String
     let speech = |clip: &str, from: u64, to: u64| spoken_share(transcripts.get(clip)?, from, to);
     // The corrections of this computer, outside every project (user 2026-11-10).
     let examples = qnc_dev_diagnostics::resolve_qnc_root().map_or_else(|| Ok(Vec::new()), |root| qnc_shot_examples::read(&root, &model))?;
-    let mut parts = sort_parts(&content, &set, &list, &speech, (target.uri(), &examples));
+    // The groups the captions of this computer's captioner give the shots (user 2026-11-11:
+    // Florence-2 as the corrector and trainer of SigLIP): made here from the captions and the
+    // list's rules, never kept, so a changed rule counts at once.
+    let described = qnc_dev_diagnostics::resolve_qnc_root().map_or_else(Vec::new, |root| described_examples(&root, target.uri(), &model, &content, &list));
+    let mut parts = sort_parts(&content, &set, &list, &speech, (target.uri(), &examples, &described));
     // The terms of the vocabulary of this computer, where its vectors are kept for this model.
     let vocabulary = qnc_dev_diagnostics::resolve_qnc_root().and_then(|root| qnc_shot_vocabulary::read(&root, &model).ok().flatten()).zip(qnc_shot_vocabulary::installed().ok());
     if let Some((set, list)) = vocabulary {
@@ -476,7 +499,7 @@ mod tests {
             ClipContent { clip_id: "a".into(), model: "m".into(), parts: vec![part(0, 100, vec![0.0, 1.0]), part(200, 500, vec![1.0, 0.0])], error: String::new(), took_ms: 0 },
             ClipContent { clip_id: "b".into(), model: "m".into(), parts: vec![part(0, 50, vec![0.9, 0.1])], error: String::new(), took_ms: 0 },
         ];
-        let parts = sort_parts(&content, &set, &list(), &|_, _, _| None, ("p", &[]));
+        let parts = sort_parts(&content, &set, &list(), &|_, _, _| None, ("p", &[], &[]));
         let shown: Vec<(&str, u64, &str)> = parts.iter().map(|p| (p.clip_id.as_str(), p.from, p.label.as_str())).collect();
         assert_eq!(shown, [("a", 200, "sea"), ("b", 0, "sea"), ("a", 0, "person")], "sea comes first in the list; the longer sea part first");
         assert!(parts[0].share > 0.99);
@@ -501,7 +524,7 @@ mod tests {
         let set = LabelSet { model: "m".into(), scale: 10.0, bias: 0.0, labels: vec![LabelVector { code: "sea".into(), prompt: "s".into(), vector: vec![1.0, 0.0] }] };
         let content = vec![ClipContent { clip_id: "a".into(), model: "m".into(), parts: vec![part(0, 400, vec![1.0, 0.0]), part(500, 900, vec![1.0, 0.0])], error: String::new(), took_ms: 0 }];
         let speech = |_: &str, from: u64, to: u64| Some(if from == 0 { 0.5 } else { 0.0 }).filter(|_| to > from);
-        let parts = sort_parts(&content, &set, &list(), &speech, ("p", &[]));
+        let parts = sort_parts(&content, &set, &list(), &speech, ("p", &[], &[]));
         // The pictures are no statement: spoken or not both stay, the spoken one marked (people
         // and A1 may be both).
         assert_eq!(parts.iter().map(|p| (p.from, p.spoken)).collect::<Vec<_>>(), [(0, true), (500, false)]);
@@ -519,9 +542,9 @@ mod tests {
             labels: vec![LabelVector { code: "talk".into(), prompt: "talk".into(), vector: vec![1.0, 0.0] }, LabelVector { code: "sea".into(), prompt: "s".into(), vector: vec![1.0, 0.0] }],
             ..set
         };
-        let parts = sort_parts(&content, &set, &talk, &speech, ("p", &[]));
+        let parts = sort_parts(&content, &set, &talk, &speech, ("p", &[], &[]));
         assert_eq!(parts.iter().map(|p| p.from).collect::<Vec<_>>(), [500], "looks like a statement and spoken: a statement; not spoken: B-roll");
-        let parts = sort_parts(&content, &set, &talk, &|_, _, _| None, ("p", &[]));
+        let parts = sort_parts(&content, &set, &talk, &|_, _, _| None, ("p", &[], &[]));
         assert!(parts.is_empty(), "without a transcript the pictures decide");
     }
 
@@ -574,12 +597,18 @@ mod tests {
         // The pictures say sea; the user said person, and that a shot of the sea far from it is
         // no B-roll.
         let examples = [example(&qnc_shot_examples::key("p", "a", 0, 100), "person", vec![1.0, 0.0]), example("other project|z|0|9", NOT_BROLL, vec![0.6, 0.8])];
-        let parts = sort_parts(&content, &set, &list(), &|_, _, _| None, ("p", &examples));
+        let parts = sort_parts(&content, &set, &list(), &|_, _, _| None, ("p", &examples, &[]));
         let shown: Vec<(u64, &str, Option<Taught>)> = parts.iter().map(|p| (p.from, p.label.as_str(), p.taught)).collect();
         assert_eq!(
             shown,
             [(0, "person", Some(Taught::Corrected)), (200, "person", Some(Taught::LikeCorrected)), (400, "person", None)],
             "its own correction, one like it follows it, one like a shot that is no B-roll is left out, the rest as the labels say"
         );
+        // A caption names the first shot sea and the
+        // third sea; the user's correction still comes first for the first and its like.
+        let described = [example(&qnc_shot_examples::key("p", "a", 0, 100), "sea", vec![1.0, 0.0]), example(&qnc_shot_examples::key("p", "a", 400, 500), "sea", vec![0.0, 1.0])];
+        let parts = sort_parts(&content, &set, &list(), &|_, _, _| None, ("p", &examples, &described));
+        let shown: Vec<(u64, &str, Option<Taught>)> = parts.iter().map(|p| (p.from, p.label.as_str(), p.taught)).collect();
+        assert_eq!(shown, [(400, "sea", Some(Taught::Described)), (0, "person", Some(Taught::Corrected)), (200, "person", Some(Taught::LikeCorrected))], "the groups in the order of the list");
     }
 }
