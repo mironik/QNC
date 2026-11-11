@@ -187,7 +187,7 @@ fn main() {
 
     // A program speaking another contract is refused.
     report((|| {
-        let spec = qnc_plugin_process::PluginSpec { executable: args.plugin.clone(), contract: "qnc.other".into(), version: 1, timeout: Duration::from_secs(10) };
+        let spec = qnc_plugin_process::PluginSpec { executable: args.plugin.clone(), contract: "qnc.other".into(), version: 1, timeout: Duration::from_secs(10), remote: None };
         match qnc_plugin_process::Plugin::new(spec).ready() {
             Err(error) if error.contains("speaks") => Ok("another contract: refused".into()),
             other => Err(format!("another contract was not refused: {other:?}")),

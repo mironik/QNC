@@ -7,3 +7,4 @@ description = "QNC public block: the AI catalog of this host (catalogs/ai/catalo
 [dependencies]
 serde = { workspace = true }
 serde_json = { workspace = true }
+qnc-ai-place = { workspace = true }

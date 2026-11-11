@@ -61,8 +61,7 @@ pub fn look_missing(reader: &SettingsReader, settings: &WorkSettings, local_medi
     if remaining.is_empty() && stale.is_none() {
         return Ok(0);
     }
-    let program = qnc_plugin_process::beside_application(&engine.program)?;
-    let client = qnc_shot_content::ContentClient::new(&program);
+    let client = qnc_shot_content::ContentClient::for_program(&engine.program)?;
     let mut catalog = qnc_content_store::ContentTarget::for_project(reader, settings)?.open(qnc_content_store::Access::ReadOnly)?;
     let label_texts = match stale {
         Some(list) => {
@@ -209,7 +208,7 @@ pub fn look_posters(reader: &SettingsReader, settings: &WorkSettings, local_medi
     if wanted.is_empty() {
         return Ok(0);
     }
-    let client = qnc_shot_content::ContentClient::new(&qnc_plugin_process::beside_application(&engine.program)?);
+    let client = qnc_shot_content::ContentClient::for_program(&engine.program)?;
     // The posters go to the agent as bytes (contract version 2): the card stays only read and
     // the agent reads no file of the application.
     let mut kept = 0;
@@ -339,7 +338,7 @@ fn keep_vocabulary(engine: &qnc_ai_catalog::ShotContentEngine, model: &str) -> R
         return Ok(());
     }
     let started = std::time::Instant::now();
-    let client = qnc_shot_content::ContentClient::new(&qnc_plugin_process::beside_application(&engine.program)?);
+    let client = qnc_shot_content::ContentClient::for_program(&engine.program)?;
     let (mut vectors, mut scoring) = (Vec::new(), (0.0, 0.0));
     for prompts in list.prompts().chunks(qnc_shot_content::MOST_AT_ONCE) {
         let texts = client.texts(&qnc_shot_content::TextsRequest::new(&engine.model, prompts.to_vec()))?;

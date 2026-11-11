@@ -11,7 +11,7 @@ const INDEX: &str = include_str!("../../../crates/qnc-sony-metadata/tests/fixtur
 const SIDECAR: &str = include_str!("../../../crates/qnc-sony-metadata/tests/fixtures/TEST-AM01.XML");
 
 fn spec(version: u32) -> PluginSpec {
-    PluginSpec { executable: env!("CARGO_BIN_EXE_qnc-format-sony").into(), contract: CONTRACT.into(), version, timeout: Duration::from_secs(10) }
+    PluginSpec { executable: env!("CARGO_BIN_EXE_qnc-format-sony").into(), contract: CONTRACT.into(), version, timeout: Duration::from_secs(10), remote: None }
 }
 
 fn json<T: serde::Serialize>(value: &T) -> serde_json::Value {

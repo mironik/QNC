@@ -473,7 +473,7 @@ fn work(job: &Job, client: &mut Option<(std::path::PathBuf, qnc_shot_content::Co
     }
     let engine = qnc_ai_catalog::installed_shot_content()?;
     if client.as_ref().is_none_or(|(model, _)| *model != engine.model) {
-        *client = Some((engine.model.clone(), qnc_shot_content::ContentClient::new(&qnc_plugin_process::beside_application(&engine.program)?)));
+        *client = Some((engine.model.clone(), qnc_shot_content::ContentClient::for_program(&engine.program)?));
     }
     let (_, content) = client.as_ref().ok_or("no shot-content program")?;
     // The words in English where this computer's translator knows their language (user
@@ -524,7 +524,7 @@ fn english(texts: &[String], language: Option<&str>, translator: &mut Option<Tra
         return Ok(texts.to_vec());
     }
     if translator.as_ref().is_none_or(|(model, _, _)| *model != engine.model) {
-        *translator = Some((engine.model.clone(), qnc_text_translate::TranslateClient::new(&qnc_plugin_process::beside_application(&engine.program)?), Default::default()));
+        *translator = Some((engine.model.clone(), qnc_text_translate::TranslateClient::for_program(&engine.program)?, Default::default()));
     }
     let (_, client, given) = translator.as_mut().ok_or("no translator")?;
     // A text asked again (the same OFF, new captions) is not translated again.

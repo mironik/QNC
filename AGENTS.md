@@ -9115,3 +9115,17 @@ verzije). Kocke `qnc-shot-content`, `qnc-shot-caption`, `qnc-letter-align`, `qnc
 (SigLIP, Florence-2, OPUS-MT, wav2vec2 slova, Parakeet, wav2vec2 prijepis). Whisper je izmijenjen, ali se njegov build s
 Vulkanom ne gradi (od 28. 10.), pa do nove gradnje govori v1 i odbija se; katalog ga ne bira. Dodaci formata kamera i poslova
 dekodera ostaju v1 (nisu AI, rade uz medij).
+Izvedeno 2026-11-11 (korisnik: "da, kreni s korakom 6"; docs/102 korak 6): AI server i udaljeni prijenos. Novi program
+`tools/qnc-ai-server`: slusa gdje kaze postavka racunala `ai-server.json` (`listen`, `token` najmanje 16 znakova; uz ostale
+postavke racunala). Prvi redak klijenta je `{ token, program }`; server provjerava token (usporedba u istom vremenu), pokrece
+samo program dodatka koji imenuje njegov AI katalog (`qnc_ai_catalog::installed_programs`, bez Smoothovog rife-a koji nije
+dodatak) uz sebe, odgovara `{ ok: true }` i zatim prosljeduje retke dodatka u oba smjera nepromijenjene; prekid veze gasi
+program. `qnc-plugin-process`: `PluginSpec.remote` (`Remote { address, token }`), prijenos lokalno (proces) ili veza na server
+(odbijanje servera je greska dodatka, nikad tihi povratak na ovo racunalo). Nova javna kocka `crates/qnc-ai-place` (+ ugovor
+`contracts/modules/ai-place.module.json`): postavka racunala `ai-place.json` (`server`, `token`); bez nje AI radi uz
+aplikaciju; neispravna je greska. Klijenti AI dodataka (`for_program`, i `Transcriber::beside_application`) uzimaju mjesto iz
+nje. Kad AI radi na serveru, laptop ne mora imati modele (`qnc-ai-catalog` `model_here`), program na serveru ih trazi strogo.
+Project Advanced uz sklopku pise "na AI serveru adresa: program, model" (`qnc-ai-engines` `Runs`). Provjereno na izoliranom
+korijenu (postavke ovog racunala nisu dirane): server na 127.0.0.1, prijepis wav2vec2 kroz server, kriv token i program kojeg
+nema u katalogu servera odbijeni; test `the_server_hears_the_token_and_the_program_and_its_refusal_is_the_error`. Nije izvedeno:
+TLS (token i sadrzaj idu nesifrirani; za LAN/intranet tek uz TLS), drugi stroj na LAN-u, Smooth i Whisper na serveru.

@@ -3703,6 +3703,7 @@ dependencies = [
 name = "qnc-ai-catalog"
 version = "0.1.0"
 dependencies = [
+ "qnc-ai-place",
  "serde",
  "serde_json",
 ]
@@ -3712,6 +3713,7 @@ name = "qnc-ai-engines"
 version = "0.1.0"
 dependencies = [
  "qnc-ai-catalog",
+ "qnc-ai-place",
  "qnc-plugin-process",
 ]
 
@@ -3732,10 +3734,33 @@ name = "qnc-ai-features-view"
 version = "0.1.0"
 dependencies = [
  "eframe",
+ "qnc-ai-engines",
  "qnc-ai-features",
  "qnc-desktop-theme",
  "qnc-ui-kit",
  "qnc-ui-text",
+ "serde_json",
+]
+
+[[package]]
+name = "qnc-ai-place"
+version = "0.1.0"
+dependencies = [
+ "qnc-dev-diagnostics",
+ "qnc-plugin-process",
+ "serde",
+ "serde_json",
+ "tempfile",
+]
+
+[[package]]
+name = "qnc-ai-server"
+version = "0.1.0"
+dependencies = [
+ "qnc-ai-catalog",
+ "qnc-dev-diagnostics",
+ "qnc-plugin-process",
+ "serde",
  "serde_json",
 ]
 
@@ -5247,6 +5272,7 @@ dependencies = [
 name = "qnc-letter-align"
 version = "0.1.0"
 dependencies = [
+ "qnc-ai-place",
  "qnc-plugin-process",
  "serde",
  "serde_json",
@@ -6826,6 +6852,7 @@ name = "qnc-shot-caption"
 version = "0.1.0"
 dependencies = [
  "qnc-ai-catalog",
+ "qnc-ai-place",
  "qnc-plugin-process",
  "serde",
  "serde_json",
@@ -6873,6 +6900,7 @@ name = "qnc-shot-content"
 version = "0.1.0"
 dependencies = [
  "qnc-ai-catalog",
+ "qnc-ai-place",
  "qnc-plugin-process",
  "serde",
  "serde_json",
@@ -7487,6 +7515,7 @@ name = "qnc-text-translate"
 version = "0.1.0"
 dependencies = [
  "qnc-ai-catalog",
+ "qnc-ai-place",
  "qnc-plugin-process",
  "serde",
  "serde_json",
@@ -7593,6 +7622,7 @@ name = "qnc-transcribe-jobs"
 version = "0.1.0"
 dependencies = [
  "qnc-ai-catalog",
+ "qnc-ai-place",
  "qnc-decoder-catalog",
  "qnc-ffmpeg-decode",
  "qnc-plugin-process",

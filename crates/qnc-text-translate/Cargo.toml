@@ -5,6 +5,7 @@ edition = "2021"
 description = "QNC public block: the text-translate plug-in contract (qnc.text-translate 1), the application's side and the program's side"
 
 [dependencies]
+qnc-ai-place = { workspace = true }
 qnc-plugin-process = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }

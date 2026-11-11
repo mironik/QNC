@@ -6,4 +6,5 @@ description = "QNC public block: whether the engine of an AI job runs on this co
 
 [dependencies]
 qnc-ai-catalog = { workspace = true }
+qnc-ai-place = { workspace = true }
 qnc-plugin-process = { workspace = true }

@@ -8,9 +8,18 @@ pub const MODULE_ID: &str = "qnc.module.ai-engines";
 /// The engines a feature may name: the jobs of the AI catalog of this host.
 pub const KEYS: [&str; 7] = ["transcribe.fast", "transcribe.best", "letters", "shot_content", "shot_caption", "translate", "smooth"];
 
-/// Where the engine of `key` runs: on this computer (its program and model), or why it is not
-/// installed.
-pub fn state(key: &str) -> Result<String, String> {
+/// Where an engine runs: on this computer or on the AI server of this computer (`qnc-ai-place`).
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum Runs {
+    /// Its program and model on this computer.
+    Here(String),
+    /// The AI server of this computer and its program and model as named here.
+    Server { address: String, engine: String },
+}
+
+/// Where the engine of `key` runs: on this computer (its program and model), on the AI server of
+/// this computer, or why it is not installed.
+pub fn state(key: &str) -> Result<Runs, String> {
     use qnc_ai_catalog::Quality;
     let (program, model) = match key {
         "transcribe.fast" => qnc_ai_catalog::installed_transcriber_for(Quality::Fast).map(|engine| (engine.program, engine.model))?,
@@ -22,9 +31,12 @@ pub fn state(key: &str) -> Result<String, String> {
         "smooth" => qnc_ai_catalog::installed_frame_interpolator().map(|engine| (engine.program, engine.model))?,
         other => return Err(format!("no AI engine '{other}'")),
     };
+    let engine = format!("{program}, {}", qnc_ai_catalog::model_name(&model));
+    if let Some(server) = qnc_ai_place::server()? {
+        return Ok(Runs::Server { address: server.address, engine });
+    }
     qnc_plugin_process::beside_application(&program)?;
-    let model = model.file_name().map_or_else(|| model.display().to_string(), |name| name.to_string_lossy().into_owned());
-    Ok(format!("{program}, {model}"))
+    Ok(Runs::Here(engine))
 }
 
 #[cfg(test)]

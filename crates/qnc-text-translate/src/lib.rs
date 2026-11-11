@@ -55,8 +55,15 @@ impl TranslateClient {
             contract: CONTRACT.into(),
             version: CONTRACT_VERSION,
             timeout: Duration::from_secs(120),
+            remote: None,
         };
         Self { plugin: qnc_plugin_process::Plugin::new(spec) }
+    }
+
+    /// The program `program` where this computer runs its AI (`qnc-ai-place`): beside the
+    /// application, or on its AI server.
+    pub fn for_program(program: &str) -> Result<Self, String> {
+        Ok(Self { plugin: qnc_plugin_process::Plugin::new(qnc_ai_place::spec(program, CONTRACT, CONTRACT_VERSION, Duration::from_secs(120))?) })
     }
 
     /// Each text in English, in the order given; a longer list is asked in parts.

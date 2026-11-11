@@ -209,7 +209,7 @@ impl JobsClient {
     }
 
     pub fn new(executable: PathBuf) -> Self {
-        let spec = PluginSpec { executable, contract: CONTRACT.into(), version: CONTRACT_VERSION, timeout: TIMEOUT };
+        let spec = PluginSpec { executable, contract: CONTRACT.into(), version: CONTRACT_VERSION, timeout: TIMEOUT, remote: None };
         Self { spec, idle: Mutex::new(Vec::new()) }
     }
 

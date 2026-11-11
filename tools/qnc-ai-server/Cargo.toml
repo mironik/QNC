@@ -1,0 +1,12 @@
+[package]
+name = "qnc-ai-server"
+version = "0.1.0"
+edition = "2021"
+description = "QNC AI server (docs/102 step 6): serves the AI plug-in programs of its own AI catalog over the network to QNC on other computers (the LAN, the intranet, a laptop), with a token; the plug-in contracts are the same"
+
+[dependencies]
+qnc-ai-catalog = { workspace = true }
+qnc-dev-diagnostics = { workspace = true }
+qnc-plugin-process = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }

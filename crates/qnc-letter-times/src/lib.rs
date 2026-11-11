@@ -119,7 +119,7 @@ impl LetterTimes {
     fn start(&mut self, locator: &StillLocator, clip_id: String, words: Vec<Word>) {
         let aligner = match (&self.aligner, qnc_ai_catalog::installed_letter_aligner()) {
             (Some(aligner), _) => Ok(aligner.clone()),
-            (None, Ok(engine)) => qnc_plugin_process::beside_application(&engine.program).map(|program| Arc::new(qnc_letter_align::Aligner::new(&program))),
+            (None, Ok(engine)) => qnc_letter_align::Aligner::for_program(&engine.program).map(Arc::new),
             (None, Err(error)) => Err(error),
         };
         let (send, done) = mpsc::channel();

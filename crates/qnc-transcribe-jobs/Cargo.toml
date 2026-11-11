@@ -6,6 +6,7 @@ description = "QNC public block: speech to text as a plug-in program (contract q
 
 [dependencies]
 qnc-ai-catalog = { workspace = true }
+qnc-ai-place = { workspace = true }
 qnc-plugin-process = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true, features = ["float_roundtrip"] }

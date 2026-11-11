@@ -29,6 +29,7 @@ fn format(entry: &Entry) -> Result<Arc<dyn RecordFormat>, String> {
                 contract: qnc_record_format_plugin::CONTRACT.into(),
                 version: *contract_version,
                 timeout: Duration::from_millis(*timeout_ms),
+                remote: None,
             };
             Arc::new(qnc_record_format_plugin::PluginFormat::start(spec)?)
         }

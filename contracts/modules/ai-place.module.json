@@ -1,0 +1,21 @@
+{
+  "module_id": "qnc.module.ai-place",
+  "module_name": "AI Place",
+  "module_version": "0.1.0",
+  "module_kind": "library",
+  "capabilities": ["ai.place.server", "ai.place.plugin_spec"],
+  "input_contract_version": "0.1.0",
+  "output_contract_version": "0.1.0",
+  "transport_protocol_version": "0.1.0",
+  "transport_scope": ["local", "lan", "intranet"],
+  "supported_os": ["windows", "linux", "macos"],
+  "supported_cpu": ["x86_64", "aarch64"],
+  "forbidden_calls": ["db.write", "media.decode", "source.write", "media.probe"],
+  "forbidden_dependencies": ["qnc.module.media-probe"],
+  "state_policy": "stateless",
+  "database_write_policy": "no_db_writes",
+  "runtime_crate": "qnc-ai-place",
+  "input": "The setting of this computer ai-place.json beside its other settings: none (AI runs beside the application) or { server: host:port, token }.",
+  "output": "The plug-in spec of an AI program: beside the application, or on the AI server of this computer.",
+  "specification": "docs/102 step 6, user 2026-11-11: an AI server on the LAN, the intranet or a laptop. A setting of this computer, never of a project; a setting that cannot be read is an error, never a quiet fall back."
+}

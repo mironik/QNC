@@ -280,6 +280,7 @@ members = [
     "crates/qnc-ai-broll",
     "crates/qnc-shot-labels",
     "crates/qnc-ai-engines",
+    "crates/qnc-ai-place",
     "crates/qnc-ai-features",
     "crates/qnc-ai-features-view",
     "crates/qnc-shot-examples",
@@ -296,6 +297,7 @@ members = [
     "crates/qnc-letter-align",
     "crates/qnc-letter-db",
     "crates/qnc-letter-times",
+    "tools/qnc-ai-server",
     "tools/qnc-align-wav2vec2",
     "tools/qnc-shot-content-siglip",
     "tools/qnc-shot-caption-florence",
@@ -617,6 +619,7 @@ qnc-text-translate = { path = "crates/qnc-text-translate" }
 qnc-ai-broll = { path = "crates/qnc-ai-broll" }
 qnc-shot-labels = { path = "crates/qnc-shot-labels" }
 qnc-ai-engines = { path = "crates/qnc-ai-engines" }
+qnc-ai-place = { path = "crates/qnc-ai-place" }
 qnc-ai-features = { path = "crates/qnc-ai-features" }
 qnc-ai-features-view = { path = "crates/qnc-ai-features-view" }
 qnc-shot-examples = { path = "crates/qnc-shot-examples" }

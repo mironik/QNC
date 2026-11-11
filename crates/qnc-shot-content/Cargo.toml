@@ -5,6 +5,7 @@ edition = "2021"
 description = "QNC public block: the shot-content plug-in contract (qnc.shot-content 1), the application's side and the program's side"
 
 [dependencies]
+qnc-ai-place = { workspace = true }
 qnc-plugin-process = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }

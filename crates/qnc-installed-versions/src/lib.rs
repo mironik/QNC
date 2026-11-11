@@ -165,7 +165,7 @@ fn ask(role: String, program: &str, contract: &str, version: u32, timeout: Durat
             return line;
         }
     };
-    let spec = qnc_plugin_process::PluginSpec { executable, contract: contract.into(), version, timeout };
+    let spec = qnc_plugin_process::PluginSpec { executable, contract: contract.into(), version, timeout, remote: None };
     match qnc_plugin_process::Plugin::new(spec).ready() {
         Ok(ready) => {
             line.plugin_id = Some(ready.plugin_id);

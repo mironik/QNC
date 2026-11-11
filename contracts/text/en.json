@@ -560,6 +560,7 @@
     "ai.delete_template": "Delete",
     "ai.needed_lock": "needed by: {names}",
     "ai.engine_here": "on this computer: {engine}",
+    "ai.engine_server": "on the AI server {address}: {engine}",
     "ai.engine_missing": "not installed: {why}",
     "ai.unknown_feature": "Unknown AI feature '{code}'.",
     "ai.need_missing": "AI feature '{code}' needs '{need}', which is not on.",

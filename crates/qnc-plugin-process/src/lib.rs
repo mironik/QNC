@@ -86,6 +86,24 @@ pub struct PluginSpec {
     pub version: u32,
     /// How long one answer may take.
     pub timeout: Duration,
+    /// The server the program runs on (docs/102 step 6: an AI server on the LAN, the intranet or
+    /// a laptop); none: beside the application. On a server `executable` only names the program.
+    pub remote: Option<Remote>,
+}
+
+/// A server that runs plug-in programs (`qnc-ai-server`): its address and its token. Its first
+/// line is `{ token, program }`, its answer `{ ok: true }` or `{ error }`; then the plug-in's
+/// lines go both ways unchanged.
+#[derive(Clone, PartialEq, Eq)]
+pub struct Remote {
+    pub address: String,
+    pub token: String,
+}
+
+impl std::fmt::Debug for Remote {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("Remote").field("address", &self.address).finish_non_exhaustive()
+    }
 }
 
 /// A plug-in's program by its name, beside the running application (or one folder up, where a
@@ -117,9 +135,32 @@ pub fn background_command(executable: &Path) -> Command {
     command
 }
 
+/// How the application talks to a running plug-in: its process here, or its connection to a
+/// server that runs it.
+enum Link {
+    Local { child: Child, stdin: ChildStdin },
+    Remote(std::net::TcpStream),
+}
+
+impl Link {
+    fn writer(&mut self) -> &mut dyn Write {
+        match self {
+            Link::Local { stdin, .. } => stdin,
+            Link::Remote(stream) => stream,
+        }
+    }
+
+    /// Whether the process here has ended (a connection that ended shows in its lines).
+    fn ended(&mut self) -> bool {
+        match self {
+            Link::Local { child, .. } => child.try_wait().ok().flatten().is_some(),
+            Link::Remote(_) => false,
+        }
+    }
+}
+
 struct Running {
-    child: Child,
-    stdin: ChildStdin,
+    link: Link,
     lines: Receiver<Result<String, String>>,
     ready: Ready,
     next_id: u64,
@@ -128,8 +169,15 @@ struct Running {
 
 impl Drop for Running {
     fn drop(&mut self) {
-        let _ = self.child.kill();
-        let _ = self.child.wait();
+        match &mut self.link {
+            Link::Local { child, .. } => {
+                let _ = child.kill();
+                let _ = child.wait();
+            }
+            Link::Remote(stream) => {
+                let _ = stream.shutdown(std::net::Shutdown::Both);
+            }
+        }
     }
 }
 
@@ -186,7 +234,7 @@ impl Plugin {
         let id = running.next_id;
         running.next_id += 1;
         let program = self.spec.executable.display().to_string();
-        if let Err(error) = send(&mut running.stdin, &Request { id, op: op.into(), body }) {
+        if let Err(error) = send(running.link.writer(), &Request { id, op: op.into(), body }) {
             *guard = None; // a plug-in that broke is started again at the next request
             return Err(format!("plug-in {program}: {error}"));
         }
@@ -194,7 +242,7 @@ impl Plugin {
         let mut last_line = Instant::now();
         let answer = loop {
             if cancelled_at.is_none() && cancel.load(Ordering::Relaxed) {
-                if send(&mut running.stdin, &Request { id: 0, op: CANCEL.into(), body: id.into() }).is_err() {
+                if send(running.link.writer(), &Request { id: 0, op: CANCEL.into(), body: id.into() }).is_err() {
                     *guard = None;
                     return Err("cancelled".into());
                 }
@@ -247,7 +295,7 @@ impl Plugin {
     }
 
     fn started<'a>(&self, guard: &'a mut Option<Running>) -> Result<&'a mut Running, String> {
-        if guard.as_mut().is_some_and(|r| r.child.try_wait().ok().flatten().is_some()) {
+        if guard.as_mut().is_some_and(|r| r.link.ended()) {
             *guard = None;
         }
         if guard.is_none() {
@@ -258,19 +306,25 @@ impl Plugin {
 }
 
 fn start(spec: &PluginSpec) -> Result<Running, String> {
-    let mut command = background_command(&spec.executable);
-    command.stdin(Stdio::piped()).stdout(Stdio::piped()).stderr(Stdio::null());
-    let mut child = command.spawn().map_err(|e| format!("plug-in {} does not start: {e}", spec.executable.display()))?;
-    let mut stdin = child.stdin.take().ok_or("plug-in has no stdin")?;
-    let stdout = child.stdout.take().ok_or("plug-in has no stdout")?;
     let (send_line, lines) = mpsc::channel();
-    std::thread::Builder::new()
-        .name("qnc-plugin-read".into())
-        .spawn(move || read_lines(stdout, send_line))
-        .map_err(|e| e.to_string())?;
+    let mut link = match &spec.remote {
+        None => {
+            let mut command = background_command(&spec.executable);
+            command.stdin(Stdio::piped()).stdout(Stdio::piped()).stderr(Stdio::null());
+            let mut child = command.spawn().map_err(|e| format!("plug-in {} does not start: {e}", spec.executable.display()))?;
+            let stdin = child.stdin.take().ok_or("plug-in has no stdin")?;
+            let stdout = child.stdout.take().ok_or("plug-in has no stdout")?;
+            std::thread::Builder::new()
+                .name("qnc-plugin-read".into())
+                .spawn(move || read_lines(stdout, send_line))
+                .map_err(|e| e.to_string())?;
+            Link::Local { child, stdin }
+        }
+        Some(remote) => Link::Remote(connect(remote, &spec.executable, spec.timeout, send_line)?),
+    };
     let hello = Hello { contract: spec.contract.clone(), version: spec.version };
-    let ready = send(&mut stdin, &hello).and_then(|()| receive::<Ready>(&lines, spec.timeout));
-    let mut running = Running { child, stdin, lines, ready: Ready { contract: String::new(), version: 0, plugin_id: String::new(), plugin_version: String::new(), about: Value::Null }, next_id: 1, used: Instant::now() };
+    let ready = send(link.writer(), &hello).and_then(|()| receive::<Ready>(&lines, spec.timeout));
+    let mut running = Running { link, lines, ready: Ready { contract: String::new(), version: 0, plugin_id: String::new(), plugin_version: String::new(), about: Value::Null }, next_id: 1, used: Instant::now() };
     let ready = ready.map_err(|e| format!("plug-in {} did not say who it is: {e}", spec.executable.display()))?;
     if ready.contract != spec.contract || ready.version != spec.version {
         return Err(format!(
@@ -306,7 +360,7 @@ fn read_lines(stdout: impl std::io::Read, lines: mpsc::Sender<Result<String, Str
 
 use std::io::Read as _;
 
-fn send(stdin: &mut ChildStdin, message: &impl Serialize) -> Result<(), String> {
+fn send(stdin: &mut dyn Write, message: &impl Serialize) -> Result<(), String> {
     let mut line = serde_json::to_vec(message).map_err(|e| e.to_string())?;
     line.push(b'\n');
     stdin.write_all(&line).and_then(|()| stdin.flush()).map_err(|e| format!("the plug-in does not listen: {e}"))
@@ -422,4 +476,49 @@ fn write_line(out: &mut impl Write, message: &impl Serialize) -> Result<(), Stri
 /// The program of a plug-in for `spec`, as a path for messages.
 pub fn program(spec: &PluginSpec) -> &Path {
     &spec.executable
+}
+
+/// The answer of a server to its first line.
+#[derive(Debug, Deserialize)]
+struct ServerAnswer {
+    #[serde(default)]
+    ok: Option<bool>,
+    #[serde(default)]
+    error: Option<String>,
+}
+
+/// A connection to the server `remote` running the program `executable` names; its lines go to
+/// `lines` as a process's would.
+fn connect(remote: &Remote, executable: &Path, timeout: Duration, lines: mpsc::Sender<Result<String, String>>) -> Result<std::net::TcpStream, String> {
+    use std::net::ToSocketAddrs;
+    let program = executable.file_stem().map(|name| name.to_string_lossy().into_owned()).ok_or("a plug-in without a program name")?;
+    let address = remote.address.to_socket_addrs().map_err(|e| format!("AI server {}: {e}", remote.address))?.next().ok_or_else(|| format!("AI server {}: no address", remote.address))?;
+    let mut stream = std::net::TcpStream::connect_timeout(&address, Duration::from_secs(5)).map_err(|e| format!("AI server {}: {e}", remote.address))?;
+    let _ = stream.set_nodelay(true);
+    stream.set_read_timeout(Some(timeout)).map_err(|e| e.to_string())?;
+    let first = serde_json::json!({ "token": remote.token, "program": program });
+    send(&mut stream, &first).map_err(|e| format!("AI server {}: {e}", remote.address))?;
+    // The server's answer, read a byte at a time: what follows it belongs to the plug-in.
+    let mut answer = Vec::new();
+    let mut byte = [0u8; 1];
+    while answer.len() < 4096 {
+        match stream.read(&mut byte) {
+            Ok(0) => return Err(format!("AI server {} closed the connection", remote.address)),
+            Ok(_) if byte[0] == b'\n' => break,
+            Ok(_) => answer.push(byte[0]),
+            Err(e) => return Err(format!("AI server {}: {e}", remote.address)),
+        }
+    }
+    let answer: ServerAnswer = serde_json::from_slice(&answer).map_err(|e| format!("AI server {}: an answer outside its contract: {e}", remote.address))?;
+    if let Some(error) = answer.error {
+        return Err(format!("AI server {}: {error}", remote.address));
+    }
+    if answer.ok != Some(true) {
+        return Err(format!("AI server {}: no answer", remote.address));
+    }
+    // The plug-in's lines are waited for as a process's are (by the line channel's timeout).
+    stream.set_read_timeout(None).map_err(|e| e.to_string())?;
+    let reading = stream.try_clone().map_err(|e| e.to_string())?;
+    std::thread::Builder::new().name("qnc-plugin-read".into()).spawn(move || read_lines(reading, lines)).map_err(|e| e.to_string())?;
+    Ok(stream)
 }

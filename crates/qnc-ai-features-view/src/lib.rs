@@ -61,7 +61,8 @@ pub fn show(ui: &mut egui::Ui, choice: &mut Choice, settings: &mut Value) -> boo
             // Where its engine runs on this computer, or why it is not installed (docs/102 step 4).
             for state in choice.engines_of(feature) {
                 match state {
-                    Ok(engine) => ui.label(RichText::new(qnc_ui_text::fill("ai.engine_here", &[("engine", engine)])).weak().small()),
+                    Ok(qnc_ai_engines::Runs::Here(engine)) => ui.label(RichText::new(qnc_ui_text::fill("ai.engine_here", &[("engine", engine)])).weak().small()),
+                    Ok(qnc_ai_engines::Runs::Server { address, engine }) => ui.label(RichText::new(qnc_ui_text::fill("ai.engine_server", &[("address", address), ("engine", engine)])).weak().small()),
                     Err(why) => ui.label(RichText::new(qnc_ui_text::fill("ai.engine_missing", &[("why", why)])).color(qnc_desktop_theme::danger()).small()),
                 };
             }

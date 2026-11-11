@@ -302,7 +302,7 @@ pub struct Choice {
     pub message: String,
     /// Where the engines of the features run on this computer, by their key, read when the
     /// choice is loaded (docs/102 step 4): its program and model, or why it is not installed.
-    pub engines: Vec<(String, Result<String, String>)>,
+    pub engines: Vec<(String, Result<qnc_ai_engines::Runs, String>)>,
 }
 
 impl Choice {
@@ -417,7 +417,7 @@ impl Gate {
 impl Choice {
     /// What the engines of `feature` say on this computer: none when it uses no AI model, else
     /// for each engine its program and model, or why it is not installed.
-    pub fn engines_of(&self, feature: &Feature) -> Vec<&Result<String, String>> {
+    pub fn engines_of(&self, feature: &Feature) -> Vec<&Result<qnc_ai_engines::Runs, String>> {
         feature.engines.iter().filter_map(|key| self.engines.iter().find(|(engine, _)| engine == key).map(|(_, state)| state)).collect()
     }
 }

@@ -160,13 +160,14 @@ impl std::fmt::Debug for Transcriber {
 }
 
 impl Transcriber {
-    /// The program named `program`, beside the application.
+    /// The program named `program` where this computer runs its AI (`qnc-ai-place`): beside the
+    /// application, or on its AI server.
     pub fn beside_application(program: &str) -> Result<Self, String> {
-        Ok(Self::new(qnc_plugin_process::beside_application(program)?))
+        Ok(Self { plugin: Mutex::new(Plugin::new(qnc_ai_place::spec(program, CONTRACT, CONTRACT_VERSION, TIMEOUT)?)) })
     }
 
     pub fn new(executable: PathBuf) -> Self {
-        let spec = PluginSpec { executable, contract: CONTRACT.into(), version: CONTRACT_VERSION, timeout: TIMEOUT };
+        let spec = PluginSpec { executable, contract: CONTRACT.into(), version: CONTRACT_VERSION, timeout: TIMEOUT, remote: None };
         Self { plugin: Mutex::new(Plugin::new(spec)) }
     }
 

@@ -74,7 +74,7 @@ pub fn caption_missing(root: &Path, reader: &SettingsReader, settings: &WorkSett
     if wanted.is_empty() {
         return Ok(0);
     }
-    let client = qnc_shot_caption::CaptionClient::new(&qnc_plugin_process::beside_application(&captioner.program)?);
+    let client = qnc_shot_caption::CaptionClient::for_program(&captioner.program)?;
     let mut kept = 0;
     while !wanted.is_empty() {
         if !wait_for_player(pace) {

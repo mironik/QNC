@@ -82,7 +82,7 @@ pub fn shot_content(path: &Path) -> Result<ShotContentEngine, String> {
         return Err("shot content: pictures per part is 1, 2 or 3".into());
     }
     let model = path.parent().ok_or("the AI catalog has no folder")?.join(&job.model);
-    if !model.exists() {
+    if !model_here(&model) {
         return Err(format!("shot content: the model {} is not on this host", model.display()));
     }
     Ok(ShotContentEngine { program: job.program, model, pictures: job.pictures })
@@ -115,7 +115,7 @@ pub fn shot_captioner(path: &Path) -> Result<ShotCaptioner, String> {
     let file: File = serde_json::from_str(&text).map_err(|e| format!("{}: {e}", path.display()))?;
     let job = file.shot_caption.ok_or("the AI catalog of this host has no shot captioner")?;
     let model = path.parent().ok_or("the AI catalog has no folder")?.join(&job.model);
-    if !model.exists() {
+    if !model_here(&model) {
         return Err(format!("shot captioner: the model {} is not on this host", model.display()));
     }
     Ok(ShotCaptioner { program: job.program, model })
@@ -174,7 +174,7 @@ pub fn letter_aligner(path: &Path) -> Result<LetterAligner, String> {
     let file: File = serde_json::from_str(&text).map_err(|e| format!("{}: {e}", path.display()))?;
     let job = file.letters.ok_or("the AI catalog of this host has no letter aligner")?;
     let model = path.parent().ok_or("the AI catalog has no folder")?.join(&job.model);
-    if !model.exists() {
+    if !model_here(&model) {
         return Err(format!("letter aligner: the model {} is not on this host", model.display()));
     }
     Ok(LetterAligner { program: job.program, model })
@@ -301,7 +301,7 @@ fn engine_in(file: &File, folder: &Path, selected: &str) -> Result<Transcriber, 
     }
     let present = |relative: &str| -> Result<PathBuf, String> {
         let file = folder.join(relative);
-        if file.exists() {
+        if model_here(&file) {
             Ok(file)
         } else {
             Err(format!("transcription engine {}: the model {} is not on this host", engine.id, file.display()))
@@ -358,7 +358,7 @@ pub fn translator(path: &Path) -> Result<Translator, String> {
     let file: File = serde_json::from_str(&text).map_err(|e| format!("{}: {e}", path.display()))?;
     let job = file.translate.ok_or("the AI catalog of this host has no translator")?;
     let model = path.parent().ok_or("the AI catalog has no folder")?.join(&job.model);
-    if !model.exists() {
+    if !model_here(&model) {
         return Err(format!("translator: the model {} is not on this host", model.display()));
     }
     if job.from.is_empty() {
@@ -381,7 +381,7 @@ pub fn installed_model(name: &str) -> Result<PathBuf, String> {
     let catalog: serde_json::Value = serde_json::from_str(&text).map_err(|e| format!("{}: {e}", path.display()))?;
     let folder = path.parent().ok_or("the AI catalog has no folder")?;
     let mut models = Vec::new();
-    collect_models(&catalog, &mut models);
+    collect(&catalog, &["model", "vad_model"], &mut models);
     models
         .into_iter()
         .map(|relative| folder.join(relative))
@@ -390,17 +390,41 @@ pub fn installed_model(name: &str) -> Result<PathBuf, String> {
         .ok_or_else(|| format!("the model {name} is not in the AI catalog of this host or not on it"))
 }
 
-fn collect_models(value: &serde_json::Value, into: &mut Vec<String>) {
+/// The plug-in programs this host's catalog names (an AI server runs only these): every job but
+/// the frame interpolator of the smooth cut, which is a tool of this computer, not a plug-in.
+pub fn installed_programs() -> Result<Vec<String>, String> {
+    let path = installed_path()?;
+    let text = std::fs::read_to_string(&path).map_err(|e| format!("{}: {e}", path.display()))?;
+    let mut catalog: serde_json::Value = serde_json::from_str(&text).map_err(|e| format!("{}: {e}", path.display()))?;
+    if let Some(jobs) = catalog.as_object_mut() {
+        jobs.remove("smooth");
+    }
+    let mut programs = Vec::new();
+    collect(&catalog, &["program"], &mut programs);
+    programs.sort_unstable();
+    programs.dedup();
+    Ok(programs)
+}
+
+/// Every string of the catalog under one of `keys`, however deep.
+fn collect(value: &serde_json::Value, keys: &[&str], into: &mut Vec<String>) {
     match value {
         serde_json::Value::Object(map) => {
             for (key, value) in map {
                 match value {
-                    serde_json::Value::String(model) if key == "model" || key == "vad_model" => into.push(model.clone()),
-                    other => collect_models(other, into),
+                    serde_json::Value::String(text) if keys.contains(&key.as_str()) => into.push(text.clone()),
+                    other => collect(other, keys, into),
                 }
             }
         }
-        serde_json::Value::Array(items) => items.iter().for_each(|item| collect_models(item, into)),
+        serde_json::Value::Array(items) => items.iter().for_each(|item| collect(item, keys, into)),
         _ => {}
     }
+}
+
+/// Whether a model the application names is where it runs: on this computer, or on the AI
+/// server of this computer (docs/102 step 6: a laptop asking a server needs no models; the
+/// program there finds them in its own catalog, strictly).
+fn model_here(model: &Path) -> bool {
+    model.exists() || qnc_ai_place::server().ok().flatten().is_some()
 }
