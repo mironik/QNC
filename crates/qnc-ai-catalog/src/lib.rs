@@ -38,6 +38,11 @@ struct File {
     /// none.
     #[serde(default)]
     translate: Option<TranslateJob>,
+    /// The store of the captions and the corrections an AI server keeps for every QNC that uses it
+    /// (docs/102 step 7b); a host that is no AI server needs none.
+    #[serde(default)]
+    #[allow(dead_code)]
+    store: Option<StoreJob>,
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -319,6 +324,13 @@ fn engine_in(file: &File, folder: &Path, selected: &str) -> Result<Transcriber, 
 
 #[cfg(test)]
 mod tests;
+
+#[derive(Debug, Clone, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct StoreJob {
+    #[allow(dead_code)]
+    program: String,
+}
 
 #[derive(Debug, Clone, Deserialize)]
 #[serde(deny_unknown_fields)]

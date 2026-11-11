@@ -1,0 +1,21 @@
+{
+  "module_id": "qnc.module.ai-store",
+  "module_name": "AI Store",
+  "module_version": "0.1.0",
+  "module_kind": "library",
+  "capabilities": ["ai.store.captions", "ai.store.examples"],
+  "input_contract_version": "0.1.0",
+  "output_contract_version": "0.1.0",
+  "transport_protocol_version": "0.1.0",
+  "transport_scope": ["local", "lan", "intranet"],
+  "supported_os": ["windows", "linux", "macos"],
+  "supported_cpu": ["x86_64", "aarch64"],
+  "forbidden_calls": ["db.write", "media.decode", "source.write", "media.probe"],
+  "forbidden_dependencies": ["qnc.module.media-probe"],
+  "state_policy": "stateless",
+  "database_write_policy": "no_db_writes",
+  "runtime_crate": "qnc-ai-store",
+  "input": "The AI server of this computer (qnc-ai-place) and a caption or a correction of a shot, or what is asked of them.",
+  "output": "The captions and the corrections kept on the AI server, through its store program (contract qnc.ai-store 1).",
+  "specification": "docs/102 step 7b, user 2026-11-11: the captions and the corrections are common to every QNC that uses the AI server. The client writes no database itself; the store program writes only the databases of the server's computer."
+}

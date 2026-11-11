@@ -86,7 +86,7 @@ pub fn path(root: &Path) -> PathBuf {
 
 /// The examples of `model` in the examples database of `root`, the oldest first; none while the
 /// database does not exist.
-pub fn read(root: &Path, model: &str) -> Result<Vec<Example>, String> {
+pub fn read_here(root: &Path, model: &str) -> Result<Vec<Example>, String> {
     let file = path(root);
     if !file.is_file() {
         return Ok(Vec::new());
@@ -110,7 +110,7 @@ pub fn read(root: &Path, model: &str) -> Result<Vec<Example>, String> {
 
 /// Keeps `example` in the examples database of `root`, replacing the correction of the same
 /// shot.
-pub fn save(root: &Path, example: &Example) -> Result<(), String> {
+pub fn save_here(root: &Path, example: &Example) -> Result<(), String> {
     let valid = !example.model.is_empty()
         && !example.key.is_empty()
         && example.key.len() <= 1000
@@ -198,5 +198,30 @@ mod tests {
         assert_eq!(group_with(&corrected, &described, "b", &[0.0, 1.0]), Some(("pool", Taught::Described)));
         assert_eq!(group_with(&corrected, &described, "y", &[0.141, 0.99]), Some(("pool", Taught::LikeDescribed)));
         assert_eq!(group_with(&corrected, &described, "z", &[0.7, -0.7]), None);
+    }
+}
+
+/// The examples of `model`, the oldest first: on the AI server of this computer when it names one
+/// (docs/102 step 7b, user 2026-11-11: "common to all, we are building a base to train on"), else
+/// in the examples database of `root`.
+pub fn read(root: &Path, model: &str) -> Result<Vec<Example>, String> {
+    match qnc_ai_place::server_of(root)? {
+        Some(server) => Ok(qnc_ai_store::read_examples(&qnc_ai_store::on(&server), model)?
+            .into_iter()
+            .map(|example| Example { model: model.into(), key: example.key, label: example.label, vector: example.vector })
+            .collect()),
+        None => read_here(root, model),
+    }
+}
+
+/// Keeps `example`: on the AI server, else here.
+pub fn save(root: &Path, example: &Example) -> Result<(), String> {
+    match qnc_ai_place::server_of(root)? {
+        Some(server) => qnc_ai_store::save_example(
+            &qnc_ai_store::on(&server),
+            &example.model,
+            qnc_ai_store::Example { key: example.key.clone(), label: example.label.clone(), vector: example.vector.clone() },
+        ),
+        None => save_here(root, example),
     }
 }

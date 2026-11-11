@@ -9166,3 +9166,14 @@ prvi redak s tokenom ide tek kroz TLS. Provjereno na izoliranom korijenu: Parake
 odbijen. Testovi `a_client_talks_only_to_the_server_of_the_fingerprint_it_names`,
 `the_server_hears_the_token_and_the_program_over_tls_and_its_refusal_is_the_error`. Kljuc servera cuva se kao datoteka bez
 dodatne zastite (prava mape korisnika); drugi stroj na LAN-u nije proban.
+Izvedeno 2026-11-11 (korisnik: "da, kreni sa 7b"; docs/102 korak 7b, odluka 3 "zajednicki svima, gradimo bazu kako bi mogli
+trenirati"): opisi kadrova i ispravci grupa zajednicki su svim QNC-ima koji koriste isti AI server. Ugovor
+`contracts/plugins/ai-store.v1.json` (`qnc.ai-store` 1: captioned, read_captions, save_caption, read_examples,
+save_example), nova javna kocka `crates/qnc-ai-store` (+ ugovor modula; klijent i strana programa; jedna veza po serveru) i
+program `qnc-ai-store` (paket `tools/qnc-ai-store-program`) uz AI server, koji ga pokrece kao svaki dodatak (TLS, token) i koji
+pise samo baze svog racunala. AI katalog ima posao `store`; `pack.json` i AI paket nose program. `qnc-shot-captions` i
+`qnc-shot-examples`: javne funkcije (`captioned`, `read_clip`, `save`, `read`, `save`) idu na spremiste servera kad racunalo u
+`ai-place.json` navodi server, inace u baze racunala kao dosad (`*_here`); pozivatelji nisu mijenjani. Provjereno na dva
+izolirana korijena (server i "drugo racunalo"): opis i ispravak spremljeni kroz server i procitani natrag, baze su nastale na
+serveru, klijent nema nijednu. Nije izvedeno: postojeci opisi i ispravci ovog racunala ne prenose se na server (bez migracije);
+drugi stroj na LAN-u nije proban.

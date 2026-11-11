@@ -9,7 +9,8 @@
     { "program": "qnc-shot-caption-florence", "beside": ["onnxruntime.dll", "onnxruntime_providers_shared.dll"], "licence": "QNC (ONNX Runtime MIT)", "status": "known" },
     { "program": "qnc-translate-opus", "beside": [], "licence": "QNC", "status": "known" },
     { "program": "rife-ncnn-vulkan", "beside": ["vcomp140.dll"], "licence": "MIT (nihui/rife-ncnn-vulkan); vcomp140.dll: Microsoft Visual C++ redistributable", "status": "known" },
-    { "program": "qnc-ai-server", "beside": [], "licence": "QNC", "status": "known" }
+    { "program": "qnc-ai-server", "beside": [], "licence": "QNC", "status": "known" },
+    { "program": "qnc-ai-store", "beside": [], "licence": "QNC", "status": "known" }
   ],
   "libraries": [
     { "file": "sherpa-onnx-c-api.dll", "licence": "Apache-2.0 (k2-fsa/sherpa-onnx)" },

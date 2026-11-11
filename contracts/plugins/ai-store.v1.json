@@ -1,0 +1,19 @@
+{
+  "contract": "qnc.ai-store",
+  "version": 1,
+  "purpose": "The captions of the shots and the users' corrections of their groups kept on the AI server, common to every QNC that uses it (docs/102 step 7b, user 2026-11-11: \"common to all, we are building a base to train on\"). The store program runs beside the AI server, which starts it like any plug-in (over TLS, with the token). Without a server a QNC keeps them in the databases of its computer.",
+  "transport": "The JSON lines of qnc.module.plugin-process: the application's hello, the plug-in's ready, then one request at a time.",
+  "handshake": {
+    "application": { "contract": "qnc.ai-store", "version": 1 },
+    "plugin": { "contract": "qnc.ai-store", "version": 1, "plugin_id": "qnc.ai-store", "plugin_version": "its version", "about": null }
+  },
+  "operations": {
+    "captioned": { "body": "{ model, project_uri }", "ok": "[shot_key]: the shots of the project with a caption of the model" },
+    "read_captions": { "body": "{ model, project_uri, clip_id }", "ok": "[{ from, to, text }]: the captions of the clip, by its frames" },
+    "save_caption": { "body": "{ model, shot_key, text }", "ok": "null: the caption kept, replacing the shot's earlier one" },
+    "read_examples": { "body": "{ model }", "ok": "[{ key, label, vector }]: the corrections of the model, the oldest first" },
+    "save_example": { "body": "{ model, example: { key, label, vector } }", "ok": "null: the correction kept, replacing the shot's earlier one" }
+  },
+  "rules": "A shot is its project's public URI, clip and frames (project|clip|from|to). A caption or a correction outside the rules of the databases (qnc-shot-captions, qnc-shot-examples) is an error. The store program writes only the databases of its own computer.",
+  "acceptance": "crates/qnc-shot-examples/examples/through_server.rs (a caption and a correction kept and read back through the AI server of the root it is given)."
+}

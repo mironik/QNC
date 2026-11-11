@@ -184,7 +184,7 @@ fn make(out: &Path, include_unchecked: bool) -> Result<(), String> {
     let catalog = plain(&catalog);
     let catalog_dir = catalog.parent().ok_or("no catalog folder")?;
     let (mut jobs, mut left_out) = (Vec::new(), Vec::new());
-    let mut programs: BTreeSet<String> = BTreeSet::from(["qnc-ai-server".to_string()]);
+    let mut programs: BTreeSet<String> = BTreeSet::from(["qnc-ai-server".to_string(), "qnc-ai-store".to_string()]);
     let mut models = BTreeSet::new();
     for (job, used) in used() {
         let used = match used {

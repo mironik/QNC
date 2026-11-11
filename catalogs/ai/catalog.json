@@ -18,6 +18,9 @@
     "model": "../../data/models/opus-mt-tc-big-sh-en",
     "from": ["hr", "sr", "bs"]
   },
+  "store": {
+    "program": "qnc-ai-store"
+  },
   "letters": {
     "program": "qnc-align-wav2vec2",
     "model": "../../data/models/wav2vec2-parlaspeech-hr"

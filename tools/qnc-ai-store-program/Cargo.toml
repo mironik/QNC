@@ -1,0 +1,15 @@
+[package]
+name = "qnc-ai-store-program"
+version = "0.1.0"
+edition = "2021"
+description = "QNC AI store program (contract qnc.ai-store 1, docs/102 step 7b): beside the AI server, it keeps the captions of the shots and the users' corrections of their groups in the databases of its computer, common to every QNC that uses the server"
+
+[[bin]]
+name = "qnc-ai-store"
+path = "src/main.rs"
+
+[dependencies]
+qnc-ai-store = { workspace = true }
+qnc-dev-diagnostics = { workspace = true }
+qnc-shot-captions = { workspace = true }
+qnc-shot-examples = { workspace = true }

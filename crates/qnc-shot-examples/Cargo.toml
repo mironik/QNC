@@ -5,9 +5,12 @@ edition = "2021"
 description = "QNC public block: the corrected AI B-roll groups of this computer, kept outside the projects in data/qnc-shot-examples.db (its only writer); a shot like a corrected one follows its group"
 
 [dependencies]
+qnc-ai-place = { workspace = true }
+qnc-ai-store = { workspace = true }
 qnc-ui-text = { workspace = true }
 rusqlite = { workspace = true }
 serde_json = "1"
 
 [dev-dependencies]
+qnc-shot-captions = { workspace = true }
 tempfile = "3"

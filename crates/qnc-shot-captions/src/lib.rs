@@ -36,7 +36,7 @@ pub fn path(root: &Path) -> PathBuf {
 }
 
 /// The keys of the shots of `project_uri` that have a caption of `model`.
-pub fn captioned(root: &Path, model: &str, project_uri: &str) -> Result<Vec<String>, String> {
+pub fn captioned_here(root: &Path, model: &str, project_uri: &str) -> Result<Vec<String>, String> {
     let Some(conn) = open_read(root)? else { return Ok(Vec::new()) };
     let mut statement = conn.prepare("SELECT shot_key FROM public_shot_captions WHERE model = ?1 AND shot_key LIKE ?2 ESCAPE '\\'").map_err(err)?;
     let rows = statement.query_map(params![model, format!("{}|%", like(project_uri))], |r| r.get::<_, String>(0)).map_err(err)?;
@@ -44,7 +44,7 @@ pub fn captioned(root: &Path, model: &str, project_uri: &str) -> Result<Vec<Stri
 }
 
 /// The captions of `model` of a clip of `project_uri`, by its frames.
-pub fn read_clip(root: &Path, model: &str, project_uri: &str, clip_id: &str) -> Result<Vec<Caption>, String> {
+pub fn read_clip_here(root: &Path, model: &str, project_uri: &str, clip_id: &str) -> Result<Vec<Caption>, String> {
     let Some(conn) = open_read(root)? else { return Ok(Vec::new()) };
     let prefix = format!("{project_uri}|{clip_id}|");
     let mut statement = conn.prepare("SELECT shot_key, caption FROM public_shot_captions WHERE model = ?1 AND shot_key LIKE ?2 ESCAPE '\\'").map_err(err)?;
@@ -63,7 +63,7 @@ pub fn read_clip(root: &Path, model: &str, project_uri: &str, clip_id: &str) -> 
 }
 
 /// Keeps the caption `text` of `model` of the shot `shot_key`, replacing what was kept for it.
-pub fn save(root: &Path, model: &str, shot_key: &str, text: &str) -> Result<(), String> {
+pub fn save_here(root: &Path, model: &str, shot_key: &str, text: &str) -> Result<(), String> {
     let text = text.trim();
     if model.is_empty() || shot_key.matches('|').count() < 3 || text.is_empty() || text.len() > LONGEST {
         return Err(qnc_ui_text::text("db.shot_caption_invalid").into());
@@ -129,5 +129,34 @@ mod tests {
         assert_eq!(captioned(root.path(), "m", "qnc://p_1").unwrap().len(), 3);
         assert!(save(root.path(), "m", "not a key", "x").is_err());
         assert!(save(root.path(), "m", &key("qnc://p_1", "a", 0, 1), "  ").is_err());
+    }
+}
+
+/// The keys of the shots of `project_uri` that have a caption of `model`: on the AI server of
+/// this computer when it names one (docs/102 step 7b: common to every QNC that uses it), else in
+/// the captions database of `root`.
+pub fn captioned(root: &Path, model: &str, project_uri: &str) -> Result<Vec<String>, String> {
+    match qnc_ai_place::server_of(root)? {
+        Some(server) => qnc_ai_store::captioned(&qnc_ai_store::on(&server), model, project_uri),
+        None => captioned_here(root, model, project_uri),
+    }
+}
+
+/// The captions of `model` of a clip of `project_uri`: on the AI server, else here.
+pub fn read_clip(root: &Path, model: &str, project_uri: &str, clip_id: &str) -> Result<Vec<Caption>, String> {
+    match qnc_ai_place::server_of(root)? {
+        Some(server) => Ok(qnc_ai_store::read_captions(&qnc_ai_store::on(&server), model, project_uri, clip_id)?
+            .into_iter()
+            .map(|caption| Caption { from: caption.from, to: caption.to, text: caption.text })
+            .collect()),
+        None => read_clip_here(root, model, project_uri, clip_id),
+    }
+}
+
+/// Keeps the caption of a shot: on the AI server, else here.
+pub fn save(root: &Path, model: &str, shot_key: &str, text: &str) -> Result<(), String> {
+    match qnc_ai_place::server_of(root)? {
+        Some(server) => qnc_ai_store::save_caption(&qnc_ai_store::on(&server), model, shot_key, text),
+        None => save_here(root, model, shot_key, text),
     }
 }

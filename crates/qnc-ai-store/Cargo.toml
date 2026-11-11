@@ -1,0 +1,11 @@
+[package]
+name = "qnc-ai-store"
+version = "0.1.0"
+edition = "2021"
+description = "QNC public block: the AI store contract (qnc.ai-store 1, docs/102 step 7b): the captions of the shots and the user's corrections of their groups kept on the AI server, common to every QNC that uses it; the client and the side the store program serves"
+
+[dependencies]
+qnc-ai-place = { workspace = true }
+qnc-plugin-process = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }

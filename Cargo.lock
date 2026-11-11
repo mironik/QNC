@@ -3806,6 +3806,26 @@ dependencies = [
 ]
 
 [[package]]
+name = "qnc-ai-store"
+version = "0.1.0"
+dependencies = [
+ "qnc-ai-place",
+ "qnc-plugin-process",
+ "serde",
+ "serde_json",
+]
+
+[[package]]
+name = "qnc-ai-store-program"
+version = "0.1.0"
+dependencies = [
+ "qnc-ai-store",
+ "qnc-dev-diagnostics",
+ "qnc-shot-captions",
+ "qnc-shot-examples",
+]
+
+[[package]]
 name = "qnc-ai-tls"
 version = "0.1.0"
 dependencies = [
@@ -6941,6 +6961,8 @@ dependencies = [
 name = "qnc-shot-captions"
 version = "0.1.0"
 dependencies = [
+ "qnc-ai-place",
+ "qnc-ai-store",
  "qnc-ui-text",
  "rusqlite",
  "tempfile",
@@ -7026,6 +7048,9 @@ version = "0.1.0"
 name = "qnc-shot-examples"
 version = "0.1.0"
 dependencies = [
+ "qnc-ai-place",
+ "qnc-ai-store",
+ "qnc-shot-captions",
  "qnc-ui-text",
  "rusqlite",
  "serde_json",

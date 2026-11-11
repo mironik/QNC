@@ -5,6 +5,8 @@ edition = "2021"
 description = "QNC public block: the captions a model wrote of the shots, kept on this computer in data/qnc-shot-captions.db (its only writer), outside every project"
 
 [dependencies]
+qnc-ai-place = { workspace = true }
+qnc-ai-store = { workspace = true }
 qnc-ui-text = { workspace = true }
 rusqlite = { workspace = true }
 
