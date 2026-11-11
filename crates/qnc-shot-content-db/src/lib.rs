@@ -124,7 +124,7 @@ fn encode(operation: &Operation) -> Result<Value> {
 }
 
 fn read(target: &ProjectDbTarget, operation: Operation) -> Result<Data> {
-    let mut client = target.open(Access::ReadOnly, vec![ShotContentModule::factory()])?;
+    let mut client = target.ai().open(Access::ReadOnly, vec![ShotContentModule::factory()])?;
     let answer = client.execute(MODULE_ID, encode(&operation)?)?;
     serde_json::from_value(answer).map_err(|e| e.to_string())
 }
@@ -165,7 +165,7 @@ pub fn save_labels(target: &ProjectDbTarget, labels: LabelSet, lease: Option<Wri
 }
 
 fn write(target: &ProjectDbTarget, operation: Operation, lease: Option<WriteLease>) -> Result<()> {
-    let writer = qnc_db_broker::ProjectDbWriter::spawn(target.clone(), vec![ShotContentModule::factory()])?;
+    let writer = qnc_db_broker::ProjectDbWriter::spawn(target.ai(), vec![ShotContentModule::factory()])?;
     let writer = match lease {
         Some(lease) => writer.leased(lease),
         None => writer,

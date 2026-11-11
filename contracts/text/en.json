@@ -399,6 +399,7 @@
     "db.ingest_database_belongs_another_project": "The Ingest database belongs to another project.",
     "db.access_read_only": "The access is read-only.",
     "db.draft_story_local_only": "The S-Story story is kept only beside a local project database.",
+    "db.ai_file_local_only": "The AI results of a project are kept only beside a local project database.",
     "db.invalid_source": "Invalid source.",
     "db.ingest_schema_initialised": "The Ingest schema is not initialised.",
     "db.invalid_write_batch_size": "Invalid write batch size.",

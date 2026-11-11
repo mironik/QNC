@@ -104,7 +104,7 @@ fn encode(operation: &Operation) -> Result<Value> {
 }
 
 fn read(target: &ProjectDbTarget, operation: Operation) -> Result<Data> {
-    let mut client = target.open(Access::ReadOnly, vec![ShotModule::factory()])?;
+    let mut client = target.ai().open(Access::ReadOnly, vec![ShotModule::factory()])?;
     let answer = client.execute(MODULE_ID, encode(&operation)?)?;
     serde_json::from_value(answer).map_err(|e| e.to_string())
 }
@@ -128,7 +128,7 @@ pub fn read_analysed(target: &ProjectDbTarget) -> Result<Vec<String>> {
 /// Keeps `shots` in the project behind `target` through its serial writer, under `lease`
 /// when given (checked in the same transaction as the write).
 pub fn save(target: &ProjectDbTarget, shots: ClipShots, lease: Option<WriteLease>) -> Result<()> {
-    let writer = qnc_db_broker::ProjectDbWriter::spawn(target.clone(), vec![ShotModule::factory()])?;
+    let writer = qnc_db_broker::ProjectDbWriter::spawn(target.ai(), vec![ShotModule::factory()])?;
     let writer = match lease {
         Some(lease) => writer.leased(lease),
         None => writer,

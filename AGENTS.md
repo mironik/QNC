@@ -9129,3 +9129,13 @@ Project Advanced uz sklopku pise "na AI serveru adresa: program, model" (`qnc-ai
 korijenu (postavke ovog racunala nisu dirane): server na 127.0.0.1, prijepis wav2vec2 kroz server, kriv token i program kojeg
 nema u katalogu servera odbijeni; test `the_server_hears_the_token_and_the_program_and_its_refusal_is_the_error`. Nije izvedeno:
 TLS (token i sadrzaj idu nesifrirani; za LAN/intranet tek uz TLS), drugi stroj na LAN-u, Smooth i Whisper na serveru.
+Izvedeno 2026-11-11 (korisnik: "da, kreni s korakom 7"; docs/102 korak 7): AI rezultati projekta odvojeni od projekta. Tablice
+analize kadrova (`clip_shots`) i sadrzaja kadra (`clip_content`, `shot_label_vectors`) su u `ai.db` uz `project.db`
+(`qnc-db-broker` `ProjectDbTarget::ai`, `AI_FILE`; ista pratna datoteka kao `story-draft-n.db`, `with_companion`: baza
+projekta prikljucena samo za katalog, postavke i najmove). `qnc-shot-db` i `qnc-shot-content-db` otvaraju je sami, pozivatelji
+nisu mijenjani. Brisanje `ai.db` ne dira projekt: AI ponovno pregleda klipove. Projekt cija je baza na LAN-u ili intranetu nema
+AI datoteku (`db.ai_file_local_only`). Prijepisi ostaju u `project.db` (prica ih treba). Postojeci AI zapisi u `project.db` se
+ne prenose (bez migracije): AI ih napravi ponovno u `ai.db`, stare tablice ostaju neiskoristene. Ugovori baza `shots`,
+`shot-content` (pravilo `file`). Test `the_analysis_is_kept_in_the_ai_file_beside_the_project_not_in_it`. Nije izvedeno (7b):
+zajednicki opisi kadrova i ispravci grupa na AI serveru (odluka 3: zajednicki svima); danas su u bazama ovog racunala
+(`qnc-shot-captions`, `qnc-shot-examples`).

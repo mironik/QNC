@@ -16,6 +16,7 @@
   "write_owner": "qnc.module.shot-content-db",
   "public_read_policy": "public_read_views",
   "rules": {
+    "file": "Its tables are in ai.db beside the project database (docs/102 step 7, user 2026-11-11: AI is an add-on), opened through the same intermediary with the project database attached for the catalog, the settings and the leases; deleting ai.db leaves the project as it was and the AI looks at its clips again. A project database on the LAN or intranet keeps no AI file.",
     "clip": "A row is what the usable parts of one clip show (user 2026-11-10: sorting the B-roll by content): per part of its shot analysis the clip frames [from, to), the frames its 1-3 pictures were taken at and one vector of what they show (their mean, unit length); or only why the clip was not looked at.",
     "model": "A row names the model its vectors come from; vectors of different models are not compared, and a clip is looked at again for another model.",
     "labels": "No labels are kept: which labels a part gets is worked out from its vector when it is read (catalogs/ai/shot-labels.json), so a newsroom's own list needs no new look at the pictures.",

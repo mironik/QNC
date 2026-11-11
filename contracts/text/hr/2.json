@@ -77,6 +77,7 @@
     "db.ingest_database_belongs_another_project": "Ingest baza pripada drugom projektu.",
     "db.access_read_only": "Pristup je samo za čitanje.",
     "db.draft_story_local_only": "S-Story priča čuva se samo uz lokalnu bazu projekta.",
+    "db.ai_file_local_only": "AI rezultati projekta čuvaju se samo uz lokalnu bazu projekta.",
     "db.invalid_source": "Neispravan izvor.",
     "db.ingest_schema_initialised": "Ingest shema nije inicijalizirana.",
     "db.invalid_write_batch_size": "Neispravna veličina skupa za upis.",

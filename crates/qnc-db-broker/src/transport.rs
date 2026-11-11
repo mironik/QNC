@@ -15,7 +15,7 @@ use serde::{de::DeserializeOwned, Serialize};
 use serde_json::Value;
 
 use crate::{
-    project_db_uri, project_id, Access, Credentials, ProjectDb, Reply, Request, Result,
+    draft_file, project_db_uri, project_id, Access, Credentials, ProjectDb, Reply, Request, Result, AI_FILE,
     TableModuleFactory, WriteLease, MAX_BYTES, VERSION,
 };
 
@@ -36,6 +36,9 @@ pub struct ProjectDbTarget {
     /// own, beside the Story): the same table modules on a companion file of the project
     /// database, which it reads through.
     draft: Option<u32>,
+    /// The AI results of the project (docs/102 step 7): the same kind of companion file,
+    /// `ai.db`, so deleting it leaves the project as it was.
+    ai: bool,
 }
 
 #[derive(Clone)]
@@ -77,7 +80,7 @@ impl ProjectDbTarget {
                 token: owner.token.ok_or("Nedostaje DB credential.")?,
             },
         };
-        Ok(Self { uri, binding, draft: None })
+        Ok(Self { uri, binding, draft: None, ai: false })
     }
 
     /// The owner supplies the private file binding; the public identity stays `uri`.
@@ -87,6 +90,7 @@ impl ProjectDbTarget {
             uri: uri.into(),
             binding: Binding::Local(file.to_path_buf()),
             draft: None,
+            ai: false,
         })
     }
 
@@ -99,6 +103,7 @@ impl ProjectDbTarget {
             uri: uri.into(),
             binding: Binding::Remote { resolver, token },
             draft: None,
+            ai: false,
         })
     }
 
@@ -110,12 +115,19 @@ impl ProjectDbTarget {
     /// companion file beside the project database, reading the project database (catalog,
     /// settings, leases) through it. The Story is never written there.
     pub fn draft_story(&self, version: u32) -> Self {
-        Self { draft: Some(version), ..self.clone() }
+        Self { draft: Some(version), ai: false, ..self.clone() }
+    }
+
+    /// The AI results of the same project (docs/102 step 7, user 2026-11-11: AI is an add-on):
+    /// the tables of the AI modules in `ai.db` beside the project database, reading the project
+    /// database (catalog, settings, leases) through it. Deleting `ai.db` leaves the project.
+    pub fn ai(&self) -> Self {
+        Self { draft: None, ai: true, ..self.clone() }
     }
 
     /// The Story of the same project (from a draft target).
     pub fn main_story(&self) -> Self {
-        Self { draft: None, ..self.clone() }
+        Self { draft: None, ai: false, ..self.clone() }
     }
 
     pub fn is_draft(&self) -> bool {
@@ -135,14 +147,16 @@ impl ProjectDbTarget {
         let endpoint = match &self.binding {
             Binding::Local(file) => {
                 let db = ProjectDb::open(file, &self.uri, access, factories.clone())?;
-                Endpoint::Local(match self.draft {
-                    Some(version) => db.with_draft(version)?,
-                    None => db,
+                Endpoint::Local(match (self.draft, self.ai) {
+                    (Some(version), _) => db.with_companion(&draft_file(version))?,
+                    (None, true) => db.with_companion(AI_FILE)?,
+                    (None, false) => db,
                 })
             }
             Binding::Remote { .. } if self.draft.is_some() => {
                 return Err(qnc_ui_text::text("db.draft_story_local_only").into())
             }
+            Binding::Remote { .. } if self.ai => return Err(qnc_ui_text::text("db.ai_file_local_only").into()),
             Binding::Remote { resolver, token } => Endpoint::Remote(
                 JsonClient::connect(resolver, &self.uri, ENDPOINT, token, MAX_BYTES)
                     .map_err(|e| e.to_string())?,

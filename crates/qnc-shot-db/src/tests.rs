@@ -52,8 +52,8 @@ fn shots_with_a_gap_or_an_error_beside_shots_are_refused() {
 #[test]
 fn usable_parts_are_kept_and_an_earlier_table_without_them_is_analysed_again() {
     let (dir, target) = project();
-    // An analysis of the earlier form (without usable parts).
-    Connection::open(dir.path().join("project.db"))
+    // An analysis of the earlier form (without usable parts), in the AI file of the project.
+    Connection::open(dir.path().join(qnc_db_broker::AI_FILE))
         .unwrap()
         .execute_batch(
             "CREATE TABLE clip_shots (clip_id TEXT PRIMARY KEY, media_uri TEXT NOT NULL, pictures INTEGER NOT NULL,
@@ -69,4 +69,14 @@ fn usable_parts_are_kept_and_an_earlier_table_without_them_is_analysed_again() {
     assert_eq!(read_clip(&target, "c1").unwrap().unwrap().parts, [part]);
     let jerky = PartRecord { camera: "jerk".into(), ..PartRecord { from: 10, to: 200, camera: String::new(), key_frame: 50 } };
     assert!(save(&target, ClipShots { parts: vec![jerky], ..analysis("c2", Vec::new()) }, None).is_err());
+}
+
+#[test]
+fn the_analysis_is_kept_in_the_ai_file_beside_the_project_not_in_it() {
+    let (dir, target) = project();
+    save(&target, analysis("c1", vec![shot(0, 300, &[])]), None).unwrap();
+    let in_project: i64 = Connection::open(dir.path().join("project.db")).unwrap().query_row("SELECT count(*) FROM sqlite_master WHERE name = 'clip_shots'", [], |row| row.get(0)).unwrap();
+    assert_eq!(in_project, 0, "the project database has no AI table");
+    std::fs::remove_file(dir.path().join(qnc_db_broker::AI_FILE)).ok();
+    assert_eq!(read_clip(&target, "c1").unwrap(), None, "the AI file gone, the project reads as not analysed");
 }

@@ -25,6 +25,9 @@ pub struct ProjectDb {
 /// The files of the S-Story versions beside the project database: `story-draft-<n>.db`, one per
 /// version (user 2026-10-31: every version of the S-Story is a copy of the Story of its own).
 pub const DRAFT_PREFIX: &str = "story-draft-";
+/// The file of the AI results beside the project database (docs/102 step 7): the tables of the AI
+/// modules, apart from the project, so deleting it leaves the project as it was.
+pub const AI_FILE: &str = "ai.db";
 
 /// The file of version `version` of the S-Story.
 pub fn draft_file(version: u32) -> String {
@@ -99,8 +102,9 @@ impl ProjectDb {
     /// database, created empty when missing; the project database is attached read through, so
     /// the catalog, the settings and the leases are the project's. Unqualified names find the
     /// draft's tables first, so a module writes only there.
-    pub fn with_draft(mut self, version: u32) -> Result<Self> {
-        let file = self.file.with_file_name(draft_file(version));
+    /// The AI results of the project (`ai.db`) are such a companion file too.
+    pub fn with_companion(mut self, name: &str) -> Result<Self> {
+        let file = self.file.with_file_name(name);
         if !file.is_file() {
             Connection::open_with_flags(&file, OpenFlags::SQLITE_OPEN_READ_WRITE | OpenFlags::SQLITE_OPEN_CREATE)
                 .map_err(|e| e.to_string())?;
