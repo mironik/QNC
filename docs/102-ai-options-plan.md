@@ -104,6 +104,28 @@ Analiza kadrova (Video AI: rezovi i upotrebljivi dijelovi) nije AI model; vrijed
   pokretac i svaki prikaz pita samo nju. Stare sklopke (`ai.enabled`, `ai.transcription`,
   `ai.coverage_suggestions`) zamjenjuju se njome.
 
+### 3.2a AI templatei (korisnik 2026-11-11)
+
+Korisnik: "kako u projektu vec koristimo templatee za postavke projekta, tako bi se mogli koristiti i templatei
+za AI... netko ne zeli da mu se nude automatske pokrivalice... u templateu korisnik moze odabrati postavke koje
+mu trebaju, ali da sacuva ovisnosti: kad odabere automatske prijedloge pokrivalica ne moze iskljuciti analizu
+kadrova".
+
+- AI template je imenovani skup ukljucenih mogucnosti (sifre iz `features.json`), po istom obrascu kao
+  projektni templatei: sistemski AI templatei su zakljucani baseline (seed), korisnicki se spremaju u Project
+  registry (`system = 0`) i smiju se brisati.
+- Predlozeni sistemski: "Bez AI-ja" (zadano), "Prijepis" (transcription, letter_times, read_check), "Video AI"
+  (shot_analysis, shot_content, shot_caption), "News puni" (sve), "Bez prijedloga pokrivalica" (sve osim
+  broll_suggest i translate).
+- Projekt cuva izabrani AI template i stvarni skup mogucnosti u svojoj bazi (`ai.template`, `ai.features`);
+  korisnik nakon izbora smije sklopke dodatno mijenjati, a "Spremi kao AI template" pravi korisnicki.
+- Ovisnosti su pravilo jedne kocke (`qnc-ai-features`), isto u templateu i u projektu:
+  - ukljucivanje mogucnosti ukljucuje sve sto ona treba (npr. broll_suggest ukljuci shot_content i
+    shot_analysis);
+  - mogucnost koju treba neka ukljucena mogucnost je zakljucana (siva, ukljucena, uz razlog "treba je:
+    Prijedlog pokrivalica"); iskljucuje se tek kad se iskljuce sve koje je trebaju;
+  - template ili zapis koji krsi ovisnosti je nevaljan (kontrolirana greska), nikad se tiho ne popravlja.
+
 ### 3.3 AI server
 
 - Novi program `qnc-ai-server`: drzi iste programe dodataka i njihove modele na svom stroju i sluzi njihove
@@ -126,8 +148,9 @@ Analiza kadrova (Video AI: rezovi i upotrebljivi dijelovi) nije AI model; vrijed
 
 ## 4. Plan (redom)
 
-1. **Popis mogucnosti i kocka `qnc-ai-features`**; Project Advanced: odjeljak AI s jednom sklopkom po
-   mogucnosti (ovisne sive dok ovisnost nije ukljucena) i izbor "Gdje radi AI" (ovo racunalo / LAN /
+1. **Popis mogucnosti, AI templatei i kocka `qnc-ai-features`** (ovisnosti, 3.2a); Project Advanced:
+   odjeljak AI s izborom AI templatea, jednom sklopkom po mogucnosti (potrebne zakljucane dok ih nesto treba)
+   i "Spremi kao AI template" i izbor "Gdje radi AI" (ovo racunalo / LAN /
    Intranet). Treba otkljucati Project. Zadano sve iskljuceno; stare sklopke se citaju kao nove dok se ne
    zamijene (bez migracije: razvojni projekti dobivaju zadano).
 2. **Svaki pokretac pita `qnc-ai-features`**: pozadinski radnik (analiza, sadrzaj, opis), red prijepisa,
@@ -152,3 +175,5 @@ Analiza kadrova (Video AI: rezovi i upotrebljivi dijelovi) nije AI model; vrijed
    sadrzaj kadra na serveru)?
 3. Opisi kadrova i ispravci grupa na LAN-u: zajednicki (na serveru / u projektu) ili po racunalu?
 4. Otkljucavanje Projecta za korak 1 (Advanced odjeljak AI).
+5. AI template zaseban od projektnog templatea (projekt bira tehnicki template i AI template odvojeno;
+   predlozeno) ili AI kao dio projektnog templatea?
