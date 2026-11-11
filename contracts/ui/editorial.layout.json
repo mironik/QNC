@@ -233,6 +233,10 @@
           {
             "label": "@pool.tab.voice",
             "action_id": "editorial_tab_voice"
+          },
+          {
+            "label": "@pool.tab.ai_broll",
+            "action_id": "editorial_tab_ai_broll"
           }
         ]
       },
@@ -298,6 +302,10 @@
           {
             "label": "@pool.tab.voice",
             "action_id": "editorial_tab_voice"
+          },
+          {
+            "label": "@pool.tab.ai_broll",
+            "action_id": "editorial_tab_ai_broll"
           }
         ]
       },

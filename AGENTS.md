@@ -9014,3 +9014,15 @@ kadrova vrijede kad je govor engleski ili ga prevoditelj zna. Testovi `qnc-trans
 `qnc-ai-catalog` (prevoditelj), `qnc-broll-suggest`, `qnc-ai-broll`, conformance; prihvat ugovora
 `qnc-text-translate/examples/translate_with_program.rs` kroz program (7 recenica 5,7 s s ucitavanjem). Uzivo nije
 provjereno. Za beta paket: model i program uz aplikaciju, navesti autore modela (CC-BY 4.0).
+Izvedeno 2026-11-11 (korisnik: "da, kreni s prijedlogom iz teksta scenarija"; usporedba s primjerom "montaza po tekstu"):
+upit za pokrivalice daje i tekst scenarija, ne samo slot price. MA Script (g) i MA Audio (h) imaju tab AI pokrivalice
+(`contracts/ui/editorial.layout.json`). `qnc-script` `ScriptView::broll_query`: tekst koji se pise u uredivacu (barem tri
+rijeci) je jedan slot svog vremena citanja; inace izabrani blok koji cita novinar (uloga spoken, ne voditelj) je serija:
+slot izmedu svaka dva M markera u tekstu, s rijecima tog dijela i duljinom kadra (`mark_lengths`: po pročitanoj snimci,
+inace vrijeme citanja), bez markera cijeli blok. `qnc-broll-suggest`: `SlotAsk.text` (napisane rijeci, A1 se ne cita),
+`ask_of_text`; prikazani poredak ostaje dok ne stigne novi (tekst koji se tipka pita na svaku tipku). `qnc-side-pieces`
+`follow_slot`: tekst scenarija pita prije slota price. Dalje isti put: prijevod, slika i opis kadra, poredak i serija u
+tabu AI pokrivalice. Testovi `qnc-script` (novi `the_text_written_or_the_chosen_off_asks_for_b_roll_a_slot_between_its_marks`),
+`qnc-broll-suggest` (novi `the_text_of_a_script_asks_with_its_own_words_and_lengths`), `qnc-ai-broll`, `qnc-side-pieces`,
+`qnc-panel-focus`, conformance. Uzivo nije provjereno. Nije izvedeno: prijedlog za jednu oznacenu recenicu teksta (sada
+cijeli izabrani OFF kao serija), upis predlozene serije.

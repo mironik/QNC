@@ -237,6 +237,39 @@ pub struct ScriptView {
 }
 
 impl ScriptView {
+    /// What the script asks the B-roll for (user 2026-11-11: "a mark or a sentence in the text
+    /// editor gives the query", as the story's slots do): the text being written in the editor,
+    /// one slot of its reading time; else the chosen block a reporter reads (an OFF), a slot
+    /// between every two M markers of its text, each its words and the seconds it lasts (by the
+    /// recording heard, or the reading time). A key naming the text and its lengths, and the
+    /// slots as (words, seconds); `None` while nothing is written or chosen.
+    pub fn broll_query(&self) -> Option<(String, Vec<(String, f64)>)> {
+        if self.editor.split_whitespace().count() >= 3 && self.editor_seconds > 0.0 {
+            let text = self.editor.trim().to_string();
+            return Some((format!("script-editor:{text}"), vec![(text, self.editor_seconds)]));
+        }
+        let row = self.blocks.iter().find(|row| Some(row.block.id) == self.selected && row.role == Some(Role::Spoken) && row.seconds > 0.0)?;
+        let words: Vec<&str> = row.block.text.split_whitespace().collect();
+        if words.is_empty() {
+            return None;
+        }
+        // The words between the marks (a mark stands before the word it counts).
+        let mut cuts: Vec<usize> = row.block.marks.iter().map(|mark| *mark as usize).filter(|mark| (1..words.len()).contains(mark)).collect();
+        cuts.sort_unstable();
+        cuts.dedup();
+        let bounds: Vec<usize> = std::iter::once(0).chain(cuts).chain(std::iter::once(words.len())).collect();
+        let texts: Vec<String> = bounds.windows(2).map(|pair| words[pair[0]..pair[1]].join(" ")).collect();
+        // The lengths of the shots the marks make; without them (or not one a shot) the reading
+        // time shared by the words.
+        let lengths: Vec<f64> = if row.mark_lengths.len() == texts.len() {
+            row.mark_lengths.clone()
+        } else {
+            bounds.windows(2).map(|pair| row.seconds * (pair[1] - pair[0]) as f64 / words.len() as f64).collect()
+        };
+        let key = format!("script:{}:{}:{:?}", row.block.id, row.block.text, lengths.iter().map(|seconds| (seconds * 10.0).round() as i64).collect::<Vec<_>>());
+        Some((key, texts.into_iter().zip(lengths).collect()))
+    }
+
     /// The SubSegments of the script as cards of the pool, in reading order; `clips` gives each
     /// its first clip's poster.
     pub fn pool_cards<'a>(&self, clips: &'a [qnc_clip_row::ClipRow]) -> Vec<SubsegmentCard<'a>> {

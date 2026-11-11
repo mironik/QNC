@@ -59,7 +59,7 @@ pub use qnc_pool_tabs::REGROUP_AI_BROLL as REGROUP;
 pub const GROUP: &str = "ai_broll_group";
 pub const REGROUP_CANCEL: &str = "ai_broll_regroup_cancel";
 pub use qnc_shot_examples::{Taught, NOT_BROLL};
-pub use qnc_broll_suggest::{ask_of, Ask};
+pub use qnc_broll_suggest::{ask_of, ask_of_text, Ask};
 
 /// What the tab shows.
 #[derive(Debug, Clone, Default, PartialEq)]

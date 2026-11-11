@@ -245,7 +245,10 @@ impl SidePieces {
     /// 2026-11-10); the ask is made only where the form has that tab.
     pub fn follow_slot(&mut self, ask: impl FnOnce() -> Option<qnc_ai_broll::Ask>, preview: &SourcePreview) {
         if let Some(ai_broll) = &mut self.ai_broll {
-            if ai_broll.follow_slot(ask(), preview) {
+            // The text of the script asks first where the form has one (user 2026-11-11: the
+            // text editor gives the query), else the story's chosen slot.
+            let written = self.script.as_ref().and_then(|script| script.view().broll_query()).and_then(|(key, slots)| qnc_ai_broll::ask_of_text(key, slots));
+            if ai_broll.follow_slot(written.or_else(ask), preview) {
                 self.views.ai_broll = Arc::new(ai_broll.view().clone());
             }
         }

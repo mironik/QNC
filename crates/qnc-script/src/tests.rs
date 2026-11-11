@@ -155,3 +155,26 @@ fn the_edited_text_of_a_statement_is_the_scripts_until_enter_or_esc() {
     script.pick_key(TEXT_REVERT, Some("4:0"), &preview);
     assert_eq!(script.view.text_draft(4, 0, said), None, "Esc gives the text back");
 }
+
+#[test]
+fn the_text_written_or_the_chosen_off_asks_for_b_roll_a_slot_between_its_marks() {
+    let profile = general_tv();
+    // Ten words at 2.5 a second: 4 seconds; marks before the 4th and the 8th word.
+    let mut off = Block::written("off", "Ribari su jutros isplovili iz luke, brodovi su se vratili.");
+    off.id = 3;
+    off.marks = vec![3, 7];
+    let blocks = [Block { id: 2, ..Block::written("intro", "Dobar dan.") }, off, Block { id: 4, ..sot("Rekao je.") }];
+    let mut view = ScriptView { blocks: rows(&blocks, Some(&profile), 2.5), profile: Some(profile), ..ScriptView::default() };
+    assert!(view.broll_query().is_none(), "nothing chosen, nothing written");
+    view.selected = Some(2);
+    assert!(view.broll_query().is_none(), "the anchor's text has no B-roll");
+    view.selected = Some(3);
+    let (_, slots) = view.broll_query().unwrap();
+    let texts: Vec<&str> = slots.iter().map(|(text, _)| text.as_str()).collect();
+    assert_eq!(texts, ["Ribari su jutros", "isplovili iz luke, brodovi", "su se vratili."]);
+    let seconds: f64 = slots.iter().map(|(_, seconds)| seconds).sum();
+    assert!((seconds - 4.0).abs() < 0.01, "the shots share the OFF's length: {slots:?}");
+    view.editor = "Policija je s psom pretražila parkiralište.".into();
+    view.editor_seconds = 2.4;
+    assert_eq!(view.broll_query().unwrap().1, [("Policija je s psom pretražila parkiralište.".to_string(), 2.4)], "the text being written asks first");
+}

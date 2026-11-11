@@ -23,12 +23,14 @@ pub struct Piece {
     pub to: u64,
 }
 
-/// One slot of an ask: its id, how long its cover is and what A1 plays there.
+/// One slot of an ask: its id, how long its cover is and what A1 plays there, or the words it
+/// covers when they are written, not yet said (user 2026-11-11: the text of the script).
 #[derive(Debug, Clone, PartialEq)]
 pub struct SlotAsk {
     pub slot_id: String,
     pub seconds: f64,
     pub pieces: Vec<Piece>,
+    pub text: String,
 }
 
 /// What the story asks for: one slot (a sentence of the OFF) or the slots of an OFF (a series).
@@ -69,7 +71,7 @@ pub fn ask_of(view: &SegmentsView) -> Option<Ask> {
     }
     let seconds = |frames: u64| frames as f64 * f64::from(den) / f64::from(num);
     let placements = view.wave_placements().0;
-    let slot_ask = |slot_id: &str, from: u64, to: u64| SlotAsk { slot_id: slot_id.to_string(), seconds: seconds(to - from), pieces: pieces_in(&placements, from, to) };
+    let slot_ask = |slot_id: &str, from: u64, to: u64| SlotAsk { slot_id: slot_id.to_string(), seconds: seconds(to - from), pieces: pieces_in(&placements, from, to), text: String::new() };
     if let Some(slot) = view.selected_slot().filter(|slot| slot.end_frame > slot.start_frame) {
         return Some(Ask { key: slot.slot_id.clone(), fps: f64::from(num) / f64::from(den), slots: vec![slot_ask(&slot.slot_id, slot.start_frame, slot.end_frame)] });
     }
@@ -84,6 +86,19 @@ pub fn ask_of(view: &SegmentsView) -> Option<Ask> {
         .map(|(slot, from, to)| slot_ask(&slot.slot_id, from, to))
         .collect();
     (!slots.is_empty()).then(|| Ask { key: format!("off:{}", off.segment_id), fps: f64::from(num) / f64::from(den), slots })
+}
+
+/// What the text of a script asks for (user 2026-11-11: "a mark or a sentence in the text
+/// editor gives the query"): its slots, each the words it covers and the seconds they last; the
+/// key names what is asked (a changed text or length is asked anew). `None` without words.
+pub fn ask_of_text(key: String, slots: Vec<(String, f64)>) -> Option<Ask> {
+    let slots: Vec<SlotAsk> = slots
+        .into_iter()
+        .enumerate()
+        .filter(|(_, (text, seconds))| !text.trim().is_empty() && *seconds > 0.0)
+        .map(|(n, (text, seconds))| SlotAsk { slot_id: format!("{key}#{n}"), seconds, pieces: Vec::new(), text })
+        .collect();
+    (!slots.is_empty()).then(|| Ask { key, fps: 0.0, slots })
 }
 
 /// The A1 pieces of program frames `[from, to)`, in their clips' frames.
@@ -263,7 +278,9 @@ impl Suggest {
         self.asked_captions.clone_from(&captions);
         if !same_ask {
             self.asked = ask.clone();
-            if self.shown.take().is_some() {
+            // The suggestion shown stays until the new one comes (a text being typed asks at every
+            // key: the cards do not jump back meanwhile); none asked withdraws it.
+            if ask.is_none() && self.shown.take().is_some() {
                 changed = true;
             }
         }
@@ -330,7 +347,7 @@ fn work(job: &Job, client: &mut Option<(std::path::PathBuf, qnc_shot_content::Co
         .ask
         .slots
         .iter()
-        .map(|slot| (slot, words_of(&slot.pieces, &transcripts, &heard, job.ask.fps)))
+        .map(|slot| (slot, if slot.text.trim().is_empty() { words_of(&slot.pieces, &transcripts, &heard, job.ask.fps) } else { slot.text.clone() }))
         .filter(|(_, text)| !text.is_empty())
         .collect();
     if said.is_empty() {
@@ -466,5 +483,13 @@ mod tests {
         assert_eq!(series(&suggestion, &parts), [Some(1)]);
         let other = [0.0f32; 2];
         assert_eq!(super::scores(&suggestion, &slot, &[Candidate { seconds: 3.0, vector: &other, caption: None }]), [f32::NEG_INFINITY], "another model's width never fits");
+    }
+
+    #[test]
+    fn the_text_of_a_script_asks_with_its_own_words_and_lengths() {
+        let ask = ask_of_text("script:7".into(), vec![("Ribari su isplovili iz luke.".into(), 2.4), ("  ".into(), 1.0), ("Brodovi su se vratili.".into(), 0.0), ("Navečer.".into(), 0.8)]).unwrap();
+        let slots: Vec<(&str, &str, f64)> = ask.slots.iter().map(|slot| (slot.slot_id.as_str(), slot.text.as_str(), slot.seconds)).collect();
+        assert_eq!(slots, [("script:7#0", "Ribari su isplovili iz luke.", 2.4), ("script:7#3", "Navečer.", 0.8)], "a slot without words or length asks nothing");
+        assert!(ask_of_text("script:7".into(), vec![("".into(), 2.0)]).is_none());
     }
 }
