@@ -281,6 +281,7 @@ members = [
     "crates/qnc-shot-labels",
     "crates/qnc-ai-engines",
     "crates/qnc-ai-place",
+    "crates/qnc-ai-tls",
     "crates/qnc-ai-features",
     "crates/qnc-ai-features-view",
     "crates/qnc-shot-examples",
@@ -621,6 +622,7 @@ qnc-ai-broll = { path = "crates/qnc-ai-broll" }
 qnc-shot-labels = { path = "crates/qnc-shot-labels" }
 qnc-ai-engines = { path = "crates/qnc-ai-engines" }
 qnc-ai-place = { path = "crates/qnc-ai-place" }
+qnc-ai-tls = { path = "crates/qnc-ai-tls" }
 qnc-ai-features = { path = "crates/qnc-ai-features" }
 qnc-ai-features-view = { path = "crates/qnc-ai-features-view" }
 qnc-shot-examples = { path = "crates/qnc-shot-examples" }

@@ -6,6 +6,7 @@ description = "QNC AI server (docs/102 step 6): serves the AI plug-in programs o
 
 [dependencies]
 qnc-ai-catalog = { workspace = true }
+qnc-ai-tls = { workspace = true }
 qnc-dev-diagnostics = { workspace = true }
 qnc-plugin-process = { workspace = true }
 serde = { workspace = true }

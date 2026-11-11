@@ -9155,3 +9155,14 @@ CLASSLA).
 Obrisano 2026-11-11 (korisnik: "da, obriši neiskorištene modele"): iz `data/models` (izvan gita) ggml-large-v3-turbo.bin,
 ggml-large-v3-turbo-q5_0.bin, moondream-q4 i siglip-base-patch16-224 (4,3 GB). Ostao je ggml-silero-v5.1.2.bin (0,9 MB, VAD
 Whispera). Whisper motori u AI katalogu racunala sada nemaju model; katalog ih ne bira, a izabrani bi dao kontroliranu gresku.
+Izvedeno 2026-11-11 (korisnik: "da, kreni s TLS-om za AI server, ako je neophodno"; neophodno za LAN i intranet: slike i zvuk
+neobjavljenog priloga i token isli su mrezom citljivi): veza QNC - AI server je TLS. Nova javna kocka `crates/qnc-ai-tls` (+ ugovor
+`contracts/modules/ai-tls.module.json`; rustls s ring, vec u projektu, i nova mala biblioteka rcgen): server prvi put sam
+napravi svoj certifikat i kljuc (`ai-server-cert.pem`, `ai-server-key.pem` uz postavke racunala) i ispise otisak (SHA-256
+certifikata); QNC u `ai-place.json` uz `server` i `token` navodi `fingerprint` i vjeruje samo tom certifikatu (drugi server se
+odbija na rukovanju); bez CA. Jedna nit vodi TLS vezu (`pump`). `qnc-plugin-process` ne zna za TLS (njega koriste player i dekoderi, granica playera): udaljenu
+vezu daje sucelje `Connect`, a TLS vezu `qnc-ai-place` (`AiServer`); posluzitelj je `qnc-ai-server`;
+prvi redak s tokenom ide tek kroz TLS. Provjereno na izoliranom korijenu: Parakeet i wav2vec2 kroz TLS server, krivi otisak
+odbijen. Testovi `a_client_talks_only_to_the_server_of_the_fingerprint_it_names`,
+`the_server_hears_the_token_and_the_program_over_tls_and_its_refusal_is_the_error`. Kljuc servera cuva se kao datoteka bez
+dodatne zastite (prava mape korisnika); drugi stroj na LAN-u nije proban.

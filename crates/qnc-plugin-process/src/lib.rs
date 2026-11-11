@@ -79,7 +79,7 @@ pub const CANCEL: &str = "cancel";
 pub const CANCEL_GRACE: Duration = Duration::from_secs(2);
 
 /// How the application reaches one plug-in.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone)]
 pub struct PluginSpec {
     pub executable: PathBuf,
     pub contract: String,
@@ -91,18 +91,23 @@ pub struct PluginSpec {
     pub remote: Option<Remote>,
 }
 
-/// A server that runs plug-in programs (`qnc-ai-server`): its address and its token. Its first
-/// line is `{ token, program }`, its answer `{ ok: true }` or `{ error }`; then the plug-in's
-/// lines go both ways unchanged.
-#[derive(Clone, PartialEq, Eq)]
-pub struct Remote {
-    pub address: String,
-    pub token: String,
+/// A server that runs plug-in programs (`qnc-ai-server`): how the application reaches a program
+/// there. The security of the connection (TLS, the token) is the connector's (`qnc-ai-place`),
+/// so this block, which the player and the decoders use, carries none of it.
+pub trait Connect: Send + Sync {
+    /// Where the server is (for messages).
+    fn address(&self) -> String;
+    /// A connection to the server for `program`: its lines go to `lines` (`line_sink`), what is
+    /// written to the answer goes to it (a flush sends).
+    fn connect(&self, program: &str, timeout: Duration, lines: mpsc::Sender<Result<String, String>>) -> Result<Box<dyn Write + Send>, String>;
 }
 
-impl std::fmt::Debug for Remote {
+/// A server a plug-in runs on.
+pub type Remote = Arc<dyn Connect>;
+
+impl std::fmt::Debug for dyn Connect {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.debug_struct("Remote").field("address", &self.address).finish_non_exhaustive()
+        f.debug_struct("Remote").field("address", &self.address()).finish_non_exhaustive()
     }
 }
 
@@ -139,14 +144,15 @@ pub fn background_command(executable: &Path) -> Command {
 /// server that runs it.
 enum Link {
     Local { child: Child, stdin: ChildStdin },
-    Remote(std::net::TcpStream),
+    /// The bytes the thread running the TLS connection writes (it ends when this goes).
+    Remote(Box<dyn Write + Send>),
 }
 
 impl Link {
     fn writer(&mut self) -> &mut dyn Write {
         match self {
             Link::Local { stdin, .. } => stdin,
-            Link::Remote(stream) => stream,
+            Link::Remote(writer) => writer,
         }
     }
 
@@ -174,9 +180,8 @@ impl Drop for Running {
                 let _ = child.kill();
                 let _ = child.wait();
             }
-            Link::Remote(stream) => {
-                let _ = stream.shutdown(std::net::Shutdown::Both);
-            }
+            // Dropping the writer ends the thread that runs the connection.
+            Link::Remote(_) => {}
         }
     }
 }
@@ -320,7 +325,10 @@ fn start(spec: &PluginSpec) -> Result<Running, String> {
                 .map_err(|e| e.to_string())?;
             Link::Local { child, stdin }
         }
-        Some(remote) => Link::Remote(connect(remote, &spec.executable, spec.timeout, send_line)?),
+        Some(remote) => {
+            let program = spec.executable.file_stem().map(|name| name.to_string_lossy().into_owned()).ok_or("a plug-in without a program name")?;
+            Link::Remote(remote.connect(&program, spec.timeout, send_line)?)
+        }
     };
     let hello = Hello { contract: spec.contract.clone(), version: spec.version };
     let ready = send(link.writer(), &hello).and_then(|()| receive::<Ready>(&lines, spec.timeout));
@@ -478,47 +486,54 @@ pub fn program(spec: &PluginSpec) -> &Path {
     &spec.executable
 }
 
-/// The answer of a server to its first line.
-#[derive(Debug, Deserialize)]
-struct ServerAnswer {
-    #[serde(default)]
-    ok: Option<bool>,
-    #[serde(default)]
-    error: Option<String>,
+/// The lines a program sends over a connection: bytes as they come, split into lines for the
+/// line channel as a process's are (the longest line holds as for a process).
+pub fn line_sink(lines: mpsc::Sender<Result<String, String>>) -> impl FnMut(&[u8]) -> bool {
+    let mut pending: Vec<u8> = Vec::new();
+    let mut too_long = false;
+    move |bytes| {
+        for byte in bytes {
+            if *byte == b'\n' {
+                let line = std::mem::take(&mut pending);
+                let sent = if too_long {
+                    lines.send(Err(format!("an answer longer than {MAX_LINE_BYTES} bytes")))
+                } else {
+                    lines.send(String::from_utf8(line).map_err(|_| "an answer that is not UTF-8".to_string()))
+                };
+                too_long = false;
+                if sent.is_err() {
+                    return false;
+                }
+            } else if pending.len() >= MAX_LINE_BYTES {
+                too_long = true;
+            } else {
+                pending.push(*byte);
+            }
+        }
+        true
+    }
 }
 
-/// A connection to the server `remote` running the program `executable` names; its lines go to
-/// `lines` as a process's would.
-fn connect(remote: &Remote, executable: &Path, timeout: Duration, lines: mpsc::Sender<Result<String, String>>) -> Result<std::net::TcpStream, String> {
-    use std::net::ToSocketAddrs;
-    let program = executable.file_stem().map(|name| name.to_string_lossy().into_owned()).ok_or("a plug-in without a program name")?;
-    let address = remote.address.to_socket_addrs().map_err(|e| format!("AI server {}: {e}", remote.address))?.next().ok_or_else(|| format!("AI server {}: no address", remote.address))?;
-    let mut stream = std::net::TcpStream::connect_timeout(&address, Duration::from_secs(5)).map_err(|e| format!("AI server {}: {e}", remote.address))?;
-    let _ = stream.set_nodelay(true);
-    stream.set_read_timeout(Some(timeout)).map_err(|e| e.to_string())?;
-    let first = serde_json::json!({ "token": remote.token, "program": program });
-    send(&mut stream, &first).map_err(|e| format!("AI server {}: {e}", remote.address))?;
-    // The server's answer, read a byte at a time: what follows it belongs to the plug-in.
-    let mut answer = Vec::new();
-    let mut byte = [0u8; 1];
-    while answer.len() < 4096 {
-        match stream.read(&mut byte) {
-            Ok(0) => return Err(format!("AI server {} closed the connection", remote.address)),
-            Ok(_) if byte[0] == b'\n' => break,
-            Ok(_) => answer.push(byte[0]),
-            Err(e) => return Err(format!("AI server {}: {e}", remote.address)),
-        }
+/// Writes into a thread that runs a connection: a flush sends what was written.
+pub struct ChannelWriter {
+    outgoing: mpsc::Sender<Vec<u8>>,
+    buffer: Vec<u8>,
+}
+
+impl ChannelWriter {
+    pub fn new(outgoing: mpsc::Sender<Vec<u8>>) -> Self {
+        Self { outgoing, buffer: Vec::new() }
     }
-    let answer: ServerAnswer = serde_json::from_slice(&answer).map_err(|e| format!("AI server {}: an answer outside its contract: {e}", remote.address))?;
-    if let Some(error) = answer.error {
-        return Err(format!("AI server {}: {error}", remote.address));
+}
+
+impl Write for ChannelWriter {
+    fn write(&mut self, bytes: &[u8]) -> std::io::Result<usize> {
+        self.buffer.extend_from_slice(bytes);
+        Ok(bytes.len())
     }
-    if answer.ok != Some(true) {
-        return Err(format!("AI server {}: no answer", remote.address));
+
+    fn flush(&mut self) -> std::io::Result<()> {
+        let bytes = std::mem::take(&mut self.buffer);
+        self.outgoing.send(bytes).map_err(|_| std::io::Error::new(std::io::ErrorKind::BrokenPipe, "the connection ended"))
     }
-    // The plug-in's lines are waited for as a process's are (by the line channel's timeout).
-    stream.set_read_timeout(None).map_err(|e| e.to_string())?;
-    let reading = stream.try_clone().map_err(|e| e.to_string())?;
-    std::thread::Builder::new().name("qnc-plugin-read".into()).spawn(move || read_lines(reading, lines)).map_err(|e| e.to_string())?;
-    Ok(stream)
 }

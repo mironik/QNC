@@ -6,6 +6,7 @@ description = "QNC public block: where the AI programs of this computer run (doc
 
 [dependencies]
 qnc-dev-diagnostics = { workspace = true }
+qnc-ai-tls = { workspace = true }
 qnc-plugin-process = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }

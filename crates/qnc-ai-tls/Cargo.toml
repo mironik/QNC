@@ -1,0 +1,13 @@
+[package]
+name = "qnc-ai-tls"
+version = "0.1.0"
+edition = "2021"
+description = "QNC public block: TLS between QNC and its AI server (docs/102 step 6): the server's own certificate made once, the client trusting only the certificate whose fingerprint its setting names, and one thread passing the bytes both ways"
+
+[dependencies]
+rcgen = { version = "0.13", default-features = false, features = ["crypto", "pem", "ring"] }
+rustls = { version = "0.23", default-features = false, features = ["ring", "std", "tls12"] }
+sha2 = "0.10"
+
+[dev-dependencies]
+tempfile = "3"

@@ -6,7 +6,7 @@
 //! JSON lines both ways unchanged. The programs find their models in this computer's AI catalog
 //! (plug-in contracts version 2), so nothing of the other computer is read here.
 
-use std::io::{BufRead, BufReader, Read, Write};
+use std::io::{Read, Write};
 use std::net::{TcpListener, TcpStream};
 use std::process::Stdio;
 
@@ -15,7 +15,7 @@ use serde::{Deserialize, Serialize};
 /// The setting of this computer as a server, beside its other settings.
 const FILE: &str = "ai-server.json";
 /// The longest first line a client may send.
-const LONGEST_FIRST_LINE: u64 = 4096;
+const LONGEST_FIRST_LINE: usize = 4096;
 
 #[derive(Debug, Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -57,14 +57,20 @@ fn run() -> Result<(), String> {
         return Err(format!("{}: the token must be at least 16 characters", path.display()));
     }
     let programs = qnc_ai_catalog::installed_programs()?;
+    // TLS: the server's own certificate, made the first time beside the settings; a QNC names
+    // its fingerprint in its ai-place.json and trusts no other server.
+    let folder = path.parent().ok_or("no settings folder")?;
+    let (tls, fingerprint) = qnc_ai_tls::server_config(folder)?;
+    println!("QNC AI server fingerprint (for ai-place.json): {fingerprint}");
+    log(format!("ai-server fingerprint {fingerprint}"));
     let listener = TcpListener::bind(&setting.listen).map_err(|error| format!("listen {}: {error}", setting.listen))?;
     log(format!("ai-server listens on {} for {}", setting.listen, programs.join(", ")));
     for stream in listener.incoming() {
         let Ok(stream) = stream else { continue };
-        let (token, programs) = (setting.token.clone(), programs.clone());
+        let (token, programs, tls) = (setting.token.clone(), programs.clone(), tls.clone());
         let _ = std::thread::Builder::new().name("qnc-ai-server-client".into()).spawn(move || {
             let peer = stream.peer_addr().map(|addr| addr.to_string()).unwrap_or_default();
-            match serve(stream, &token, &programs) {
+            match qnc_ai_tls::accept(stream, tls).and_then(|stream| serve(stream, &token, &programs)) {
                 Ok(program) => log(format!("ai-server {peer} {program} ended")),
                 Err(error) => log(format!("ai-server {peer} refused: {error}")),
             }
@@ -73,13 +79,12 @@ fn run() -> Result<(), String> {
     Ok(())
 }
 
-/// One client: its first line, then its program's lines both ways until either ends.
-fn serve(stream: TcpStream, token: &str, programs: &[String]) -> Result<String, String> {
-    let mut reader = BufReader::new(stream.try_clone().map_err(|error| error.to_string())?);
-    let mut writer = stream;
-    let mut first = String::new();
-    (&mut reader).take(LONGEST_FIRST_LINE).read_line(&mut first).map_err(|error| error.to_string())?;
-    let refuse = |writer: &mut TcpStream, why: String| {
+type Tls = qnc_ai_tls::StreamOwned<qnc_ai_tls::ServerConnection, TcpStream>;
+
+/// One client over TLS: its first line, then its program's lines both ways until either ends.
+fn serve(mut writer: Tls, token: &str, programs: &[String]) -> Result<String, String> {
+    let first = String::from_utf8(qnc_ai_tls::read_line(&mut writer, LONGEST_FIRST_LINE)?).map_err(|_| "a first line that is not UTF-8".to_string())?;
+    let refuse = |writer: &mut Tls, why: String| {
         let _ = say(writer, &Answer { ok: None, error: Some(why.clone()) });
         Err(why)
     };
@@ -105,22 +110,25 @@ fn serve(stream: TcpStream, token: &str, programs: &[String]) -> Result<String, 
     log(format!("ai-server started {}", asked.program));
     let mut stdin = child.stdin.take().ok_or("no stdin")?;
     let mut stdout = child.stdout.take().ok_or("no stdout")?;
-    let mut back = writer.try_clone().map_err(|error| error.to_string())?;
-    let out = std::thread::spawn(move || {
-        let _ = std::io::copy(&mut stdout, &mut back);
-        let _ = back.shutdown(std::net::Shutdown::Both);
+    // The program's answers go to the thread that runs the connection; its end ends the connection.
+    let (answers, to_send) = std::sync::mpsc::channel::<Vec<u8>>();
+    std::thread::spawn(move || {
+        let mut buffer = vec![0u8; 64 << 10];
+        while let Ok(read) = stdout.read(&mut buffer) {
+            if read == 0 || answers.send(buffer[..read].to_vec()).is_err() {
+                break;
+            }
+        }
     });
-    // What the client sends after its first line goes to the program; the client gone ends it.
-    let _ = std::io::copy(&mut reader, &mut stdin);
+    // What the client sends goes to the program; the client gone ends it.
+    qnc_ai_tls::pump(writer, |bytes| stdin.write_all(bytes).and_then(|()| stdin.flush()).is_ok(), to_send);
     drop(stdin);
     let _ = child.kill();
     let _ = child.wait();
-    let _ = writer.shutdown(std::net::Shutdown::Both);
-    let _ = out.join();
     Ok(asked.program)
 }
 
-fn say(writer: &mut TcpStream, answer: &Answer) -> Result<(), String> {
+fn say(writer: &mut Tls, answer: &Answer) -> Result<(), String> {
     let mut line = serde_json::to_vec(answer).map_err(|error| error.to_string())?;
     line.push(b'\n');
     writer.write_all(&line).and_then(|()| writer.flush()).map_err(|error| error.to_string())
