@@ -47,6 +47,8 @@ pub struct SideViews {
     pub script: Arc<ScriptView>,
     pub versions: Arc<VersionsView>,
     pub ai_broll: Arc<AiBrollView>,
+    /// What the project's AI features allow (docs/102 step 3).
+    pub ai: Arc<qnc_ai_features::Gate>,
 }
 
 /// The pieces of the panels a form has.
@@ -69,6 +71,9 @@ pub struct SidePieces {
     plans: u64,
     /// The messages of the script and the transcript at the last look.
     said: [String; 2],
+    /// The project the AI gate is of, and the list of AI features of this QNC (read once).
+    gate_of: Option<String>,
+    features: Option<Result<qnc_ai_features::Features, String>>,
 }
 
 impl SidePieces {
@@ -89,6 +94,8 @@ impl SidePieces {
             said: Default::default(),
             plan: None,
             plans: 0,
+            gate_of: None,
+            features: None,
         }
     }
 
@@ -118,6 +125,7 @@ impl SidePieces {
 
     /// Polls the pieces; a view is renewed only when its piece changed it.
     pub fn poll(&mut self, preview: &mut SourcePreview, timeline: &TimelineProjection, clips: &mut [ClipRow]) {
+        self.follow_ai(preview);
         // The transcripts the pieces show, read once for all of them.
         if self.transcript.is_some() || self.script.is_some() {
             // No clip on the preview: the form was left or opened again; what a repass wrote is
@@ -339,5 +347,35 @@ mod tests {
 fn play_pieces(script: &mut Script, preview: &mut SourcePreview) {
     if let Some((pieces, frame)) = script.take_pieces_request() {
         preview.show_pieces(&pieces, frame);
+    }
+}
+
+impl SidePieces {
+    /// The AI gate of the project on the preview: what its AI template turned on when it was
+    /// made (user 2026-11-11: not changed in a running project), read again for another project.
+    fn follow_ai(&mut self, preview: &SourcePreview) {
+        let key = preview.project_target().map(|target| target.uri().to_string());
+        if key == self.gate_of {
+            return;
+        }
+        self.gate_of.clone_from(&key);
+        let features = self.features.get_or_insert_with(|| {
+            let root = qnc_dev_diagnostics::resolve_qnc_root().ok_or_else(|| "no QNC root".to_string())?;
+            qnc_ai_features::Features::load(&root)
+        });
+        let gate = match (features, preview.project_settings()) {
+            (Ok(features), Some((_, settings))) => qnc_ai_features::Gate::new(features, |code| settings.ai_feature(code).unwrap_or(false)),
+            (Err(error), Some(_)) => {
+                qnc_dev_diagnostics::log_line(qnc_dev_diagnostics::DiagnosticsStream::Player, format!("ai-gate {error}"));
+                qnc_ai_features::Gate::default()
+            }
+            _ => qnc_ai_features::Gate::default(),
+        };
+        if let Some(script) = &mut self.script {
+            if script.set_ai(&gate) {
+                self.views.script = Arc::new(script.view().clone());
+            }
+        }
+        self.views.ai = Arc::new(gate);
     }
 }

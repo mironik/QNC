@@ -233,6 +233,9 @@ pub struct ScriptView {
     pub proposal: Option<Vec<(i64, Vec<qnc_script_db::Cover>)>>,
     /// A suggestion is being made.
     pub suggesting: bool,
+    /// What the project's AI features allow (docs/102 step 3): the B-roll suggestion and the
+    /// smooth cut grey while off.
+    pub ai: qnc_ai_features::Gate,
     /// The M marker in a text taken with a right click: its block and word.
     pub taken_mark: Option<(i64, u32)>,
     /// The SubSegment open in place of the source timeline.

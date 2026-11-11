@@ -25,6 +25,8 @@ pub struct Shown<'a> {
     pub script: &'a qnc_script::ScriptView,
     /// The shown clip's source timecode.
     pub timecode: Option<&'a qnc_source_timecode::SourceTimecode>,
+    /// What the project's AI features allow: a tab of a feature it has off is grey.
+    pub ai: &'a qnc_ai_features::Gate,
 }
 
 /// The right panel of a group: its tabs on top when it has them, then the panel of the open tab;
@@ -36,10 +38,15 @@ pub fn show_tabbed(ui: &mut egui::Ui, kind: &str, tabs: &[RightPanelTab], theme:
     }
     let memory = egui::Id::new("qnc-right-panel-tab");
     let open: Option<String> = ui.ctx().data(|data| data.get_temp(memory));
-    let open = open.filter(|id| tabs.iter().any(|tab| &tab.action_id == id)).unwrap_or_else(|| tabs[0].action_id.clone());
+    // A tab of a feature the project has off is grey and never open while another one is not.
+    let allowed = |id: &str| shown.ai.allows(id);
+    let open = open
+        .filter(|id| tabs.iter().any(|tab| &tab.action_id == id) && allowed(id))
+        .or_else(|| tabs.iter().find(|tab| allowed(&tab.action_id)).map(|tab| tab.action_id.clone()))
+        .unwrap_or_else(|| tabs[0].action_id.clone());
     let (rect, _) = ui.allocate_exact_size(egui::vec2(ui.available_width(), theme.chrome_row_height), egui::Sense::hover());
     let row: Vec<_> = tabs.iter().map(|tab| qnc_pool_tabs_panel::PoolTab { label: &tab.label, action_id: Some(tab.action_id.as_str()) }).collect();
-    if let Some(chosen) = qnc_pool_tabs_panel::show(ui, rect, (theme, 10.0), &row, |id| id == open, |_| true) {
+    if let Some(chosen) = qnc_pool_tabs_panel::show(ui, rect, (theme, 10.0), &row, |id| id == open, allowed) {
         ui.ctx().data_mut(|data| data.insert_temp(memory, chosen.to_string()));
     }
     let panel = tabs.iter().find(|tab| tab.action_id == open).map_or(kind, |tab| tab.panel.as_str());

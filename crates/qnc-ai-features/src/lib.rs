@@ -40,6 +40,10 @@ pub struct Feature {
     /// Text code of its name.
     pub name: String,
     pub needs: Vec<String>,
+    /// The catalog actions of the forms that start it: grey in every form while the project has it
+    /// off (docs/102 step 3).
+    #[serde(default)]
+    pub actions: Vec<String>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -75,6 +79,9 @@ impl Features {
             }
             if features.all_needs(&feature.code).contains(&feature.code) {
                 return Err(format!("feature '{}' needs itself", feature.code));
+            }
+            if let Some(action) = feature.actions.iter().find(|action| features.list[..index].iter().any(|earlier| earlier.actions.contains(action))) {
+                return Err(format!("action '{action}' starts two features"));
             }
         }
         Ok(features)
@@ -372,4 +379,23 @@ mod tests;
 /// computer's language; a code the dictionary lacks shows as itself.
 pub fn words_of(code: &str) -> String {
     qnc_ui_text::host().ok().and_then(|texts| texts.get(code).ok()).unwrap_or(code).to_string()
+}
+
+/// The actions of the forms an AI feature starts (`actions` of the list), grey while the
+/// project has that feature off (docs/102 step 3: the AI template chosen when the project was
+/// made says what it does). Without a project every action is allowed.
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct Gate {
+    off: Vec<String>,
+}
+
+impl Gate {
+    /// The gate of a project whose feature `code` is on when `on(code)`.
+    pub fn new(features: &Features, on: impl Fn(&str) -> bool) -> Self {
+        Self { off: features.list.iter().filter(|feature| !on(&feature.code)).flat_map(|feature| feature.actions.iter().cloned()).collect() }
+    }
+
+    pub fn allows(&self, action: &str) -> bool {
+        !self.off.iter().any(|off| off == action)
+    }
 }

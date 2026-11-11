@@ -5755,6 +5755,7 @@ version = "0.1.0"
 dependencies = [
  "qnc-action-event",
  "qnc-ai-broll",
+ "qnc-ai-features",
  "qnc-clip-row",
  "qnc-clip-shots",
  "qnc-db-broker",
@@ -6450,6 +6451,7 @@ version = "0.1.0"
 dependencies = [
  "eframe",
  "qnc-action-event",
+ "qnc-ai-features",
  "qnc-clip-shots",
  "qnc-desktop-theme",
  "qnc-editorial-layout",
@@ -6507,6 +6509,7 @@ dependencies = [
 name = "qnc-script"
 version = "0.1.0"
 dependencies = [
+ "qnc-ai-features",
  "qnc-clip-row",
  "qnc-clip-sound",
  "qnc-clip-transcripts",
@@ -6996,9 +6999,11 @@ name = "qnc-side-pieces"
 version = "0.1.0"
 dependencies = [
  "qnc-ai-broll",
+ "qnc-ai-features",
  "qnc-clip-row",
  "qnc-clip-shots",
  "qnc-db-broker",
+ "qnc-dev-diagnostics",
  "qnc-notice",
  "qnc-script",
  "qnc-skeleton-versions",

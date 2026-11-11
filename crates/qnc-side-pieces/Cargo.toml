@@ -7,8 +7,10 @@ description = "QNC public module: the pieces of the right panel of an editorial 
 [dependencies]
 qnc-clip-row = { workspace = true }
 qnc-ai-broll = { workspace = true }
+qnc-ai-features = { workspace = true }
 qnc-clip-shots = { workspace = true }
 qnc-db-broker = { workspace = true }
+qnc-dev-diagnostics = { workspace = true }
 qnc-notice.workspace = true
 qnc-script = { workspace = true }
 qnc-skeleton-versions = { workspace = true }

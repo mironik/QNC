@@ -64,3 +64,16 @@ fn the_prepared_templates_keep_the_rule_and_an_own_one_is_kept_chosen_and_delete
     choice.delete_template(&kept.id);
     assert!(choice.templates.iter().all(|template| !template.own));
 }
+
+#[test]
+fn an_action_of_a_feature_the_project_has_off_is_grey() {
+    let features = Features::load(&root()).expect("features");
+    let on = [TRANSCRIPTION, SHOT_ANALYSIS, SHOT_CONTENT];
+    let gate = Gate::new(&features, |code| on.contains(&code));
+    assert!(gate.allows("transcribe_marks") && gate.allows("editorial_tab_ai_broll"));
+    assert!(!gate.allows("script_suggest_broll") && !gate.allows("subsegment_join_smooth"));
+    assert!(gate.allows("play_pause"), "an action no feature starts");
+    assert!(Gate::default().allows("script_suggest_broll"), "without a project every action is allowed");
+    let twice = r#"{"features": [{"code": "a", "name": "n", "needs": [], "actions": ["x"]}, {"code": "b", "name": "n", "needs": [], "actions": ["x"]}]}"#;
+    assert!(Features::parse(twice).is_err());
+}

@@ -87,9 +87,22 @@ pub struct FocusView {
     pub versions: std::sync::Arc<qnc_skeleton_versions::VersionsView>,
     /// The AI B-roll of the project.
     pub ai_broll: std::sync::Arc<qnc_ai_broll::AiBrollView>,
+    /// What the project's AI features allow: an action of a feature it has off is grey.
+    pub ai: std::sync::Arc<qnc_ai_features::Gate>,
 }
 
 impl FocusView {
+    /// Whether this view decides whether `action` can be done: an action of an AI feature the
+    /// project has off (docs/102 step 3), or a Transcribe button.
+    pub fn decides(&self, action: &str) -> bool {
+        !self.ai.allows(action) || matches!(action, "transcribe_marks" | "transcribe_fast" | "transcribe_best")
+    }
+
+    /// Whether `action` it decides can be done now; `clip_chosen`: a clip is on the preview.
+    pub fn enabled(&self, action: &str, clip_chosen: bool) -> bool {
+        self.ai.allows(action) && (action != "transcribe_marks" || clip_chosen || self.transcript.ticked > 0)
+    }
+
     /// The cards of a pool tab the right panel's pieces fill (SubSegment, Voice, Stories) and
     /// the action a click sends with the card's id.
     pub fn tab_cards<'a>(&'a self, tab: qnc_pool_tabs::LibraryTab, clips: &'a [qnc_clip_row::ClipRow]) -> (Vec<qnc_clip_row::TabCard<'a>>, &'static str) {

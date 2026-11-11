@@ -1,14 +1,14 @@
 {
-  "note": "The AI features a project turns on or off (docs/102). Each names the features it needs: turning one on turns on what it needs, a feature another one needs cannot be turned off. Names are text codes.",
+  "note": "The AI features a project turns on or off (docs/102). Each names the features it needs: turning one on turns on what it needs, a feature another one needs cannot be turned off. Names are text codes. actions: the catalog actions of the forms that start it, grey while the project has it off.",
   "features": [
-    { "code": "transcription", "name": "ai.feature.transcription", "needs": [] },
+    { "code": "transcription", "name": "ai.feature.transcription", "needs": [], "actions": ["transcribe_marks", "transcribe_fast", "transcribe_best", "transcribe_mark", "transcribe_repass", "editorial_tab_transcript", "ai_tab_audio"] },
     { "code": "letter_times", "name": "ai.feature.letter_times", "needs": ["transcription"] },
-    { "code": "read_check", "name": "ai.feature.read_check", "needs": ["transcription"] },
-    { "code": "shot_analysis", "name": "ai.feature.shot_analysis", "needs": [] },
-    { "code": "shot_content", "name": "ai.feature.shot_content", "needs": ["shot_analysis"] },
+    { "code": "read_check", "name": "ai.feature.read_check", "needs": ["transcription"], "actions": ["script_off_recording"] },
+    { "code": "shot_analysis", "name": "ai.feature.shot_analysis", "needs": [], "actions": ["ai_tab_video"] },
+    { "code": "shot_content", "name": "ai.feature.shot_content", "needs": ["shot_analysis"], "actions": ["editorial_tab_ai_broll"] },
     { "code": "shot_caption", "name": "ai.feature.shot_caption", "needs": ["shot_content"] },
-    { "code": "broll_suggest", "name": "ai.feature.broll_suggest", "needs": ["shot_content"] },
+    { "code": "broll_suggest", "name": "ai.feature.broll_suggest", "needs": ["shot_content"], "actions": ["script_suggest_broll"] },
     { "code": "translate", "name": "ai.feature.translate", "needs": ["broll_suggest"] },
-    { "code": "smooth_cut", "name": "ai.feature.smooth_cut", "needs": [] }
+    { "code": "smooth_cut", "name": "ai.feature.smooth_cut", "needs": [], "actions": ["subsegment_join_smooth"] }
   ]
 }

@@ -297,7 +297,7 @@ pub fn show_clip_bar(ui: &mut Ui, view: &ScriptView, search: &qnc_transcript_pan
     bar.with_layout(Layout::right_to_left(Align::Center), |ui| {
         ui.spacing_mut().item_spacing.x = STORY_GAP;
         // The shown clip as a recording of the OFFs made elsewhere (user 2026-11-10).
-        let free = view.recording.is_none() && !view.session_busy;
+        let free = view.recording.is_none() && !view.session_busy && view.ai.allows(qnc_script::OFF_RECORDING);
         if qnc_ui_kit::chrome_button(ui, qnc_ui_text::text("script.off_recording"), view.marks && free, false, style).on_hover_text(qnc_ui_text::text("script.off_recording_hint")).clicked() {
             asked = Some(ActionEvent::key(qnc_script::OFF_RECORDING).at(PANEL));
         }

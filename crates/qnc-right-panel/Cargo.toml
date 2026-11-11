@@ -7,6 +7,7 @@ description = "QNC public piece: the right panel of an editorial board by the ki
 [dependencies]
 eframe = { workspace = true }
 qnc-action-event = { workspace = true }
+qnc-ai-features = { workspace = true }
 qnc-desktop-theme = { workspace = true }
 qnc-program-view = { workspace = true }
 qnc-segment-panel = { workspace = true }

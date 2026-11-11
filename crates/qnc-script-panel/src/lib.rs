@@ -104,7 +104,7 @@ fn paint_script(ui: &mut egui::Ui, view: &ScriptView, transcript: &TranscriptVie
             }
         }
         // The shown clip as a recording of the OFFs made elsewhere (user 2026-11-10).
-        let free = view.recording.is_none() && !view.session_busy;
+        let free = view.recording.is_none() && !view.session_busy && view.ai.allows(qnc_script::OFF_RECORDING);
         if qnc_ui_kit::chrome_button(ui, qnc_ui_text::text("script.off_recording"), view.marks && free, false, style).on_hover_text(qnc_ui_text::text("script.off_recording_hint")).clicked() {
             asked = Some(ActionEvent::key(qnc_script::OFF_RECORDING).at(PANEL));
         }
@@ -352,7 +352,7 @@ pub fn paint_block(ui: &mut egui::Ui, place: &'static str, row: &qnc_script::Blo
                     });
                     let join = ui.allocate_ui(egui::vec2(JOIN_COLUMN, height), |ui| {
                         ui.set_width(JOIN_COLUMN);
-                        open_part.and_then(|(open, part)| part_controls::join_cell(ui, open, index, part, theme))
+                        open_part.and_then(|(open, part)| part_controls::join_cell(ui, open, index, part, theme, view.ai.allows(qnc_script::JOIN_SMOOTH)))
                     });
                     (join.inner.or(text.inner.0), text.inner.1)
                 })
@@ -485,7 +485,7 @@ pub fn broll_buttons(ui: &mut egui::Ui, view: &ScriptView, style: qnc_ui_kit::Ch
             asked = Some(ActionEvent::key(qnc_script::ACCEPT_BROLL).at(PANEL));
         }
     }
-    let can = !view.blocks.is_empty() && !view.suggesting;
+    let can = !view.blocks.is_empty() && !view.suggesting && view.ai.allows(qnc_script::SUGGEST_BROLL);
     if qnc_ui_kit::chrome_button(ui, qnc_ui_text::text("script.broll_suggest"), can, view.suggesting, style).on_hover_text(qnc_ui_text::text("script.broll_suggest_hint")).clicked() {
         asked = Some(ActionEvent::key(qnc_script::SUGGEST_BROLL).at(PANEL));
     }

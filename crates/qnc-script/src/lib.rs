@@ -231,6 +231,13 @@ impl Script {
         &self.view
     }
 
+    /// The project's AI features, as its view shows them; true when they changed.
+    pub fn set_ai(&mut self, gate: &qnc_ai_features::Gate) -> bool {
+        let changed = self.view.ai != *gate;
+        self.view.ai.clone_from(gate);
+        changed
+    }
+
     /// The reporter's ask for B-roll for the OFFs, once (the side pieces work it out with the
     /// shots of the project).
     pub fn take_broll_ask(&mut self) -> bool {

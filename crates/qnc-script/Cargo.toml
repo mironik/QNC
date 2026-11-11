@@ -6,6 +6,7 @@ description = "QNC public piece: the script of a project's story (user 2026-10-2
 
 [dependencies]
 qnc-clip-row = { workspace = true }
+qnc-ai-features = { workspace = true }
 qnc-smooth-joins = { workspace = true }
 qnc-read-check = { workspace = true }
 qnc-take-heard = { workspace = true }

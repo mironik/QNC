@@ -9084,3 +9084,13 @@ scenarija ne pitaju, a "Predlozi pokrivalice" kaze `script.broll_off_in_project`
 `qnc-broll-suggest` `follow(.., translate_from: Option<&str>)`, bez njega rijeci ostaju kako su izgovorene, a opisi kadrova
 vrijede samo za engleski govor). Testovi dotaknutih kocki, conformance. Uzivo nije provjereno. Nije izvedeno (korak 3):
 forme jos pokazuju AI tabove i gumbe bez obzira na mogucnosti.
+Izvedeno 2026-11-11 (docs/102 korak 3): forme slijede AI mogucnosti projekta. Popis mogucnosti (`catalogs/ai/features.json`)
+uz svaku mogucnost navodi radnje kataloga koje je pokrecu (`actions`: prijepis - Transcribe, Fast/Quality, Ponovo (HR), tab
+Prijepis, tab Audio AI; provjera citanja - Snimka OFF-ova; analiza kadrova - tab Video AI; sadrzaj kadra - tab AI
+pokrivalice; prijedlog - Predlozi pokrivalice; Smooth - Smooth spoja); radnja ne smije pokretati dvije mogucnosti.
+`qnc-ai-features` `Gate` (iz popisa i mogucnosti projekta; bez projekta sve dopusteno); `qnc-side-pieces` ga racuna kad se
+projekt promijeni (popis jednom po procesu) i daje ga fokusu (`FocusView.ai`) i scenariju (`ScriptView.ai`). Radnja
+mogucnosti koju projekt nema je siva: tabovi i gumbi kroz `EditorialView::action_enabled`, tabovi desnog panela
+(`qnc-right-panel` `Shown.ai`; otvara se prvi dopusteni tab), Predlozi pokrivalice, Snimka OFF-ova i Smooth u panelima
+scenarija. Odluku o AI gumbima donosi kocka fokusa (`FocusView::decides`, `enabled`), pa aplikacija nije narasla (C10 495).
+Layout nije mijenjan. Test `an_action_of_a_feature_the_project_has_off_is_grey`. Uzivo nije provjereno.
