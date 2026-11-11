@@ -5,6 +5,7 @@ edition = "2021"
 description = "QNC public block: B-roll suggested for the words of an OFF: the chosen slot's length and the words A1 says there as a vector of the shot-content program, the usable parts long enough ranked by how like it they are"
 
 [dependencies]
+qnc-text-translate = { workspace = true }
 qnc-ai-catalog = { workspace = true }
 qnc-db-broker = { workspace = true }
 qnc-dev-diagnostics = { workspace = true }

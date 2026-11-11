@@ -13,6 +13,11 @@
     "program": "qnc-shot-caption-florence",
     "model": "../../data/models/florence-2-base-ft"
   },
+  "translate": {
+    "program": "qnc-translate-opus",
+    "model": "../../data/models/opus-mt-tc-big-sh-en",
+    "from": ["hr", "sr", "bs"]
+  },
   "letters": {
     "program": "qnc-align-wav2vec2",
     "model": "../../data/models/wav2vec2-parlaspeech-hr"

@@ -1,0 +1,20 @@
+{
+  "module_id": "qnc.module.text-translate",
+  "module_name": "Text translate",
+  "module_version": "0.1.0",
+  "module_kind": "library",
+  "capabilities": ["text.translate.request", "text.translate.serve"],
+  "input_contract_version": "0.1.0",
+  "output_contract_version": "0.1.0",
+  "transport_protocol_version": "0.1.0",
+  "supported_os": ["windows", "linux", "macos"],
+  "supported_cpu": ["x86_64", "aarch64"],
+  "forbidden_calls": ["media.decode", "ffprobe", "card.write", "project.database.write", "player.command"],
+  "forbidden_dependencies": ["qnc.module.media-probe"],
+  "state_policy": "stateless",
+  "database_write_policy": "no_db_writes",
+  "runtime_crate": "qnc-text-translate",
+  "input": "Texts and the model's folder.",
+  "output": "Each text in English, from the plug-in program (contract qnc.text-translate 1).",
+  "specification": "User 2026-11-11: the words of an OFF into English for the B-roll suggestion; the program and its model can be replaced without building QNC."
+}

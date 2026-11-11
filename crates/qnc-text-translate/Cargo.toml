@@ -1,0 +1,10 @@
+[package]
+name = "qnc-text-translate"
+version = "0.1.0"
+edition = "2021"
+description = "QNC public block: the text-translate plug-in contract (qnc.text-translate 1), the application's side and the program's side"
+
+[dependencies]
+qnc-plugin-process = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }

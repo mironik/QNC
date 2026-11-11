@@ -3891,6 +3891,7 @@ dependencies = [
  "qnc-program-waveform",
  "qnc-script-db",
  "qnc-shot-content",
+ "qnc-text-translate",
  "qnc-transcript-db",
  "qnc-voice-take",
 ]
@@ -7427,6 +7428,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "qnc-text-translate"
+version = "0.1.0"
+dependencies = [
+ "qnc-plugin-process",
+ "serde",
+ "serde_json",
+]
+
+[[package]]
 name = "qnc-theme-styles"
 version = "0.1.0"
 dependencies = [
@@ -7633,6 +7643,27 @@ dependencies = [
  "qnc-transcript",
  "qnc-ui-kit",
  "qnc-ui-text",
+]
+
+[[package]]
+name = "qnc-translate"
+version = "0.1.0"
+dependencies = [
+ "candle-core",
+ "candle-nn",
+ "candle-transformers",
+ "serde_json",
+ "tokenizers",
+]
+
+[[package]]
+name = "qnc-translate-opus"
+version = "0.1.0"
+dependencies = [
+ "qnc-dev-diagnostics",
+ "qnc-text-translate",
+ "qnc-translate",
+ "windows-sys 0.59.0",
 ]
 
 [[package]]

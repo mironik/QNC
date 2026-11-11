@@ -200,11 +200,15 @@ struct Job {
     target: ProjectDbTarget,
     ask: Ask,
     captions: Vec<String>,
+    language: String,
 }
 
 /// The vectors of captions the worker made, kept for the next ask (by the model they were made
 /// with).
 type CaptionVectors = (std::path::PathBuf, std::collections::HashMap<String, Vec<f32>>);
+
+/// This computer's translator program (by its model) and the translations it gave.
+type Translating = (std::path::PathBuf, qnc_text_translate::TranslateClient, std::collections::HashMap<String, String>);
 
 /// The suggestion of what the story asks for, made off the form thread by one worker that keeps
 /// the shot-content program started (its model loads once).
@@ -226,9 +230,11 @@ impl std::fmt::Debug for Suggest {
 
 impl Suggest {
     /// Follows what the story asks for: a new ask is worked out, none withdraws the suggestion;
-    /// `captions` are the captions of the parts it may suggest, made vectors with its words.
+    /// `captions` are the captions of the parts it may suggest, made vectors with its words;
+    /// `language` is the project's language of speech (`ai.language`): words of a language this
+    /// computer's translator knows are made English first.
     /// Returns whether the suggestion shown changed.
-    pub fn follow(&mut self, ask: Option<Ask>, target: Option<&ProjectDbTarget>, captions: &[&str]) -> bool {
+    pub fn follow(&mut self, ask: Option<Ask>, target: Option<&ProjectDbTarget>, captions: &[&str], language: &str) -> bool {
         let mut changed = false;
         if let Some(answers) = &self.answers {
             while let Ok(answer) = answers.try_recv() {
@@ -266,7 +272,7 @@ impl Suggest {
             self.start();
         }
         if let Some(jobs) = &self.jobs {
-            self.working = jobs.send(Job { target: target.clone(), ask, captions }).is_ok();
+            self.working = jobs.send(Job { target: target.clone(), ask, captions, language: language.to_string() }).is_ok();
         }
         changed
     }
@@ -287,12 +293,13 @@ impl Suggest {
         let spawned = std::thread::Builder::new().name("qnc-broll-suggest".into()).spawn(move || {
             let mut client: Option<(std::path::PathBuf, qnc_shot_content::ContentClient)> = None;
             let mut made: CaptionVectors = (std::path::PathBuf::new(), std::collections::HashMap::new());
+            let mut translator: Option<Translating> = None;
             while let Ok(mut job) = take.recv() {
                 // Only what was asked last counts.
                 while let Ok(newer) = take.try_recv() {
                     job = newer;
                 }
-                if send.send(work(&job, &mut client, &mut made)).is_err() {
+                if send.send(work(&job, &mut client, &mut made, &mut translator)).is_err() {
                     return;
                 }
             }
@@ -304,7 +311,7 @@ impl Suggest {
 }
 
 /// The words of an ask's slots and their vectors (a slot without words is left out).
-fn work(job: &Job, client: &mut Option<(std::path::PathBuf, qnc_shot_content::ContentClient)>, made: &mut CaptionVectors) -> Result<Suggestion, String> {
+fn work(job: &Job, client: &mut Option<(std::path::PathBuf, qnc_shot_content::ContentClient)>, made: &mut CaptionVectors, translator: &mut Option<Translating>) -> Result<Suggestion, String> {
     let voices = qnc_script_db::read_voices(&job.target).unwrap_or_default();
     let heard = |clip: &str| {
         voices
@@ -334,9 +341,20 @@ fn work(job: &Job, client: &mut Option<(std::path::PathBuf, qnc_shot_content::Co
         *client = Some((engine.model.clone(), qnc_shot_content::ContentClient::new(&qnc_plugin_process::beside_application(&engine.program)?)));
     }
     let (_, content) = client.as_ref().ok_or("no shot-content program")?;
+    // The words in English where this computer's translator knows their language (user
+    // 2026-11-11: measured, SigLIP 2 finds the pictures and the captions of an English sentence
+    // better than of the same sentence in Croatian); a translation that fails leaves the words
+    // as they are said.
+    let asked: Vec<String> = match english(&said.iter().map(|(_, text)| text.clone()).collect::<Vec<_>>(), &job.language, translator) {
+        Ok(texts) => texts,
+        Err(error) => {
+            log(&format!("broll-suggest translation failed error={error}"));
+            said.iter().map(|(_, text)| text.clone()).collect()
+        }
+    };
     let mut vectors = Vec::new();
-    for texts in said.chunks(qnc_shot_content::MOST_AT_ONCE) {
-        let request = qnc_shot_content::TextsRequest { model: engine.model.clone(), texts: texts.iter().map(|(_, text)| text.clone()).collect() };
+    for texts in asked.chunks(qnc_shot_content::MOST_AT_ONCE) {
+        let request = qnc_shot_content::TextsRequest { model: engine.model.clone(), texts: texts.to_vec() };
         vectors.extend(content.texts(&request)?.vectors);
     }
     let slots = said.into_iter().zip(vectors).map(|((slot, text), vector)| SlotSuggestion { slot_id: slot.slot_id.clone(), seconds: slot.seconds, text, vector }).collect();
@@ -357,6 +375,33 @@ fn work(job: &Job, client: &mut Option<(std::path::PathBuf, qnc_shot_content::Co
     }
     let captions = job.captions.iter().filter_map(|caption| Some((caption.clone(), made.1.get(caption)?.clone()))).collect();
     Ok(Suggestion { key: job.ask.key.clone(), slots, captions })
+}
+
+/// `texts` (said in `language`, an `ai.language` code) in English: as they are when English or
+/// when this computer has no translator of their language, else translated by its program, kept
+/// started for the next ask.
+fn english(texts: &[String], language: &str, translator: &mut Option<Translating>) -> Result<Vec<String>, String> {
+    if language == "en" {
+        return Ok(texts.to_vec());
+    }
+    let Ok(engine) = qnc_ai_catalog::installed_translator() else { return Ok(texts.to_vec()) };
+    if !engine.translates(language) {
+        return Ok(texts.to_vec());
+    }
+    if translator.as_ref().is_none_or(|(model, _, _)| *model != engine.model) {
+        *translator = Some((engine.model.clone(), qnc_text_translate::TranslateClient::new(&qnc_plugin_process::beside_application(&engine.program)?), Default::default()));
+    }
+    let (_, client, given) = translator.as_mut().ok_or("no translator")?;
+    // A text asked again (the same OFF, new captions) is not translated again.
+    let missing: Vec<String> = texts.iter().filter(|text| !given.contains_key(*text)).cloned().collect();
+    if !missing.is_empty() {
+        let english = client.translate(&qnc_text_translate::TranslateRequest { model: engine.model.clone(), texts: missing.clone() })?;
+        for (said, english) in missing.into_iter().zip(english) {
+            log(&format!("broll-suggest translated {said:?} -> {english:?}"));
+            given.insert(said, english);
+        }
+    }
+    Ok(texts.iter().map(|text| given.get(text).cloned().unwrap_or_else(|| text.clone())).collect())
 }
 
 fn log(line: &str) {

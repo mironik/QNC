@@ -225,7 +225,7 @@ pub fn sort_parts(
 }
 
 /// The parts in order, the posters newly read and the model of the parts' vectors.
-type Read = Result<(Vec<AiPart>, Vec<(String, std::sync::Arc<qnc_image_assets::RgbaImage>)>, String), String>;
+type Read = Result<(Vec<AiPart>, Vec<(String, std::sync::Arc<qnc_image_assets::RgbaImage>)>, String, String), String>;
 
 /// The AI B-roll of the project on the preview.
 #[derive(Debug, Default)]
@@ -238,6 +238,8 @@ pub struct AiBroll {
     /// The model of the parts read, the card a group is being chosen for and a correction
     /// being kept.
     model: String,
+    /// The project's language of speech (`ai.language`), for the words of an OFF.
+    language: String,
     regroup: Option<String>,
     keeping: Option<mpsc::Receiver<Result<(), String>>>,
     /// B-roll suggested for the words of the slot chosen in the story.
@@ -258,7 +260,7 @@ impl AiBroll {
     pub fn follow_slot(&mut self, ask: Option<qnc_broll_suggest::Ask>, preview: &SourcePreview) -> bool {
         // The parts' captions fit the words with their pictures (user 2026-11-11).
         let captions: Vec<&str> = self.view.parts.iter().filter_map(|part| part.caption.as_deref()).collect();
-        let changed = self.suggest.follow(ask, preview.project_target(), &captions);
+        let changed = self.suggest.follow(ask, preview.project_target(), &captions, &self.language);
         if changed {
             self.view.suggestion = self.suggest.shown().cloned();
         }
@@ -283,7 +285,8 @@ impl AiBroll {
         if let Some(reading) = &self.reading {
             if let Ok(result) = reading.try_recv() {
                 match result {
-                    Ok((parts, posters, model)) => {
+                    Ok((parts, posters, model, language)) => {
+                        self.language = language;
                         self.view.posters.extend(posters);
                         self.view.parts = parts;
                         self.view.message.clear();
@@ -403,11 +406,13 @@ fn regroup_choice(part: &AiPart, groups: &[(String, String)]) -> qnc_notice::Cho
 /// shots not in `known`, read from the project folder.
 fn read_parts(target: &ProjectDbTarget, settings: Option<(qnc_work_settings::SettingsReader, qnc_work_settings::WorkSettings)>, known: &std::collections::HashSet<String>) -> Read {
     let (mut parts, model) = read_sorted(target)?;
-    // A caption (English) fits the words of an OFF only when they are English too: measured
+    // A caption (English) fits the words of an OFF only when they are English: measured
     // 2026-11-11, SigLIP 2 finds the English captions of the shots for English sentences (5 of
-    // 7) but not for the same sentences in Croatian, which it matches with the pictures; so the
-    // captions count in the suggestion only for a project whose speech is English.
-    let english = settings.as_ref().is_some_and(|(_, settings)| settings.speech_language().is_ok_and(|language| language == "en"));
+    // 7) but not for the same sentences in Croatian; translated into English by this computer's
+    // translator they find them as well (5 of 7). So the captions count in the suggestion for a
+    // project whose speech is English or translated into English.
+    let language = settings.as_ref().and_then(|(_, settings)| settings.speech_language().ok()).unwrap_or_default();
+    let english = language == "en" || qnc_ai_catalog::installed_translator().is_ok_and(|translator| translator.translates(&language));
     if !english {
         parts.iter_mut().for_each(|part| part.caption = None);
     }
@@ -426,7 +431,7 @@ fn read_parts(target: &ProjectDbTarget, settings: Option<(qnc_work_settings::Set
             })
             .collect()
     });
-    Ok((parts, posters, model))
+    Ok((parts, posters, model, language))
 }
 
 /// The captions this computer's captioner wrote of the looked-at parts of the project, by clip

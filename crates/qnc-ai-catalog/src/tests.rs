@@ -65,3 +65,19 @@ fn the_fast_engine_is_its_own_and_a_catalog_without_one_gives_none() {
     let without = catalog(&folder, "w.gpu", "vulkan");
     assert!(transcriber_for(&without, Quality::Fast).unwrap_err().contains("no fast"));
 }
+
+#[test]
+fn the_translator_says_which_languages_it_translates_and_a_catalog_without_one_has_none() {
+    let folder = folder("translate");
+    std::fs::create_dir_all(folder.join("opus")).unwrap();
+    let path = catalog(&folder, "w.gpu", "vulkan");
+    assert!(translator(&path).is_err(), "a catalog without a translator has none");
+    let with = |from: &str| {
+        std::fs::write(&path, format!(r#"{{"version":"1","transcribe":{{"selected":"x","engines":[]}},"translate":{{"program":"qnc-translate-opus","model":"opus","from":{from}}}}}"#)).unwrap();
+        translator(&path)
+    };
+    let translator = with(r#"["hr","sr","bs"]"#).unwrap();
+    assert_eq!(translator.model, folder.join("opus"));
+    assert!(translator.translates("hr") && !translator.translates("en"));
+    assert!(with("[]").is_err(), "from no language");
+}

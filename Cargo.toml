@@ -274,6 +274,9 @@ members = [
     "crates/qnc-trim-play",
     "crates/qnc-wav2vec2",
     "crates/qnc-siglip",
+    "crates/qnc-translate",
+    "crates/qnc-text-translate",
+    "tools/qnc-translate-opus",
     "crates/qnc-ai-broll",
     "crates/qnc-shot-labels",
     "crates/qnc-shot-examples",
@@ -606,6 +609,8 @@ qnc-keyframe-jump = { path = "crates/qnc-keyframe-jump" }
 qnc-trim-play = { path = "crates/qnc-trim-play" }
 qnc-wav2vec2 = { path = "crates/qnc-wav2vec2" }
 qnc-siglip = { path = "crates/qnc-siglip" }
+qnc-translate = { path = "crates/qnc-translate" }
+qnc-text-translate = { path = "crates/qnc-text-translate" }
 qnc-ai-broll = { path = "crates/qnc-ai-broll" }
 qnc-shot-labels = { path = "crates/qnc-shot-labels" }
 qnc-shot-examples = { path = "crates/qnc-shot-examples" }

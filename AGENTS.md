@@ -8996,3 +8996,21 @@ projekt ciji je jezik govora (`ai.language`) engleski (`qnc-ai-broll` `read_part
 slikom. Testovi `qnc-broll-suggest` (novi `a_caption_like_the_words_lifts_a_part_its_pictures_alone_would_not`),
 `qnc-ai-broll`, conformance. Uzivo nije provjereno. Nije izvedeno: hrvatski OFF s opisima (trebao bi prijevod opisa ili
 visejezicni tekstni model).
+Izvedeno 2026-11-11 (korisnik: "da, preuzmi prijevod i izmjeri,, probaj put 2"): rijeci OFF-a prevode se na engleski prije
+usporedbe sa slikama i opisima kadrova. Preuzet Helsinki-NLP opus-mt-tc-big-sh-en (srpskohrvatski -> engleski, CC-BY 4.0,
+treba navesti autora; 465 MB, `data/models/opus-mt-tc-big-sh-en`, izvan gita, uz model ostaje njegov README). Nova kocka
+`crates/qnc-translate` (+ ugovor modula): Marian u cistom Rustu (candle), tokenizator iz SentencePiece modela procitanog iz
+njegova protobufa (bez Pythona), pohlepno dekodiranje; ucitavanje 1 s, recenica 0,4-1 s na procesoru. Ugovor dodatka
+`contracts/plugins/text-translate.v1.json` (`qnc.text-translate` 1, obje strane u `crates/qnc-text-translate`), program
+`tools/qnc-translate-opus` (model ucitan jednom, ispod normalnog prioriteta). AI katalog racunala ima `translate`
+(program, model, `from`: hr, sr, bs; `qnc-ai-catalog` `installed_translator`, `Translator::translates`). Mjereno (primjeri
+`qnc-siglip/examples/rank_texts.rs`, `rank_for_texts.rs`, `qnc-translate/examples/translate_lines.rs`; samo citanje): 7
+hrvatskih recenica prevedeno tocno; s opisima kadrova prevedene nalaze isto sto engleske (knjiga, bazen, fontana, koncert,
+luka uz vodu; 5 od 7), hrvatske ne; sa slikama prevedene daju bolji poredak (knjiga 3 kadra s knjigom umjesto mikrofona,
+luka kadrovi s brodovima, koncert glazbenici; fontana i pas sigurnije). `qnc-broll-suggest` (`english`): rijeci slota na
+jeziku govora projekta koji prevoditelj racunala zna prevode se prije SigLIP-a (prijevod se pamti u radniku, greska
+prijevoda ostavlja izgovorene rijeci, zapis u log `broll-suggest translated`); `follow` prima jezik. `qnc-ai-broll`: opisi
+kadrova vrijede kad je govor engleski ili ga prevoditelj zna. Testovi `qnc-translate` (protobuf SentencePiece),
+`qnc-ai-catalog` (prevoditelj), `qnc-broll-suggest`, `qnc-ai-broll`, conformance; prihvat ugovora
+`qnc-text-translate/examples/translate_with_program.rs` kroz program (7 recenica 5,7 s s ucitavanjem). Uzivo nije
+provjereno. Za beta paket: model i program uz aplikaciju, navesti autore modela (CC-BY 4.0).

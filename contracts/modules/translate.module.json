@@ -1,0 +1,20 @@
+{
+  "module_id": "qnc.module.translate",
+  "module_name": "Translate",
+  "module_version": "0.1.0",
+  "module_kind": "library",
+  "capabilities": ["text.translate"],
+  "input_contract_version": "0.1.0",
+  "output_contract_version": "0.1.0",
+  "transport_protocol_version": "0.1.0",
+  "supported_os": ["windows", "linux", "macos"],
+  "supported_cpu": ["x86_64", "aarch64"],
+  "forbidden_calls": ["media.decode", "media.read", "ffprobe", "card.write", "project.database.write", "player.command"],
+  "forbidden_dependencies": ["qnc.module.media-probe"],
+  "state_policy": "stateless",
+  "database_write_policy": "no_db_writes",
+  "runtime_crate": "qnc-translate",
+  "input": "A Marian model of OPUS-MT (safetensors, config.json, source.spm, vocab.json) in a folder and a text.",
+  "output": "The text in the model's target language (greedy decoding).",
+  "specification": "User 2026-11-11: the words of an OFF into English, so that SigLIP 2 finds the pictures and the captions of the shots; measured on 7 sentences and 48 shots of the cards. Pure Rust (candle); the SentencePiece model is read from its protobuf."
+}

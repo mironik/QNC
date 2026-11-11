@@ -33,6 +33,11 @@ struct File {
     /// host without it has none.
     #[serde(default)]
     shot_caption: Option<LettersJob>,
+    /// A translation of the words of a story into English (user 2026-11-11: "the OFF into English",
+    /// so that SigLIP 2 finds the pictures and the captions of its words); a host without it has
+    /// none.
+    #[serde(default)]
+    translate: Option<TranslateJob>,
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -300,3 +305,50 @@ pub fn transcriber_for(path: &Path, quality: Quality) -> Result<Transcriber, Str
 
 #[cfg(test)]
 mod tests;
+
+#[derive(Debug, Clone, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct TranslateJob {
+    program: String,
+    model: String,
+    /// The languages of speech (the project's `ai.language` codes) the model translates from.
+    from: Vec<String>,
+}
+
+/// The engine that translates the words of a story into English on this host (user 2026-11-11).
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Translator {
+    /// The program's name beside the application.
+    pub program: String,
+    /// The model's folder.
+    pub model: PathBuf,
+    /// The languages it translates from.
+    pub from: Vec<String>,
+}
+
+impl Translator {
+    /// Whether it translates speech of `language` (an `ai.language` code).
+    pub fn translates(&self, language: &str) -> bool {
+        self.from.iter().any(|code| code == language)
+    }
+}
+
+/// The translator of this host's catalog; its model must be there.
+pub fn installed_translator() -> Result<Translator, String> {
+    translator(&installed_path()?)
+}
+
+/// The translator of the catalog at `path`.
+pub fn translator(path: &Path) -> Result<Translator, String> {
+    let text = std::fs::read_to_string(path).map_err(|e| format!("{}: {e}", path.display()))?;
+    let file: File = serde_json::from_str(&text).map_err(|e| format!("{}: {e}", path.display()))?;
+    let job = file.translate.ok_or("the AI catalog of this host has no translator")?;
+    let model = path.parent().ok_or("the AI catalog has no folder")?.join(&job.model);
+    if !model.exists() {
+        return Err(format!("translator: the model {} is not on this host", model.display()));
+    }
+    if job.from.is_empty() {
+        return Err("translator: it translates from no language".into());
+    }
+    Ok(Translator { program: job.program, model, from: job.from })
+}

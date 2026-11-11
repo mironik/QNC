@@ -1,0 +1,13 @@
+[package]
+name = "qnc-translate-opus"
+version = "0.1.0"
+edition = "2021"
+description = "QNC text-translate plug-in: texts into English with a Marian model of OPUS-MT in pure Rust (contract qnc.text-translate 1), as its own program"
+
+[dependencies]
+qnc-dev-diagnostics = { workspace = true }
+qnc-text-translate = { workspace = true }
+qnc-translate = { workspace = true }
+
+[target.'cfg(windows)'.dependencies]
+windows-sys = { version = "0.59", features = ["Win32_Foundation", "Win32_System_Threading"] }
