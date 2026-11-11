@@ -75,7 +75,7 @@ impl SmoothJoins {
             *self = Self { project_id: Some(locator.project_id().to_string()), ..Self::default() };
         }
         let finished = self.take_finished();
-        if self.job.is_none() && idle {
+        if self.job.is_none() && idle && locator.settings().ai_feature(qnc_ai_features::SMOOTH_CUT).unwrap_or(false) {
             if let Some(join) = joins.iter().find(|join| !self.failed.contains(&join.clip_id)) {
                 let (send, done) = mpsc::channel();
                 let (locator, work) = (locator.clone(), join.clone());

@@ -331,7 +331,8 @@ struct Job {
     target: ProjectDbTarget,
     ask: Ask,
     captions: Vec<String>,
-    language: String,
+    /// The language the words are translated from; none keeps them as said.
+    translate_from: Option<String>,
 }
 
 /// The vectors of captions the worker made, kept for the next ask (by the model they were made
@@ -362,10 +363,11 @@ impl std::fmt::Debug for Suggest {
 impl Suggest {
     /// Follows what the story asks for: a new ask is worked out, none withdraws the suggestion;
     /// `captions` are the captions of the parts it may suggest, made vectors with its words;
-    /// `language` is the project's language of speech (`ai.language`): words of a language this
-    /// computer's translator knows are made English first.
+    /// `translate_from` is the project's language of speech (`ai.language`) where the project
+    /// translates (`translate`): words of a language this computer's translator knows are made
+    /// English first; none keeps them as said.
     /// Returns whether the suggestion shown changed.
-    pub fn follow(&mut self, ask: Option<Ask>, target: Option<&ProjectDbTarget>, captions: &[&str], language: &str) -> bool {
+    pub fn follow(&mut self, ask: Option<Ask>, target: Option<&ProjectDbTarget>, captions: &[&str], translate_from: Option<&str>) -> bool {
         let mut changed = false;
         if let Some(answers) = &self.answers {
             while let Ok(answer) = answers.try_recv() {
@@ -405,7 +407,7 @@ impl Suggest {
             self.start();
         }
         if let Some(jobs) = &self.jobs {
-            self.working = jobs.send(Job { target: target.clone(), ask, captions, language: language.to_string() }).is_ok();
+            self.working = jobs.send(Job { target: target.clone(), ask, captions, translate_from: translate_from.map(str::to_string) }).is_ok();
         }
         changed
     }
@@ -478,7 +480,7 @@ fn work(job: &Job, client: &mut Option<(std::path::PathBuf, qnc_shot_content::Co
     // 2026-11-11: measured, SigLIP 2 finds the pictures and the captions of an English sentence
     // better than of the same sentence in Croatian); a translation that fails leaves the words
     // as they are said.
-    let asked: Vec<String> = match english(&said.iter().map(|(_, text)| text.clone()).collect::<Vec<_>>(), &job.language, translator) {
+    let asked: Vec<String> = match english(&said.iter().map(|(_, text)| text.clone()).collect::<Vec<_>>(), job.translate_from.as_deref(), translator) {
         Ok(texts) => texts,
         Err(error) => {
             log(&format!("broll-suggest translation failed error={error}"));
@@ -510,13 +512,13 @@ fn work(job: &Job, client: &mut Option<(std::path::PathBuf, qnc_shot_content::Co
     Ok(Suggestion { key: job.ask.key.clone(), slots, captions })
 }
 
-/// `texts` (said in `language`, an `ai.language` code) in English: as they are when English or
-/// when this computer has no translator of their language, else translated by its program, kept
-/// started for the next ask.
-fn english(texts: &[String], language: &str, translator: &mut Option<Translating>) -> Result<Vec<String>, String> {
-    if language == "en" {
+/// `texts` (said in `language`, an `ai.language` code) in English: as they are when the project
+/// does not translate, when English or when this computer has no translator of their language,
+/// else translated by its program, kept started for the next ask.
+fn english(texts: &[String], language: Option<&str>, translator: &mut Option<Translating>) -> Result<Vec<String>, String> {
+    let Some(language) = language.filter(|language| *language != "en") else {
         return Ok(texts.to_vec());
-    }
+    };
     let Ok(engine) = qnc_ai_catalog::installed_translator() else { return Ok(texts.to_vec()) };
     if !engine.translates(language) {
         return Ok(texts.to_vec());

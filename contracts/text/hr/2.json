@@ -203,6 +203,7 @@
     "script.broll_none": "Nijedan kadar projekta ne odgovara OFF-ovima (jesu li klipovi pregledani AI-jem?).",
     "script.broll_no_offs": "Nema OFF-a s riječima za pokrivanje.",
     "script.broll_no_ai": "Ova forma nema AI pokrivalice.",
+    "script.broll_off_in_project": "Ovaj projekt nema prijedloge pokrivalica (njegov AI template).",
     "script.broll_failed": "Pokrivalice se nisu mogle predložiti: pogledaj player log (broll-suggest).",
     "script.broll_wanted": "Kadrovi koje želim: {note}",
     "script.broll_proposed": "Predložene pokrivalice:",

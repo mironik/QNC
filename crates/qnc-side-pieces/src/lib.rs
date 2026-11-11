@@ -177,6 +177,7 @@ impl SidePieces {
             match (blocks.is_empty(), &self.ai_broll) {
                 (true, _) => script.propose(None, "script.broll_no_offs"),
                 (_, None) => script.propose(None, "script.broll_no_ai"),
+                (_, Some(ai_broll)) if !ai_broll.suggests() => script.propose(None, "script.broll_off_in_project"),
                 _ => match qnc_ai_broll::plan_ask(format!("plan:{}", self.plans), &blocks) {
                     Some(ask) => self.plan = Some((ask, blocks, std::time::Instant::now())),
                     None => script.propose(None, "script.broll_no_offs"),

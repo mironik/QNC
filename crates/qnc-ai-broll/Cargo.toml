@@ -6,6 +6,7 @@ description = "QNC public piece: the AI B-roll of the project on the preview, ev
 
 [dependencies]
 qnc-ai-catalog = { workspace = true }
+qnc-ai-features = { workspace = true }
 qnc-clip-row = { workspace = true }
 qnc-db-broker = { workspace = true }
 qnc-shot-content = { workspace = true }

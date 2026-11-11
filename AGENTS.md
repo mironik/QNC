@@ -9073,3 +9073,14 @@ ne pitaju svoju mogucnost; forme jos pokazuju AI tabove bez obzira na mogucnosti
 ne mijenja postavke otvorenog projekta). Tri testa `qnc-ingest-application` catalog_tests padaju i bez ove izmjene
 (postojeci kvar). Testovi `qnc-ai-features` (3), `qnc-work-settings`, `qnc-project-store`, `qnc-project-jobs` i
 dotaknutih kocki, conformance. Uzivo nije provjereno. Project je ponovno zamrznut.
+Odluka 2026-11-11 (korisnik: "ne na otvorenom projektu.. odabrani template odreduje mogucnosti, naknadno unutar pokrenutog
+projekta ne.. neki administratori ne vole da im korisnici prtljaju po postavkama jer im je prioritet stabilnost sustava"):
+AI mogucnosti projekta odreduje AI template izabran (i po potrebi doraden sklopkama) pri kreiranju projekta; u pokrenutom
+projektu se ne mijenjaju. Nema izbora "primijeni AI na otvoreni projekt" i za to se Project ne otkljucava.
+Izvedeno 2026-11-11 (docs/102 korak 2): i preostali pokretaci pitaju svoju mogucnost projekta. Vremena slova
+(`qnc-letter-times` `poll`, `letter_times`), medjuslike Smootha (`qnc-smooth-joins` `poll`, `smooth_cut`; vec napravljeni
+klip i dalje svira), prijedlog pokrivalica (`qnc-ai-broll` `Allowed`, `suggests`: bez `broll_suggest` slot price i tekst
+scenarija ne pitaju, a "Predlozi pokrivalice" kaze `script.broll_off_in_project`) i prijevod (`translate`:
+`qnc-broll-suggest` `follow(.., translate_from: Option<&str>)`, bez njega rijeci ostaju kako su izgovorene, a opisi kadrova
+vrijede samo za engleski govor). Testovi dotaknutih kocki, conformance. Uzivo nije provjereno. Nije izvedeno (korak 3):
+forme jos pokazuju AI tabove i gumbe bez obzira na mogucnosti.

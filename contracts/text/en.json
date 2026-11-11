@@ -525,6 +525,7 @@
     "script.broll_none": "No shot of the project fits the OFFs (are the clips looked at by the AI?).",
     "script.broll_no_offs": "There is no OFF with words to cover.",
     "script.broll_no_ai": "This form has no AI B-roll.",
+    "script.broll_off_in_project": "This project has no B-roll suggestions (its AI template).",
     "script.broll_failed": "The B-roll could not be suggested: look at the player log (broll-suggest).",
     "script.broll_wanted": "Shots wanted: {note}",
     "script.broll_proposed": "B-roll suggested:",

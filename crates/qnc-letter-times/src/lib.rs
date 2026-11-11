@@ -78,7 +78,7 @@ impl LetterTimes {
             *self = Self { project_id: Some(locator.project_id().to_string()), ..Self::default() };
         }
         let kept = self.take_finished();
-        if self.job.is_some() || !idle {
+        if self.job.is_some() || !idle || !locator.settings().ai_feature(qnc_ai_features::LETTER_TIMES).unwrap_or(false) {
             return kept;
         }
         let next = needs.iter().find_map(|need| {

@@ -3677,6 +3677,7 @@ name = "qnc-ai-broll"
 version = "0.1.0"
 dependencies = [
  "qnc-ai-catalog",
+ "qnc-ai-features",
  "qnc-broll-suggest",
  "qnc-clip-row",
  "qnc-db-broker",
@@ -5257,6 +5258,7 @@ name = "qnc-letter-times"
 version = "0.1.0"
 dependencies = [
  "qnc-ai-catalog",
+ "qnc-ai-features",
  "qnc-db-broker",
  "qnc-dev-diagnostics",
  "qnc-letter-align",
@@ -7045,6 +7047,7 @@ name = "qnc-smooth-joins"
 version = "0.1.0"
 dependencies = [
  "qnc-ai-catalog",
+ "qnc-ai-features",
  "qnc-db-broker",
  "qnc-decoder-catalog",
  "qnc-dev-diagnostics",

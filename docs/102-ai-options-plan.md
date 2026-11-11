@@ -121,7 +121,9 @@ kadrova".
   (shot_analysis, shot_content, shot_caption), "News puni" (sve), "Bez prijedloga pokrivalica" (sve osim
   broll_suggest i translate).
 - Projekt cuva izabrani AI template i stvarni skup mogucnosti u svojoj bazi (`ai.template`, `ai.features`);
-  korisnik nakon izbora smije sklopke dodatno mijenjati, a "Spremi kao AI template" pravi korisnicki.
+  korisnik pri kreiranju projekta smije sklopke dodatno mijenjati, a "Spremi kao AI template" pravi korisnicki.
+- Odluka korisnika 2026-11-11: u pokrenutom projektu AI mogucnosti se ne mijenjaju (administratorima je prioritet
+  stabilnost sustava); vrijedi ono sto je izabrano pri kreiranju.
 - Ovisnosti su pravilo jedne kocke (`qnc-ai-features`), isto u templateu i u projektu:
   - ukljucivanje mogucnosti ukljucuje sve sto ona treba (npr. broll_suggest ukljuci shot_content i
     shot_analysis);

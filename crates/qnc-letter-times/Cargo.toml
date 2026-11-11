@@ -6,6 +6,7 @@ description = "QNC public block: the fine times of the letters of the words a sc
 
 [dependencies]
 qnc-ai-catalog = { workspace = true }
+qnc-ai-features = { workspace = true }
 qnc-db-broker = { workspace = true }
 qnc-dev-diagnostics = { workspace = true }
 qnc-letter-align = { workspace = true }

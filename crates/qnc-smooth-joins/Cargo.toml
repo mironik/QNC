@@ -6,6 +6,7 @@ description = "QNC public piece: the in-between pictures of the smooth cuts of a
 
 [dependencies]
 qnc-ai-catalog = { workspace = true }
+qnc-ai-features = { workspace = true }
 qnc-db-broker = { workspace = true }
 qnc-decoder-catalog = { workspace = true }
 qnc-dev-diagnostics = { workspace = true }

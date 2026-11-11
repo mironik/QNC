@@ -256,7 +256,16 @@ pub fn sort_parts(
 }
 
 /// The parts in order, the posters newly read and the model of the parts' vectors.
-type Read = Result<(Vec<AiPart>, Vec<(String, std::sync::Arc<qnc_image_assets::RgbaImage>)>, String, String), String>;
+/// What the project lets the B-roll do (`ai.features`, user 2026-11-11): suggest shots for the
+/// words of the story, and translate them first from the project's language of speech.
+#[derive(Clone, Debug, Default)]
+struct Allowed {
+    /// The language the words are translated from (`ai.language`); none keeps them as said.
+    translate_from: Option<String>,
+    suggest: bool,
+}
+
+type Read = Result<(Vec<AiPart>, Vec<(String, std::sync::Arc<qnc_image_assets::RgbaImage>)>, String, Allowed), String>;
 
 /// The AI B-roll of the project on the preview.
 #[derive(Debug, Default)]
@@ -269,8 +278,8 @@ pub struct AiBroll {
     /// The model of the parts read, the card a group is being chosen for and a correction
     /// being kept.
     model: String,
-    /// The project's language of speech (`ai.language`), for the words of an OFF.
-    language: String,
+    /// What the project lets the suggestion do.
+    allowed: Allowed,
     regroup: Option<String>,
     keeping: Option<mpsc::Receiver<Result<(), String>>>,
     /// B-roll suggested for the words of the slot chosen in the story.
@@ -291,11 +300,17 @@ impl AiBroll {
     pub fn follow_slot(&mut self, ask: Option<qnc_broll_suggest::Ask>, preview: &SourcePreview) -> bool {
         // The parts' captions fit the words with their pictures (user 2026-11-11).
         let captions: Vec<&str> = self.view.parts.iter().filter_map(|part| part.caption.as_deref()).collect();
-        let changed = self.suggest.follow(ask, preview.project_target(), &captions, &self.language);
+        let ask = ask.filter(|_| self.allowed.suggest);
+        let changed = self.suggest.follow(ask, preview.project_target(), &captions, self.allowed.translate_from.as_deref());
         if changed {
             self.view.suggestion = self.suggest.shown().cloned();
         }
         changed
+    }
+
+    /// Whether the project suggests B-roll for the words of the story (`broll_suggest`).
+    pub fn suggests(&self) -> bool {
+        self.allowed.suggest
     }
 
     pub fn busy(&self) -> bool {
@@ -316,8 +331,8 @@ impl AiBroll {
         if let Some(reading) = &self.reading {
             if let Ok(result) = reading.try_recv() {
                 match result {
-                    Ok((parts, posters, model, language)) => {
-                        self.language = language;
+                    Ok((parts, posters, model, allowed)) => {
+                        self.allowed = allowed;
                         self.view.posters.extend(posters);
                         self.view.parts = parts;
                         self.view.message.clear();
@@ -443,7 +458,10 @@ fn read_parts(target: &ProjectDbTarget, settings: Option<(qnc_work_settings::Set
     // translator they find them as well (5 of 7). So the captions count in the suggestion for a
     // project whose speech is English or translated into English.
     let language = settings.as_ref().and_then(|(_, settings)| settings.speech_language().ok()).unwrap_or_default();
-    let english = language == "en" || qnc_ai_catalog::installed_translator().is_ok_and(|translator| translator.translates(&language));
+    let feature = |code| settings.as_ref().is_some_and(|(_, settings)| settings.ai_feature(code).unwrap_or(false));
+    let translate = feature(qnc_ai_features::TRANSLATE) && language != "en";
+    let english = language == "en" || (translate && qnc_ai_catalog::installed_translator().is_ok_and(|translator| translator.translates(&language)));
+    let allowed = Allowed { translate_from: translate.then(|| language.clone()), suggest: feature(qnc_ai_features::BROLL_SUGGEST) };
     if !english {
         parts.iter_mut().for_each(|part| part.caption = None);
     }
@@ -462,7 +480,7 @@ fn read_parts(target: &ProjectDbTarget, settings: Option<(qnc_work_settings::Set
             })
             .collect()
     });
-    Ok((parts, posters, model, language))
+    Ok((parts, posters, model, allowed))
 }
 
 /// The captions this computer's captioner wrote of the looked-at parts of the project, by clip
