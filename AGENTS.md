@@ -8983,3 +8983,16 @@ razumnu grupu, osim "a cloth" (bez grupe, ostaje SigLIP) i mikrofona (izjava). T
 `a_captions_first_sentence_gives_the_group_of_the_first_rule_it_says`), `qnc-shot-examples` (novi
 `a_correction_comes_before_a_caption_and_a_caption_teaches_the_shots_like_it`), `qnc-ai-broll`, conformance. Nije
 izvedeno: opis kadra u prijedlogu serije za OFF. Uzivo nije provjereno.
+Izvedeno 2026-11-11 (korisnik: "da, dodaj opis kadra u prijedlog serije za OFF"): opis kadra (Florence-2) ulazi u prijedlog
+pokrivalica za recenicu i seriju OFF-a. `qnc-broll-suggest`: `Candidate` (trajanje, vektor slike, opis), `scores`:
+slicnost rijeci slota sa slikom i, gdje kadar ima opis, s opisom, svaka standardizirana medu kandidatima (slika-tekst i
+tekst-tekst nisu na istoj ljestvici) i zbrojena; kadar bez opisa broji samo sliku. `series` i poredak jedne recenice
+(`qnc-ai-broll` `cards`) koriste ga. Vektori opisa rade se istim programom sadrzaja kao rijeci, u istoj pozadinskoj
+niti, jednom po modelu (`Suggestion.captions`); `follow` prima opise dijelova, novi opis istog upita racuna se ponovno;
+opis koji program ne procita ostavlja prijedlog slici. Mjereno (`qnc-siglip/examples/rank_texts.rs`, samo citanje, 48
+opisa s kartica): engleske recenice nalaze svoje opise (knjiga, bazen, fontana, luka; 5 od 7), iste recenice na hrvatskom
+ne (najslicniji su kratki opisi "a cloth", "a person"; i nakon uklanjanja zajednickog smjera). Zato opisi vrijede samo za
+projekt ciji je jezik govora (`ai.language`) engleski (`qnc-ai-broll` `read_parts`); hrvatski OFF i dalje se usporeduje sa
+slikom. Testovi `qnc-broll-suggest` (novi `a_caption_like_the_words_lifts_a_part_its_pictures_alone_would_not`),
+`qnc-ai-broll`, conformance. Uzivo nije provjereno. Nije izvedeno: hrvatski OFF s opisima (trebao bi prijevod opisa ili
+visejezicni tekstni model).

@@ -48,6 +48,9 @@ pub struct AiPart {
     /// The terms of the vocabulary it fits best (dictionary keys), best first (user 2026-11-10:
     /// what the model saw, not only the group).
     pub terms: Vec<String>,
+    /// The caption a model wrote of it (user 2026-11-11: Florence-2), when there is one; with
+    /// its pictures it fits the words of an OFF.
+    pub caption: Option<String>,
 }
 
 /// The chosen card's button asks for another group (target: `clip|from|to`); an answer gives
@@ -89,7 +92,7 @@ impl AiBrollView {
     /// parts long enough for the slot come first, the most like its words first, numbered; the
     /// shorter ones after them, in the same order.
     pub fn cards<'a>(&'a self, clips: &'a [ClipRow]) -> Vec<TabCard<'a>> {
-        let mut cards: Vec<(f64, &'a [f32], TabCard<'a>)> = self
+        let cards: Vec<(qnc_broll_suggest::Candidate<'a>, TabCard<'a>)> = self
             .parts
             .iter()
             .filter_map(|part| {
@@ -102,8 +105,7 @@ impl AiBrollView {
                 let label = if !part.terms.is_empty() { part.terms.iter().take(2).map(|term| words(term)).collect::<Vec<_>>().join(", ") } else if kind.is_empty() { label.to_string() } else { format!("{label} · {kind}") };
                 let seconds = (part.to - part.from) as f64 * per_frame;
                 Some((
-                    seconds,
-                    part.vector.as_slice(),
+                    qnc_broll_suggest::Candidate { seconds, vector: part.vector.as_slice(), caption: part.caption.as_deref() },
                     TabCard {
                         id: format!("{}|{}|{}", part.clip_id, part.from, part.to),
                         title: qnc_ui_text::fill(if part.spoken { "ai_broll.card_spoken" } else { "ai_broll.card" }, &[("label", &label), ("clip", &clip.name)]).into(),
@@ -115,14 +117,16 @@ impl AiBrollView {
                 ))
             })
             .collect();
-        let Some(suggestion) = &self.suggestion else { return cards.into_iter().map(|(_, _, card)| card).collect() };
+        let Some(suggestion) = &self.suggestion else { return cards.into_iter().map(|(_, card)| card).collect() };
+        let parts: Vec<qnc_broll_suggest::Candidate<'_>> = cards.iter().map(|(part, _)| *part).collect();
         match suggestion.slots.as_slice() {
-            // One sentence of the OFF: the parts long enough first, the most like its words first.
+            // One sentence of the OFF: the parts long enough first, those fitting its words best
+            // first (their pictures and their captions).
             [slot] => {
-                cards.sort_by(|(a_seconds, a, _), (b_seconds, b, _)| {
-                    (*b_seconds >= slot.seconds).cmp(&(*a_seconds >= slot.seconds)).then(qnc_broll_suggest::likeness(slot, b).total_cmp(&qnc_broll_suggest::likeness(slot, a)))
-                });
-                let long = cards.iter().filter(|(seconds, _, _)| *seconds >= slot.seconds).count();
+                let scores = qnc_broll_suggest::scores(suggestion, slot, &parts);
+                let mut cards: Vec<(f32, qnc_broll_suggest::Candidate<'_>, TabCard<'a>)> = scores.into_iter().zip(cards).map(|(score, (part, card))| (score, part, card)).collect();
+                cards.sort_by(|(a_score, a, _), (b_score, b, _)| (b.seconds >= slot.seconds).cmp(&(a.seconds >= slot.seconds)).then(b_score.total_cmp(a_score)));
+                let long = cards.iter().filter(|(_, part, _)| part.seconds >= slot.seconds).count();
                 for (n, (_, _, card)) in cards.iter_mut().take(long).enumerate() {
                     card.title = format!("{}. {}", n + 1, card.title);
                 }
@@ -130,9 +134,8 @@ impl AiBrollView {
             }
             // The whole OFF: the series, a cover a slot in the story's order, then the rest.
             slots => {
-                let parts: Vec<(f64, &[f32])> = cards.iter().map(|(seconds, vector, _)| (*seconds, *vector)).collect();
                 let picks = qnc_broll_suggest::series(suggestion, &parts);
-                let mut cards: Vec<Option<TabCard<'a>>> = cards.into_iter().map(|(_, _, card)| Some(card)).collect();
+                let mut cards: Vec<Option<TabCard<'a>>> = cards.into_iter().map(|(_, card)| Some(card)).collect();
                 let mut shown = Vec::with_capacity(cards.len());
                 for (n, pick) in picks.iter().enumerate() {
                     if let Some(mut card) = pick.and_then(|index| cards[index].take()) {
@@ -212,6 +215,7 @@ pub fn sort_parts(
                     vector: part.vector.clone(),
                     taught,
                     terms: Vec::new(),
+                    caption: None,
                 },
             ))
         })
@@ -252,7 +256,9 @@ impl AiBroll {
     /// Follows the slot chosen in the story (`qnc_broll_suggest::ask_of`): its suggestion orders
     /// the cards once worked out. Returns whether the view changed.
     pub fn follow_slot(&mut self, ask: Option<qnc_broll_suggest::Ask>, preview: &SourcePreview) -> bool {
-        let changed = self.suggest.follow(ask, preview.project_target());
+        // The parts' captions fit the words with their pictures (user 2026-11-11).
+        let captions: Vec<&str> = self.view.parts.iter().filter_map(|part| part.caption.as_deref()).collect();
+        let changed = self.suggest.follow(ask, preview.project_target(), &captions);
         if changed {
             self.view.suggestion = self.suggest.shown().cloned();
         }
@@ -396,7 +402,15 @@ fn regroup_choice(part: &AiPart, groups: &[(String, String)]) -> qnc_notice::Cho
 /// The parts of the project behind `target` for the model of this host, and the posters of its
 /// shots not in `known`, read from the project folder.
 fn read_parts(target: &ProjectDbTarget, settings: Option<(qnc_work_settings::SettingsReader, qnc_work_settings::WorkSettings)>, known: &std::collections::HashSet<String>) -> Read {
-    let (parts, model) = read_sorted(target)?;
+    let (mut parts, model) = read_sorted(target)?;
+    // A caption (English) fits the words of an OFF only when they are English too: measured
+    // 2026-11-11, SigLIP 2 finds the English captions of the shots for English sentences (5 of
+    // 7) but not for the same sentences in Croatian, which it matches with the pictures; so the
+    // captions count in the suggestion only for a project whose speech is English.
+    let english = settings.as_ref().is_some_and(|(_, settings)| settings.speech_language().is_ok_and(|language| language == "en"));
+    if !english {
+        parts.iter_mut().for_each(|part| part.caption = None);
+    }
     let folder = settings.and_then(|(reader, settings)| Some((reader.local_workspace_dir(&settings).ok()??, settings.output_root_uri)));
     let posters = folder.map_or_else(Vec::new, |(dir, root)| {
         parts
@@ -415,23 +429,30 @@ fn read_parts(target: &ProjectDbTarget, settings: Option<(qnc_work_settings::Set
     Ok((parts, posters, model))
 }
 
-/// Examples of the groups the captions give the looked-at shots of the project: a shot whose
-/// caption a rule of the list names gets that group with its vector (`model`: of the vectors).
-/// None while this host has no captioner.
-fn described_examples(root: &std::path::Path, project: &str, model: &str, content: &[qnc_shot_content_db::ClipContent], list: &qnc_shot_labels::Labels) -> Vec<qnc_shot_examples::Example> {
-    let Ok(captioner) = qnc_ai_catalog::installed_shot_captioner() else { return Vec::new() };
+/// The captions this computer's captioner wrote of the looked-at parts of the project, by clip
+/// and frames; none while this host has no captioner.
+fn captions_of(root: &std::path::Path, project: &str, content: &[qnc_shot_content_db::ClipContent]) -> std::collections::HashMap<(String, u64, u64), String> {
+    let Ok(captioner) = qnc_ai_catalog::installed_shot_captioner() else { return Default::default() };
     let captioner = captioner.model_name();
-    let mut described = Vec::new();
+    let mut captions = std::collections::HashMap::new();
     for clip in content.iter().filter(|clip| !clip.parts.is_empty()) {
-        let Ok(captions) = qnc_shot_captions::read_clip(root, &captioner, project, &clip.clip_id) else { continue };
-        for part in &clip.parts {
-            let caption = captions.iter().find(|caption| caption.from == part.from && caption.to == part.to);
-            if let Some(group) = caption.and_then(|caption| list.group_of_caption(&caption.text)) {
-                described.push(qnc_shot_examples::Example { model: model.into(), key: qnc_shot_examples::key(project, &clip.clip_id, part.from, part.to), label: group.into(), vector: part.vector.clone() });
-            }
-        }
+        let Ok(read) = qnc_shot_captions::read_clip(root, &captioner, project, &clip.clip_id) else { continue };
+        captions.extend(read.into_iter().map(|caption| ((clip.clip_id.clone(), caption.from, caption.to), caption.text)));
     }
-    described
+    captions
+}
+
+/// Examples of the groups the captions give the looked-at shots: a shot whose caption a rule of
+/// the list names gets that group with its vector (`model`: of the vectors).
+fn described_examples(captions: &std::collections::HashMap<(String, u64, u64), String>, project: &str, model: &str, content: &[qnc_shot_content_db::ClipContent], list: &qnc_shot_labels::Labels) -> Vec<qnc_shot_examples::Example> {
+    content
+        .iter()
+        .flat_map(|clip| clip.parts.iter().map(move |part| (clip, part)))
+        .filter_map(|(clip, part)| {
+            let group = list.group_of_caption(captions.get(&(clip.clip_id.clone(), part.from, part.to))?)?;
+            Some(qnc_shot_examples::Example { model: model.into(), key: qnc_shot_examples::key(project, &clip.clip_id, part.from, part.to), label: group.into(), vector: part.vector.clone() })
+        })
+        .collect()
 }
 
 /// The parts of the project behind `target` for the model of this host, in the tab's order.
@@ -451,15 +472,20 @@ fn read_sorted(target: &ProjectDbTarget) -> Result<(Vec<AiPart>, String), String
         .filter_map(|clip| Some((clip.clip_id.as_str(), qnc_transcript_db::read_clip(target, &clip.clip_id).ok()?)))
         .collect();
     let speech = |clip: &str, from: u64, to: u64| spoken_share(transcripts.get(clip)?, from, to);
+    let root = qnc_dev_diagnostics::resolve_qnc_root();
     // The corrections of this computer, outside every project (user 2026-11-10).
-    let examples = qnc_dev_diagnostics::resolve_qnc_root().map_or_else(|| Ok(Vec::new()), |root| qnc_shot_examples::read(&root, &model))?;
-    // The groups the captions of this computer's captioner give the shots (user 2026-11-11:
-    // Florence-2 as the corrector and trainer of SigLIP): made here from the captions and the
-    // list's rules, never kept, so a changed rule counts at once.
-    let described = qnc_dev_diagnostics::resolve_qnc_root().map_or_else(Vec::new, |root| described_examples(&root, target.uri(), &model, &content, &list));
+    let examples = root.as_deref().map_or_else(|| Ok(Vec::new()), |root| qnc_shot_examples::read(root, &model))?;
+    // The captions of this computer's captioner (user 2026-11-11: Florence-2) and the groups
+    // they give the shots, the corrector and trainer of SigLIP: made here from the captions and
+    // the list's rules, never kept, so a changed rule counts at once.
+    let captions = root.as_deref().map_or_else(Default::default, |root| captions_of(root, target.uri(), &content));
+    let described = described_examples(&captions, target.uri(), &model, &content, &list);
     let mut parts = sort_parts(&content, &set, &list, &speech, (target.uri(), &examples, &described));
+    for part in &mut parts {
+        part.caption = captions.get(&(part.clip_id.clone(), part.from, part.to)).cloned();
+    }
     // The terms of the vocabulary of this computer, where its vectors are kept for this model.
-    let vocabulary = qnc_dev_diagnostics::resolve_qnc_root().and_then(|root| qnc_shot_vocabulary::read(&root, &model).ok().flatten()).zip(qnc_shot_vocabulary::installed().ok());
+    let vocabulary = root.as_deref().and_then(|root| qnc_shot_vocabulary::read(root, &model).ok().flatten()).zip(qnc_shot_vocabulary::installed().ok());
     if let Some((set, list)) = vocabulary {
         for part in &mut parts {
             part.terms = qnc_shot_vocabulary::best_terms(&set, &list, &part.vector, 2).into_iter().filter_map(|(code, _)| list.text_of(&code).map(str::to_string)).collect();
@@ -551,7 +577,7 @@ mod tests {
     #[test]
     fn a_click_opens_only_a_part_the_tab_shows() {
         let mut broll = AiBroll::new();
-        broll.view.parts = vec![AiPart { clip_id: "clip|x".into(), from: 10, to: 90, label: "sea".into(), text: "shot.label.sea".into(), share: 1.0, spoken: false, kind: "steady".into(), poster: String::new(), vector: vec![], taught: None, terms: Vec::new() }];
+        broll.view.parts = vec![AiPart { clip_id: "clip|x".into(), from: 10, to: 90, label: "sea".into(), text: "shot.label.sea".into(), share: 1.0, spoken: false, kind: "steady".into(), poster: String::new(), vector: vec![], taught: None, terms: Vec::new(), caption: None }];
         assert_eq!(broll.act(OPEN, Some("clip|x|10|90")), Some(true));
         assert_eq!(broll.take_source_request(), Some(("clip|x".to_string(), 10, 90)));
         assert_eq!(broll.act(OPEN, Some("clip|x|10|91")), Some(false));
@@ -561,18 +587,18 @@ mod tests {
     #[test]
     fn a_slots_suggestion_puts_the_parts_long_enough_and_most_like_its_words_first() {
         let clip = ClipRow { clip_id: "a".into(), name: "A".into(), duration_seconds: 10.0, duration_frames: 500, ..ClipRow::default() };
-        let shot = |from, to, vector: Vec<f32>| AiPart { clip_id: "a".into(), from, to, label: "sea".into(), text: "sea".into(), share: 1.0, spoken: false, kind: String::new(), poster: String::new(), vector, taught: None, terms: Vec::new() };
+        let shot = |from, to, vector: Vec<f32>| AiPart { clip_id: "a".into(), from, to, label: "sea".into(), text: "sea".into(), share: 1.0, spoken: false, kind: String::new(), poster: String::new(), vector, taught: None, terms: Vec::new(), caption: None };
         let mut view = AiBrollView { parts: vec![shot(0, 100, vec![1.0, 0.0]), shot(100, 300, vec![0.0, 1.0]), shot(300, 500, vec![0.8, 0.6])], ..AiBrollView::default() };
         let ids = |view: &AiBrollView| view.cards(std::slice::from_ref(&clip)).iter().map(|card| card.id.clone()).collect::<Vec<_>>();
         assert_eq!(ids(&view), ["a|0|100", "a|100|300", "a|300|500"]);
         let slot = |id: &str, seconds, vector: Vec<f32>| qnc_broll_suggest::SlotSuggestion { slot_id: id.into(), seconds, text: "more".into(), vector };
-        view.suggestion = Some(qnc_broll_suggest::Suggestion { key: "s".into(), slots: vec![slot("s", 3.0, vec![1.0, 0.0])] });
+        view.suggestion = Some(qnc_broll_suggest::Suggestion { key: "s".into(), slots: vec![slot("s", 3.0, vec![1.0, 0.0])], captions: Default::default() });
         // 2 s is shorter than the slot: last; of the 4 s parts the one most like the words first.
         assert_eq!(ids(&view), ["a|300|500", "a|100|300", "a|0|100"]);
         let cards = view.cards(std::slice::from_ref(&clip));
         assert!(cards[0].title.starts_with("1. ") && cards[1].title.starts_with("2. ") && !cards[2].title.starts_with("3. "));
         // The whole OFF: a cover a slot in order, none twice, then the rest.
-        view.suggestion = Some(qnc_broll_suggest::Suggestion { key: "off:x".into(), slots: vec![slot("s1", 3.0, vec![0.0, 1.0]), slot("s2", 3.0, vec![0.0, 1.0])] });
+        view.suggestion = Some(qnc_broll_suggest::Suggestion { key: "off:x".into(), slots: vec![slot("s1", 3.0, vec![0.0, 1.0]), slot("s2", 3.0, vec![0.0, 1.0])], captions: Default::default() });
         let cards = view.cards(std::slice::from_ref(&clip));
         assert_eq!(cards.iter().map(|card| card.id.as_str()).collect::<Vec<_>>(), ["a|100|300", "a|300|500", "a|0|100"]);
         assert!(cards[0].title.starts_with("1/2 · ") && cards[1].title.starts_with("2/2 · "));

@@ -55,6 +55,8 @@ pub struct SlotSuggestion {
 pub struct Suggestion {
     pub key: String,
     pub slots: Vec<SlotSuggestion>,
+    /// The vectors of the parts' captions asked with it (by the same program as the words).
+    pub captions: std::collections::HashMap<String, Vec<f32>>,
 }
 
 /// What the story asks for now: the chosen slot, else the empty slots of the OFF under the Wrap
@@ -128,20 +130,62 @@ pub fn likeness(slot: &SlotSuggestion, vector: &[f32]) -> f32 {
     vector.iter().zip(&slot.vector).map(|(a, b)| a * b).sum()
 }
 
-/// The series: for each slot in order, the part (index into `parts`: its seconds and vector)
-/// most like its words that is long enough and not given to an earlier slot; `None` for a slot
-/// no part is long enough for.
-pub fn series(suggestion: &Suggestion, parts: &[(f64, &[f32])]) -> Vec<Option<usize>> {
+/// A usable part a slot may get: how long it is, the vector of its pictures and the caption a
+/// model wrote of it (user 2026-11-11: Florence-2), when there is one.
+#[derive(Debug, Clone, Copy)]
+pub struct Candidate<'a> {
+    pub seconds: f64,
+    pub vector: &'a [f32],
+    pub caption: Option<&'a str>,
+}
+
+/// How well each candidate fits a slot's words: the likeness of its pictures to the words and,
+/// where it has a caption, the likeness of the caption to the words (user 2026-11-11: the
+/// caption of a shot in the suggestion), each standardised among the candidates (a picture and a
+/// text are alike on another scale than two texts) and added; a candidate without a caption
+/// counts its pictures only. A part of another model's width is never fit.
+pub fn scores(suggestion: &Suggestion, slot: &SlotSuggestion, parts: &[Candidate<'_>]) -> Vec<f32> {
+    let pictures: Vec<f32> = parts.iter().map(|part| likeness(slot, part.vector)).collect();
+    let captions: Vec<Option<f32>> = parts
+        .iter()
+        .map(|part| part.caption.and_then(|caption| suggestion.captions.get(caption)).filter(|vector| vector.len() == slot.vector.len()).map(|vector| likeness(slot, vector)))
+        .collect();
+    let pictures_z = standardised(&pictures.iter().map(|value| value.is_finite().then_some(*value)).collect::<Vec<_>>());
+    let captions_z = standardised(&captions);
+    pictures
+        .iter()
+        .zip(pictures_z.iter().zip(&captions_z))
+        .map(|(picture, (picture_z, caption_z))| if picture.is_finite() { picture_z.unwrap_or(0.0) + caption_z.unwrap_or(0.0) } else { f32::NEG_INFINITY })
+        .collect()
+}
+
+/// Each value's distance from the values' mean in their standard deviations (0 when they are all
+/// alike); `None` stays `None`.
+fn standardised(values: &[Option<f32>]) -> Vec<Option<f32>> {
+    let known: Vec<f32> = values.iter().flatten().copied().collect();
+    if known.is_empty() {
+        return values.to_vec();
+    }
+    let mean = known.iter().sum::<f32>() / known.len() as f32;
+    let deviation = (known.iter().map(|value| (value - mean).powi(2)).sum::<f32>() / known.len() as f32).sqrt();
+    values.iter().map(|value| value.map(|value| if deviation > 1e-6 { (value - mean) / deviation } else { 0.0 })).collect()
+}
+
+/// The series: for each slot in order, the part (index into `parts`) that fits its words best
+/// (`scores`), long enough and not given to an earlier slot; `None` for a slot no part is long
+/// enough for.
+pub fn series(suggestion: &Suggestion, parts: &[Candidate<'_>]) -> Vec<Option<usize>> {
     let mut given = vec![false; parts.len()];
     suggestion
         .slots
         .iter()
         .map(|slot| {
+            let scores = scores(suggestion, slot, parts);
             let best = parts
                 .iter()
                 .enumerate()
-                .filter(|(index, (seconds, _))| !given[*index] && *seconds >= slot.seconds)
-                .map(|(index, (_, vector))| (index, likeness(slot, vector)))
+                .filter(|(index, part)| !given[*index] && part.seconds >= slot.seconds && scores[*index].is_finite())
+                .map(|(index, _)| (index, scores[index]))
                 .max_by(|a, b| a.1.total_cmp(&b.1))
                 .map(|(index, _)| index);
             if let Some(index) = best {
@@ -155,13 +199,19 @@ pub fn series(suggestion: &Suggestion, parts: &[(f64, &[f32])]) -> Vec<Option<us
 struct Job {
     target: ProjectDbTarget,
     ask: Ask,
+    captions: Vec<String>,
 }
+
+/// The vectors of captions the worker made, kept for the next ask (by the model they were made
+/// with).
+type CaptionVectors = (std::path::PathBuf, std::collections::HashMap<String, Vec<f32>>);
 
 /// The suggestion of what the story asks for, made off the form thread by one worker that keeps
 /// the shot-content program started (its model loads once).
 #[derive(Default)]
 pub struct Suggest {
     asked: Option<Ask>,
+    asked_captions: Vec<String>,
     jobs: Option<mpsc::Sender<Job>>,
     answers: Option<mpsc::Receiver<Result<Suggestion, String>>>,
     shown: Option<Suggestion>,
@@ -175,9 +225,10 @@ impl std::fmt::Debug for Suggest {
 }
 
 impl Suggest {
-    /// Follows what the story asks for: a new ask is worked out, none withdraws the suggestion.
+    /// Follows what the story asks for: a new ask is worked out, none withdraws the suggestion;
+    /// `captions` are the captions of the parts it may suggest, made vectors with its words.
     /// Returns whether the suggestion shown changed.
-    pub fn follow(&mut self, ask: Option<Ask>, target: Option<&ProjectDbTarget>) -> bool {
+    pub fn follow(&mut self, ask: Option<Ask>, target: Option<&ProjectDbTarget>, captions: &[&str]) -> bool {
         let mut changed = false;
         if let Some(answers) = &self.answers {
             while let Ok(answer) = answers.try_recv() {
@@ -195,19 +246,27 @@ impl Suggest {
                 }
             }
         }
-        if ask == self.asked {
+        // The parts' captions, once each; a new caption of the same ask is worked out again.
+        let mut captions: Vec<String> = captions.iter().map(|caption| (*caption).to_string()).collect();
+        captions.sort_unstable();
+        captions.dedup();
+        let same_ask = ask == self.asked;
+        if same_ask && (ask.is_none() || captions == self.asked_captions) {
             return changed;
         }
-        self.asked = ask.clone();
-        if self.shown.take().is_some() {
-            changed = true;
+        self.asked_captions.clone_from(&captions);
+        if !same_ask {
+            self.asked = ask.clone();
+            if self.shown.take().is_some() {
+                changed = true;
+            }
         }
         let (Some(ask), Some(target)) = (ask, target) else { return changed };
         if self.jobs.is_none() {
             self.start();
         }
         if let Some(jobs) = &self.jobs {
-            self.working = jobs.send(Job { target: target.clone(), ask }).is_ok();
+            self.working = jobs.send(Job { target: target.clone(), ask, captions }).is_ok();
         }
         changed
     }
@@ -227,12 +286,13 @@ impl Suggest {
         let (send, answers) = mpsc::channel();
         let spawned = std::thread::Builder::new().name("qnc-broll-suggest".into()).spawn(move || {
             let mut client: Option<(std::path::PathBuf, qnc_shot_content::ContentClient)> = None;
+            let mut made: CaptionVectors = (std::path::PathBuf::new(), std::collections::HashMap::new());
             while let Ok(mut job) = take.recv() {
                 // Only what was asked last counts.
                 while let Ok(newer) = take.try_recv() {
                     job = newer;
                 }
-                if send.send(work(&job, &mut client)).is_err() {
+                if send.send(work(&job, &mut client, &mut made)).is_err() {
                     return;
                 }
             }
@@ -244,7 +304,7 @@ impl Suggest {
 }
 
 /// The words of an ask's slots and their vectors (a slot without words is left out).
-fn work(job: &Job, client: &mut Option<(std::path::PathBuf, qnc_shot_content::ContentClient)>) -> Result<Suggestion, String> {
+fn work(job: &Job, client: &mut Option<(std::path::PathBuf, qnc_shot_content::ContentClient)>, made: &mut CaptionVectors) -> Result<Suggestion, String> {
     let voices = qnc_script_db::read_voices(&job.target).unwrap_or_default();
     let heard = |clip: &str| {
         voices
@@ -280,7 +340,23 @@ fn work(job: &Job, client: &mut Option<(std::path::PathBuf, qnc_shot_content::Co
         vectors.extend(content.texts(&request)?.vectors);
     }
     let slots = said.into_iter().zip(vectors).map(|((slot, text), vector)| SlotSuggestion { slot_id: slot.slot_id.clone(), seconds: slot.seconds, text, vector }).collect();
-    Ok(Suggestion { key: job.ask.key.clone(), slots })
+    // The parts' captions, each made a vector once a model (a caption the program cannot read
+    // leaves the suggestion to the pictures, never stops it).
+    if made.0 != engine.model {
+        *made = (engine.model.clone(), std::collections::HashMap::new());
+    }
+    let missing: Vec<String> = job.captions.iter().filter(|caption| !made.1.contains_key(*caption)).cloned().collect();
+    for texts in missing.chunks(qnc_shot_content::MOST_AT_ONCE) {
+        match content.texts(&qnc_shot_content::TextsRequest { model: engine.model.clone(), texts: texts.to_vec() }) {
+            Ok(answer) => made.1.extend(texts.iter().cloned().zip(answer.vectors)),
+            Err(error) => {
+                log(&format!("broll-suggest captions failed error={error}"));
+                break;
+            }
+        }
+    }
+    let captions = job.captions.iter().filter_map(|caption| Some((caption.clone(), made.1.get(caption)?.clone()))).collect();
+    Ok(Suggestion { key: job.ask.key.clone(), slots, captions })
 }
 
 fn log(line: &str) {
@@ -314,10 +390,36 @@ mod tests {
     #[test]
     fn a_series_gives_each_slot_its_best_part_long_enough_and_none_twice() {
         let slot = |id: &str, seconds, vector: Vec<f32>| SlotSuggestion { slot_id: id.into(), seconds, text: String::new(), vector };
-        let suggestion = Suggestion { key: "off:x".into(), slots: vec![slot("s1", 3.0, vec![1.0, 0.0]), slot("s2", 3.0, vec![1.0, 0.0]), slot("s3", 9.0, vec![0.0, 1.0])] };
-        let (sea, sea2, short_book) = ([1.0, 0.0], [0.8, 0.6], [0.0, 1.0]);
-        let parts: Vec<(f64, &[f32])> = vec![(4.0, &sea), (5.0, &sea2), (2.0, &short_book)];
+        let suggestion = Suggestion { key: "off:x".into(), slots: vec![slot("s1", 3.0, vec![1.0, 0.0]), slot("s2", 3.0, vec![1.0, 0.0]), slot("s3", 9.0, vec![0.0, 1.0])], captions: Default::default() };
+        const SEA: [f32; 2] = [1.0, 0.0];
+        const SEA2: [f32; 2] = [0.8, 0.6];
+        const BOOK: [f32; 2] = [0.0, 1.0];
+        let part = |seconds, vector: &'static [f32]| Candidate { seconds, vector, caption: None };
+        let parts = [part(4.0, &SEA), part(5.0, &SEA2), part(2.0, &BOOK)];
         // s1 takes the sea, s2 the next like it, s3 has none long enough.
         assert_eq!(series(&suggestion, &parts), [Some(0), Some(1), None]);
+    }
+
+    #[test]
+    fn a_caption_like_the_words_lifts_a_part_its_pictures_alone_would_not() {
+        // The words are of a harbour; two parts' pictures are alike to them, the second a little
+        // less, but its caption says boats on the water.
+        let words = vec![1.0, 0.0, 0.0];
+        let slot = SlotSuggestion { slot_id: "s".into(), seconds: 2.0, text: "luka i brodovi".into(), vector: words };
+        let mut captions = std::collections::HashMap::new();
+        captions.insert("a person standing on the floor".to_string(), vec![0.0, 1.0, 0.0]);
+        captions.insert("some boats on the water".to_string(), vec![0.9, 0.0, 0.436]);
+        let suggestion = Suggestion { key: "slot:s".into(), slots: vec![slot.clone()], captions };
+        let (a, b, c) = ([0.30, 0.95, 0.0], [0.28, 0.96, 0.0], [0.0, 1.0, 0.0]);
+        let parts = [
+            Candidate { seconds: 3.0, vector: &a, caption: Some("a person standing on the floor") },
+            Candidate { seconds: 3.0, vector: &b, caption: Some("some boats on the water") },
+            Candidate { seconds: 3.0, vector: &c, caption: None },
+        ];
+        let scores = scores(&suggestion, &slot, &parts);
+        assert!(scores[1] > scores[0], "the caption of the boats lifts it over a picture a little more alike: {scores:?}");
+        assert_eq!(series(&suggestion, &parts), [Some(1)]);
+        let other = [0.0f32; 2];
+        assert_eq!(super::scores(&suggestion, &slot, &[Candidate { seconds: 3.0, vector: &other, caption: None }]), [f32::NEG_INFINITY], "another model's width never fits");
     }
 }
