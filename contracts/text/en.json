@@ -585,6 +585,7 @@
     "transcript.waiting": "waiting",
     "transcript.running": "transcribing",
     "transcript.done": "done",
+    "transcript.done_count": "Transcribed: {clips} clips (open them from the Transcript tab)",
     "transcript.failed": "failed",
     "transcript.reading": "reading the sound",
     "transcript.running_for": "running {elapsed}",

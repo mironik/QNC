@@ -260,6 +260,7 @@
     "transcript.waiting": "čeka",
     "transcript.running": "prepisuje se",
     "transcript.done": "gotovo",
+    "transcript.done_count": "Prepisano: {clips} klipova (otvaraju se iz taba Prijepis)",
     "transcript.failed": "neuspjelo",
     "transcript.reading": "čitanje tona",
     "transcript.running_for": "radi {elapsed}",
