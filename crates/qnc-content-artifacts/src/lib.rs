@@ -223,8 +223,8 @@ impl qnc_filmstrip_worker::FilmstripContentRead for ProjectFilmstripContentReade
                 Ok(qnc_filmstrip_worker::FilmstripClipRecord {
                     priority: artifact_priority(&stored),
                     clip_id: stored.clip.id().to_string(),
-                    name: stored.clip.name,
-                    snapshot: stored.clip.snapshot,
+                    name: stored.clip.name.clone(),
+                    snapshot: stored.snapshot_to_read(),
                 })
             })
             .collect()
@@ -241,8 +241,8 @@ impl qnc_filmstrip_worker::FilmstripContentRead for ProjectFilmstripContentReade
             qnc_filmstrip_worker::FilmstripClipRecord {
                 priority: artifact_priority(&stored),
                 clip_id: stored.clip.id().to_string(),
-                name: stored.clip.name,
-                snapshot: stored.clip.snapshot,
+                name: stored.clip.name.clone(),
+                snapshot: stored.snapshot_to_read(),
             }
         }))
     }
@@ -305,8 +305,8 @@ impl qnc_wave_worker::WaveContentRead for ProjectWaveContentReader {
                 Ok(qnc_wave_worker::WaveClipRecord {
                     priority: artifact_priority(&stored),
                     clip_id: stored.clip.id().to_string(),
-                    name: stored.clip.name,
-                    snapshot: stored.clip.snapshot,
+                    name: stored.clip.name.clone(),
+                    snapshot: stored.snapshot_to_read(),
                 })
             })
             .collect()
@@ -323,8 +323,8 @@ impl qnc_wave_worker::WaveContentRead for ProjectWaveContentReader {
             .map(|stored| qnc_wave_worker::WaveClipRecord {
                 priority: artifact_priority(&stored),
                 clip_id: stored.clip.id().to_string(),
-                name: stored.clip.name,
-                snapshot: stored.clip.snapshot,
+                name: stored.clip.name.clone(),
+                snapshot: stored.snapshot_to_read(),
             }))
     }
 
