@@ -9182,3 +9182,14 @@ trebalo uzeti rijesit cu; alat koristi Hrvatski sabor, mislim da je javan"): QNC
 zaseban repo koji koristi kocke QNC-a kao git ovisnost zakljucanu na oznaku; nista se ne kopira, sto wizardu fali, a pripada
 kocki, radi se u QNC-u. Plan: `QNC-AI/docs/01-wizard-plan.md`. wav2vec2 ParlaSpeech ulazi u AI paket odlukom korisnika
 (izvesti u W0.1: `pack.json` status `user`).
+Otkljucano i izvedeno 2026-11-12 (korisnik: "za AI smo rekli formirati posebni direktorij koji mogu pozivati obje verzije
+aplikacija (share direktorij)"; "C:\Users\Public\QNC-AI-share", "da, otkljucaj" qnc-ai-catalog i qnc-ai-pack): AI modeli su u
+zajednickom AI direktoriju racunala koji citaju QNC i QNC-AI. `qnc-ai-catalog` `share_dir` (`QNC_AI_SHARE`, inace Windows
+`%PUBLIC%\QNC-AI-share`, macOS `/Users/Shared/QNC-AI-share`, drugdje `/usr/local/share/qnc-ai-share`) i `model_path`
+(model u katalogu `share:models/<ime>` je u zajednickom direktoriju, ostalo relativno mapi kataloga);
+`catalogs/ai/catalog.json` svi modeli `share:models/...`; `tools/qnc-ai-pack` takav model drzi u paketu pod `share/` i
+instalira ga natrag u zajednicki direktorij. Modeli premjesteni iz `QNC/data/models` u
+`C:\Users\Public\QNC-AI-share\models` (isti disk, bez kopije). Izmjena je ista u QNC-AI. Test
+`a_model_named_share_is_in_the_shared_ai_folder_another_beside_the_catalog`; programi koji citaju AI katalog ponovno
+izgradjeni (`qnc-app`, `qnc-story` s `libav`); `qnc-versions` nalazi model. Usput: debug build obrisan u oba projekta
+(korisnik: "ocisti nepotrebne kes i debug datoteke"; QNC 49,1 GiB, QNC-AI 6,7 GiB). Odobrenje je zatvoreno.

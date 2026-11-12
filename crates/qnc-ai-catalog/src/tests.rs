@@ -81,3 +81,10 @@ fn the_translator_says_which_languages_it_translates_and_a_catalog_without_one_h
     assert!(translator.translates("hr") && !translator.translates("en"));
     assert!(with("[]").is_err(), "from no language");
 }
+
+#[test]
+fn a_model_named_share_is_in_the_shared_ai_folder_another_beside_the_catalog() {
+    let folder = Path::new("C:/qnc/catalogs/ai");
+    assert_eq!(model_path(folder, "share:models/opus"), share_dir().join("models/opus"));
+    assert_eq!(model_path(folder, "../../data/models/opus"), folder.join("../../data/models/opus"));
+}

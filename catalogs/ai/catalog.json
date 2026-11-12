@@ -2,20 +2,20 @@
   "version": "1",
   "smooth": {
     "program": "rife-ncnn-vulkan",
-    "model": "../../data/models/rife-v4.6"
+    "model": "share:models/rife-v4.6"
   },
   "shot_content": {
     "program": "qnc-shot-content-siglip",
-    "model": "../../data/models/siglip2-base-patch16-224",
+    "model": "share:models/siglip2-base-patch16-224",
     "pictures": 2
   },
   "shot_caption": {
     "program": "qnc-shot-caption-florence",
-    "model": "../../data/models/florence-2-base-ft"
+    "model": "share:models/florence-2-base-ft"
   },
   "translate": {
     "program": "qnc-translate-opus",
-    "model": "../../data/models/opus-mt-tc-big-sh-en",
+    "model": "share:models/opus-mt-tc-big-sh-en",
     "from": ["hr", "sr", "bs"]
   },
   "store": {
@@ -23,7 +23,7 @@
   },
   "letters": {
     "program": "qnc-align-wav2vec2",
-    "model": "../../data/models/wav2vec2-parlaspeech-hr"
+    "model": "share:models/wav2vec2-parlaspeech-hr"
   },
   "transcribe": {
     "selected": "wav2vec2.parlaspeech-hr.cpu",
@@ -33,30 +33,30 @@
         "id": "whisper.large-v3-turbo.vulkan",
         "program": "qnc-transcribe-whisper",
         "backend": "vulkan",
-        "model": "../../data/models/ggml-large-v3-turbo.bin",
-        "vad_model": "../../data/models/ggml-silero-v5.1.2.bin",
+        "model": "share:models/ggml-large-v3-turbo.bin",
+        "vad_model": "share:models/ggml-silero-v5.1.2.bin",
         "threads": 4
       },
       {
         "id": "whisper.large-v3-turbo.cpu",
         "program": "qnc-transcribe-whisper",
         "backend": "cpu",
-        "model": "../../data/models/ggml-large-v3-turbo.bin",
-        "vad_model": "../../data/models/ggml-silero-v5.1.2.bin",
+        "model": "share:models/ggml-large-v3-turbo.bin",
+        "vad_model": "share:models/ggml-silero-v5.1.2.bin",
         "threads": 6
       },
       {
         "id": "wav2vec2.parlaspeech-hr.cpu",
         "program": "qnc-transcribe-wav2vec2",
         "backend": "cpu",
-        "model": "../../data/models/wav2vec2-parlaspeech-hr",
+        "model": "share:models/wav2vec2-parlaspeech-hr",
         "threads": 4
       },
       {
         "id": "parakeet.tdt-0.6b-v3.cpu",
         "program": "qnc-transcribe-parakeet",
         "backend": "cpu",
-        "model": "../../data/models/parakeet-tdt-0.6b-v3-int8",
+        "model": "share:models/parakeet-tdt-0.6b-v3-int8",
         "threads": 2
       }
     ]

@@ -12,6 +12,35 @@ pub const MODULE_ID: &str = "qnc.module.ai-catalog";
 pub const CATALOG: &str = "catalogs/ai/catalog.json";
 /// The backends an engine may name.
 pub const BACKENDS: [&str; 2] = ["vulkan", "cpu"];
+/// A model the catalog names under this prefix is in the shared AI folder of the computer.
+pub const SHARE_PREFIX: &str = "share:";
+
+/// The AI folder of this computer that QNC and QNC-AI share (user 2026-11-12: "za AI posebni
+/// direktorij koji mogu pozivati obje verzije aplikacija"): `QNC_AI_SHARE`, else the folder every
+/// user of the computer reaches (Windows `%PUBLIC%\QNC-AI-share`, macOS
+/// `/Users/Shared/QNC-AI-share`, elsewhere `/usr/local/share/qnc-ai-share`).
+pub fn share_dir() -> PathBuf {
+    if let Some(dir) = std::env::var_os("QNC_AI_SHARE").filter(|dir| !dir.is_empty()) {
+        return PathBuf::from(dir);
+    }
+    if cfg!(windows) {
+        let public = std::env::var_os("PUBLIC").map(PathBuf::from).unwrap_or_else(|| PathBuf::from(r"C:\Users\Public"));
+        public.join("QNC-AI-share")
+    } else if cfg!(target_os = "macos") {
+        PathBuf::from("/Users/Shared/QNC-AI-share")
+    } else {
+        PathBuf::from("/usr/local/share/qnc-ai-share")
+    }
+}
+
+/// Where a model the catalog at `folder` names is: under the shared AI folder for `share:...`,
+/// else relative to the catalog's folder.
+pub fn model_path(folder: &Path, named: &str) -> PathBuf {
+    match named.strip_prefix(SHARE_PREFIX) {
+        Some(rest) => share_dir().join(rest),
+        None => folder.join(named),
+    }
+}
 
 #[derive(Debug, Clone, Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -86,7 +115,7 @@ pub fn shot_content(path: &Path) -> Result<ShotContentEngine, String> {
     if !(1..=3).contains(&job.pictures) {
         return Err("shot content: pictures per part is 1, 2 or 3".into());
     }
-    let model = path.parent().ok_or("the AI catalog has no folder")?.join(&job.model);
+    let model = model_path(path.parent().ok_or("the AI catalog has no folder")?, &job.model);
     if !model_here(&model) {
         return Err(format!("shot content: the model {} is not on this host", model.display()));
     }
@@ -119,7 +148,7 @@ pub fn shot_captioner(path: &Path) -> Result<ShotCaptioner, String> {
     let text = std::fs::read_to_string(path).map_err(|e| format!("{}: {e}", path.display()))?;
     let file: File = serde_json::from_str(&text).map_err(|e| format!("{}: {e}", path.display()))?;
     let job = file.shot_caption.ok_or("the AI catalog of this host has no shot captioner")?;
-    let model = path.parent().ok_or("the AI catalog has no folder")?.join(&job.model);
+    let model = model_path(path.parent().ok_or("the AI catalog has no folder")?, &job.model);
     if !model_here(&model) {
         return Err(format!("shot captioner: the model {} is not on this host", model.display()));
     }
@@ -145,7 +174,7 @@ pub fn frame_interpolator(path: &Path) -> Result<FrameInterpolator, String> {
     let text = std::fs::read_to_string(path).map_err(|e| format!("{}: {e}", path.display()))?;
     let file: File = serde_json::from_str(&text).map_err(|e| format!("{}: {e}", path.display()))?;
     let job = file.smooth.ok_or("the AI catalog of this host has no frame interpolator")?;
-    let model = path.parent().ok_or("the AI catalog has no folder")?.join(&job.model);
+    let model = model_path(path.parent().ok_or("the AI catalog has no folder")?, &job.model);
     if !model.exists() {
         return Err(format!("frame interpolator: the model {} is not on this host", model.display()));
     }
@@ -178,7 +207,7 @@ pub fn letter_aligner(path: &Path) -> Result<LetterAligner, String> {
     let text = std::fs::read_to_string(path).map_err(|e| format!("{}: {e}", path.display()))?;
     let file: File = serde_json::from_str(&text).map_err(|e| format!("{}: {e}", path.display()))?;
     let job = file.letters.ok_or("the AI catalog of this host has no letter aligner")?;
-    let model = path.parent().ok_or("the AI catalog has no folder")?.join(&job.model);
+    let model = model_path(path.parent().ok_or("the AI catalog has no folder")?, &job.model);
     if !model_here(&model) {
         return Err(format!("letter aligner: the model {} is not on this host", model.display()));
     }
@@ -212,8 +241,8 @@ struct Engine {
     id: String,
     program: String,
     backend: String,
-    /// The model, relative to the catalog's folder: a file, or the folder of a model made
-    /// of several files.
+    /// The model, relative to the catalog's folder or `share:...` in the shared AI folder: a file,
+    /// or the folder of a model made of several files.
     model: String,
     #[serde(default)]
     vad_model: Option<String>,
@@ -305,7 +334,7 @@ fn engine_in(file: &File, folder: &Path, selected: &str) -> Result<Transcriber, 
         return Err(format!("transcription engine {}: threads must be at least 1", engine.id));
     }
     let present = |relative: &str| -> Result<PathBuf, String> {
-        let file = folder.join(relative);
+        let file = model_path(folder, relative);
         if model_here(&file) {
             Ok(file)
         } else {
@@ -369,7 +398,7 @@ pub fn translator(path: &Path) -> Result<Translator, String> {
     let text = std::fs::read_to_string(path).map_err(|e| format!("{}: {e}", path.display()))?;
     let file: File = serde_json::from_str(&text).map_err(|e| format!("{}: {e}", path.display()))?;
     let job = file.translate.ok_or("the AI catalog of this host has no translator")?;
-    let model = path.parent().ok_or("the AI catalog has no folder")?.join(&job.model);
+    let model = model_path(path.parent().ok_or("the AI catalog has no folder")?, &job.model);
     if !model_here(&model) {
         return Err(format!("translator: the model {} is not on this host", model.display()));
     }
@@ -396,7 +425,7 @@ pub fn installed_model(name: &str) -> Result<PathBuf, String> {
     collect(&catalog, &["model", "vad_model"], &mut models);
     models
         .into_iter()
-        .map(|relative| folder.join(relative))
+        .map(|relative| model_path(folder, &relative))
         .find(|model| model_name(model) == name)
         .filter(|model| model.exists())
         .ok_or_else(|| format!("the model {name} is not in the AI catalog of this host or not on it"))

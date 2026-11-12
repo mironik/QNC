@@ -26,6 +26,8 @@ const PACK_FILE: &str = "pack.json";
 const MANIFEST: &str = "ai-pack.json";
 /// Where a pack keeps the programs (installed beside the application).
 const APP: &str = "app";
+/// Where a pack keeps the models of the shared AI folder (installed back there).
+const SHARE: &str = "share";
 /// Where a pack keeps the licences of its models and libraries.
 const LICENCES: &str = "LICENSES";
 
@@ -220,9 +222,14 @@ fn make(out: &Path, include_unchecked: bool) -> Result<(), String> {
     // The models, at the same place under the root as the catalog names them, and their licences.
     let root = catalog_dir.parent().and_then(Path::parent).ok_or("the catalog is not in a QNC root")?;
     let mut licences = String::from("The AI pack of QNC: the licences of its models and libraries.\n\n");
+    let share = plain(&qnc_ai_catalog::share_dir());
     for model in &models {
-        let relative = model.strip_prefix(root).map_err(|_| format!("{} is not under the QNC root", model.display()))?;
-        copy(model, &out.join(relative))?;
+        // A model of the shared AI folder goes under `share/`, one under the root at its place there.
+        let place = match model.strip_prefix(&share) {
+            Ok(shared) => Path::new(SHARE).join(shared),
+            Err(_) => model.strip_prefix(root).map_err(|_| format!("{} is neither under the QNC root nor in the shared AI folder", model.display()))?.to_path_buf(),
+        };
+        copy(model, &out.join(place))?;
         if let Some(entry) = model_entry(&pack, model) {
             licences.push_str(&format!("{}: {} ({}). {}\n", entry.model, entry.licence, entry.source, entry.attribution));
         }
@@ -273,9 +280,11 @@ fn install(pack: &Path, app: &Path, root: &Path) -> Result<(), String> {
     }
     for file in &manifest.files {
         let relative = Path::new(&file.path);
-        let to = match relative.strip_prefix(APP) {
-            Ok(program) => app.join(program),
-            Err(_) => root.join(relative),
+        let to = match (relative.strip_prefix(APP), relative.strip_prefix(SHARE)) {
+            (Ok(program), _) => app.join(program),
+            // The models of the shared AI folder go back there (QNC and QNC-AI read them both).
+            (_, Ok(shared)) => qnc_ai_catalog::share_dir().join(shared),
+            _ => root.join(relative),
         };
         copy(&pack.join(relative), &to)?;
     }
