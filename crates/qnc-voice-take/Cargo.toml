@@ -6,7 +6,7 @@ description = "QNC public module: one take of a script block from the microphone
 
 [dependencies]
 qnc-media-metadata = { workspace = true }
-qnc-script-db = { version = "0.1.0", path = "../qnc-script-db" }
+qnc-script-db = { workspace = true }
 qnc-source-contract = { workspace = true }
 qnc-still-locator = { workspace = true }
 qnc-ui-text = { workspace = true }

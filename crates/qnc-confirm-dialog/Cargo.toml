@@ -1,9 +1,0 @@
-[package]
-name = "qnc-confirm-dialog"
-version = "0.1.0"
-edition = "2021"
-description = "QNC public passive UI component: a modal yes/no question over the window"
-
-[dependencies]
-qnc-ui-kit = { workspace = true }
-eframe = { workspace = true }

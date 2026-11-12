@@ -1,7 +1,0 @@
-[package]
-name = "qnc-edit-edge"
-version = "0.1.0"
-edition = "2021"
-description = "QNC public block: the one rule of an edge of a piece (its IN or OUT inside its clip, moved by a key, a drag or a roll of two pieces) for every owner of an edge"
-
-[dependencies]

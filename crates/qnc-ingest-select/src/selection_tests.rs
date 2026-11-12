@@ -6,8 +6,8 @@ use serde_json::json;
 use std::{path::Path, sync::mpsc};
 
 const SOURCE: &str = "qnc://local/source/card-test";
-const INDEX: &str = include_str!("../../qnc-sony-metadata/tests/fixtures/MEDIAPRO.XML");
-const SIDE: &str = include_str!("../../qnc-sony-metadata/tests/fixtures/TEST-AM01.XML");
+const INDEX: &str = include_str!("../../../../QNC-shared/crates/qnc-sony-metadata/tests/fixtures/MEDIAPRO.XML");
+const SIDE: &str = include_str!("../../../../QNC-shared/crates/qnc-sony-metadata/tests/fixtures/TEST-AM01.XML");
 
 fn local(uri: &str, file: &Path) -> Binding {
     Binding {

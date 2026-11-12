@@ -171,7 +171,7 @@ fn run_checks(root: &Path) -> Vec<CheckResult> {
 
 fn validate_no_ingest_components_layer(root: &Path) -> CheckResult {
     let mut report = ValidationReport::new();
-    let forbidden_dir = root.join("crates").join("qnc-ingest-components");
+    let forbidden_dir = crate_dir(root, "qnc-ingest-components");
     if forbidden_dir.exists() {
         report.error(format!(
             "{} must not exist; Ingest has no application components layer",
@@ -181,6 +181,9 @@ fn validate_no_ingest_components_layer(root: &Path) -> CheckResult {
 
     let mut cargo_files = Vec::new();
     collect_named_files(root, "Cargo.toml", &mut cargo_files);
+    for dir in shared_crate_dirs(root) {
+        collect_named_files(&dir, "Cargo.toml", &mut cargo_files);
+    }
     for path in cargo_files {
         let Ok(contents) = fs::read_to_string(&path) else {
             continue;
@@ -195,7 +198,7 @@ fn validate_no_ingest_components_layer(root: &Path) -> CheckResult {
 
     let mut rust_files = Vec::new();
     collect_rs_files(&root.join("apps"), &mut rust_files);
-    collect_rs_files(&root.join("crates"), &mut rust_files);
+    collect_crate_rs_files(root, &mut rust_files);
     for path in rust_files {
         let Ok(contents) = fs::read_to_string(&path) else {
             continue;
@@ -215,7 +218,7 @@ fn validate_no_ingest_components_layer(root: &Path) -> CheckResult {
 
 fn validate_ingest_form_has_no_tests(root: &Path) -> CheckResult {
     let mut report = ValidationReport::new();
-    let src = root.join("crates").join("qnc-ingest-desktop").join("src");
+    let src = crate_dir(root, "qnc-ingest-desktop").join("src");
     let mut files = Vec::new();
     collect_rs_files(&src, &mut files);
     for path in files {
@@ -238,7 +241,7 @@ fn validate_ingest_form_has_no_tests(root: &Path) -> CheckResult {
 /// dependency on another application, a store, a scanner, a probe or a player.
 fn validate_editorial_form_boundary(root: &Path) -> CheckResult {
     let mut report = ValidationReport::new();
-    let form = root.join("crates").join("qnc-editorial-desktop");
+    let form = crate_dir(root, "qnc-editorial-desktop");
     let mut files = Vec::new();
     collect_rs_files(&form.join("src"), &mut files);
     for path in files {
@@ -286,7 +289,7 @@ fn validate_editorial_form_boundary(root: &Path) -> CheckResult {
 
 fn validate_project_form_has_no_tests(root: &Path) -> CheckResult {
     let mut report = ValidationReport::new();
-    let src = root.join("crates").join("qnc-project-desktop").join("src");
+    let src = crate_dir(root, "qnc-project-desktop").join("src");
     let mut files = Vec::new();
     collect_rs_files(&src, &mut files);
     for path in files {
@@ -449,10 +452,8 @@ fn validate_project_layout_reference(root: &Path) -> CheckResult {
 
 fn scan_timeline_engine_boundary(root: &Path) -> CheckResult {
     let mut report = ValidationReport::new();
-    let cargo_path = root.join("crates").join("qnc-timeline").join("Cargo.toml");
-    let source_path = root
-        .join("crates")
-        .join("qnc-timeline")
+    let cargo_path = crate_dir(root, "qnc-timeline").join("Cargo.toml");
+    let source_path = crate_dir(root, "qnc-timeline")
         .join("src")
         .join("lib.rs");
 
@@ -520,7 +521,10 @@ fn scan_timeline_engine_boundary(root: &Path) -> CheckResult {
 }
 
 fn require_file(root: &Path, relative: &str) -> CheckResult {
-    let path = root.join(relative);
+    let path = match relative.strip_prefix("crates/").and_then(|rest| rest.split_once('/')) {
+        Some((name, rest)) => crate_dir(root, name).join(rest),
+        None => root.join(relative),
+    };
     if path.is_file() {
         CheckResult::ok(format!("required file {relative}"))
     } else {
@@ -769,9 +773,7 @@ fn validate_keyboard_matches_qnc_v4(root: &Path) -> CheckResult {
 fn validate_ingest_keyboard_actions(root: &Path) -> CheckResult {
     let mut report = ValidationReport::new();
     let keyboard_path = root.join("contracts").join("qnc-keyboard-shortcuts.json");
-    let component_path = root
-        .join("crates")
-        .join("qnc-ingest-application")
+    let component_path = crate_dir(root, "qnc-ingest-application")
         .join("src")
         .join("lib.rs");
 
@@ -1524,6 +1526,9 @@ fn application_runtime_crates(
 fn cargo_package_index(root: &Path) -> BTreeMap<String, PathBuf> {
     let mut cargo_files = Vec::new();
     collect_named_files(root, "Cargo.toml", &mut cargo_files);
+    for dir in shared_crate_dirs(root) {
+        collect_named_files(&dir, "Cargo.toml", &mut cargo_files);
+    }
     let mut packages = BTreeMap::new();
     for cargo_toml in cargo_files {
         let Ok(contents) = fs::read_to_string(&cargo_toml) else {
@@ -1752,7 +1757,7 @@ fn read_relative_json_paths(root: &Path, relative_dir: &str) -> BTreeSet<String>
 fn scan_rust_for_hardcoded_shortcuts(root: &Path) -> CheckResult {
     let mut report = ValidationReport::new();
     let mut files = Vec::new();
-    collect_rs_files(&root.join("crates"), &mut files);
+    collect_crate_rs_files(root, &mut files);
     collect_rs_files(&root.join("apps"), &mut files);
     collect_rs_files(&root.join("tools"), &mut files);
 
@@ -1781,7 +1786,7 @@ fn scan_rust_for_hardcoded_shortcuts(root: &Path) -> CheckResult {
 fn scan_decoder_selection_boundary(root: &Path) -> CheckResult {
     let mut report = ValidationReport::new();
     let mut files = Vec::new();
-    collect_rs_files(&root.join("crates"), &mut files);
+    collect_crate_rs_files(root, &mut files);
     collect_rs_files(&root.join("apps"), &mut files);
     collect_rs_files(&root.join("tools"), &mut files);
 
@@ -1820,7 +1825,7 @@ fn scan_decoder_selection_boundary(root: &Path) -> CheckResult {
 fn scan_public_db_write_boundary(root: &Path) -> CheckResult {
     let mut report = ValidationReport::new();
     let mut files = Vec::new();
-    collect_rs_files(&root.join("crates"), &mut files);
+    collect_crate_rs_files(root, &mut files);
     collect_rs_files(&root.join("apps"), &mut files);
 
     for file in files {
@@ -2044,9 +2049,9 @@ fn contains_business_app_import(contents: &str, crate_prefix: &str) -> bool {
 fn scan_project_app_boundary(root: &Path) -> CheckResult {
     let mut report = ValidationReport::new();
     let project_app_root = root.join("apps").join("qnc-project");
-    let project_desktop_root = root.join("crates").join("qnc-project-desktop");
-    let project_store_root = root.join("crates").join("qnc-project-store");
-    let project_adapter_root = root.join("crates").join("qnc-project-desktop-adapter");
+    let project_desktop_root = crate_dir(root, "qnc-project-desktop");
+    let project_store_root = crate_dir(root, "qnc-project-store");
+    let project_adapter_root = crate_dir(root, "qnc-project-desktop-adapter");
     let app_cargo_toml = project_app_root.join("Cargo.toml");
     let desktop_cargo_toml = project_desktop_root.join("Cargo.toml");
     let store_cargo_toml = project_store_root.join("Cargo.toml");
@@ -2108,7 +2113,7 @@ fn scan_project_app_boundary(root: &Path) -> CheckResult {
         ));
     }
 
-    let blocks_cargo_toml = root.join("crates").join("qnc-project-blocks").join("Cargo.toml");
+    let blocks_cargo_toml = crate_dir(root, "qnc-project-blocks").join("Cargo.toml");
     if let Ok(contents) = fs::read_to_string(&blocks_cargo_toml) {
         has_dir_browser_dependency |= contents.contains("qnc-dir-browser");
         has_keyboard_dependency |= contents.contains("qnc-keyboard-shortcut");
@@ -2211,20 +2216,16 @@ fn scan_project_app_boundary(root: &Path) -> CheckResult {
     collect_rs_files(&project_app_root.join("src"), &mut files);
     collect_rs_files(&project_desktop_root.join("src"), &mut files);
     collect_rs_files(&project_store_root.join("src"), &mut files);
-    collect_rs_files(&root.join("crates").join("qnc-project-blocks").join("src"), &mut files);
-    collect_rs_files(&root.join("crates").join("qnc-project-session").join("src"), &mut files);
-    collect_rs_files(&root.join("crates").join("qnc-location-field").join("src"), &mut files);
+    collect_rs_files(&crate_dir(root, "qnc-project-blocks").join("src"), &mut files);
+    collect_rs_files(&crate_dir(root, "qnc-project-session").join("src"), &mut files);
+    collect_rs_files(&crate_dir(root, "qnc-location-field").join("src"), &mut files);
     collect_rs_files(
-        &root
-            .join("crates")
-            .join("qnc-project-application")
+        &crate_dir(root, "qnc-project-application")
             .join("src"),
         &mut files,
     );
     collect_rs_files(
-        &root
-            .join("crates")
-            .join("qnc-application-selection")
+        &crate_dir(root, "qnc-application-selection")
             .join("src"),
         &mut files,
     );
@@ -2363,9 +2364,7 @@ fn scan_project_app_boundary(root: &Path) -> CheckResult {
 
 fn scan_shared_ui_patterns(root: &Path) -> CheckResult {
     let mut report = ValidationReport::new();
-    let ui_kit = root
-        .join("crates")
-        .join("qnc-ui-kit")
+    let ui_kit = crate_dir(root, "qnc-ui-kit")
         .join("src")
         .join("lib.rs");
     match fs::read_to_string(&ui_kit) {
@@ -2391,13 +2390,13 @@ fn scan_shared_ui_patterns(root: &Path) -> CheckResult {
     }
     // One browser open at a time (AGENTS 9): the core piece of the location fields opens one
     // and closes the other (docs/99 step 3: the core cannot take it from the gui-kit).
-    let fields = root.join("crates").join("qnc-location-field").join("src").join("lib.rs");
+    let fields = crate_dir(root, "qnc-location-field").join("src").join("lib.rs");
     if !fs::read_to_string(&fields).is_ok_and(|contents| contents.contains("fn toggle_exclusive_panel")) {
         report.error(format!("{}: missing the exclusive opening of the location fields", display_relative(root, &fields)));
     }
 
     for crate_name in ["qnc-project-blocks", "qnc-ingest-blocks"] {
-        let cargo = root.join("crates").join(crate_name).join("Cargo.toml");
+        let cargo = crate_dir(root, crate_name).join("Cargo.toml");
         match fs::read_to_string(&cargo) {
             Ok(contents) => {
                 if !contents.contains("qnc-ui-kit") {
@@ -2413,7 +2412,7 @@ fn scan_shared_ui_patterns(root: &Path) -> CheckResult {
             )),
         }
 
-        let src = root.join("crates").join(crate_name).join("src");
+        let src = crate_dir(root, crate_name).join("src");
         let mut files = Vec::new();
         collect_rs_files(&src, &mut files);
         for file in files {
@@ -2446,8 +2445,8 @@ fn scan_shared_ui_patterns(root: &Path) -> CheckResult {
 fn validate_ingest_browser_uses_shared_action_bar(root: &Path, report: &mut ValidationReport) {
     // The confirm/cancel bar under the browser is the browser panel's own (rule 11), drawn
     // with qnc-ui-kit; the Ingest form only places the panel and draws no bar of its own.
-    let panel_file = root.join("crates").join("qnc-dir-browser-panel").join("src").join("lib.rs");
-    let form = root.join("crates").join("qnc-ingest-blocks").join("src");
+    let panel_file = crate_dir(root, "qnc-dir-browser-panel").join("src").join("lib.rs");
+    let form = crate_dir(root, "qnc-ingest-blocks").join("src");
     let Ok(panel) = fs::read_to_string(&panel_file) else {
         report.error(format!("{}: cannot read the browser panel", display_relative(root, &panel_file)));
         return;
@@ -2645,11 +2644,74 @@ fn collect_rs_files(dir: &Path, out: &mut Vec<PathBuf>) {
     }
 }
 
+/// The folders of crates outside the root that the root's workspace takes as path
+/// dependencies (the shared blocks, QNC-shared, user 2026-11-12). Their place is what
+/// the root Cargo.toml says, never a folder written here.
+fn shared_crate_dirs(root: &Path) -> Vec<PathBuf> {
+    let Ok(contents) = fs::read_to_string(root.join("Cargo.toml")) else {
+        return Vec::new();
+    };
+    let mut dirs: Vec<PathBuf> = Vec::new();
+    for line in contents.lines() {
+        let Some((_, rest)) = line.split_once("path = \"") else {
+            continue;
+        };
+        let Some((path, _)) = rest.split_once('"') else {
+            continue;
+        };
+        let Some(parent) = root.join(path).parent().map(Path::to_path_buf) else {
+            continue;
+        };
+        let parent = fs::canonicalize(&parent).unwrap_or(parent);
+        let inside = fs::canonicalize(root).map(|root| parent.starts_with(root)).unwrap_or(false);
+        if !inside && !dirs.contains(&parent) {
+            dirs.push(parent);
+        }
+    }
+    dirs
+}
+
+/// Every folder of crates the root builds from: its own `crates` and the shared ones.
+fn crate_roots(root: &Path) -> Vec<PathBuf> {
+    let mut roots = vec![root.join("crates")];
+    roots.extend(shared_crate_dirs(root));
+    roots
+}
+
+/// The folder of one crate: in the root's `crates`, else in a shared folder of crates.
+fn crate_dir(root: &Path, name: &str) -> PathBuf {
+    let own = root.join("crates").join(name);
+    if own.exists() {
+        return own;
+    }
+    shared_crate_dirs(root)
+        .into_iter()
+        .map(|dir| dir.join(name))
+        .find(|dir| dir.exists())
+        .unwrap_or(own)
+}
+
+/// `.rs` files of every crate the root builds from.
+fn collect_crate_rs_files(root: &Path, out: &mut Vec<PathBuf>) {
+    for dir in crate_roots(root) {
+        collect_rs_files(&dir, out);
+    }
+}
+
 fn display_relative(root: &Path, path: &Path) -> String {
-    path.strip_prefix(root)
-        .unwrap_or(path)
-        .to_string_lossy()
-        .replace('\\', "/")
+    if let Ok(relative) = path.strip_prefix(root) {
+        return relative.to_string_lossy().replace('\\', "/");
+    }
+    // A shared crate reads as `crates/<name>/...`, the same as one of the root's own.
+    static SHARED: std::sync::OnceLock<Vec<PathBuf>> = std::sync::OnceLock::new();
+    let shared = SHARED.get_or_init(|| shared_crate_dirs(root));
+    let path_canonical = fs::canonicalize(path).unwrap_or_else(|_| path.to_path_buf());
+    for dir in shared {
+        if let Ok(relative) = path_canonical.strip_prefix(dir) {
+            return format!("crates/{}", relative.to_string_lossy().replace('\\', "/"));
+        }
+    }
+    path.to_string_lossy().replace('\\', "/")
 }
 
 #[cfg(test)]
@@ -2817,7 +2879,7 @@ fn write_operations_outside_tests(contents: &str) -> Vec<&'static str> {
 fn scan_sources_are_read_only(root: &Path) -> CheckResult {
     let mut report = ValidationReport::default();
     for name in SOURCE_FACING_CRATES {
-        let src = root.join("crates").join(name).join("src");
+        let src = crate_dir(root, name).join("src");
         let mut files = Vec::new();
         collect_rust_files(&src, &mut files);
         for file in files {

@@ -1,8 +1,0 @@
-[package]
-name = "qnc-sync-cover"
-version = "0.1.0"
-edition = "2021"
-description = "QNC public component: Sync/B-roll capture of a story cover (session state and frame math)"
-
-[dependencies]
-qnc-ui-text = { workspace = true }

@@ -9,7 +9,9 @@ use std::{
 pub fn check(root: &Path) -> ValidationReport {
     let mut report = ValidationReport::new();
     let output = match Command::new("cargo")
-        .args(["metadata", "--format-version", "1", "--no-deps", "--locked"])
+        // With dependencies: the player's blocks are path dependencies in the shared
+        // folder of crates (QNC-shared), not members of this workspace.
+        .args(["metadata", "--format-version", "1", "--locked"])
         .current_dir(root)
         .output()
     {
@@ -30,6 +32,8 @@ pub fn check(root: &Path) -> ValidationReport {
         .as_array()
         .into_iter()
         .flatten()
+        // Only the blocks on disk (here and in the shared folder), not registry crates.
+        .filter(|p| p["source"].is_null())
         .filter_map(|p| p["name"].as_str().map(|name| (name.to_owned(), p)))
         .collect();
     for (name, manifest) in [

@@ -7,8 +7,8 @@ use qnc_source_contract::SourceReference;
 use qnc_source_groups::IndexDocument;
 use std::time::Duration;
 
-const INDEX: &str = include_str!("../../../crates/qnc-sony-metadata/tests/fixtures/MEDIAPRO.XML");
-const SIDECAR: &str = include_str!("../../../crates/qnc-sony-metadata/tests/fixtures/TEST-AM01.XML");
+const INDEX: &str = include_str!("../../../../QNC-shared/crates/qnc-sony-metadata/tests/fixtures/MEDIAPRO.XML");
+const SIDECAR: &str = include_str!("../../../../QNC-shared/crates/qnc-sony-metadata/tests/fixtures/TEST-AM01.XML");
 
 fn spec(version: u32) -> PluginSpec {
     PluginSpec { executable: env!("CARGO_BIN_EXE_qnc-format-sony").into(), contract: CONTRACT.into(), version, timeout: Duration::from_secs(10), remote: None }

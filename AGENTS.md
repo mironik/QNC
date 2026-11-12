@@ -9199,3 +9199,25 @@ Dopuna istog dana (korisnik: "direktoriji ne smiju biti hardkodirani"): zajednic
 `qnc-ai-pack` instalira modele `share/` samo kad je postavka postavljena. Postavka QNC-a upisana kao podatak racunala
 (`data/ai-share.json` = `C:\Users\Public\QNC-AI-share`, izbor korisnika); QNC Project (zamrznut) nema polje za nju, QNC-AI
 Postavke imaju. Test prosiren; `qnc-versions` nalazi model.
+Izvedeno 2026-11-12 (korisnik: "kocke su shared-zajednicke... ako neka aplikacija trazi promjenu kocke, orginalna ostaje,
+a ta aplikacija u svoj direktorij ukljucuje promjenjenu kocku"; "GUI je samostalan po aplikaciji"; "AI je shared"; izbor
+`Projects\QNC-shared`, svoj git repo, samo identicne kocke; "1, ugovori zajednicki"): zajednicke kocke QNC-a i QNC-AI-ja
+su u repou `C:\Users\miron\Projects\QNC-shared` (uz QNC i QNC-AI u istoj mapi). U njemu je 247 kocki koje su bile iste u
+oba repoa (isti git tree), nisu GUI (`*-desktop`, `*-desktop-adapter`, `*-blocks`) i ovise samo o drugim zajednickim
+kockama; uz njih ugovori, katalozi i seed koje ugradjuju (`include_str!`) ili koje njihovi testovi citaju (`contracts/text`,
+tipke, `contracts/input`, `contracts/ui/editorial|shell`, ugovori baza i modula koje kocke ugradjuju, `catalogs/ai`,
+`catalogs/record-formats`, `catalogs/camera-patterns` bez revizije 2026.10.19.1, `catalogs/cameras/sony`,
+`catalogs/script-profiles`, `seed/system_seed.json`). QNC-shared je svoj Cargo workspace (`crates/*`, bez
+`qnc-libav-decode`), a QNC i QNC-AI ga uzimaju kao path ovisnost: `[workspace.dependencies]` korijena
+`qnc-x = { path = "../QNC-shared/crates/qnc-x" }`; premjestene kocke uklonjene iz `crates/` oba repoa (git rm) i iz popisa
+clanova QNC-a. Promjena zajednicke kocke ostaje original ondje; aplikacija koja treba drukciju uzima kopiju u svoj `crates/`
+i u svom `Cargo.toml` pokazuje na nju. Ugovori i katalozi i dalje postoje i u aplikacijama (aplikacija ih cita pri radu iz
+svog korijena); istina za gradnju zajednickih kocki je QNC-shared, a duplikati se uklanjaju kasnije. Conformance
+(`tools/qnc-conformance`) kocke trazi i u mapama kocki koje korijenski `Cargo.toml` uzima izvan korijena
+(`shared_crate_dirs`, `crate_dir`, `collect_crate_rs_files`; zajednicka kocka cita se kao `crates/<ime>`), a granica playera
+cita `cargo metadata` s ovisnostima (samo pakete s diska). Testne datoteke koje su pokazivale na premjestenu kocku
+(`qnc-ingest-select`, `tools/qnc-format-sony`) pokazuju na `../QNC-shared/crates/qnc-sony-metadata`. Provjereno: `cargo
+check --workspace` QNC i QNC-AI, release gradnja (`qnc-app`, `qnc-story`, `qnc-export`, `qnc-player-runner`,
+`qnc-prerender` s `libav`), testovi QNC-shared (svi prolaze), QNC i QNC-AI (pada samo
+`without_a_lease_and_without_its_executable_launching_says_so`, jer je `qnc-ingest-worker.exe` u `target/release`; nije od
+premjestanja), conformance QNC-a prolazi. Uzivo nije provjereno.
