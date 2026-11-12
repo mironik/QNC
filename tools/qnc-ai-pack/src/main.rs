@@ -222,12 +222,12 @@ fn make(out: &Path, include_unchecked: bool) -> Result<(), String> {
     // The models, at the same place under the root as the catalog names them, and their licences.
     let root = catalog_dir.parent().and_then(Path::parent).ok_or("the catalog is not in a QNC root")?;
     let mut licences = String::from("The AI pack of QNC: the licences of its models and libraries.\n\n");
-    let share = plain(&qnc_ai_catalog::share_dir());
+    let share = qnc_ai_catalog::share_dir(catalog_dir).ok().map(|share| plain(&share));
     for model in &models {
         // A model of the shared AI folder goes under `share/`, one under the root at its place there.
-        let place = match model.strip_prefix(&share) {
-            Ok(shared) => Path::new(SHARE).join(shared),
-            Err(_) => model.strip_prefix(root).map_err(|_| format!("{} is neither under the QNC root nor in the shared AI folder", model.display()))?.to_path_buf(),
+        let place = match share.as_ref().and_then(|share| model.strip_prefix(share).ok()) {
+            Some(shared) => Path::new(SHARE).join(shared),
+            None => model.strip_prefix(root).map_err(|_| format!("{} is neither under the QNC root nor in the shared AI folder", model.display()))?.to_path_buf(),
         };
         copy(model, &out.join(place))?;
         if let Some(entry) = model_entry(&pack, model) {
@@ -270,6 +270,11 @@ fn install(pack: &Path, app: &Path, root: &Path) -> Result<(), String> {
     if !plain(app).starts_with(plain(root)) {
         return Err(format!("{} is not inside the QNC root {}: its programs would not find the AI catalog", app.display(), root.display()));
     }
+    // The models of the shared AI folder go where the root's setting names it; not set, nothing installs.
+    let share = qnc_ai_catalog::chosen_share(root);
+    if share.is_none() && manifest.files.iter().any(|file| Path::new(&file.path).starts_with(SHARE)) {
+        return Err(format!("the shared AI folder of {} is not set (choose it in Settings first)", root.display()));
+    }
     // Every file is checked before any is copied: a broken pack installs nothing.
     for file in &manifest.files {
         let path = pack.join(&file.path);
@@ -283,7 +288,7 @@ fn install(pack: &Path, app: &Path, root: &Path) -> Result<(), String> {
         let to = match (relative.strip_prefix(APP), relative.strip_prefix(SHARE)) {
             (Ok(program), _) => app.join(program),
             // The models of the shared AI folder go back there (QNC and QNC-AI read them both).
-            (_, Ok(shared)) => qnc_ai_catalog::share_dir().join(shared),
+            (_, Ok(shared)) => share.as_ref().ok_or("the shared AI folder is not set")?.join(shared),
             _ => root.join(relative),
         };
         copy(&pack.join(relative), &to)?;

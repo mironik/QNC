@@ -83,8 +83,15 @@ fn the_translator_says_which_languages_it_translates_and_a_catalog_without_one_h
 }
 
 #[test]
-fn a_model_named_share_is_in_the_shared_ai_folder_another_beside_the_catalog() {
-    let folder = Path::new("C:/qnc/catalogs/ai");
-    assert_eq!(model_path(folder, "share:models/opus"), share_dir().join("models/opus"));
-    assert_eq!(model_path(folder, "../../data/models/opus"), folder.join("../../data/models/opus"));
+fn a_model_named_share_is_in_the_shared_ai_folder_the_setting_names_another_beside_the_catalog() {
+    let root = folder("share-root");
+    let catalogs = root.join("catalogs").join("ai");
+    std::fs::create_dir_all(&catalogs).unwrap();
+    std::fs::create_dir_all(root.join("data")).unwrap();
+    assert!(model_path(&catalogs, "share:models/opus").unwrap_err().contains("not set"), "no folder is guessed");
+    assert_eq!(model_path(&catalogs, "../../data/models/opus").unwrap(), catalogs.join("../../data/models/opus"));
+    let shared = folder("share-folder");
+    set_share(&root, &shared).unwrap();
+    assert_eq!(model_path(&catalogs, "share:models/opus").unwrap(), shared.join("models/opus"));
+    assert_eq!(chosen_share(&root), Some(shared));
 }

@@ -9193,3 +9193,9 @@ instalira ga natrag u zajednicki direktorij. Modeli premjesteni iz `QNC/data/mod
 `a_model_named_share_is_in_the_shared_ai_folder_another_beside_the_catalog`; programi koji citaju AI katalog ponovno
 izgradjeni (`qnc-app`, `qnc-story` s `libav`); `qnc-versions` nalazi model. Usput: debug build obrisan u oba projekta
 (korisnik: "ocisti nepotrebne kes i debug datoteke"; QNC 49,1 GiB, QNC-AI 6,7 GiB). Odobrenje je zatvoreno.
+Dopuna istog dana (korisnik: "direktoriji ne smiju biti hardkodirani"): zajednicki AI direktorij nema ugradjenu zadanu mapu.
+`qnc-ai-catalog` `share_dir(folder)` cita `QNC_AI_SHARE`, inace postavku racunala `data/ai-share.json` QNC korijena kataloga
+(`set_share`, `chosen_share`); bez postavke je greska ("not set"), nista se ne pogadja; `model_path` vraca `Result`.
+`qnc-ai-pack` instalira modele `share/` samo kad je postavka postavljena. Postavka QNC-a upisana kao podatak racunala
+(`data/ai-share.json` = `C:\Users\Public\QNC-AI-share`, izbor korisnika); QNC Project (zamrznut) nema polje za nju, QNC-AI
+Postavke imaju. Test prosiren; `qnc-versions` nalazi model.

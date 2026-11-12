@@ -15,30 +15,49 @@ pub const BACKENDS: [&str; 2] = ["vulkan", "cpu"];
 /// A model the catalog names under this prefix is in the shared AI folder of the computer.
 pub const SHARE_PREFIX: &str = "share:";
 
+/// The setting of this computer that names the shared AI folder, in the root's `data` (Settings
+/// writes it).
+pub const SHARE_SETTING: &str = "data/ai-share.json";
+
+#[derive(serde::Serialize, Deserialize)]
+struct ShareSetting {
+    folder: PathBuf,
+}
+
 /// The AI folder of this computer that QNC and QNC-AI share (user 2026-11-12: "za AI posebni
-/// direktorij koji mogu pozivati obje verzije aplikacija"): `QNC_AI_SHARE`, else the folder every
-/// user of the computer reaches (Windows `%PUBLIC%\QNC-AI-share`, macOS
-/// `/Users/Shared/QNC-AI-share`, elsewhere `/usr/local/share/qnc-ai-share`).
-pub fn share_dir() -> PathBuf {
+/// direktorij koji mogu pozivati obje verzije aplikacija"; "direktoriji ne smiju biti
+/// hardkodirani"): `QNC_AI_SHARE`, else the setting `data/ai-share.json` of the QNC root of the
+/// catalog in `folder` (`catalogs/ai`). Not set is an error: no folder is guessed.
+pub fn share_dir(folder: &Path) -> Result<PathBuf, String> {
     if let Some(dir) = std::env::var_os("QNC_AI_SHARE").filter(|dir| !dir.is_empty()) {
-        return PathBuf::from(dir);
+        return Ok(PathBuf::from(dir));
     }
-    if cfg!(windows) {
-        let public = std::env::var_os("PUBLIC").map(PathBuf::from).unwrap_or_else(|| PathBuf::from(r"C:\Users\Public"));
-        public.join("QNC-AI-share")
-    } else if cfg!(target_os = "macos") {
-        PathBuf::from("/Users/Shared/QNC-AI-share")
-    } else {
-        PathBuf::from("/usr/local/share/qnc-ai-share")
-    }
+    let root = folder.parent().and_then(Path::parent).ok_or("the AI catalog is not in a QNC root")?;
+    let file = root.join(SHARE_SETTING);
+    let bytes = std::fs::read(&file).map_err(|_| format!("the shared AI folder is not set ({} missing; choose it in Settings)", file.display()))?;
+    let setting: ShareSetting = serde_json::from_slice(&bytes).map_err(|error| format!("{}: {error}", file.display()))?;
+    Ok(if setting.folder.is_absolute() { setting.folder } else { root.join(setting.folder) })
+}
+
+/// The shared AI folder the setting of the QNC `root` names, if it is set.
+pub fn chosen_share(root: &Path) -> Option<PathBuf> {
+    share_dir(&root.join("catalogs").join("ai")).ok()
+}
+
+/// Settings: the shared AI folder of the QNC `root` is `folder` from now on.
+pub fn set_share(root: &Path, folder: &Path) -> Result<(), String> {
+    std::fs::create_dir_all(folder).map_err(|error| format!("{}: {error}", folder.display()))?;
+    let file = root.join(SHARE_SETTING);
+    let json = serde_json::to_vec_pretty(&ShareSetting { folder: folder.to_path_buf() }).map_err(|error| error.to_string())?;
+    std::fs::write(&file, json).map_err(|error| format!("{}: {error}", file.display()))
 }
 
 /// Where a model the catalog at `folder` names is: under the shared AI folder for `share:...`,
 /// else relative to the catalog's folder.
-pub fn model_path(folder: &Path, named: &str) -> PathBuf {
+pub fn model_path(folder: &Path, named: &str) -> Result<PathBuf, String> {
     match named.strip_prefix(SHARE_PREFIX) {
-        Some(rest) => share_dir().join(rest),
-        None => folder.join(named),
+        Some(rest) => Ok(share_dir(folder)?.join(rest)),
+        None => Ok(folder.join(named)),
     }
 }
 
@@ -115,7 +134,7 @@ pub fn shot_content(path: &Path) -> Result<ShotContentEngine, String> {
     if !(1..=3).contains(&job.pictures) {
         return Err("shot content: pictures per part is 1, 2 or 3".into());
     }
-    let model = model_path(path.parent().ok_or("the AI catalog has no folder")?, &job.model);
+    let model = model_path(path.parent().ok_or("the AI catalog has no folder")?, &job.model)?;
     if !model_here(&model) {
         return Err(format!("shot content: the model {} is not on this host", model.display()));
     }
@@ -148,7 +167,7 @@ pub fn shot_captioner(path: &Path) -> Result<ShotCaptioner, String> {
     let text = std::fs::read_to_string(path).map_err(|e| format!("{}: {e}", path.display()))?;
     let file: File = serde_json::from_str(&text).map_err(|e| format!("{}: {e}", path.display()))?;
     let job = file.shot_caption.ok_or("the AI catalog of this host has no shot captioner")?;
-    let model = model_path(path.parent().ok_or("the AI catalog has no folder")?, &job.model);
+    let model = model_path(path.parent().ok_or("the AI catalog has no folder")?, &job.model)?;
     if !model_here(&model) {
         return Err(format!("shot captioner: the model {} is not on this host", model.display()));
     }
@@ -174,7 +193,7 @@ pub fn frame_interpolator(path: &Path) -> Result<FrameInterpolator, String> {
     let text = std::fs::read_to_string(path).map_err(|e| format!("{}: {e}", path.display()))?;
     let file: File = serde_json::from_str(&text).map_err(|e| format!("{}: {e}", path.display()))?;
     let job = file.smooth.ok_or("the AI catalog of this host has no frame interpolator")?;
-    let model = model_path(path.parent().ok_or("the AI catalog has no folder")?, &job.model);
+    let model = model_path(path.parent().ok_or("the AI catalog has no folder")?, &job.model)?;
     if !model.exists() {
         return Err(format!("frame interpolator: the model {} is not on this host", model.display()));
     }
@@ -207,7 +226,7 @@ pub fn letter_aligner(path: &Path) -> Result<LetterAligner, String> {
     let text = std::fs::read_to_string(path).map_err(|e| format!("{}: {e}", path.display()))?;
     let file: File = serde_json::from_str(&text).map_err(|e| format!("{}: {e}", path.display()))?;
     let job = file.letters.ok_or("the AI catalog of this host has no letter aligner")?;
-    let model = model_path(path.parent().ok_or("the AI catalog has no folder")?, &job.model);
+    let model = model_path(path.parent().ok_or("the AI catalog has no folder")?, &job.model)?;
     if !model_here(&model) {
         return Err(format!("letter aligner: the model {} is not on this host", model.display()));
     }
@@ -334,7 +353,7 @@ fn engine_in(file: &File, folder: &Path, selected: &str) -> Result<Transcriber, 
         return Err(format!("transcription engine {}: threads must be at least 1", engine.id));
     }
     let present = |relative: &str| -> Result<PathBuf, String> {
-        let file = model_path(folder, relative);
+        let file = model_path(folder, relative)?;
         if model_here(&file) {
             Ok(file)
         } else {
@@ -398,7 +417,7 @@ pub fn translator(path: &Path) -> Result<Translator, String> {
     let text = std::fs::read_to_string(path).map_err(|e| format!("{}: {e}", path.display()))?;
     let file: File = serde_json::from_str(&text).map_err(|e| format!("{}: {e}", path.display()))?;
     let job = file.translate.ok_or("the AI catalog of this host has no translator")?;
-    let model = model_path(path.parent().ok_or("the AI catalog has no folder")?, &job.model);
+    let model = model_path(path.parent().ok_or("the AI catalog has no folder")?, &job.model)?;
     if !model_here(&model) {
         return Err(format!("translator: the model {} is not on this host", model.display()));
     }
@@ -425,7 +444,7 @@ pub fn installed_model(name: &str) -> Result<PathBuf, String> {
     collect(&catalog, &["model", "vad_model"], &mut models);
     models
         .into_iter()
-        .map(|relative| model_path(folder, &relative))
+        .filter_map(|relative| model_path(folder, &relative).ok())
         .find(|model| model_name(model) == name)
         .filter(|model| model.exists())
         .ok_or_else(|| format!("the model {name} is not in the AI catalog of this host or not on it"))
