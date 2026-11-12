@@ -6832,6 +6832,7 @@ dependencies = [
  "qnc-shot-caption",
  "qnc-shot-captions",
  "qnc-shot-content-db",
+ "qnc-shot-db",
  "qnc-work-settings",
 ]
 
@@ -7958,10 +7959,12 @@ dependencies = [
  "core-foundation 0.9.4",
  "hostname",
  "io-kit-sys 0.4.1",
+ "libc",
  "serde",
  "serde_json",
  "smbios-lib",
  "whoami",
+ "windows-sys 0.59.0",
 ]
 
 [[package]]

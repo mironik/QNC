@@ -380,7 +380,7 @@ fn make_shots(
         let transcribing = || qnc_playback_activity::is_fresh(&target, qnc_transcribe_queue::LEASE, qnc_playback_activity::WORKER_FRESH_SECONDS);
         let player_plays = || level() == qnc_playback_activity::PlaybackLevel::Playing || transcribing();
         let wanted = || qnc_playback_activity::read(&target, qnc_playback_activity::PLAYBACK_CLIP);
-        let pace = qnc_shot_analysis::Pace { player_plays: &player_plays, wanted: &wanted, cancel };
+        let pace = qnc_shot_analysis::Pace { player_plays: &player_plays, wanted: &wanted, takes: &|_| true, cancel };
         // First the quickest sorting, from each clip's poster (user 2026-11-10), before any
         // picture of a shot is read.
         if let Err(error) = qnc_shot_content_run::look_posters(active.settings_reader(), &snapshot.settings, &local_media, Some(lease.write_lease()), &pace) {
