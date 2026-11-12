@@ -9221,3 +9221,18 @@ check --workspace` QNC i QNC-AI, release gradnja (`qnc-app`, `qnc-story`, `qnc-e
 `qnc-prerender` s `libav`), testovi QNC-shared (svi prolaze), QNC i QNC-AI (pada samo
 `without_a_lease_and_without_its_executable_launching_says_so`, jer je `qnc-ingest-worker.exe` u `target/release`; nije od
 premjestanja), conformance QNC-a prolazi. Uzivo nije provjereno.
+Izvedeno 2026-11-12 (korisnik: "tray je jedan... klasicni QNC preuzima ingest i Projekt od QNC-AI, a ostatak aplikacije
+ostaje isti"; "u QNC ingestu treba samo pored LAN, Intranet, Racunalo dodati izbor ulaza Baza koji vodi kad korisnik
+klikne na ono sto je tray napravio"; "to se tretira kao kartica"; "klasicni QNC kupi podatke i sprema u svoju bazu, kako
+inace radi"): QNC Ingest ima uz Racunalo / LAN / Internet tab Baze (Alt+4, `ingest_source_kind_bases`). Popis su kartice
+Ingest baza koje je napravio tray QNC-AI-ja: redak je baza (naziv mape) i kartica s koje je tray uzeo klipove s brojem
+klipova, a kartica koja sada nije spojena to kaze. Klik otvara tu karticu kao svaku karticu, a Select je kupi u bazu QNC
+projekta kao inace (isti Select, iste kamere, isti zapisi). Mapa baza je postavka racunala `data/ingest-bases.json`, ista
+kao u QNC-AI-ju (`C:\Users\Public\QNC-IngestBase`, bez ugradjene mape); QNC Project (zamrznut) nema polje za nju. Nove i
+izmijenjene zajednicke kocke (QNC-shared): `qnc-base-cards` (+ ugovor modula; mapa baza, kartice svake baze, samo citanje;
+QNC-AI `qnc-ingest-base` koristi njezinu postavku umjesto svoje kopije), `qnc-content-read::sources_of_file` (izvori klipova
+jedne baze, jedini citac kataloga), `qnc-source-browse` (`SourceKind` sa svim tabovima preglednika i `kind_actions`,
+`Step::Bases`: kartice baza su korijeni preglednika). Ingest aplikacija vise nema svoj `source_kind.rs` (koristi tip
+preglednika), pa su C10 granice spustene: Ingest aplikacija 1129 -> 1091, ploca 155 -> 151. Rjecnik
+`source.base_card_missing`. Provjereno: testovi `qnc-base-cards`, `qnc-source-browse`, `qnc-ingest-application`,
+`qnc-focus-walk`, conformance, release gradnja. Uzivo nije provjereno (mapa baza je prazna dok tray ne uveze karticu).

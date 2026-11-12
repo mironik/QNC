@@ -33,7 +33,7 @@ impl IngestApplication {
             return IngestDispatchResult::rejected(qnc_ui_text::text("ingest.msg.source_not_qnc_uri"));
         }
         let (browser, private) = (&self.view.browser, self.browse.selected_private_local_path(&uri));
-        let record = qnc_ingest_select_run::source_record(&uri, source_kind_id(self.view.source_kind), &browser.chosen, &browser.path_label, private);
+        let record = qnc_ingest_select_run::source_record(&uri, self.view.source_kind.id(), &browser.chosen, &browser.path_label, private);
 
         if let Some(store) = self.store.as_mut() {
             match store.record_source_selection(&record) {

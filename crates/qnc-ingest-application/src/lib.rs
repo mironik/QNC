@@ -27,7 +27,6 @@ mod playback;
 mod playback_guard;
 mod poll;
 mod settings;
-mod source_kind;
 mod state;
 mod pieces;
 mod thumbnails;
@@ -44,12 +43,11 @@ pub use dispatch_result::IngestDispatchResult;
 pub use intent::{IngestIntent, IngestPayload};
 pub use qnc_source_browse::BrowseLocationEntry as LocationEntry;
 pub use navigation::SequenceStep;
-pub use source_kind::SourceKind;
+pub use qnc_source_browse::SourceKind;
 pub use timeline_projection::timeline_intent_to_ingest_intent;
 pub use view_model::IngestViewModel;
 
 pub(crate) use playback_guard::playback_guard_message;
-pub(crate) use source_kind::source_kind_id;
 
 #[derive(Debug, Default)]
 pub struct IngestApplication {

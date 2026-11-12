@@ -33,6 +33,7 @@ impl IngestApplication {
             action_ids::INGEST_SOURCE_KIND_LOCAL => self.on_source_kind(SourceKind::Local),
             action_ids::INGEST_SOURCE_KIND_LAN => self.on_source_kind(SourceKind::Lan),
             action_ids::INGEST_SOURCE_KIND_INTERNET => self.on_source_kind(SourceKind::Internet),
+            action_ids::INGEST_SOURCE_KIND_BASES => self.on_source_kind(SourceKind::Bases),
             action_ids::INGEST_DIR_ROOTS => self.on_dir_roots(),
             action_ids::INGEST_DIR_UP => self.on_dir_up(),
             action_ids::INGEST_DIR_OPEN => self.on_dir_open(intent.payload),
@@ -60,6 +61,7 @@ impl IngestApplication {
                 | action_ids::INGEST_SOURCE_KIND_LOCAL
                 | action_ids::INGEST_SOURCE_KIND_LAN
                 | action_ids::INGEST_SOURCE_KIND_INTERNET
+                | action_ids::INGEST_SOURCE_KIND_BASES
                 | action_ids::INGEST_DIR_ROOTS
                 | action_ids::INGEST_DIR_UP
                 | action_ids::INGEST_DIR_OPEN

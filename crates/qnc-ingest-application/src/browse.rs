@@ -18,13 +18,7 @@ impl IngestApplication {
                 // The disks attached now are listed (user 2026-10-16), not those at the start.
                 if let Some(browser) = self.refresh_sources() { self.browse.connect(browser) }
                 self.clear_source_browser_state();
-                qnc_source_browse::Step::Roots(
-                    match kind {
-                        SourceKind::Internet => "intranet",
-                        _ => source_kind_id(kind),
-                    }
-                    .into(),
-                )
+                kind.roots(self.root.as_deref())
             }
             Some(None) => qnc_source_browse::Step::Parent,
             Some(Some(uri)) => qnc_source_browse::Step::Open(uri),

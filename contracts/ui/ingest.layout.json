@@ -30,7 +30,8 @@
     "source_kinds": [
       "ingest_source_kind_local",
       "ingest_source_kind_lan",
-      "ingest_source_kind_internet"
+      "ingest_source_kind_internet",
+      "ingest_source_kind_bases"
     ],
     "browser_buttons": [
       "ingest_dir_confirm",
@@ -49,7 +50,8 @@
     "source_kinds": [
       "ingest_source_kind_local",
       "ingest_source_kind_lan",
-      "ingest_source_kind_internet"
+      "ingest_source_kind_internet",
+      "ingest_source_kind_bases"
     ],
     "browser": [
       "ingest_dir_roots",
@@ -122,7 +124,8 @@
     "kinds": [
       "@source.computer",
       "@source.lan",
-      "@source.internet"
+      "@source.internet",
+      "@source.bases"
     ],
     "kind_gap": 10.0,
     "up_label": "@source.up",
@@ -139,6 +142,7 @@
     "footer_item_gap": 8.0,
     "empty_lan": "@source.empty_lan",
     "empty_internet": "@source.empty_internet",
+    "empty_bases": "@source.empty_bases",
     "empty_local": "@source.empty_local",
     "empty_folder": "@source.empty_folder",
     "loading_label": "@common.loading"
@@ -234,6 +238,8 @@
     "@common.cancel",
     "@source.empty_lan",
     "@source.empty_internet",
+    "@source.bases",
+    "@source.empty_bases",
     "@ingest.grid.empty",
     "@ingest.ai_mining",
     "@ingest.copy_original",

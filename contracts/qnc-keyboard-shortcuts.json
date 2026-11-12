@@ -550,6 +550,9 @@
     "ingest_source_kind_internet": {
       "label": "Ingest izvor Internet"
     },
+    "ingest_source_kind_bases": {
+      "label": "Ingest baze"
+    },
     "ingest_dir_up": {
       "label": "Ingest browser Gore"
     },
@@ -867,6 +870,9 @@
         ],
         "ingest_source_kind_internet": [
           { "code": "Digit3", "alt": true }
+        ],
+        "ingest_source_kind_bases": [
+          { "code": "Digit4", "alt": true }
         ],
         "ingest_dir_roots": [
           { "code": "KeyD", "alt": true }

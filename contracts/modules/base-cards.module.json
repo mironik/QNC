@@ -1,0 +1,18 @@
+{
+  "module_id": "qnc.module.base-cards",
+  "module_name": "base-cards",
+  "module_version": "0.1.0",
+  "module_kind": "library",
+  "capabilities": ["base_cards.folder", "base_cards.list"],
+  "input_contract_version": "0.1.0",
+  "output_contract_version": "0.1.0",
+  "supported_os": ["windows", "linux", "macos"],
+  "supported_cpu": ["x86_64", "aarch64"],
+  "transport_protocol_version": "0.1.0",
+  "forbidden_calls": ["ffprobe", "media.probe.full", "source.scan", "player.command", "project.workflow"],
+  "forbidden_dependencies": ["qnc.module.media-probe", "qnc.module.scanner"],
+  "state_policy": "stateless",
+  "database_write_policy": "no_db_writes",
+  "runtime_crate": "qnc-base-cards",
+  "reader_policy": "The folder of the Ingest bases is the setting data/ingest-bases.json of the computer, never guessed. Each base's catalog is read only through qnc-content-read; a base is listed as the sources its clips were Selected from, so a form opens such a card as any card of the sources (user 2026-11-12)."
+}

@@ -3952,6 +3952,15 @@ name = "qnc-background-jobs"
 version = "0.1.0"
 
 [[package]]
+name = "qnc-base-cards"
+version = "0.1.0"
+dependencies = [
+ "qnc-content-read",
+ "serde",
+ "serde_json",
+]
+
+[[package]]
 name = "qnc-board"
 version = "0.1.0"
 dependencies = [
@@ -7104,6 +7113,7 @@ dependencies = [
 name = "qnc-source-browse"
 version = "0.1.0"
 dependencies = [
+ "qnc-base-cards",
  "qnc-dir-browser",
  "qnc-source-reader",
  "qnc-ui-text",

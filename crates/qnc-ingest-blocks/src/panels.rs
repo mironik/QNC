@@ -9,7 +9,7 @@ use qnc_media_card::{CardGridAction, CardMetrics, StatusDotsMode, Ticks};
 use qnc_source_timeline_view::HeaderAction;
 
 /// The source tabs in the order of the contract's labels.
-const KINDS: [SourceKind; 3] = [SourceKind::Local, SourceKind::Lan, SourceKind::Internet];
+const KINDS: [SourceKind; 4] = [SourceKind::Local, SourceKind::Lan, SourceKind::Internet, SourceKind::Bases];
 
 pub(super) fn preview(ui: &mut Ui, rect: Rect, contracts: &IngestContracts, theme: &Theme, view: &IngestViewModel) -> Option<IngestIntent> {
     let label = if view.preview_clip_id.is_some() { view.current_clip_label() } else { contracts.ingest.preview.empty_label.as_str() };
@@ -27,11 +27,7 @@ pub(super) fn pool_tabs(ui: &mut Ui, rect: Rect, contracts: &IngestContracts, th
 pub(super) fn browser(ui: &mut Ui, rect: Rect, contracts: &IngestContracts, theme: &Theme, view: &IngestViewModel) -> Option<IngestIntent> {
     let labels = &contracts.ingest.dir_browser;
     let kinds: Vec<&str> = KINDS.iter().enumerate().map(|(index, kind)| labels.kinds.get(index).map_or(kind.label(), String::as_str)).collect();
-    let empty = match view.source_kind {
-        SourceKind::Local => &labels.empty_local,
-        SourceKind::Lan => &labels.empty_lan,
-        SourceKind::Internet => &labels.empty_internet,
-    };
+    let empty = labels.empty_of(view.source_kind.id());
     let browser = &view.browser;
     let (focused_entry, opened) = qnc_list_focus::list_keys(ui, "qnc-ingest-browser", browser.entries.len(), &view.focus, qnc_focus_walk::BROWSER);
     let input = BrowserInput {

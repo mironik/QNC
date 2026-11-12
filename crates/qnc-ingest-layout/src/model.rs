@@ -92,9 +92,22 @@ pub struct IngestDirBrowser {
     pub cancel_label: String,
     pub empty_lan: String,
     pub empty_internet: String,
+    pub empty_bases: String,
     pub empty_local: String,
     pub empty_folder: String,
     pub loading_label: String,
+}
+
+impl IngestDirBrowser {
+    /// The words of an empty list of the tab `kind` (`local`, `lan`, `internet`, `bases`).
+    pub fn empty_of(&self, kind: &str) -> &str {
+        match kind {
+            "lan" => &self.empty_lan,
+            "internet" => &self.empty_internet,
+            "bases" => &self.empty_bases,
+            _ => &self.empty_local,
+        }
+    }
 }
 
 #[derive(Debug, Clone, Deserialize)]

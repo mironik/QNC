@@ -1,6 +1,4 @@
-pub const INGEST_SOURCE_KIND_LOCAL: &str = "ingest_source_kind_local";
-pub const INGEST_SOURCE_KIND_LAN: &str = "ingest_source_kind_lan";
-pub const INGEST_SOURCE_KIND_INTERNET: &str = "ingest_source_kind_internet";
+pub use qnc_source_browse::kind_actions::{BASES as INGEST_SOURCE_KIND_BASES, INTERNET as INGEST_SOURCE_KIND_INTERNET, LAN as INGEST_SOURCE_KIND_LAN, LOCAL as INGEST_SOURCE_KIND_LOCAL};
 pub const INGEST_DIR_UP: &str = "ingest_dir_up";
 pub const INGEST_DIR_ROOTS: &str = "ingest_dir_roots";
 pub const INGEST_DIR_OPEN: &str = "ingest_dir_open";
@@ -28,6 +26,7 @@ pub const ALL: &[&str] = &[
     INGEST_SOURCE_KIND_LOCAL,
     INGEST_SOURCE_KIND_LAN,
     INGEST_SOURCE_KIND_INTERNET,
+    INGEST_SOURCE_KIND_BASES,
     INGEST_DIR_UP,
     INGEST_DIR_ROOTS,
     INGEST_DIR_OPEN,
