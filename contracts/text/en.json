@@ -465,6 +465,8 @@
     "import.playback_input_proxy_but_camera_proxy": "playback.input is proxy, but the camera has no proxy.",
     "import.clip_proxy_making_proxy_supported_yet": "The clip has no proxy, and making a proxy is not supported yet.",
     "import.import_interrupted": "The import was interrupted.",
+    "import.source_changed": "The file on the card changed while it was copied: the clip is imported again.",
+    "import.card_stalled": "The card gave no data for {seconds} s (a bad place of the card or a reader that hangs): this clip is imported again when the card is back.",
     "import.writing_allowed_only_into_project_folder": "Writing is allowed only into the project folder.",
     "import.source_clip_available_this_computer": "The source of the clip is not available on this computer.",
     "posters.stream_container_unknown": "The poster over LAN/Intranet is made from MXF and MP4/QuickTime media only.",

@@ -140,6 +140,8 @@
     "import.playback_input_proxy_but_camera_proxy": "playback.input je proxy, ali kamera nema proxy.",
     "import.clip_proxy_making_proxy_supported_yet": "Klip nema proxy, a izrada proxyja još nije podržana.",
     "import.import_interrupted": "Uvoz je prekinut.",
+    "import.source_changed": "Datoteka na kartici promijenila se tijekom kopiranja: klip se uvozi ponovno.",
+    "import.card_stalled": "Kartica {seconds} s nije dala podatke (oštećeno mjesto kartice ili čitač koji je zapeo): klip se ponovno uvozi kad se kartica vrati.",
     "import.writing_allowed_only_into_project_folder": "Upis je dopušten samo u mapu projekta.",
     "import.source_clip_available_this_computer": "Izvor klipa nije dostupan na ovom računalu.",
     "posters.stream_container_unknown": "Poster preko LAN-a/intraneta radi se samo iz MXF i MP4/QuickTime medija.",
