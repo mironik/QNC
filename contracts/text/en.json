@@ -1380,6 +1380,8 @@
     "shots.statement_whole": "A statement: it is kept whole, not cut by its pictures (if it is cut, by its sound).",
     "shots.camera.steady": "steady camera",
     "shots.camera.pan": "even pan",
+    "shots.camera.zoom_in": "zoom in",
+    "shots.camera.zoom_out": "zoom out",
     "shots.look.black": "black",
     "shots.look.soft": "soft",
     "shots.look.moving": "moving",

@@ -78,6 +78,8 @@ fn kind_text(kind: &str) -> &'static str {
     match kind {
         "steady" => qnc_ui_text::text("shots.camera.steady"),
         "pan" => qnc_ui_text::text("shots.camera.pan"),
+        "zoom_in" => qnc_ui_text::text("shots.camera.zoom_in"),
+        "zoom_out" => qnc_ui_text::text("shots.camera.zoom_out"),
         "moving" => qnc_ui_text::text("shots.look.moving"),
         "soft" => qnc_ui_text::text("shots.look.soft"),
         "still" => qnc_ui_text::text("shots.look.still"),

@@ -667,6 +667,8 @@
     "shots.statement_whole": "Izjava: ostaje cijela, ne reže se po slici (ako se reže, reže se po tonu).",
     "shots.camera.steady": "mirna kamera",
     "shots.camera.pan": "jednoliki švenk",
+    "shots.camera.zoom_in": "zum",
+    "shots.camera.zoom_out": "odzum",
     "shots.look.black": "crno",
     "shots.look.soft": "mutno",
     "shots.look.moving": "u pokretu",

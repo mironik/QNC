@@ -56,6 +56,8 @@ pub fn show(ui: &mut egui::Ui, view: &ShotsView, theme: &qnc_desktop_theme::Them
             let camera = match part.camera.as_str() {
                 "steady" => qnc_ui_text::text("shots.camera.steady"),
                 "pan" => qnc_ui_text::text("shots.camera.pan"),
+                "zoom_in" => qnc_ui_text::text("shots.camera.zoom_in"),
+                "zoom_out" => qnc_ui_text::text("shots.camera.zoom_out"),
                 other => other,
             };
             let frames = part.to.saturating_sub(part.from);
