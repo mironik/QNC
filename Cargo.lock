@@ -3965,6 +3965,7 @@ name = "qnc-board"
 version = "0.1.0"
 dependencies = [
  "eframe",
+ "qnc-panel-map",
  "serde",
 ]
 
@@ -4084,6 +4085,18 @@ dependencies = [
  "serde",
  "serde_json",
  "xml-rs",
+]
+
+[[package]]
+name = "qnc-camera-qnc-base"
+version = "0.1.0"
+dependencies = [
+ "qnc-camera-adapter",
+ "qnc-media-metadata",
+ "qnc-source-contract",
+ "qnc-source-groups",
+ "serde",
+ "serde_json",
 ]
 
 [[package]]
@@ -4904,6 +4917,7 @@ dependencies = [
  "qnc-camera-generic-file",
  "qnc-camera-profile-adapter",
  "qnc-camera-profiles",
+ "qnc-camera-qnc-base",
  "qnc-dev-diagnostics",
  "qnc-plugin-process",
  "qnc-record-format-plugin",
@@ -5815,6 +5829,10 @@ dependencies = [
  "qnc-transcript",
  "qnc-wrap-session",
 ]
+
+[[package]]
+name = "qnc-panel-map"
+version = "0.1.0"
 
 [[package]]
 name = "qnc-part-sound"
@@ -6832,7 +6850,6 @@ dependencies = [
  "qnc-shot-caption",
  "qnc-shot-captions",
  "qnc-shot-content-db",
- "qnc-shot-db",
  "qnc-work-settings",
 ]
 
