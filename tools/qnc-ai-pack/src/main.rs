@@ -110,7 +110,7 @@ fn used() -> Vec<(&'static str, Result<Used, String>)> {
     let transcriber = |job, quality| {
         qnc_ai_catalog::installed_transcriber_for(quality).map(|engine| Used { job, program: engine.program, models: std::iter::once(engine.model).chain(engine.vad_model).collect() })
     };
-    vec![
+    let mut used = vec![
         ("transcribe.best", transcriber("transcribe.best", Quality::Best)),
         ("transcribe.fast", transcriber("transcribe.fast", Quality::Fast)),
         ("letters", qnc_ai_catalog::installed_letter_aligner().map(|engine| Used { job: "letters", program: engine.program, models: vec![engine.model] })),
@@ -118,7 +118,14 @@ fn used() -> Vec<(&'static str, Result<Used, String>)> {
         ("shot_caption", qnc_ai_catalog::installed_shot_captioner().map(|engine| Used { job: "shot_caption", program: engine.program, models: vec![engine.model] })),
         ("translate", qnc_ai_catalog::installed_translator().map(|engine| Used { job: "translate", program: engine.program, models: vec![engine.model] })),
         ("smooth", qnc_ai_catalog::installed_frame_interpolator().map(|engine| Used { job: "smooth", program: engine.program, models: vec![engine.model] })),
-    ]
+    ];
+    // The engines that hear the fast pieces with the fast one (the graphics card and the processor).
+    if let Ok(engines) = qnc_ai_catalog::installed_fast_transcribers() {
+        for engine in engines.into_iter().skip(1) {
+            used.push(("transcribe.fast_with", Ok(Used { job: "transcribe.fast_with", program: engine.program, models: std::iter::once(engine.model).chain(engine.vad_model).collect() })));
+        }
+    }
+    used
 }
 
 fn pack_list() -> Result<(PathBuf, Pack), String> {
