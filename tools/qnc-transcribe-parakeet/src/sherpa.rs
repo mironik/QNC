@@ -59,13 +59,7 @@ struct Opaque {
 }
 
 /// One token of a result: its text and where it is in the sound (seconds).
-#[derive(Debug, Clone, PartialEq)]
-pub struct Token {
-    pub text: String,
-    pub start: f32,
-    pub duration: f32,
-    pub log_prob: Option<f32>,
-}
+pub use qnc_transcribe_jobs::Token;
 
 /// The sherpa-onnx library and one recognizer of a model.
 pub struct Recognizer {
