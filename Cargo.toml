@@ -151,6 +151,7 @@ qnc-filmstrip = { path = "../QNC-shared/crates/qnc-filmstrip" }
 qnc-filmstrip-worker = { path = "../QNC-shared/crates/qnc-filmstrip-worker" }
 qnc-wave = { path = "../QNC-shared/crates/qnc-wave" }
 qnc-wave-view = { path = "../QNC-shared/crates/qnc-wave-view" }
+qnc-done-count = { path = "../QNC-shared/crates/qnc-done-count" }
 qnc-wave-worker = { path = "../QNC-shared/crates/qnc-wave-worker" }
 qnc-timeline-artifacts = { path = "../QNC-shared/crates/qnc-timeline-artifacts" }
 qnc-content-artifacts = { path = "crates/qnc-content-artifacts" }
