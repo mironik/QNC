@@ -21,17 +21,45 @@ impl Engine {
         let folder = qnc_ai_catalog::installed_model(name)?;
         let folder = folder.as_path();
         if self.model.as_ref().map(|(loaded, _)| loaded.as_path()) != Some(folder) {
-            self.model = Some((folder.to_path_buf(), Florence::load(folder, &runtime()?, THREADS)?));
+            let directml = qnc_ai_catalog::installed_shot_captioner()?.backend == "directml";
+            self.model = Some((folder.to_path_buf(), Florence::load(folder, &runtime(directml)?, THREADS, directml)?));
         }
         Ok(&mut self.model.as_mut().expect("just loaded").1)
     }
 }
 
-/// The ONNX Runtime library beside this program.
-fn runtime() -> Result<PathBuf, String> {
+/// The ONNX Runtime library beside this program; for DirectML its DirectML build in the folder
+/// `directml` beside it (the one beside the program is sherpa-onnx's, for the processor), with
+/// DirectML's own library loaded from there first (Windows keeps an older one of its own).
+fn runtime(directml: bool) -> Result<PathBuf, String> {
     let name = format!("{}onnxruntime{}", std::env::consts::DLL_PREFIX, std::env::consts::DLL_SUFFIX);
     let exe = std::env::current_exe().map_err(|e| e.to_string())?;
-    exe.parent().map(|dir| dir.join(&name)).filter(|path| path.is_file()).ok_or_else(|| format!("{name} is not beside the program"))
+    let dir = exe.parent().ok_or("the program has no folder")?;
+    let dir = if directml { dir.join(DIRECTML_FOLDER) } else { dir.to_path_buf() };
+    if directml {
+        preload_directml(&dir)?;
+    }
+    Some(dir.join(&name)).filter(|path| path.is_file()).ok_or_else(|| format!("{name} is not in {}", dir.display()))
+}
+
+/// The folder of ONNX Runtime's DirectML build beside the program.
+const DIRECTML_FOLDER: &str = "directml";
+
+#[cfg(windows)]
+fn preload_directml(dir: &std::path::Path) -> Result<(), String> {
+    use std::os::windows::ffi::OsStrExt;
+    let path = dir.join("DirectML.dll");
+    let wide: Vec<u16> = path.as_os_str().encode_wide().chain(Some(0)).collect();
+    let module = unsafe { windows_sys::Win32::System::LibraryLoader::LoadLibraryW(wide.as_ptr()) };
+    if module.is_null() {
+        return Err(format!("{} could not be loaded", path.display()));
+    }
+    Ok(())
+}
+
+#[cfg(not(windows))]
+fn preload_directml(_dir: &std::path::Path) -> Result<(), String> {
+    Err("DirectML is Windows' own".into())
 }
 
 impl qnc_shot_caption::Engine for Engine {

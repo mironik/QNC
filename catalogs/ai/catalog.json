@@ -11,7 +11,8 @@
   },
   "shot_caption": {
     "program": "qnc-shot-caption-florence",
-    "model": "share:models/florence-2-base-ft"
+    "model": "share:models/florence-2-base-ft",
+    "backend": "directml"
   },
   "translate": {
     "program": "qnc-translate-opus",

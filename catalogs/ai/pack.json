@@ -6,7 +6,7 @@
     { "program": "qnc-transcribe-whisper", "beside": [], "licence": "QNC (whisper.cpp MIT)", "status": "known" },
     { "program": "qnc-align-wav2vec2", "beside": [], "licence": "QNC", "status": "known" },
     { "program": "qnc-shot-content-siglip", "beside": [], "licence": "QNC", "status": "known" },
-    { "program": "qnc-shot-caption-florence", "beside": ["onnxruntime.dll", "onnxruntime_providers_shared.dll"], "licence": "QNC (ONNX Runtime MIT)", "status": "known" },
+    { "program": "qnc-shot-caption-florence", "beside": ["onnxruntime.dll", "onnxruntime_providers_shared.dll", "directml/onnxruntime.dll", "directml/DirectML.dll"], "licence": "QNC (ONNX Runtime MIT; DirectML: Microsoft DirectML licence)", "status": "known" },
     { "program": "qnc-translate-opus", "beside": [], "licence": "QNC", "status": "known" },
     { "program": "rife-ncnn-vulkan", "beside": ["vcomp140.dll"], "licence": "MIT (nihui/rife-ncnn-vulkan); vcomp140.dll: Microsoft Visual C++ redistributable", "status": "known" },
     { "program": "qnc-ai-server", "beside": [], "licence": "QNC", "status": "known" },
@@ -16,7 +16,9 @@
     { "file": "sherpa-onnx-c-api.dll", "licence": "Apache-2.0 (k2-fsa/sherpa-onnx)" },
     { "file": "onnxruntime.dll", "licence": "MIT (Microsoft ONNX Runtime)" },
     { "file": "onnxruntime_providers_shared.dll", "licence": "MIT (Microsoft ONNX Runtime)" },
-    { "file": "vcomp140.dll", "licence": "Microsoft Visual C++ redistributable" }
+    { "file": "vcomp140.dll", "licence": "Microsoft Visual C++ redistributable" },
+    { "file": "directml/onnxruntime.dll", "licence": "MIT (Microsoft ONNX Runtime, DirectML build 1.22.0)" },
+    { "file": "directml/DirectML.dll", "licence": "Microsoft DirectML licence (Microsoft.AI.DirectML 1.15.4, redistributable)" }
   ],
   "models": [
     { "model": "siglip2-base-patch16-224", "licence": "Apache-2.0", "source": "https://huggingface.co/google/siglip2-base-patch16-224", "attribution": "Google", "status": "known" },
