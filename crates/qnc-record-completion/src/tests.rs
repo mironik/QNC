@@ -200,8 +200,17 @@ fn a_probe_that_ran_out_of_time_is_taken_again() {
 }
 
 #[test]
-fn a_probe_that_failed_on_the_medium_is_never_run_again() {
+fn a_probe_that_ffprobe_ended_with_an_error_is_taken_again() {
+    // Under a full card copy ffprobe ended with an error on good clips (user 2026-11-18).
     let (done, left) = run_with_first_failure(qnc_media_probe::Error::Failed);
+    assert_eq!(done.completed.len(), 2, "{:?}", done.failed);
+    assert!(done.failed.is_empty());
+    assert_eq!(left, 0);
+}
+
+#[test]
+fn a_probe_whose_output_was_no_record_is_never_run_again() {
+    let (done, left) = run_with_first_failure(qnc_media_probe::Error::InvalidOutput);
     assert!(done.completed.is_empty());
     assert_eq!(done.failed.len(), 2);
     assert_eq!(left, 2, "the records stay camera records");
